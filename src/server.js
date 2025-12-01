@@ -7,7 +7,7 @@ const authRoutes = require('./routes/auth');
 app.use(express.json());
 
 
-app.use('/api/auth', authRoutes);
+app.use('/auth', authRoutes);
 
 
 app.get('/', (req, res) => res.send('Auth API is running'));
