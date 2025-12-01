@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { body } = require('express-validator');
-const { register, login } = require('../controllers/authController');
+const { register, login, verifyOtp } = require('../controllers/authController');
 
 
 // POST /api/auth/register
@@ -14,9 +14,12 @@ router.post('/register', [
 
 // POST /api/auth/login
 router.post('/login', [
-    body('username').notEmpty().withMessage('Username required'),
-    body('password').notEmpty().withMessage('password required')
+    body('mobile').notEmpty().withMessage('mobile required')
 ], login);
 
+router.post('/verifyOtP', [
+    body('mobile').notEmpty().withMessage('mobile required'),
+    body('otp').notEmpty().withMessage('otp required')
+], verifyOtp);
 
 module.exports = router;
