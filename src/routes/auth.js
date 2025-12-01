@@ -14,7 +14,7 @@ router.post('/register', [
 
 // POST /api/auth/login
 router.post('/login', [
-    body('emailOrUsername').notEmpty().withMessage('emailOrUsername required'),
+    body('username').notEmpty().withMessage('Username required'),
     body('password').notEmpty().withMessage('password required')
 ], login);
 
