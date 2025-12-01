@@ -1,0 +1,9 @@
+node_modules/
+package-lock.json
+.env
+public/
+image/
+
+
+
+i have ecoomerce dashbord where seller can connect different ecoomernce platfor like flipkar, mesho and they can manage all stock, products and order from our platforms. so for that we have to connect sellers flipkart account with our website and get all credentials from there and after that using this credentials we have to fetch all orders and product from flipkart. I have used nodejs and reactjs in my website so how can i do this please give me node and react code or apis
