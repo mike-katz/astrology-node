@@ -12,7 +12,7 @@ async function addReview(req, res) {
             .where('panditId', panditId)
             .first();
         console.log("user", user);
-        // if (user) return res.status(400).json({ success: true, message: 'You already follow this pandit' });
+        // if (user) return res.status(400).json({ success: false, message: 'You already follow this pandit' });
         if (!user) {
             await db('reviews').insert({ userId: req?.userId, panditId, message, rating, type: "user" });
         }

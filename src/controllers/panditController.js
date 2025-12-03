@@ -58,4 +58,48 @@ async function onboard(req, res) {
     }
 }
 
-module.exports = { getPandits, onboard, signup, verifyOtp };
+async function reSendOtp(req, res) {
+    try {
+        const { mobile, countryCode } = req.body;
+        if (!mobile || !countryCode) return res.status(400).json({ success: false, message: 'Mobile number required.' });
+
+        const latestRecord = await db('otpmanages').where('mobile', mobile).where('countryCode', countryCode).first();
+        const update = {};
+        let response = {
+            return: true,
+            message: 'Message sent successfully',
+        };
+        if (latestRecord) {
+            const currentDate = new Date();
+            if (latestRecord?.sendattempt === 3 && latestRecord?.sendexpiry > new Date()) {
+                response.return = false;
+                response.message = 'Your otp attempt is over. Please try after sometimes.';
+                // return response;
+                return res.status(400).json({ success: response?.return, message: response?.message });
+            }
+            if (latestRecord.sendattempt < 3) {
+                update.sendattempt = latestRecord.sendattempt + 1;
+            } else {
+                update.sendattempt = 1;
+            }
+            update.sendexpiry = new Date(currentDate.getTime() + 4 * 60 * 60 * 1000);
+        }
+        // const OTP = Math.floor(1000 + Math.random() * 9000);
+        const OTP = Math.floor(1000 + Math.random() * 9000);
+
+        await db('otpmanages').where('mobile', mobile).where('countryCode', countryCode).del();
+        await db('otpmanages').insert({
+            'mobile': mobile, countryCode, otp: '1234', sendattempt: update.sendattempt || 1,
+            sendexpiry: update.sendexpiry || new Date(new Date().getTime() + 4 * 60 * 60 * 1000)
+        })
+        response.return = true;
+        response.message = 'OTP Send successful.';
+        // });
+        return res.status(200).json({ success: response?.return, message: response?.message });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
+module.exports = { getPandits, onboard, signup, verifyOtp, reSendOtp };

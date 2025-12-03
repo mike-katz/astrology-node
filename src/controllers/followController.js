@@ -13,7 +13,7 @@ async function addFollow(req, res) {
             .where('type', 'user')
             .first();
         console.log("user", user);
-        if (user) return res.status(400).json({ success: true, message: 'You already follow this pandit' });
+        if (user) return res.status(400).json({ success: false, message: 'You already follow this pandit' });
         if (!user) {
             await db('follows').insert({ userId: req?.userId, panditId, type: "user" });
         }

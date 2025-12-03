@@ -1,9 +1,10 @@
 const express = require('express');
 const router = express.Router();
-const { getPandits, onboard, signup, verifyOtp } = require('../controllers/panditController');
+const pandits = require('../controllers/panditController');
 
-router.get('/', getPandits);
-router.post('/signup', signup);
-router.post('/verifyOtp', verifyOtp);
-router.post('/onboard', onboard);
+router.get('/', pandits.getPandits);
+router.post('/signup', pandits.signup);
+router.post('/verifyOtp', pandits.verifyOtp);
+router.post('/reSendOtp', pandits.reSendOtp);
+router.post('/onboard', pandits.onboard);
 module.exports = router;
