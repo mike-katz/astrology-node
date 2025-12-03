@@ -38,7 +38,7 @@ async function register(req, res) {
 async function login(req, res) {
     try {
         const { mobile } = req.body;
-        if (!mobile) return res.status(400).json({ message: 'Mobile number required.' });
+        if (!mobile) return res.status(400).json({ success: false, message: 'Mobile number required.' });
         const user = await db('users').where(function () {
             this.where('mobile', mobile);
         }).first();
@@ -46,10 +46,10 @@ async function login(req, res) {
         if (!user) {
             await db('users').insert({ mobile, otp: '1234' }).returning(['id', 'mobile', 'otp']);
         }
-        return res.status(200).json({ message: 'Otp Send Successfully' });
+        return res.status(200).json({ success: true, message: 'Otp Send Successfully' });
     } catch (err) {
         console.error(err);
-        res.status(500).json({ message: 'Server error' });
+        res.status(500).json({ success: false, message: 'Server error' });
     }
 }
 
@@ -57,21 +57,21 @@ async function verifyOtp(req, res) {
     try {
 
         const { mobile, otp } = req.body;
-        if (!mobile || !otp) return res.status(400).json({ message: 'Mobile number and otp required.' });
+        if (!mobile || !otp) return res.status(400).json({ success: false, message: 'Mobile number and otp required.' });
 
         const user = await db('users').where(function () {
             this.where('mobile', mobile);
         }).first();
 
         const existing = await db('users').where('mobile', mobile).where('otp', otp).first();
-        if (!existing) return res.status(409).json({ message: 'Wrong Otp' });
+        if (!existing) return res.status(400).json({ success: false, message: 'Wrong Otp' });
 
         const token = jwt.sign({ id: user.id, mobile: user.mobile }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '1h' });
         // hide password
-        res.json({ user, token });
+        return res.status(200).json({ success: true, data: { user, token }, message: 'Otp Verify Successfully' });
     } catch (err) {
         console.error(err);
-        res.status(500).json({ message: 'Server error' });
+        res.status(500).json({ success: false, message: 'Server error' });
     }
 }
 module.exports = { register, login, verifyOtp };
