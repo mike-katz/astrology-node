@@ -26,12 +26,37 @@ async function signup(req, res) {
 }
 
 async function verifyOtp(req, res) {
+    const response = {};
     try {
         const { mobile, countryCode, otp } = req.body;
         if (!mobile || !countryCode || !otp) return res.status(400).json({ success: false, message: 'Mobile number and otp required.' });
 
-        const existing = await db('otpmanages').where('mobile', mobile).where('otp', otp).first();
-        if (!existing) return res.status(400).json({ success: false, message: 'Wrong Otp' });
+        const latestRecord = await db('otpmanages').where('mobile', mobile).where('otp', otp).first();
+        if (!latestRecord) return res.status(400).json({ success: false, message: 'Wrong Otp' });
+
+        const currentDate = new Date();
+        if (latestRecord.attempt === 3 && latestRecord.expiry > new Date()) {
+            response.return = false;
+            response.message = 'Your otp attempt is over. Please try after sometimes.';
+            return res.status(400).json({ success: true, data: null, message: response?.message });
+        }
+
+        const update = {};
+        if (latestRecord.attempt < 3) {
+            update.attempt = latestRecord.attempt + 1;
+        } else {
+            update.attempt = 1;
+        }
+        response.return = true;
+        response.message = 'OTP Matched Successfully!';
+
+        update.expiry = new Date(currentDate.getTime() + 4 * 60 * 60 * 1000);
+        update.attempt = 0;
+        update.expiry = null;
+
+        await db('otpmanages')
+            .where('id', latestRecord?.id)
+            .update(update);
 
         return res.status(200).json({ success: true, data: null, message: 'Otp Verify Successfully' });
     } catch (err) {
