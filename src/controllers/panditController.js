@@ -4,7 +4,7 @@ require('dotenv').config();
 async function getPandits(req, res) {
     const user = await db('pandits');
     console.log("user", user);
-    return res.status(200).json({ data: user, message: 'Login success' });
+    return res.status(200).json({ success: true, data: user, message: 'Login success' });
 }
 
 async function signup(req, res) {
