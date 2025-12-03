@@ -3,10 +3,9 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 require('dotenv').config();
 const { validationResult } = require('express-validator');
-
+const { encrypt } = require("../utils/crypto")
 
 const SALT_ROUNDS = parseInt(process.env.BCRYPT_SALT_ROUNDS || '12', 10);
-
 
 async function register(req, res) {
     try {
@@ -66,9 +65,10 @@ async function verifyOtp(req, res) {
         const existing = await db('users').where('mobile', mobile).where('otp', otp).first();
         if (!existing) return res.status(400).json({ success: false, message: 'Wrong Otp' });
 
-        const token = jwt.sign({ id: user.id, mobile: user.mobile }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '1h' });
+        const token = jwt.sign({ userId: user.id, mobile: user.mobile }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '1h' });
         // hide password
-        return res.status(200).json({ success: true, data: { user, token }, message: 'Otp Verify Successfully' });
+        const encryptToken = encrypt(token);
+        return res.status(200).json({ success: true, data: { id: user?.id, token: encryptToken }, message: 'Otp Verify Successfully' });
     } catch (err) {
         console.error(err);
         res.status(500).json({ success: false, message: 'Server error' });

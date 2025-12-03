@@ -1,22 +1,36 @@
 const jwt = require('jsonwebtoken');
 require('dotenv').config();
+const { decrypt } = require("../utils/crypto")
 
 
 module.exports = function (req, res, next) {
     const authHeader = req.headers.authorization;
-    if (!authHeader) return res.status(401).json({ message: 'Missing Authorization header' });
+    console.log("authHeader", authHeader);
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res
+            .status(401)
+            .json({ message: 'Unauthorized: Missing or invalid token' });
+    }
 
+    const token = authHeader.split(' ')[1];
 
-    const parts = authHeader.split(' ');
-    if (parts.length !== 2 || parts[0] !== 'Bearer') return res.status(401).json({ message: 'Invalid Authorization format' });
-
-
-    const token = parts[1];
     try {
-        const payload = jwt.verify(token, process.env.JWT_SECRET);
-        req.user = payload; // contains id
+        const decryptToken = decrypt(token);
+        console.log("decryptToken", decryptToken);
+        const verified = jwt.verify(decryptToken, process.env.JWT_SECRET);
+        console.log("verified", verified);
+        if (!verified) {
+            return res
+                .status(401)
+                .json({ message: 'Unauthorized: Missing or invalid token' });
+        }
+        req.user = verified?.username
+        req.userId = verified?.userId
         next();
-    } catch (err) {
-        return res.status(401).json({ message: 'Invalid or expired token' });
+    } catch (error) {
+        console.error('Error in authenticateJWT:', error);
+        return res
+            .status(401)
+            .json({ message: 'Unauthorized: Missing or invalid token' });
     }
 };
