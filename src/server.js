@@ -2,10 +2,13 @@ require('dotenv').config();
 const express = require('express');
 const app = express();
 const authRoutes = require('./routes/auth');
-
+const { decryptRequest } = require('./middleware/decryptRequest.js');
+const { encryptResponse } = require('./middleware/encryptResponse.js')
 
 app.use(express.json());
 
+app.use(decryptRequest);
+app.use(encryptResponse);
 
 app.use('/auth', authRoutes);
 

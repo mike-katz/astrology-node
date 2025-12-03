@@ -37,10 +37,8 @@ async function register(req, res) {
 
 async function login(req, res) {
     try {
-        const errors = validationResult(req);
-        if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
-
         const { mobile } = req.body;
+        if (!mobile) return res.status(400).json({ message: 'Mobile number required.' });
         const user = await db('users').where(function () {
             this.where('mobile', mobile);
         }).first();
@@ -57,10 +55,10 @@ async function login(req, res) {
 
 async function verifyOtp(req, res) {
     try {
-        const errors = validationResult(req);
-        if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
         const { mobile, otp } = req.body;
+        if (!mobile || !otp) return res.status(400).json({ message: 'Mobile number and otp required.' });
+
         const user = await db('users').where(function () {
             this.where('mobile', mobile);
         }).first();

@@ -13,13 +13,8 @@ router.post('/register', [
 
 
 // POST /api/auth/login
-router.post('/login', [
-    body('mobile').notEmpty().withMessage('mobile required')
-], login);
+router.post('/login', login);
 
-router.post('/verifyOtP', [
-    body('mobile').notEmpty().withMessage('mobile required'),
-    body('otp').notEmpty().withMessage('otp required')
-], verifyOtp);
+router.post('/verifyOtP', verifyOtp);
 
 module.exports = router;
