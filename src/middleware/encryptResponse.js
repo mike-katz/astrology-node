@@ -12,8 +12,8 @@ const encryptResponse = (req, res, next) => {
       const statusCode = res.statusCode;
       const responseBody = JSON.stringify({
         success: statusCode === 200,
-        data: statusCode === 200 ? body : null,
-        error: statusCode !== 200 ? body : null,
+        data: statusCode === 200 ? body.data : null,
+        message: body.message || null,
       });
 
       return originalSend.call(this, responseBody);
