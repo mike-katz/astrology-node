@@ -12,7 +12,7 @@ const decryptRequest = (req, res, next) => {
     if (req.body.payload) {
       req.body = req.body.payload;
     } else if (req.query) {
-      req.body = req.query;
+      req.query = req.query;
     }
 
     return next();

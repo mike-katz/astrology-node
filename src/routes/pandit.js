@@ -3,6 +3,7 @@ const router = express.Router();
 const pandits = require('../controllers/panditController');
 
 router.get('/', pandits.getPandits);
+router.get('/detail', pandits.getPanditDetail);
 router.post('/signup', pandits.signup);
 router.post('/verifyOtp', pandits.verifyOtp);
 router.post('/reSendOtp', pandits.reSendOtp);

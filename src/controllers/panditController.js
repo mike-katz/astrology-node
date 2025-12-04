@@ -4,7 +4,14 @@ require('dotenv').config();
 async function getPandits(req, res) {
     const user = await db('pandits');
     console.log("user", user);
-    return res.status(200).json({ success: true, data: user, message: 'Login success' });
+    return res.status(200).json({ success: true, data: user, message: 'List success' });
+}
+async function getPanditDetail(req, res) {
+    const { id } = req.query;
+    const user = await db('pandits').where('id', id).first();
+    console.log("user", user);
+    delete user.balance
+    return res.status(200).json({ success: true, data: user, message: 'Detail success' });
 }
 
 async function signup(req, res) {
@@ -133,4 +140,4 @@ async function reSendOtp(req, res) {
     }
 }
 
-module.exports = { getPandits, onboard, signup, verifyOtp, reSendOtp };
+module.exports = { getPandits, onboard, signup, verifyOtp, reSendOtp, getPanditDetail };
