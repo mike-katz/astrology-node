@@ -45,4 +45,17 @@ async function addReplay(req, res) {
     }
 }
 
-module.exports = { addReview, addReplay };
+async function getList(req, res) {
+    try {
+        const { panditId } = req.query;
+        if (!panditId) return res.status(400).json({ success: false, message: 'Please enter pandit.' });
+        const user = await db('reviews')
+            .where('panditId', panditId).select('id', 'message', 'rating');
+        return res.status(200).json({ success: true, data: user, message: 'Review get Successfully' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
+module.exports = { addReview, addReplay, getList };

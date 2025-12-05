@@ -121,6 +121,21 @@ async function onboard(req, res) {
     try {
         const { name, dob, gender, phone_type, email, mobile, countryCode, languages, skills } = req.body;
         if (!mobile || !countryCode) return res.status(400).json({ success: false, message: 'Mobile number required.' });
+
+        const skill = ["signature_reading", "vedic", "tarot", "kp", "numerology", "lal_kitab", "psychic", "palmistry", "cartomancy", "prashana", "loshu_grid", "nadi", "face_reading", "horary", "life_coach", "western", "gemology", "vastu"]
+
+        const language = ["english", "hindi", "tamil", "panjabi", "marathi", "gujarati", "bangali", "french", "odia", "telugu", "kannada", "malayalam", "sanskrit", "assamese", "german", "spanish", "marwari", "manipuri", "urdu", "sindhi", "kashmiri", "bodo", "nepali", "konkani", "maithili", "arabic", "bhojpuri", "dutch", "rajasthanii"]
+
+        const selected = languages.split(",").map(l => l.trim());  // ["english", "hindi"]
+
+        const isValidLanguage = selected.every(l => language.includes(l));
+
+        const selectedskill = skills.split(",").map(l => l.trim());  // ["english", "hindi"]
+
+        const isValidSkill = selectedskill.every(l => skill.includes(l));
+
+        if (!isValidLanguage) return res.status(400).json({ success: false, message: 'enter valid languages.' });
+        if (!isValidSkill) return res.status(400).json({ success: false, message: 'enter valid skills.' });
         const user = await db('onboardings').where(function () {
             this.where('mobile', mobile);
         }).first();
@@ -128,16 +143,16 @@ async function onboard(req, res) {
         // profile_image
         const { file } = req
         const ins = { name, dob, gender, email, mobile, countryCode }
-        console.log("Array.isArray(phone_type)", Array.isArray(phone_type));
-        console.log("Array.isArray(phone_type)", phone_type?.length);
-        if (Array.isArray(phone_type) && phone_type?.length > 0) {
-            ins.phone_type = phone_type ? JSON.stringify(phone_type) : {}
+
+        if (phone_type) {
+            const selected = phone_type.split(",").map(l => l.trim());
+            ins.phone_type = phone_type ? JSON.stringify(selected) : {}
         }
-        if (Array.isArray(languages) && languages?.length > 0) {
-            ins.language = languages ? JSON.stringify(languages) : {}
+        if (Array.isArray(selectedskill) && selectedskill?.length > 0) {
+            ins.language = selectedskill ? JSON.stringify(selectedskill) : {}
         }
-        if (Array.isArray(skills) && skills?.length > 0) {
-            ins.skill = skills ? JSON.stringify(skills) : {}
+        if (Array.isArray(selectedskill) && selectedskill?.length > 0) {
+            ins.skill = selectedskill ? JSON.stringify(selectedskill) : {}
         }
 
         if (file) {
