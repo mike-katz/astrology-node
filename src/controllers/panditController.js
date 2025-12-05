@@ -36,9 +36,22 @@ async function getPanditDetail(req, res) {
     const { id } = req.query;
     const user = await db('pandits').where('id', id).first();
     if (!user) return res.status(400).json({ success: false, message: 'pandit not available.' });
-    const review = await db('reviews').where('panditId', id)
-        .orderBy('created_at', 'desc')
+    const review = await db('reviews as r')
+        .leftJoin('users as u', 'u.id', 'r.userId')
+        .select(
+            "r.id",
+            "r.message",
+            "r.rating",
+            "r.replay",
+            "r.created_at",
+            "u.name",
+            "u.profile",
+        )
+        .where('r.panditId', id)
+        .orderBy('r.created_at', 'desc')
         .limit(3);
+
+    console.log("review", review);
     const response = {
         id: user?.id,
         name: user?.name,
@@ -237,7 +250,17 @@ async function getReviewList(req, res) {
         const { panditId } = req.query;
         if (!panditId) return res.status(400).json({ success: false, message: 'Please enter pandit.' });
         const user = await db('reviews')
-            .where('panditId', panditId).select('id', 'message', 'rating');
+            .leftJoin('users as u', 'u.id', 'r.userId')
+            .select(
+                "r.id",
+                "r.message",
+                "r.rating",
+                "r.replay",
+                "r.created_at",
+                "u.name",
+                "u.profile",
+            )
+            .where('panditId', panditId);
         return res.status(200).json({ success: true, data: user, message: 'Review get Successfully' });
     } catch (err) {
         console.error(err);
