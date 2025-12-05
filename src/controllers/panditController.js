@@ -1,5 +1,6 @@
 const db = require('../db');
 require('dotenv').config();
+const { uploadImageTos3 } = require('./uploader');
 
 async function getPandits(req, res) {
     const user = await db('pandits as p')
@@ -30,6 +31,7 @@ async function getPandits(req, res) {
     console.log("user", user);
     return res.status(200).json({ success: true, data: user, message: 'List success' });
 }
+
 async function getPanditDetail(req, res) {
     const { id } = req.query;
     const user = await db('pandits').where('id', id).first();
@@ -117,14 +119,34 @@ async function verifyOtp(req, res) {
 
 async function onboard(req, res) {
     try {
-        const { name, dob, gender, language, skill, isAndroid, email, mobile, countryCode } = req.body;
+        const { name, dob, gender, phone_type, email, mobile, countryCode, languages, skills } = req.body;
         if (!mobile || !countryCode) return res.status(400).json({ success: false, message: 'Mobile number required.' });
         const user = await db('onboardings').where(function () {
             this.where('mobile', mobile);
         }).first();
         if (user) return res.status(400).json({ message: 'Mobile number already exist.' });
+        // profile_image
+        const { file } = req
+        const ins = { name, dob, gender, email, mobile, countryCode }
+        console.log("Array.isArray(phone_type)", Array.isArray(phone_type));
+        console.log("Array.isArray(phone_type)", phone_type?.length);
+        if (Array.isArray(phone_type) && phone_type?.length > 0) {
+            ins.phone_type = phone_type ? JSON.stringify(phone_type) : {}
+        }
+        if (Array.isArray(languages) && languages?.length > 0) {
+            ins.language = languages ? JSON.stringify(languages) : {}
+        }
+        if (Array.isArray(skills) && skills?.length > 0) {
+            ins.skill = skills ? JSON.stringify(skills) : {}
+        }
+
+        if (file) {
+            const image = await uploadImageTos3('profile_image', file, 'pandit');
+            console.log("image", image.data.Location);
+            ins.profile_image = image.data.Location;
+        }
         if (!user) {
-            await db('onboardings').insert({ name, dob, gender, language: language ? JSON.stringify(language) : {}, skill: skill ? JSON.stringify(skill) : {}, isAndroid, email, mobile, countryCode }).returning(['id', 'mobile']);
+            await db('onboardings').insert(ins).returning(['id', 'mobile']);
         }
         return res.status(200).json({ success: true, message: 'Onboard Successfully' });
     } catch (err) {

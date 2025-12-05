@@ -2,6 +2,9 @@ const { decrypt } = require('../utils/crypto.js');
 require('dotenv').config();
 
 const decryptRequest = (req, res, next) => {
+  if (req.file) {
+    return next();
+  }
   if (process.env.isTest === 'true') {
     if (Object.keys(req.body).length > 1) {
       return res.status(400).json({
