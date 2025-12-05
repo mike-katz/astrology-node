@@ -12,8 +12,16 @@ async function addFollow(req, res) {
             .where('panditId', panditId)
             .where('type', 'user')
             .first();
-        console.log("user", user);
-        if (user) return res.status(400).json({ success: false, message: 'You already follow this pandit' });
+        if (user) {
+            await db('follows')
+                .where({
+                    userId: req?.userId,
+                    panditId,
+                    type: "user"
+                })
+                .del();
+            return res.status(400).json({ success: false, message: 'UnFollow successful' });
+        }
         if (!user) {
             await db('follows').insert({ userId: req?.userId, panditId, type: "user" });
         }
@@ -24,4 +32,23 @@ async function addFollow(req, res) {
     }
 }
 
-module.exports = { addFollow };
+async function getFollow(req, res) {
+    const user = await db('follows as f')
+        .leftJoin('pandits as p', 'p.id', 'f.panditId')
+        .select(
+            "r.id",
+            "r.message",
+            "r.rating",
+            "r.replay",
+            "r.created_at",
+            "p.name",
+            "p.profile",
+            "p.knowledge",
+            "p.language",
+            "p.experience",
+        )
+        .where('f.userId', req?.userId);
+    return res.status(200).json({ success: true, data: user, message: 'Follow get Successfully' });
+}
+
+module.exports = { addFollow, getFollow };
