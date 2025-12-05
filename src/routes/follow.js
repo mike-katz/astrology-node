@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { addFollow } = require('../controllers/followController');
+const { addFollow, getFollow } = require('../controllers/followController');
 
 router.post('/', addFollow);
 router.get('/', getFollow);
