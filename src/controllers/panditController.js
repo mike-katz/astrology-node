@@ -12,6 +12,7 @@ async function getPandits(req, res) {
             'p.language',
             'p.experience',
             'p.profile',
+            'p.availableFor',
             'p.charge',
             db.raw(`
             COALESCE(
@@ -59,6 +60,7 @@ async function getPanditDetail(req, res) {
         language: user?.language,
         experience: user?.experience,
         profile: user?.profile,
+        availableFor: user?.availableFor,
         charge: user?.charge,
         isverified: user?.isverified,
         reviews: review,
