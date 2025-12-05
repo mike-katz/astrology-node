@@ -139,7 +139,6 @@ async function onboard(req, res) {
         if (!mobile || !countryCode || !dob) return res.status(400).json({ success: false, message: 'Mobile number required.' });
 
         const isAbove18 = is18OrAbove(dob)
-        console.log("isAbove18", isAbove18);
         if (!isAbove18) return res.status(400).json({ success: false, message: 'You are not a 18+ year.' });
         const skill = ["signature_reading", "vedic", "tarot", "kp", "numerology", "lal_kitab", "psychic", "palmistry", "cartomancy", "prashana", "loshu_grid", "nadi", "face_reading", "horary", "life_coach", "western", "gemology", "vastu"]
 
@@ -233,4 +232,17 @@ async function reSendOtp(req, res) {
     }
 }
 
-module.exports = { getPandits, onboard, signup, verifyOtp, reSendOtp, getPanditDetail };
+async function getReviewList(req, res) {
+    try {
+        const { panditId } = req.query;
+        if (!panditId) return res.status(400).json({ success: false, message: 'Please enter pandit.' });
+        const user = await db('reviews')
+            .where('panditId', panditId).select('id', 'message', 'rating');
+        return res.status(200).json({ success: true, data: user, message: 'Review get Successfully' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
+module.exports = { getPandits, onboard, signup, verifyOtp, reSendOtp, getPanditDetail, getReviewList };

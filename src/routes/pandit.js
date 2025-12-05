@@ -12,5 +12,6 @@ router.post('/signup', pandits.signup);
 router.post('/verifyOtp', pandits.verifyOtp);
 router.post('/reSendOtp', pandits.reSendOtp);
 router.post('/onboard', singleImageUpload.single('profile_image'), pandits.onboard);
+router.get('/reviewList', pandits.getReviewList);
 
 module.exports = router;
