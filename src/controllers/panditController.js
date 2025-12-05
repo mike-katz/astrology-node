@@ -117,11 +117,30 @@ async function verifyOtp(req, res) {
     }
 }
 
+function is18OrAbove(dobString) {
+    const dob = new Date(dobString);
+    const today = new Date();
+
+    const age = today.getFullYear() - dob.getFullYear();
+    const monthDiff = today.getMonth() - dob.getMonth();
+    const dayDiff = today.getDate() - dob.getDate();
+
+    // If birthday hasn't occurred yet this year, subtract 1 age
+    const realAge = (monthDiff < 0 || (monthDiff === 0 && dayDiff < 0))
+        ? age - 1
+        : age;
+
+    return realAge >= 18;
+}
+
 async function onboard(req, res) {
     try {
         const { name, dob, gender, phone_type, email, mobile, countryCode, languages, skills } = req.body;
-        if (!mobile || !countryCode) return res.status(400).json({ success: false, message: 'Mobile number required.' });
+        if (!mobile || !countryCode || !dob) return res.status(400).json({ success: false, message: 'Mobile number required.' });
 
+        const isAbove18 = is18OrAbove(dob)
+        console.log("isAbove18", isAbove18);
+        if (!isAbove18) return res.status(400).json({ success: false, message: 'You are not a 18+ year.' });
         const skill = ["signature_reading", "vedic", "tarot", "kp", "numerology", "lal_kitab", "psychic", "palmistry", "cartomancy", "prashana", "loshu_grid", "nadi", "face_reading", "horary", "life_coach", "western", "gemology", "vastu"]
 
         const language = ["english", "hindi", "tamil", "panjabi", "marathi", "gujarati", "bangali", "french", "odia", "telugu", "kannada", "malayalam", "sanskrit", "assamese", "german", "spanish", "marwari", "manipuri", "urdu", "sindhi", "kashmiri", "bodo", "nepali", "konkani", "maithili", "arabic", "bhojpuri", "dutch", "rajasthanii"]
@@ -148,8 +167,8 @@ async function onboard(req, res) {
             const selected = phone_type.split(",").map(l => l.trim());
             ins.phone_type = phone_type ? JSON.stringify(selected) : {}
         }
-        if (Array.isArray(selectedskill) && selectedskill?.length > 0) {
-            ins.language = selectedskill ? JSON.stringify(selectedskill) : {}
+        if (Array.isArray(selected) && selected?.length > 0) {
+            ins.language = selected ? JSON.stringify(selected) : {}
         }
         if (Array.isArray(selectedskill) && selectedskill?.length > 0) {
             ins.skill = selectedskill ? JSON.stringify(selectedskill) : {}
