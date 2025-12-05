@@ -33,9 +33,22 @@ async function getPandits(req, res) {
 async function getPanditDetail(req, res) {
     const { id } = req.query;
     const user = await db('pandits').where('id', id).first();
-    console.log("user", user);
-    delete user.balance
-    return res.status(200).json({ success: true, data: user, message: 'Detail success' });
+    if (!user) return res.status(400).json({ success: false, message: 'pandit not available.' });
+    const review = await db('reviews').where('panditId', id)
+        .orderBy('created_at', 'desc')
+        .limit(3);
+    const response = {
+        id: user?.id,
+        name: user?.name,
+        knowledge: user?.knowledge,
+        language: user?.language,
+        experience: user?.experience,
+        profile: user?.profile,
+        charge: user?.charge,
+        isverified: user?.isverified,
+        reviews: review,
+    }
+    return res.status(200).json({ success: true, data: response, message: 'Detail success' });
 }
 
 async function signup(req, res) {
