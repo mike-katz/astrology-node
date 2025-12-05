@@ -249,7 +249,7 @@ async function getReviewList(req, res) {
     try {
         const { panditId } = req.query;
         if (!panditId) return res.status(400).json({ success: false, message: 'Please enter pandit.' });
-        const user = await db('reviews')
+        const user = await db('reviews as r')
             .leftJoin('users as u', 'u.id', 'r.userId')
             .select(
                 "r.id",
@@ -260,7 +260,8 @@ async function getReviewList(req, res) {
                 "u.name",
                 "u.profile",
             )
-            .where('panditId', panditId);
+            .where('r.panditId', panditId);
+
         return res.status(200).json({ success: true, data: user, message: 'Review get Successfully' });
     } catch (err) {
         console.error(err);
