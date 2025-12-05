@@ -2,7 +2,30 @@ const db = require('../db');
 require('dotenv').config();
 
 async function getPandits(req, res) {
-    const user = await db('pandits');
+    const user = await db('pandits as p')
+        .leftJoin('reviews as r', 'p.id', 'r.panditId')
+        .select(
+            'p.name',
+            'p.knowledge',
+            'p.language',
+            'p.experience',
+            'p.profile',
+            'p.charge',
+            db.raw(`
+            COALESCE(
+              json_agg(
+                json_build_object(
+                  'id', r.id,
+                  'rating', r.rating,
+                  'message', r.message
+                )
+              ) FILTER (WHERE r.id IS NOT NULL),
+              '[]'
+            ) AS reviews
+          `)
+        ).where('p.status', 'active')
+        .groupBy('p.id')
+        ;
     console.log("user", user);
     return res.status(200).json({ success: true, data: user, message: 'List success' });
 }
