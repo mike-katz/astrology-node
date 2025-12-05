@@ -6,6 +6,7 @@ async function getPandits(req, res) {
         .leftJoin('reviews as r', 'p.id', 'r.panditId')
         .select(
             'p.name',
+            'p.id',
             'p.knowledge',
             'p.language',
             'p.experience',
