@@ -1,0 +1,57 @@
+const db = require('../db');
+
+require('dotenv').config();
+
+async function getProfile(req, res) {
+    const user = await db('users')
+        .where('id', req?.userId)
+        .first();
+    if (!user) return res.status(400).json({ success: false, message: 'Please enter correct user.' });
+    return res.status(200).json({ success: true, data: user, message: 'Profile get Successfully' });
+}
+
+async function updateProfile(req, res) {
+    try {
+        const { name, gender, dob, birthTime = '12:00 AM', birthPlace, currentAddress, city, pincode } = req.body;
+        if (!name) return res.status(400).json({ success: false, message: 'Please enter name.' });
+        const user = await db('users')
+            .where('id', req?.userId)
+            .first();
+        if (!user) return res.status(400).json({ success: false, message: 'Please enter correct user.' });
+        const update = {}
+        if (name) {
+            update.name = name
+        }
+        if (gender) {
+            update.gender = gender
+        }
+        if (dob) {
+            update.dob = dob
+        }
+        if (birthTime) {
+            update.birthTime = birthTime
+        }
+        if (birthPlace) {
+            update.birthPlace = birthPlace
+        }
+        if (currentAddress) {
+            update.currentAddress = currentAddress
+        }
+        if (city) {
+            update.city = city
+        }
+        if (pincode) {
+            update.pincode = pincode
+        }
+        await db('users')
+            .where('id', user?.id)
+            .update(update);
+
+        return res.status(200).json({ success: true, message: 'Profile update Successfully' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
+module.exports = { updateProfile, getProfile };

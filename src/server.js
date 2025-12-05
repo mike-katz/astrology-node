@@ -7,6 +7,7 @@ const authRoutes = require('./routes/auth');
 const panditRoutes = require('./routes/pandit');
 const followRoutes = require('./routes/follow');
 const reviewRoutes = require('./routes/review');
+const userRoutes = require('./routes/user');
 
 const { decryptRequest } = require('./middleware/decryptRequest.js');
 const { encryptResponse } = require('./middleware/encryptResponse.js')
@@ -20,6 +21,7 @@ app.use('/auth', authRoutes);
 app.use('/pandit', panditRoutes);
 app.use(auth)
 
+app.use('/user', userRoutes);
 app.use('/follow', followRoutes);
 app.use('/review', reviewRoutes);
 
