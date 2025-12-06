@@ -27,16 +27,7 @@ const decryptRequest = (req, res, next) => {
         message: 'Unauthorized request. Only payload key is allowed.',
       });
     }
-    if (req.method === 'GET' && !req.query.payload) {
-      return res.status(400).json({
-        message: 'Unauthorized request. Only payload key is allowed.',
-      });
-    }
-    if (req.method === 'POST' && !req.body.payload) {
-      return res.status(400).json({
-        message: 'Unauthorized request. Only payload key is allowed.',
-      });
-    }
+
     if (req.body.payload) {
       req.body = JSON.parse(decrypt(req.body.payload));
     } else if (req.query.payload) {
