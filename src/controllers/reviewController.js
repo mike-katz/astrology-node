@@ -48,10 +48,31 @@ async function addReplay(req, res) {
 async function getList(req, res) {
     try {
         const { panditId } = req.query;
+        let page = parseInt(req.query.page) || 1;
+        let limit = parseInt(req.query.limit) || 100;
+
+        if (page < 1) page = 1;
+        if (limit < 1) limit = 100;
+        const offset = (page - 1) * limit;
+
         if (!panditId) return res.status(400).json({ success: false, message: 'Please enter pandit.' });
         const user = await db('reviews')
-            .where('panditId', panditId).select('id', 'message', 'rating');
-        return res.status(200).json({ success: true, data: user, message: 'Review get Successfully' });
+            .where('panditId', panditId).select('id', 'message', 'rating').limit(limit)
+            .offset(offset);
+
+        const [{ count }] = await db('reviews')
+            .count('* as count').where('panditId', panditId);
+        const total = parseInt(count);
+        const totalPages = Math.ceil(total / limit);
+
+        const response = {
+            page,
+            limit,
+            total,
+            totalPages,
+            results: user
+        }
+        return res.status(200).json({ success: true, data: response, message: 'Review get Successfully' });
     } catch (err) {
         console.error(err);
         res.status(500).json({ success: false, message: 'Server error' });

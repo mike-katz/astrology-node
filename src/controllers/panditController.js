@@ -266,6 +266,13 @@ async function reSendOtp(req, res) {
 async function getReviewList(req, res) {
     try {
         const { panditId } = req.query;
+        let page = parseInt(req.query.page) || 1;
+        let limit = parseInt(req.query.limit) || 100;
+
+        if (page < 1) page = 1;
+        if (limit < 1) limit = 100;
+        const offset = (page - 1) * limit;
+
         if (!panditId) return res.status(400).json({ success: false, message: 'Please enter pandit.' });
         const user = await db('reviews as r')
             .leftJoin('users as u', 'u.id', 'r.userId')
@@ -278,9 +285,23 @@ async function getReviewList(req, res) {
                 "u.name",
                 "u.profile",
             )
-            .where('r.panditId', panditId);
+            .where('r.panditId', panditId).limit(limit)
+            .offset(offset);
 
-        return res.status(200).json({ success: true, data: user, message: 'Review get Successfully' });
+        const [{ count }] = await db('reviews')
+            .count('* as count').where('panditId', panditId);
+        const total = parseInt(count);
+        const totalPages = Math.ceil(total / limit);
+
+        const response = {
+            page,
+            limit,
+            total,
+            totalPages,
+            results: user
+        }
+
+        return res.status(200).json({ success: true, data: response, message: 'Review get Successfully' });
     } catch (err) {
         console.error(err);
         res.status(500).json({ success: false, message: 'Server error' });
