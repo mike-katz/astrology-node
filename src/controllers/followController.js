@@ -35,7 +35,7 @@ async function addFollow(req, res) {
 async function getFollow(req, res) {
 
     let page = parseInt(req.query.page) || 1;
-    let limit = parseInt(req.query.limit) || 10;
+    let limit = parseInt(req.query.limit) || 100;
 
     if (page < 1) page = 1;
     if (limit < 1) limit = 100;

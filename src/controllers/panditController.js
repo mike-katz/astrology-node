@@ -5,6 +5,14 @@ const { uploadImageTos3 } = require('./uploader');
 const jwt = require('jsonwebtoken');
 
 async function getPandits(req, res) {
+
+    let page = parseInt(req.query.page) || 1;
+    let limit = parseInt(req.query.limit) || 100;
+
+    if (page < 1) page = 1;
+    if (limit < 1) limit = 100;
+    const offset = (page - 1) * limit;
+
     const user = await db('pandits as p')
         .leftJoin('reviews as r', 'p.id', 'r.panditId')
         .select(
@@ -30,9 +38,22 @@ async function getPandits(req, res) {
           `)
         ).where('p.status', 'active')
         .groupBy('p.id')
-        ;
-    console.log("user", user);
-    return res.status(200).json({ success: true, data: user, message: 'List success' });
+        .limit(limit)
+        .offset(offset);
+    const [{ count }] = await db('pandits')
+        .count('* as count').where('status', 'active');
+
+    const total = parseInt(count);
+    const totalPages = Math.ceil(total / limit);
+
+    const response = {
+        page,
+        limit,
+        total,
+        totalPages,
+        results: user
+    }
+    return res.status(200).json({ success: true, data: response, message: 'List success' });
 }
 
 async function getPanditDetail(req, res) {
