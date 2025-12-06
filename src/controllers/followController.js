@@ -36,11 +36,7 @@ async function getFollow(req, res) {
     const user = await db('follows as f')
         .leftJoin('pandits as p', 'p.id', 'f.panditId')
         .select(
-            "r.id",
-            "r.message",
-            "r.rating",
-            "r.replay",
-            "r.created_at",
+            "f.created_at",
             "p.name",
             "p.profile",
             "p.knowledge",
