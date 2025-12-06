@@ -12,7 +12,7 @@ async function getProfile(req, res) {
 
 async function updateProfile(req, res) {
     try {
-        const { name, gender, dob, birthTime = '12:00 AM', birthPlace, currentAddress, city, pincode } = req.body;
+        const { name, gender, dob, birthTime = '12:00 AM', birthPlace, currentAddress, city, pincode, language } = req.body;
         if (!name) return res.status(400).json({ success: false, message: 'Please enter name.' });
         const user = await db('users')
             .where('id', req?.userId)
@@ -43,6 +43,10 @@ async function updateProfile(req, res) {
         if (pincode) {
             update.pincode = pincode
         }
+        if (language?.length > 0) {
+            update.language = language ? JSON.stringify(language) : {}
+        }
+
         await db('users')
             .where('id', user?.id)
             .update(update);
