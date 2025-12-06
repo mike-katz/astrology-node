@@ -1,6 +1,8 @@
 const db = require('../db');
+const { decrypt } = require('../utils/crypto');
 require('dotenv').config();
 const { uploadImageTos3 } = require('./uploader');
+const jwt = require('jsonwebtoken');
 
 async function getPandits(req, res) {
     const user = await db('pandits as p')
@@ -52,7 +54,6 @@ async function getPanditDetail(req, res) {
         .orderBy('r.created_at', 'desc')
         .limit(3);
 
-    console.log("review", review);
     const response = {
         id: user?.id,
         name: user?.name,
@@ -64,7 +65,22 @@ async function getPanditDetail(req, res) {
         charge: user?.charge,
         isverified: user?.isverified,
         reviews: review,
+        isFollow: false
     }
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+        const token = authHeader.split(' ')[1];
+        const decryptToken = decrypt(token);
+        const verified = jwt.verify(decryptToken, process.env.JWT_SECRET);
+        if (verified?.userId) {
+            const user = await db('follows').where({ 'panditId': id, 'userId': verified?.userId }).first();
+            console.log("user", user);
+            if (user) {
+                response.isFollow = true
+            }
+        }
+    }
+
     return res.status(200).json({ success: true, data: response, message: 'Detail success' });
 }
 

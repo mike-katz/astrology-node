@@ -37,6 +37,8 @@ async function getFollow(req, res) {
         .leftJoin('pandits as p', 'p.id', 'f.panditId')
         .select(
             "f.created_at",
+            "p.id",
+            "p.charge",
             "p.name",
             "p.profile",
             "p.knowledge",
