@@ -5,8 +5,8 @@ const secretKey = process.env.ENCRYPTION_KEY;
 
 const encrypt = (text) => {
     try {
-        const string = CryptoJS.AES.encrypt(text, secretKey).toString();
-        return encodeURIComponent(string)
+        return CryptoJS.AES.encrypt(text, secretKey).toString();
+        // return encodeURIComponent(string)
     } catch (error) {
         console.error('Error in encrypt function:', error);
         throw error;
