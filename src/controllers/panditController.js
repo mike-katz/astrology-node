@@ -7,7 +7,7 @@ const jwt = require('jsonwebtoken');
 async function getPandits(req, res) {
 
     let page = parseInt(req.query.page) || 1;
-    let limit = parseInt(req.query.limit) || 100;
+    let limit = parseInt(req.query.limit) || 20;
 
     if (page < 1) page = 1;
     if (limit < 1) limit = 100;
