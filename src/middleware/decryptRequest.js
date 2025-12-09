@@ -34,13 +34,13 @@ const decryptRequest = (req, res, next) => {
       req.query = JSON.parse(decrypt(req.query.payload));
     }
     if (!req.body) {
-      return res.status(400).json({ message: 'Unable to decrypt payload.' });
+      return res.status(400).json({ message: 'Something went wrong.' });
     }
 
     next();
   } catch (error) {
     console.error('Error in decrypting request:', error);
-    res.status(400).json({ message: 'Unable to decrypt payload.' });
+    res.status(400).json({ message: 'Something went wrong.' });
   }
 };
 
