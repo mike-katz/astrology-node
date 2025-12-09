@@ -3,7 +3,7 @@ require('dotenv').config();
 const crypto = require('crypto-js');
 
 async function create(req, res) {
-    const { panditId } = req.body;
+    const { panditId, type = 'chat' } = req.body;
 
     if (!panditId) {
         return res.status(400).json({ success: false, message: 'Please enter pandit' });
@@ -14,6 +14,10 @@ async function create(req, res) {
 
         const pandit = await db('pandits').where({ id: panditId }).first()
         if (!pandit) return res.status(400).json({ success: false, message: 'Pandit not found.' });
+
+        const continueOrder = await db('orders').where({ userId: req.userId, panditId, status: "continue", type }).first()
+        if (continueOrder) return res.status(400).json({ success: false, message: 'Please complete your ongoing order.' });
+
         const order = await db('orders').where({ userId: req.userId, panditId }).first()
         const orderId = ((parseInt(crypto.lib.WordArray.random(16).toString(), 16) % 1e6) + '').padStart(15, '0');
         let deduction = 0
@@ -32,7 +36,8 @@ async function create(req, res) {
             status: "pending",
             rate: pandit?.charge || 1,
             duration: 5,
-            deduction
+            deduction,
+            type
         })
         return res.status(200).json({ success: true, data: null, message: 'Order create Successfully' });
     } catch (err) {
