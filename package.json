@@ -5,6 +5,7 @@
   "main": "src/server.js",
   "scripts": {
     "start": "pm2 start src/server.js --name ASTRO_API",
+    "start:socket": "pm2 start src/server2.js --name ASTRO_SOCKET_API",
     "dev": "nodemon src/server.js",
     "migrate": "knex migrate:latest --knexfile knexfile.js",
     "migrate:rollback": "knex migrate:rollback --knexfile knexfile.js"
@@ -13,6 +14,7 @@
     "aws-sdk": "^2.1691.0",
     "axios": "^1.13.2",
     "bcrypt": "^5.1.0",
+    "cors": "^2.8.5",
     "crypto-js": "^4.2.0",
     "dotenv": "^16.0.0",
     "express": "^4.18.2",
@@ -20,7 +22,8 @@
     "jsonwebtoken": "^9.0.0",
     "knex": "^2.5.1",
     "multer": "^1.4.5-lts.1",
-    "pg": "^8.11.0"
+    "pg": "^8.11.0",
+    "socket.io": "^4.8.1"
   },
   "devDependencies": {
     "nodemon": "^2.0.22"
