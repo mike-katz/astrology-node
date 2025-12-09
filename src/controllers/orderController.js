@@ -43,14 +43,22 @@ async function create(req, res) {
 
 async function list(req, res) {
     try {
-        const order = await db('orders').where({ userId: req.userId }).orderByRaw(`
-            CASE status
-            WHEN 'continue' THEN 1
-            WHEN 'pending' THEN 2
-            WHEN 'completed' THEN 3
-            ELSE 4
+        const order = await db('orders as o').where({ userId: req.userId })
+            .leftJoin('pandits as p', 'p.id', 'o.panditId')
+            .leftJoin('chats as c', 'o.orderId', 'c.orderId')
+            .orderByRaw(`
+            CASE trim(o.status)
+                WHEN 'continue' THEN 1
+                WHEN 'pending' THEN 2
+                WHEN 'completed' THEN 3
+                ELSE 4
             END
-        `);
+            `).select(
+                "o.*",
+                "p.name",
+                "p.profile",
+                "c.lastmessage"
+            );
         return res.status(200).json({ success: true, data: order, message: 'Order create Successfully' });
     } catch (err) {
         console.error(err);
