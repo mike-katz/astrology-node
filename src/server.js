@@ -20,9 +20,9 @@ app.use(encryptResponse);
 
 app.use('/auth', authRoutes);
 app.use('/pandit', panditRoutes);
-app.use('/chat', chatRoutes);
 
 app.use(auth)
+app.use('/chat', chatRoutes);
 app.use('/user', userRoutes);
 app.use('/follow', followRoutes);
 app.use('/review', reviewRoutes);

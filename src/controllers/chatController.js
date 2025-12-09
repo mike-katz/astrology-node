@@ -4,12 +4,9 @@ const jwt = require('jsonwebtoken');
 require('dotenv').config();
 
 async function getRoom(req, res) {
-    const { type, id } = req.query;
-    if (!['user', 'admin'].includes(type)) {
-        return res.status(400).json({ error: 'Invalid type' });
-    }
-
     try {
+        const type = 'user'
+        const id = req.userId
         // Get distinct counterparts
         const rooms = await db('chats')
             .select(
