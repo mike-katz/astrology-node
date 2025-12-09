@@ -66,12 +66,19 @@ async function getRoom(req, res) {
 }
 
 async function getMessage(req, res) {
-    const { panditId, limit = 50, offset = 0 } = req.query;
+    const { panditId, } = req.query;
     if (!panditId) {
         return res.status(400).json({ error: 'Missing params' });
     }
 
     try {
+        let page = parseInt(req.query.page) || 1;
+        let limit = parseInt(req.query.limit) || 100;
+
+        if (page < 1) page = 1;
+        if (limit < 1) limit = 100;
+        const offset = (page - 1) * limit;
+
         const messages = await db('chats')
             .where(function () {
                 this.where({ sender_type: 'user', sender_id: req.userId, receiver_type: 'pandit', receiver_id: panditId })
