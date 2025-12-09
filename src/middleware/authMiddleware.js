@@ -16,9 +16,9 @@ module.exports = function (req, res, next) {
 
     try {
         const decryptToken = decrypt(token);
-        console.log("decryptToken", decryptToken);
+        // console.log("decryptToken", decryptToken);
         const verified = jwt.verify(decryptToken, process.env.JWT_SECRET);
-        console.log("verified", verified);
+        // console.log("verified", verified);
         if (!verified) {
             return res
                 .status(401)
