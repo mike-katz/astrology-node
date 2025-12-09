@@ -180,7 +180,7 @@ io.on('connection', (socket) => {
                 });
                 await db('chats')
                     .where('id', messages?.id)
-                    .update({ message: JSON.stringify(old) })
+                    .update({ message: JSON.stringify(old), lastmessage: message })
             } else {
                 const [saved] = await db('chats').insert({
                     sender_type,
@@ -188,6 +188,7 @@ io.on('connection', (socket) => {
                     receiver_type,
                     orderId,
                     receiver_id,
+                    lastmessage: message,
                     message: JSON.stringify([{
                         sender: sender_type,
                         message,
