@@ -61,21 +61,21 @@ async function getRoom(req, res) {
         return res.status(200).json({ success: true, data: results, message: 'Get chat Successfully' });
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: 'Server error', details: err.message });
+        res.status(500).json({ success: false, message: 'Server error' });
     }
 }
 
 async function getMessage(req, res) {
-    const { me_type, me_id, other_type, other_id, limit = 50, offset = 0 } = req.query;
-    if (!me_type || !me_id || !other_type || !other_id) {
+    const { panditId, limit = 50, offset = 0 } = req.query;
+    if (!panditId) {
         return res.status(400).json({ error: 'Missing params' });
     }
 
     try {
         const messages = await db('chats')
             .where(function () {
-                this.where({ sender_type: me_type, sender_id: me_id, receiver_type: other_type, receiver_id: other_id })
-                    .orWhere({ sender_type: other_type, sender_id: other_id, receiver_type: me_type, receiver_id: me_id });
+                this.where({ sender_type: 'user', sender_id: req.userId, receiver_type: 'pandit', receiver_id: panditId })
+                    .orWhere({ sender_type: 'pandit', sender_id: panditId, receiver_type: 'pandit', receiver_id: req.userId });
             })
             .orderBy('created_at', 'asc')
             .limit(limit)
@@ -83,12 +83,12 @@ async function getMessage(req, res) {
 
         // Mark messages received by me as read
         await db('chats')
-            .where({ receiver_type: me_type, receiver_id: me_id, sender_type: other_type, sender_id: other_id, is_read: false })
+            .where({ receiver_type: 'user', receiver_id: req.userId, sender_type: 'pandit', sender_id: panditId, is_read: false })
             .update({ is_read: true });
         return res.status(200).json({ success: true, data: messages, message: 'Chat get Successfully' });
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: 'Server error' });
+        res.status(500).json({ success: false, message: 'Server error' });
     }
 }
 
