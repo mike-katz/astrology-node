@@ -41,4 +41,4 @@ async function create(req, res) {
     }
 }
 
-module.exports = { create };
+async function list(req, res) {    try {        const order = await db('orders').where({ userId: req.userId }).orderByRaw(`            CASE status            WHEN 'continue' THEN 1            WHEN 'pending' THEN 2            WHEN 'completed' THEN 3            ELSE 4            END        `);        return res.status(200).json({ success: true, data: order, message: 'Order create Successfully' });    } catch (err) {        console.error(err);        res.status(500).json({ success: false, message: 'Server error' });    }}module.exports = { create, list };
