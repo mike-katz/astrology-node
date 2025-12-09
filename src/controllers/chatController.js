@@ -81,8 +81,18 @@ async function getMessage(req, res) {
 
         const messages = await db('chats')
             .where(function () {
-                this.where({ sender_type: 'user', sender_id: req.userId, receiver_type: 'pandit', receiver_id: panditId })
-                    .orWhere({ sender_type: 'pandit', sender_id: panditId, receiver_type: 'pandit', receiver_id: req.userId });
+                this.where({
+                    sender_type: 'user',
+                    sender_id: req.userId,
+                    receiver_type: 'pandit',
+                    receiver_id: panditId
+                })
+                    .orWhere({
+                        sender_type: 'pandit',
+                        sender_id: panditId,
+                        receiver_type: 'user',
+                        receiver_id: req.userId
+                    });
             })
             .orderBy('created_at', 'asc')
             .limit(limit)
