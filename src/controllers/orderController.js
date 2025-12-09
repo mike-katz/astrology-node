@@ -43,6 +43,12 @@ async function create(req, res) {
 
 async function list(req, res) {
     try {
+        let page = parseInt(req.query.page) || 1;
+        let limit = parseInt(req.query.limit) || 20;
+
+        if (page < 1) page = 1;
+        if (limit < 1) limit = 20;
+        const offset = (page - 1) * limit;
         const order = await db('orders as o').where({ userId: req.userId })
             .leftJoin('pandits as p', 'p.id', 'o.panditId')
             .leftJoin('chats as c', 'o.orderId', 'c.orderId')
@@ -58,8 +64,23 @@ async function list(req, res) {
                 "p.name",
                 "p.profile",
                 "c.lastmessage"
-            );
-        return res.status(200).json({ success: true, data: order, message: 'Order create Successfully' });
+            ).limit(limit)
+            .offset(offset);
+
+        const [{ count }] = await db('orders')
+            .count('* as count').where('userId', req?.userId);
+
+        const total = parseInt(count);
+        const totalPages = Math.ceil(total / limit);
+
+        const response = {
+            page,
+            limit,
+            total,
+            totalPages,
+            results: order
+        }
+        return res.status(200).json({ success: true, data: response, message: 'Order list Successfully' });
     } catch (err) {
         console.error(err);
         res.status(500).json({ success: false, message: 'Server error' });
