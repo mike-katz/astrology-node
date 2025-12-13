@@ -168,9 +168,17 @@ io.on('connection', (socket) => {
         if (targetSocket) io.to(targetSocket).emit('stop_typing', { from_type, from_id });
     });
 
-    socket.on("emit_to_user", ({ toType, toId, payload }) => {
-        const room = `${toType}_${toId}`;
-        socket.to(room).emit("receive_message", payload);
+    socket.on('emit_to_user', ({ toType, toId, payload }) => {
+        console.log("cdscd", toType, toId, payload);
+        const targetSocket =
+            toType === 'user'
+                ? onlineUsers.get(String(toId))
+                : onlinePandits.get(String(toId));
+        console.log("targetSocket", targetSocket);
+        if (targetSocket) {
+
+            io.to(targetSocket).emit('receive_message', payload);
+        }
     });
 
     socket.on('disconnect', async () => {
