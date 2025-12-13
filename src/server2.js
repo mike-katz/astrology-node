@@ -146,8 +146,8 @@ io.on('connection', (socket) => {
         socket.join(orderId);
         socket.orderId = orderId;
         socket.userId = id;
-        socket.role = type;
-        console.log(`${role} joined room ${orderId}`);
+        socket.type = type;
+        console.log(`${type} joined room ${orderId}`);
     });
 
     // socket.on('go_online', async (payload) => {
