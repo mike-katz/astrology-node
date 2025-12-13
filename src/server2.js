@@ -142,43 +142,85 @@ function broadcastOnline() {
 io.on('connection', (socket) => {
     console.log('socket connected', socket.id);
 
-    socket.on('go_online', async (payload) => {
-        const { id, type } = payload || {};
-        if (!id || !type) return;
+    // socket.on('go_online', async (payload) => {
+    //     const { id, type } = payload || {};
+    //     if (!id || !type) return;
 
-        if (type === 'user') {
-            onlineUsers.set(String(id), socket.id);
-            await db('users').where({ id }).update({ online: true });
-        } else if (type === 'pandit') {
-            onlinePandits.set(String(id), socket.id);
-            await db('pandits').where({ id }).update({ online: true });
-        }
+    //     if (type === 'user') {
+    //         onlineUsers.set(String(id), socket.id);
+    //         await db('users').where({ id }).update({ online: true });
+    //     } else if (type === 'pandit') {
+    //         onlinePandits.set(String(id), socket.id);
+    //         await db('pandits').where({ id }).update({ online: true });
+    //     }
 
-        broadcastOnline();
-    });
-    socket.on('typing', (data) => {
-        const { from_type, from_id, to_type, to_id } = data;
-        const targetSocket = (to_type === 'user') ? onlineUsers.get(String(to_id)) : onlinePandits.get(String(to_id));
-        if (targetSocket) io.to(targetSocket).emit('typing', { from_type, from_id });
+    //     broadcastOnline();
+    // });
+
+    // socket.on('go_online', ({ orderId, id, type }) => {
+    //     console.log('Go online:', orderId, id, type);
+
+    //     // socket.join(orderId); // join room
+
+    //     // store online user
+    // });
+
+    // socket.on('typing', (data) => {
+    //     const { from_type, from_id, to_type, to_id } = data;
+    //     const targetSocket = (to_type === 'user') ? onlineUsers.get(String(to_id)) : onlinePandits.get(String(to_id));
+    //     if (targetSocket) io.to(targetSocket).emit('typing', { from_type, from_id });
+    // });
+
+    // socket.on('stop_typing', (data) => {
+    //     const { from_type, from_id, to_type, to_id } = data;
+    //     const targetSocket = (to_type === 'user') ? onlineUsers.get(String(to_id)) : onlinePandits.get(String(to_id));
+    //     if (targetSocket) io.to(targetSocket).emit('stop_typing', { from_type, from_id });
+    // });
+
+
+    // 🔹 JOIN ROOM
+    socket.on('join_chat', ({ orderId, userId, role }) => {
+        socket.join(orderId);
+        socket.orderId = orderId;
+        socket.userId = userId;
+        socket.role = role;
+
+        console.log(`${role} joined room ${orderId}`);
     });
 
-    socket.on('stop_typing', (data) => {
-        const { from_type, from_id, to_type, to_id } = data;
-        const targetSocket = (to_type === 'user') ? onlineUsers.get(String(to_id)) : onlinePandits.get(String(to_id));
-        if (targetSocket) io.to(targetSocket).emit('stop_typing', { from_type, from_id });
+    // 🔹 SEND MESSAGE
+    // socket.on('send_message', (data) => {
+    //     const { orderId } = data;
+
+    //     // sirf usi room ko emit
+
+    // });
+
+    // 🔹 TYPING
+    socket.on('typing', ({ orderId, from_id }) => {
+        socket.to(orderId).emit('typing', { from_id });
     });
+
+    socket.on('stop_typing', ({ orderId }) => {
+        socket.to(orderId).emit('stop_typing');
+    });
+
+
 
     socket.on('emit_to_user', ({ toType, toId, payload }) => {
         console.log("cdscd", toType, toId, payload);
-        const targetSocket =
-            toType === 'user'
-                ? onlineUsers.get(String(toId))
-                : onlinePandits.get(String(toId));
-        console.log("targetSocket", targetSocket);
-        if (targetSocket) {
+        // const targetSocket =
+        //     toType === 'user'
+        //         ? onlineUsers.get(String(toId))
+        //         : onlinePandits.get(String(toId));
+        // console.log("targetSocket", targetSocket);
 
-            io.to(targetSocket).emit('receive_message', payload);
-        }
+        socket.to(payload?.orderId).emit('receive_message', payload);
+
+        // if (targetSocket) {
+
+        //     io.to(targetSocket).emit('receive_message', payload);
+        // }
     });
 
     socket.on('disconnect', async () => {
