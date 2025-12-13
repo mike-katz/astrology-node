@@ -148,6 +148,9 @@ io.on('connection', (socket) => {
         socket.userId = id;
         socket.type = type;
         console.log(`${type} joined room ${orderId}`);
+
+        socket.to(orderId).emit('online');
+
     });
 
     // socket.on('go_online', async (payload) => {
@@ -187,6 +190,7 @@ io.on('connection', (socket) => {
         console.log("go_offline orderId", orderId);
         // const targetSocket = (to_type === 'user') ? onlineUsers.get(String(to_id)) : onlinePandits.get(String(to_id));
         // if (targetSocket) io.to(targetSocket).emit('stop_typing', { from_type, from_id });
+        socket.to(orderId).emit('offline');
         socket.leave(orderId);
     });
 
