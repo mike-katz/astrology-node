@@ -198,10 +198,12 @@ io.on('connection', (socket) => {
 
     // 🔹 TYPING
     socket.on('typing', ({ orderId, from_id }) => {
+        console.log("orderId, from_id", orderId, from_id);
         socket.to(orderId).emit('typing', { from_id });
     });
 
     socket.on('stop_typing', ({ orderId }) => {
+        console.log("stop_typing orderId", orderId);
         socket.to(orderId).emit('stop_typing');
     });
 
