@@ -166,7 +166,9 @@ async function getOrderDetail(req, res) {
         if (page < 1) page = 1;
         if (limit < 1) limit = 50;
         const offset = (page - 1) * limit;
-        const order = await db('chats').where({ orderId }).limit(limit)
+        const order = await db('chats').where({ orderId })
+            .orderBy('created_at', 'desc')
+            .limit(limit)
             .offset(offset);
         const [{ count }] = await db('chats')
             .count('* as count').where({ orderId });
