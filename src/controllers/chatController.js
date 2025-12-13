@@ -116,7 +116,7 @@ async function sendMessage(req, res) {
     }
     try {
         const order = await db('orders').where({ userId: req.userId, orderId, status: "continue" }).first();
-        if (!order) return res.status(400).json({ error: 'Order is completed.' });
+        if (!order) return res.status(400).json({ success: false, message: 'Order is completed.' });
 
         const [saved] = await db('chats').insert({
             sender_type: "user",
@@ -139,7 +139,7 @@ async function getDetail(req, res) {
     const { panditId } = req.query;
     try {
         const order = await db('pandits').where({ id: panditId }).first();
-        if (!order) return res.status(400).json({ error: 'Pandit not found.' });
+        if (!order) return res.status(400).json({ success: false, message: 'Pandit not found.' });
         return res.status(200).json({ success: true, data: { id: panditId, name: order?.name, profile: order?.profile, isOnline: order?.isOnline }, message: 'get detail Successfully' });
     } catch (err) {
         console.error(err);
@@ -154,7 +154,7 @@ async function getOrderDetail(req, res) {
             return res.status(400).json({ success: false, message: 'Missing params.' });
         }
         const orderexist = await db('orders').where({ userId: req.userId, orderId }).first();
-        if (!orderexist) return res.status(400).json({ error: 'Wrong order. Please enter correct' });
+        if (!orderexist) return res.status(400).json({ success: false, message: 'Wrong order. Please enter correct' });
         let page = parseInt(req.query.page) || 1;
         let limit = parseInt(req.query.limit) || 50;
 
