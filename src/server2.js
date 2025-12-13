@@ -142,6 +142,14 @@ function broadcastOnline() {
 io.on('connection', (socket) => {
     console.log('socket connected', socket.id);
 
+    socket.on('go_online', ({ orderId, id, type }) => {
+        socket.join(orderId);
+        socket.orderId = orderId;
+        socket.userId = id;
+        socket.role = type;
+        console.log(`${role} joined room ${orderId}`);
+    });
+
     // socket.on('go_online', async (payload) => {
     //     const { id, type } = payload || {};
     //     if (!id || !type) return;
@@ -157,36 +165,36 @@ io.on('connection', (socket) => {
     //     broadcastOnline();
     // });
 
-    // socket.on('go_online', ({ orderId, id, type }) => {
-    //     console.log('Go online:', orderId, id, type);
+    socket.on('typing', (data) => {
+        const { orderId } = data;
+        // const targetSocket = (to_type === 'user') ? onlineUsers.get(String(to_id)) : onlinePandits.get(String(to_id));
+        // if (targetSocket) io.to(targetSocket).emit('typing', { from_type, from_id });
+        socket.to(orderId).emit('typing');
+    });
 
-    //     // socket.join(orderId); // join room
+    socket.on('stop_typing', (data) => {
+        const { orderId } = data;
+        // const targetSocket = (to_type === 'user') ? onlineUsers.get(String(to_id)) : onlinePandits.get(String(to_id));
+        // if (targetSocket) io.to(targetSocket).emit('stop_typing', { from_type, from_id });
+        socket.to(orderId).emit('stop_typing');
+    });
 
-    //     // store online user
-    // });
-
-    // socket.on('typing', (data) => {
-    //     const { from_type, from_id, to_type, to_id } = data;
-    //     const targetSocket = (to_type === 'user') ? onlineUsers.get(String(to_id)) : onlinePandits.get(String(to_id));
-    //     if (targetSocket) io.to(targetSocket).emit('typing', { from_type, from_id });
-    // });
-
-    // socket.on('stop_typing', (data) => {
-    //     const { from_type, from_id, to_type, to_id } = data;
-    //     const targetSocket = (to_type === 'user') ? onlineUsers.get(String(to_id)) : onlinePandits.get(String(to_id));
-    //     if (targetSocket) io.to(targetSocket).emit('stop_typing', { from_type, from_id });
-    // });
-
+    socket.on('go_offline', (data) => {
+        const { orderId } = data;
+        // const targetSocket = (to_type === 'user') ? onlineUsers.get(String(to_id)) : onlinePandits.get(String(to_id));
+        // if (targetSocket) io.to(targetSocket).emit('stop_typing', { from_type, from_id });
+        socket.leave(orderId);
+    });
 
     // 🔹 JOIN ROOM
-    socket.on('join_chat', ({ orderId, userId, role }) => {
-        socket.join(orderId);
-        socket.orderId = orderId;
-        socket.userId = userId;
-        socket.role = role;
+    // socket.on('join_chat', ({ orderId, userId, role }) => {
+    //     socket.join(orderId);
+    //     socket.orderId = orderId;
+    //     socket.userId = userId;
+    //     socket.role = role;
 
-        console.log(`${role} joined room ${orderId}`);
-    });
+    //     console.log(`${role} joined room ${orderId}`);
+    // });
 
     // 🔹 SEND MESSAGE
     // socket.on('send_message', (data) => {
@@ -197,15 +205,15 @@ io.on('connection', (socket) => {
     // });
 
     // 🔹 TYPING
-    socket.on('typing', ({ orderId, from_id }) => {
-        console.log("orderId, from_id", orderId, from_id);
-        socket.to(orderId).emit('typing', { from_id });
-    });
+    // socket.on('typing', ({ orderId, from_id }) => {
+    //     console.log("orderId, from_id", orderId, from_id);
+    //     socket.to(orderId).emit('typing', { from_id });
+    // });
 
-    socket.on('stop_typing', ({ orderId }) => {
-        console.log("stop_typing orderId", orderId);
-        socket.to(orderId).emit('stop_typing');
-    });
+    // socket.on('stop_typing', ({ orderId }) => {
+    //     console.log("stop_typing orderId", orderId);
+    //     socket.to(orderId).emit('stop_typing');
+    // });
 
 
 
