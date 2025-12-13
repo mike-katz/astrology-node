@@ -1,7 +1,6 @@
 const db = require('../db');
-const bcrypt = require('bcrypt');
-const jwt = require('jsonwebtoken');
 require('dotenv').config();
+const socket = require("../socket");
 
 async function getRoom(req, res) {
     try {
@@ -128,6 +127,12 @@ async function sendMessage(req, res) {
             message,
             status: "send"
         }).returning('*');
+        socket.emit("emit_to_user", {
+            toType: "pandit",
+            toId: order?.panditId,
+            payload: saved,
+        });
+        socket.emit('receive_message', saved);
         return res.status(200).json({ success: true, data: saved, message: 'Message send Successfully' });
     } catch (err) {
         console.error(err);

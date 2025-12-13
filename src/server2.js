@@ -156,82 +156,6 @@ io.on('connection', (socket) => {
 
         broadcastOnline();
     });
-
-    socket.on('private_message', async (data) => {
-        console.log("data", data);
-        const { sender_type, sender_id, receiver_type, receiver_id, message, orderId } = data;
-        if (!sender_type || !sender_id || !receiver_type || !receiver_id || !orderId) return;
-
-        try {
-
-            let messages = await db('chats')
-                .where('orderId', orderId)
-                .where(function () {
-                    this.where({ sender_type: sender_type, sender_id: sender_id, receiver_type: receiver_type, receiver_id: receiver_id })
-                        .orWhere({ sender_type: receiver_type, sender_id: receiver_id, receiver_type: sender_type, receiver_id: sender_id });
-                }).first()
-
-            if (messages) {
-                const old = JSON.parse(messages.message)
-                old.push({
-                    sender: sender_type,
-                    message,
-                    created_at: new Date()
-                });
-                await db('chats')
-                    .where('id', messages?.id)
-                    .update({ message: JSON.stringify(old), lastmessage: message })
-            } else {
-                const [saved] = await db('chats').insert({
-                    sender_type,
-                    sender_id,
-                    receiver_type,
-                    orderId,
-                    receiver_id,
-                    lastmessage: message,
-                    message: JSON.stringify([{
-                        sender: sender_type,
-                        message,
-                        created_at: new Date()
-                    }])
-                }).returning('*');
-                messages = saved
-            }
-            // save message
-
-
-            // send to receiver if online
-            const targetSocket = (receiver_type === 'user')
-                ? onlineUsers.get(String(receiver_id))
-                : onlinePandits.get(String(receiver_id));
-
-            const payload = {
-                id: messages.id,
-                sender_type, sender_id, receiver_type, receiver_id,
-                message: message,
-                created_at: messages.created_at,
-                is_read: messages.is_read
-            };
-
-            if (targetSocket) {
-                io.to(targetSocket).emit('receive_message', payload);
-
-                // also send notification event
-                io.to(targetSocket).emit('notification', {
-                    title: 'New message',
-                    body: message,
-                    from: { type: sender_type, id: sender_id }
-                });
-            }
-
-            // echo back to sender socket
-            socket.emit('receive_message', payload);
-
-        } catch (err) {
-            console.error('private_message error', err);
-        }
-    });
-
     socket.on('typing', (data) => {
         const { from_type, from_id, to_type, to_id } = data;
         const targetSocket = (to_type === 'user') ? onlineUsers.get(String(to_id)) : onlinePandits.get(String(to_id));
@@ -242,6 +166,11 @@ io.on('connection', (socket) => {
         const { from_type, from_id, to_type, to_id } = data;
         const targetSocket = (to_type === 'user') ? onlineUsers.get(String(to_id)) : onlinePandits.get(String(to_id));
         if (targetSocket) io.to(targetSocket).emit('stop_typing', { from_type, from_id });
+    });
+
+    socket.on("emit_to_user", ({ toType, toId, payload }) => {
+        const room = `${toType}_${toId}`;
+        socket.to(room).emit("receive_message", payload);
     });
 
     socket.on('disconnect', async () => {
