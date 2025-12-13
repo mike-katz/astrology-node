@@ -167,6 +167,7 @@ io.on('connection', (socket) => {
 
     socket.on('typing', (data) => {
         const { orderId } = data;
+        console.log("typing orderId", orderId);
         // const targetSocket = (to_type === 'user') ? onlineUsers.get(String(to_id)) : onlinePandits.get(String(to_id));
         // if (targetSocket) io.to(targetSocket).emit('typing', { from_type, from_id });
         socket.to(orderId).emit('typing');
@@ -174,6 +175,8 @@ io.on('connection', (socket) => {
 
     socket.on('stop_typing', (data) => {
         const { orderId } = data;
+        console.log("stop_typing orderId", orderId);
+
         // const targetSocket = (to_type === 'user') ? onlineUsers.get(String(to_id)) : onlinePandits.get(String(to_id));
         // if (targetSocket) io.to(targetSocket).emit('stop_typing', { from_type, from_id });
         socket.to(orderId).emit('stop_typing');
@@ -181,6 +184,7 @@ io.on('connection', (socket) => {
 
     socket.on('go_offline', (data) => {
         const { orderId } = data;
+        console.log("go_offline orderId", orderId);
         // const targetSocket = (to_type === 'user') ? onlineUsers.get(String(to_id)) : onlinePandits.get(String(to_id));
         // if (targetSocket) io.to(targetSocket).emit('stop_typing', { from_type, from_id });
         socket.leave(orderId);
@@ -235,21 +239,21 @@ io.on('connection', (socket) => {
 
     socket.on('disconnect', async () => {
         // find who disconnected (search in maps)
-        const userEntry = Array.from(onlineUsers.entries()).find(([, sid]) => sid === socket.id);
-        const adminEntry = Array.from(onlinePandits.entries()).find(([, sid]) => sid === socket.id);
+        // const userEntry = Array.from(onlineUsers.entries()).find(([, sid]) => sid === socket.id);
+        // const adminEntry = Array.from(onlinePandits.entries()).find(([, sid]) => sid === socket.id);
 
-        if (userEntry) {
-            const [id] = userEntry;
-            onlineUsers.delete(id);
-            await db('users').where({ id }).update({ online: false });
-        }
-        if (adminEntry) {
-            const [id] = adminEntry;
-            onlinePandits.delete(id);
-            await db('pandits').where({ id }).update({ online: false });
-        }
+        // if (userEntry) {
+        //     const [id] = userEntry;
+        //     onlineUsers.delete(id);
+        //     await db('users').where({ id }).update({ online: false });
+        // }
+        // if (adminEntry) {
+        //     const [id] = adminEntry;
+        //     onlinePandits.delete(id);
+        //     await db('pandits').where({ id }).update({ online: false });
+        // }
 
-        broadcastOnline();
+        // broadcastOnline();
         console.log('socket disconnected', socket.id);
     });
 
