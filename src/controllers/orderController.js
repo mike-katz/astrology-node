@@ -39,7 +39,7 @@ async function create(req, res) {
             deduction,
             type
         })
-        return res.status(200).json({ success: true, data: null, message: 'Order create Successfully' });
+        return res.status(200).json({ success: true, data: { orderId }, message: 'Order create Successfully' });
     } catch (err) {
         console.error(err);
         res.status(500).json({ success: false, message: 'Server error' });
