@@ -116,7 +116,7 @@ async function sendMessage(req, res) {
     }
     try {
         const order = await db('orders').where({ userId: req.userId, orderId, panditId, status: "continue" }).first();
-        if (!order) return res.status(400).json({ error: 'Order is over.' });
+        if (!order) return res.status(400).json({ error: 'Order is completed.' });
 
         const [saved] = await db('chats').insert({
             sender_type: "user",
@@ -126,6 +126,7 @@ async function sendMessage(req, res) {
             receiver_id: Number(panditId),
             lastmessage: message,
             message,
+            status: "send"
         }).returning('*');
         return res.status(200).json({ success: true, data: saved, message: 'Message send Successfully' });
     } catch (err) {
@@ -133,4 +134,52 @@ async function sendMessage(req, res) {
         res.status(500).json({ success: false, message: 'Server error' });
     }
 }
-module.exports = { getRoom, getMessage, sendMessage };
+
+async function getDetail(req, res) {
+    const { panditId } = req.query;
+    try {
+        const order = await db('pandits').where({ id: panditId }).first();
+        if (!order) return res.status(400).json({ error: 'Pandit not found.' });
+        return res.status(200).json({ success: true, data: { id: panditId, name: order?.name, profile: order?.profile, isOnline: order?.isOnline }, message: 'Message send Successfully' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
+async function getOrderDetail(req, res) {
+    const { orderId } = req.query;
+    try {
+        if (!orderId) {
+            return res.status(400).json({ error: 'Missing params' });
+        }
+        const orderexist = await db('orders').where({ userId: req.userId, orderId }).first();
+        if (!orderexist) return res.status(400).json({ error: 'Wrong order. Please enter correct' });
+        let page = parseInt(req.query.page) || 1;
+        let limit = parseInt(req.query.limit) || 50;
+
+        if (page < 1) page = 1;
+        if (limit < 1) limit = 50;
+        const offset = (page - 1) * limit;
+        const order = await db('chats').where({ orderId }).limit(limit)
+            .offset(offset);
+        const [{ count }] = await db('chats')
+            .count('* as count').where({ orderId });
+        const total = parseInt(count);
+        const totalPages = Math.ceil(total / limit);
+
+        const response = {
+            page,
+            limit,
+            total,
+            totalPages,
+            results: order
+        }
+        return res.status(200).json({ success: true, data: response, message: 'Get Successfully' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
+module.exports = { getRoom, getMessage, sendMessage, getDetail, getOrderDetail };
