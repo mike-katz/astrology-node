@@ -66,7 +66,7 @@ async function getRoom(req, res) {
 }
 
 async function getMessage(req, res) {
-    const { panditId, } = req.query;
+    const { panditId } = req.query;
     if (!panditId) {
         return res.status(400).json({ error: 'Missing params' });
     }
@@ -109,4 +109,28 @@ async function getMessage(req, res) {
     }
 }
 
-module.exports = { getRoom, getMessage };
+async function sendMessage(req, res) {
+    const { panditId, orderId, message } = req.body;
+    if (!panditId || !orderId || !message) {
+        return res.status(400).json({ error: 'Missing params' });
+    }
+    try {
+        const order = await db('orders').where({ userId: req.userId, orderId, panditId, status: "continue" }).first();
+        if (!order) return res.status(400).json({ error: 'Order is over.' });
+
+        const [saved] = await db('chats').insert({
+            sender_type: "user",
+            sender_id: Number(req.userId),
+            receiver_type: "pandit",
+            orderId,
+            receiver_id: Number(panditId),
+            lastmessage: message,
+            message,
+        }).returning('*');
+        return res.status(200).json({ success: true, data: saved, message: 'Message send Successfully' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+module.exports = { getRoom, getMessage, sendMessage };

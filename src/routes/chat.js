@@ -4,4 +4,5 @@ const chat = require('../controllers/chatController');
 
 router.get('/rooms', chat.getRoom);
 router.get('/messages', chat.getMessage);
+router.post('/sendMessage', chat.sendMessage);
 module.exports = router;
