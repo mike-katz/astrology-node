@@ -57,6 +57,11 @@ async function list(req, res) {
         const order = await db('orders as o').where({ userId: req.userId })
             .leftJoin('pandits as p', 'p.id', 'o.panditId')
             .leftJoin('chats as c', 'o.orderId', 'c.orderId')
+
+            .groupBy(
+                'o.id',
+                'p.id'
+            )
             .orderByRaw(`
             CASE trim(o.status)
                 WHEN 'continue' THEN 1
@@ -68,7 +73,9 @@ async function list(req, res) {
                 "o.*",
                 "p.name",
                 "p.profile",
-                "c.lastmessage"
+                // "c.lastmessage"
+                db.raw('MAX(c.lastmessage) as lastmessage')
+
             ).limit(limit)
             .offset(offset);
 
