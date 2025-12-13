@@ -6,5 +6,5 @@ router.get('/rooms', chat.getRoom);
 router.get('/messages', chat.getMessage);
 router.post('/sendMessage', chat.sendMessage);
 router.get('/getDetail', chat.getDetail);
-router.post('/getOrderDetail', chat.getOrderDetail);
+router.get('/getOrderDetail', chat.getOrderDetail);
 module.exports = router;

@@ -140,7 +140,7 @@ async function getDetail(req, res) {
     try {
         const order = await db('pandits').where({ id: panditId }).first();
         if (!order) return res.status(400).json({ error: 'Pandit not found.' });
-        return res.status(200).json({ success: true, data: { id: panditId, name: order?.name, profile: order?.profile, isOnline: order?.isOnline }, message: 'Message send Successfully' });
+        return res.status(200).json({ success: true, data: { id: panditId, name: order?.name, profile: order?.profile, isOnline: order?.isOnline }, message: 'get detail Successfully' });
     } catch (err) {
         console.error(err);
         res.status(500).json({ success: false, message: 'Server error' });
