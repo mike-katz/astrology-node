@@ -68,7 +68,7 @@ async function getRoom(req, res) {
 async function getMessage(req, res) {
     const { panditId } = req.query;
     if (!panditId) {
-        return res.status(400).json({ error: 'Missing params' });
+        return res.status(400).json({ success: false, message: 'Missing params.' });
     }
 
     try {
@@ -110,12 +110,12 @@ async function getMessage(req, res) {
 }
 
 async function sendMessage(req, res) {
-    const { panditId, orderId, message } = req.body;
-    if (!panditId || !orderId || !message) {
-        return res.status(400).json({ error: 'Missing params' });
+    const { orderId, message } = req.body;
+    if (!orderId || !message) {
+        return res.status(400).json({ success: false, message: 'Missing params.' });
     }
     try {
-        const order = await db('orders').where({ userId: req.userId, orderId, panditId, status: "continue" }).first();
+        const order = await db('orders').where({ userId: req.userId, orderId, status: "continue" }).first();
         if (!order) return res.status(400).json({ error: 'Order is completed.' });
 
         const [saved] = await db('chats').insert({
@@ -123,7 +123,7 @@ async function sendMessage(req, res) {
             sender_id: Number(req.userId),
             receiver_type: "pandit",
             orderId,
-            receiver_id: Number(panditId),
+            receiver_id: Number(order?.panditId),
             lastmessage: message,
             message,
             status: "send"
@@ -151,7 +151,7 @@ async function getOrderDetail(req, res) {
     const { orderId } = req.query;
     try {
         if (!orderId) {
-            return res.status(400).json({ error: 'Missing params' });
+            return res.status(400).json({ success: false, message: 'Missing params.' });
         }
         const orderexist = await db('orders').where({ userId: req.userId, orderId }).first();
         if (!orderexist) return res.status(400).json({ error: 'Wrong order. Please enter correct' });
