@@ -12,23 +12,14 @@ const upload = multer({
         fileSize: 2 * 1024 * 1024 // (optional) 5MB per file
     },
     fileFilter: (req, file, cb) => {
-        const allowedTypes = [
-            'image/jpeg',
-            'image/png',
-            'image/jpg',
-            'image/webp',
-            'audio/mpeg',   // mp3
-            'audio/wav',
-            'audio/x-wav',
-            'audio/mp4',    // m4a
-            'audio/ogg',
-            'application/pdf'
-        ];
-
-        if (allowedTypes.includes(file.mimetype)) {
+        if (
+            file.mimetype.startsWith('image/') ||
+            file.mimetype.startsWith('audio/') ||
+            file.mimetype === 'application/pdf'
+        ) {
             cb(null, true);
         } else {
-            cb(new Error('Only images, audio and PDF files are allowed'), false);
+            cb(new Error('Only images, audio and PDF files are allowed'));
         }
     }
 });
