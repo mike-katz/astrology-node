@@ -34,9 +34,9 @@ const decryptRequest = (req, res, next) => {
     }
 
     if (req.body.payload) {
-      req.body = JSON.parse(decrypt(req.body.payload));
+      req.body = JSON.parse(decrypt(decodeURIComponent(req.body.payload)));
     } else if (req.query.payload) {
-      req.query = JSON.parse(decrypt(req.query.payload));
+      req.query = JSON.parse(decrypt(decodeURIComponent(req.query.payload)));
     }
     if (!req.body) {
       return res.status(400).json({ message: 'Something went wrong.' });
