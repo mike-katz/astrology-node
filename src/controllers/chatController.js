@@ -109,7 +109,7 @@ async function getMessage(req, res) {
 }
 
 async function sendMessage(req, res) {
-    const { orderId, message } = req.body;
+    const { orderId, message, type = 'text' } = req.body;
     if (!orderId || !message) {
         return res.status(400).json({ success: false, message: 'Missing params.' });
     }
@@ -125,7 +125,8 @@ async function sendMessage(req, res) {
             receiver_id: Number(order?.panditId),
             lastmessage: message,
             message,
-            status: "send"
+            status: "send",
+            type
         }).returning('*');
         socket.emit("emit_to_user", {
             toType: "pandit",
