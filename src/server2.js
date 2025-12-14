@@ -225,7 +225,7 @@ io.on('connection', (socket) => {
 
 
 
-    socket.on('emit_to_user', ({ toType, toId, payload }) => {
+    socket.on('emit_to_user', ({ toType, toId, orderId, payload }) => {
         console.log("cdscd", toType, toId, payload);
         // const targetSocket =
         //     toType === 'user'
@@ -233,7 +233,7 @@ io.on('connection', (socket) => {
         //         : onlinePandits.get(String(toId));
         // console.log("targetSocket", targetSocket);
 
-        socket.to(payload?.orderId).emit('receive_message', payload);
+        socket.to(orderId).emit('receive_message', payload);
 
         // if (targetSocket) {
 

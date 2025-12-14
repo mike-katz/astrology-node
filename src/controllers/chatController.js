@@ -1,6 +1,7 @@
 const db = require('../db');
 require('dotenv').config();
 const socket = require("../socket");
+const { uploadImageTos3 } = require('./uploader');
 
 async function getRoom(req, res) {
     try {
@@ -110,31 +111,55 @@ async function getMessage(req, res) {
 
 async function sendMessage(req, res) {
     const { orderId, message, type = 'text' } = req.body;
-    if (!orderId || !message) {
+    if (!orderId || !type) {
         return res.status(400).json({ success: false, message: 'Missing params.' });
     }
     try {
         const order = await db('orders').where({ userId: req.userId, orderId, status: "continue" }).first();
         if (!order) return res.status(400).json({ success: false, message: 'Order is completed.' });
 
-        const [saved] = await db('chats').insert({
-            sender_type: "user",
-            sender_id: Number(req.userId),
-            receiver_type: "pandit",
-            orderId,
-            receiver_id: Number(order?.panditId),
-            lastmessage: message,
-            message,
-            status: "send",
-            type
-        }).returning('*');
+        const { files } = req
+        let response = [];
+        if (files?.length > 0) {
+            for (const file of files) {
+                const image = await uploadImageTos3('message', file, 'chat');
+                console.log("image", image.data.Location);
+                const [saved] = await db('chats').insert({
+                    sender_type: "user",
+                    sender_id: Number(req.userId),
+                    receiver_type: "pandit",
+                    orderId,
+                    receiver_id: Number(order?.panditId),
+                    lastmessage: image.data.Location,
+                    message: image.data.Location,
+                    status: "send",
+                    type
+                }).returning('*');
+                response.push(saved)
+            }
+            // ins.profile_image = image.data.Location;
+        } else {
+            if (!message) return res.status(400).json({ success: false, message: 'Message required.' });
+            const [saved] = await db('chats').insert({
+                sender_type: "user",
+                sender_id: Number(req.userId),
+                receiver_type: "pandit",
+                orderId,
+                receiver_id: Number(order?.panditId),
+                lastmessage: message,
+                message,
+                status: "send",
+                type
+            }).returning('*');
+            response = saved
+        }
         socket.emit("emit_to_user", {
-            toType: "pandit",
-            toId: order?.panditId,
-            payload: saved,
+            toType: "user",
+            toId: order?.userId,
+            orderId: order?.orderId,
+            payload: response,
         });
-        socket.emit('receive_message', saved);
-        return res.status(200).json({ success: true, data: saved, message: 'Message send Successfully' });
+        return res.status(200).json({ success: true, data: response, message: 'Message send Successfully' });
     } catch (err) {
         console.error(err);
         res.status(500).json({ success: false, message: 'Server error' });

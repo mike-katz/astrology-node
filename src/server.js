@@ -9,6 +9,7 @@ const followRoutes = require('./routes/follow');
 const reviewRoutes = require('./routes/review');
 const userRoutes = require('./routes/user');
 const orderRoutes = require('./routes/order');
+const multer = require('multer');
 
 const chatRoutes = require('./routes/chat');
 const { decryptRequest } = require('./middleware/decryptRequest.js');
@@ -29,7 +30,14 @@ app.use('/user', userRoutes);
 app.use('/follow', followRoutes);
 app.use('/review', reviewRoutes);
 
-app.get('/', (req, res) => res.send('Auth API is running'));
-
+app.use((err, req, res, next) => {
+    if (err instanceof multer.MulterError) {
+        return res.status(400).json({ success: false, message: err.message });
+    }
+    if (err) {
+        return res.status(400).json({ success: false, message: err.message });
+    }
+    next();
+});
 const port = process.env.PORT || 4000;
 app.listen(port, () => console.log(`Server started on port ${port}`));

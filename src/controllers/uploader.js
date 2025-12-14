@@ -11,10 +11,11 @@ exports.uploadImageTos3 = ((directoryPath, image, type) => new Promise(async (re
   const splitedFileName = originalFileName.split('.');
   fileName = `${new Date().getTime().toString()}.${splitedFileName[splitedFileName.length - 1]}`;
 
-  // const folderName = type === 'withdraw' ? process.env.AWS_FOLDER_NAME_WITHDRAWAL
-  //   : type === 'pandit' ? process.env.AWS_FOLDER_NAME_DEPOSIT
-  //     : type === 'qrcode' ? process.env.AWS_FOLDER_NAME : process.env.AWS_FOLDER_NAME_CHAT_FILE || '';
-  const folderName = process.env.PANDIT_FOLDER_NAME
+  const folderName = type === 'chat' ? process.env.CHAT_FOLDER_NAME
+    : type === 'pandit' ? process.env.PANDIT_FOLDER_NAME
+      : process.env.CHAT_FOLDER_NAME || '';
+
+  // const folderName = process.env.PANDIT_FOLDER_NAME
   const s3Params = {
     Bucket: process.env.AWS_BUCKET_NAME,
     Key: `${folderName}/${fileName}`,
