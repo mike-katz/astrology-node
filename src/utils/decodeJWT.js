@@ -16,5 +16,22 @@ const decodeJWT = (authHeader) => {
     }
 };
 
-module.exports = { decodeJWT };
+// const emitToUser = (
+//     role='user',
+//     id,
+//     event: 'chat_request',
+//     data: { fromUserId }
+//   }) => {
+// }
+// ();
+
+function emitToUser({ id, event, data }) {
+    const key = `user_${id}`;
+    const socketId = onlineUsers.get(key);
+
+    if (socketId) {
+        io.to(socketId).emit(event, data);
+    }
+}
+module.exports = { decodeJWT, emitToUser };
 
