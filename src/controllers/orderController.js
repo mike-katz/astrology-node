@@ -1,6 +1,14 @@
 const db = require('../db');
 require('dotenv').config();
 const crypto = require('crypto-js');
+const serviceAccount = require('../config/astro-1e9f7-firebase-adminsdk-fbsvc-4f429f67a7.json');
+const admin = require("firebase-admin");
+const { emitToUser } = require('../utils/decodeJWT');
+const socket = require("../socket");
+
+admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount),
+});
 
 async function create(req, res) {
     const { panditId, type = 'chat' } = req.body;
@@ -29,7 +37,7 @@ async function create(req, res) {
             deduction = (1 * pandit?.charge || 1);
         }
         if (user?.balance < deduction) return res.status(400).json({ success: false, message: 'Insufficient fund.' });
-        await db('orders').insert({
+        const [saved] = await db('orders').insert({
             panditId,
             userId: req.userId,
             orderId,
@@ -38,7 +46,52 @@ async function create(req, res) {
             duration: 5,
             deduction,
             type
-        })
+        }).returning('*');
+        const token = false;
+        if (token) {
+            const message = {
+                token,
+                notification: {
+                    title: `You have received ${type} order`,
+                },
+
+                // 🔔 Android
+                android: {
+                    notification: {
+                        sound: 'default'
+                    }
+                },
+
+                // 🔔 iOS
+                apns: {
+                    payload: {
+                        aps: {
+                            sound: 'default'
+                        }
+                    }
+                },
+
+                // 🔔 Web Browser
+                webpush: {
+                    notification: {
+                        // icon: '/icon.png',
+                        requireInteraction: true
+                        // NOTE: Browsers play default sound automatically
+                    }
+                },
+                data: {},
+
+            };
+            await admin.messaging().send(message);
+        }
+
+        socket.emit("emit_to_user_for_register", {
+            key: `user_${req?.userId}`,
+            payload: saved,
+        });
+
+        // emitToUser(req.userId, 'wait_for_pandit', saved)
+
         return res.status(200).json({ success: true, data: { orderId }, message: 'Order create Successfully' });
     } catch (err) {
         console.error(err);

@@ -163,6 +163,16 @@ io.on('connection', (socket) => {
         }
     });
 
+
+    socket.on('emit_to_user_for_register', ({ key, payload }) => {
+        const socketId = onlineUsers.get(key);
+        console.log("socketId", socketId);
+        if (socketId) {
+            socket.to(socketId).emit('wait_for_pandit', payload);
+        }
+    });
+
+
     // socket.on('go_online', async (payload) => {
     //     const { id, type } = payload || {};
     //     if (!id || !type) return;
