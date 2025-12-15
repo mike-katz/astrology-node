@@ -3,7 +3,7 @@ const express = require('express');
 const http = require('http');
 const cors = require('cors');
 const { Server } = require('socket.io');
-const { decodeJWT } = require('./utils/decodeJWT');
+const { decodeJWT, checkOrders } = require('./utils/decodeJWT');
 
 const app = express();
 app.use(cors());
