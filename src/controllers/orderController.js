@@ -87,7 +87,7 @@ async function create(req, res) {
 
         socket.emit("emit_to_user_for_register", {
             key: `user_${req?.userId}`,
-            payload: saved,
+            payload: [{ ...saved, name: user?.name, profile: user?.profile }],
         });
 
         // emitToUser(req.userId, 'wait_for_pandit', saved)

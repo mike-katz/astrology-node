@@ -153,12 +153,20 @@ io.on('connection', (socket) => {
         socket.to(orderId).emit('online');
     });
 
-    socket.on('user_register', ({ token }) => {
+    socket.on('user_register', async ({ token }) => {
         // console.log("user_register token", token);
         const response = decodeJWT(token);
         if (response?.success && response?.data?.userId) {
             const key = `user_${response?.data?.userId}`;
+            const userOrder = await checkOrders(response?.data?.userId);
             onlineUsers.set(key, socket.id);
+
+            if (userOrder?.pendingOrder?.length > 0) {
+                socket.to(socket.id).emit('wait_for_pandit', userOrder?.pendingOrder);
+            }
+            if (userOrder?.continueOrder?.length > 0) {
+                socket.to(socket.id).emit('wait_for_pandit', userOrder?.continueOrder);
+            }
             console.log('Registered:', key, socket.id);
         }
     });

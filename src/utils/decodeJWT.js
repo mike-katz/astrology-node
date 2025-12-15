@@ -2,6 +2,7 @@
 const { decrypt } = require('./crypto');
 require('dotenv').config();
 const jwt = require('jsonwebtoken');
+const db = require('../db');
 
 const decodeJWT = (authHeader) => {
     try {
@@ -33,5 +34,27 @@ function emitToUser({ id, event, data }) {
         io.to(socketId).emit(event, data);
     }
 }
-module.exports = { decodeJWT, emitToUser };
+
+const checkOrders = async (userId) => {
+    const pendingOrder = await db('orders as o')
+        .leftJoin('users as u', 'u.id', 'o.userId')
+        .where({ "o.userId": userId, "o.status": "pending" })
+        .select(
+            'o.*',
+            'u.name',
+            'u.profile'
+        );
+    ;
+    const continueOrder = await db('orders as o')
+        .leftJoin('users as u', 'u.id', 'o.userId')
+        .where({ "o.userId": userId, "o.status": "pending", is_accept: true })
+        .select(
+            'o.*',
+            'u.name',
+            'u.profile'
+        );
+    return { pendingOrder, continueOrder }
+}
+
+module.exports = { decodeJWT, emitToUser, checkOrders };
 
