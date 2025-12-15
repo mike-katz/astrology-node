@@ -154,7 +154,7 @@ io.on('connection', (socket) => {
     });
 
     socket.on('user_register', ({ token }) => {
-        console.log("user_register token", token);
+        // console.log("user_register token", token);
         const response = decodeJWT(token);
         if (response?.success && response?.data?.userId) {
             const key = `user_${response?.data?.userId}`;
@@ -169,6 +169,14 @@ io.on('connection', (socket) => {
         console.log("socketId", socketId);
         if (socketId) {
             socket.to(socketId).emit('wait_for_pandit', payload);
+        }
+    });
+
+    socket.on('emit_to_user_for_pandit_accept', ({ key, payload }) => {
+        const socketId = onlineUsers.get(key);
+        console.log("socketId", socketId);
+        if (socketId) {
+            socket.to(socketId).emit('pandit_accepted', payload);
         }
     });
 
