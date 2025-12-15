@@ -139,17 +139,19 @@ const io = new Server(server, {
  * - client emits 'typing' and 'stop_typing' with { from_type, from_id, to_type, to_id }
  */
 const onlineUsers = new Map();
+
 io.on('connection', (socket) => {
     console.log('socket connected', socket.id);
 
-    socket.on('go_online', ({ orderId, id, type }) => {
+    socket.on('go_online', ({ orderId, from_id, type, to_id }) => {
         socket.join(orderId);
         socket.orderId = orderId;
-        socket.userId = id;
+        socket.userId = from_id;
         socket.type = type;
         console.log(`${type} joined room ${orderId}`);
 
         socket.to(orderId).emit('online');
+    });
 
     socket.on('user_register', ({ token }) => {
         const response = decodeJWT(token);
