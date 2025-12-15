@@ -3,7 +3,7 @@ const express = require('express');
 const http = require('http');
 const cors = require('cors');
 const { Server } = require('socket.io');
-const db = require('./db'); // knex instance
+const { decodeJWT } = require('./utils/decodeJWT');
 
 const app = express();
 app.use(cors());
@@ -17,18 +17,17 @@ const io = new Server(server, {
 
 // Keep track of online sockets separately for users and admins
 // Map: id -> socketId
-const onlineUsers = new Map();
-const onlinePandits = new Map();
+// const orders = {};
 
 /**
  * Helper: emit updated online lists
  */
-function broadcastOnline() {
-    io.emit('online_list', {
-        users: Array.from(onlineUsers.keys()),
-        pandits: Array.from(onlinePandits.keys())
-    });
-}
+// function broadcastOnline() {
+// io.emit('online_list', {
+//     users: Array.from(onlineUsers.keys()),
+//     pandits: Array.from(onlinePandits.keys())
+// });
+// }
 
 /**
  * REST API: get chat "rooms" for a given user/admin
@@ -139,6 +138,7 @@ function broadcastOnline() {
  * - client emits 'private_message' with { sender_type, sender_id, receiver_type, receiver_id, message }
  * - client emits 'typing' and 'stop_typing' with { from_type, from_id, to_type, to_id }
  */
+const onlineUsers = new Map();
 io.on('connection', (socket) => {
     console.log('socket connected', socket.id);
 
@@ -151,6 +151,13 @@ io.on('connection', (socket) => {
 
         socket.to(orderId).emit('online');
 
+    socket.on('user_register', ({ token }) => {
+        const response = decodeJWT(token);
+        if (response?.success && response?.data?.userId) {
+            const key = `user_${response?.data?.userId}`;
+            onlineUsers.set(key, socket.id);
+            console.log('Registered:', key, socket.id);
+        }
     });
 
     // socket.on('go_online', async (payload) => {
