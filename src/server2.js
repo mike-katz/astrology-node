@@ -154,6 +154,7 @@ io.on('connection', (socket) => {
     });
 
     socket.on('user_register', ({ token }) => {
+        console.log("user_register token", token);
         const response = decodeJWT(token);
         if (response?.success && response?.data?.userId) {
             const key = `user_${response?.data?.userId}`;
