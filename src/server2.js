@@ -162,16 +162,18 @@ io.on('connection', (socket) => {
             onlineUsers.set(key, socket.id);
             const userOrder = await checkOrders(response?.data?.userId);
             console.log("userOrder", userOrder);
-            const socketId = onlineUsers.get(key);
-            if (userOrder?.pendingOrder?.length > 0) {
-                console.log('inside pending:', socketId);
-                socket.to(socketId).emit('wait_for_pandit', userOrder?.pendingOrder);
-            }
-            if (userOrder?.continueOrder?.length > 0) {
-                console.log('inside continue order:', socketId);
+            setTimeout(() => {
+                const socketId = onlineUsers.get(key);
+                if (userOrder?.pendingOrder?.length > 0) {
+                    console.log('inside pending:', socketId);
+                    socket.to(socketId).emit('wait_for_pandit', userOrder?.pendingOrder);
+                }
+                if (userOrder?.continueOrder?.length > 0) {
+                    console.log('inside continue order:', socketId);
 
-                socket.to(socketId).emit('pandit_accepted', userOrder?.continueOrder);
-            }
+                    socket.to(socketId).emit('pandit_accepted', userOrder?.continueOrder);
+                }
+            }, 5000);
             console.log('Registered:', key, socketId);
         }
     });
