@@ -3,7 +3,6 @@ require('dotenv').config();
 const crypto = require('crypto-js');
 const serviceAccount = require('../config/astro-1e9f7-firebase-adminsdk-fbsvc-4f429f67a7.json');
 const admin = require("firebase-admin");
-const { emitToUser } = require('../utils/decodeJWT');
 const socket = require("../socket");
 
 admin.initializeApp({
@@ -89,9 +88,6 @@ async function create(req, res) {
             key: `user_${req?.userId}`,
             payload: [{ ...saved, name: user?.name, profile: user?.profile }],
         });
-
-        // emitToUser(req.userId, 'wait_for_pandit', saved)
-
         return res.status(200).json({ success: true, data: { orderId }, message: 'Order create Successfully' });
     } catch (err) {
         console.error(err);
@@ -151,4 +147,26 @@ async function list(req, res) {
         res.status(500).json({ success: false, message: 'Server error' });
     }
 }
-module.exports = { create, list };
+
+async function acceptOrder(req, res) {
+    try {
+        const { orderId } = req.body;
+        if (!orderId) return res.status(400).json({ success: false, message: 'Order id required.' });
+        const order = await db('orders').where({ orderId, userId: req.userId, status: "pending", is_accept: true }).first();
+        if (!order) return res.status(400).json({ success: false, message: 'Order not accepted by pandit.' });
+
+        const startTime = new Date()
+        const endTime = new Date(Date.now() + `${order?.duration}` * 60 * 1000);
+        await db('orders').where({ id: order?.id }).update({ status: "continue", startTime, endTime });
+
+        // socket.emit("emit_to_user_for_pandit_accept", {
+        //     toType: `user_${order?.userId}`,
+        //     payload: order,
+        // });
+        return res.status(200).json({ success: true, message: 'Order accept Successfully' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+module.exports = { create, list, acceptOrder };

@@ -17,24 +17,6 @@ const decodeJWT = (authHeader) => {
     }
 };
 
-// const emitToUser = (
-//     role='user',
-//     id,
-//     event: 'chat_request',
-//     data: { fromUserId }
-//   }) => {
-// }
-// ();
-
-function emitToUser({ id, event, data }) {
-    const key = `user_${id}`;
-    const socketId = onlineUsers.get(key);
-
-    if (socketId) {
-        io.to(socketId).emit(event, data);
-    }
-}
-
 const checkOrders = async (userId) => {
     const pendingOrder = await db('orders as o')
         .leftJoin('users as u', 'u.id', 'o.userId')
@@ -56,5 +38,5 @@ const checkOrders = async (userId) => {
     return { pendingOrder, continueOrder }
 }
 
-module.exports = { decodeJWT, emitToUser, checkOrders };
+module.exports = { decodeJWT, checkOrders };
 
