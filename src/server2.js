@@ -192,7 +192,7 @@ io.on('connection', (socket) => {
     socket.on('emit_to_user_for_pandit_accept', async ({ key, payload }) => {
         // const socketId = onlineUsers.get(key);
         const socketId = await RedisCache.getCache(key);
-        console.log("socketId", socketId);
+        console.log("emit_to_user_for_pandit_accept pandit_accepted socketId", socketId);
         if (socketId) {
             io.to(socketId).emit('pandit_accepted', payload);
         }
