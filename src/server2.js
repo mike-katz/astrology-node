@@ -173,8 +173,8 @@ io.on('connection', (socket) => {
 
                     socket.to(socketId).emit('pandit_accepted', userOrder?.continueOrder);
                 }
-            }, 5000);
-            console.log('Registered:', key, socketId);
+            }, 2000);
+            console.log('Registered:', key, socket.id);
         }
     });
 
