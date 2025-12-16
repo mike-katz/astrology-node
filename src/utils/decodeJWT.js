@@ -18,7 +18,7 @@ const decodeJWT = (authHeader) => {
 };
 
 const checkOrders = async (userId) => {
-    const pendingOrder = await db('orders as o')
+    const awaitforPanditOrder = await db('orders as o')
         .leftJoin('users as u', 'u.id', 'o.userId')
         .where({ "o.userId": userId, "o.status": "pending", is_accept: false })
         .select(
@@ -27,7 +27,7 @@ const checkOrders = async (userId) => {
             'u.profile'
         );
     ;
-    const continueOrder = await db('orders as o')
+    const waitforUserOrder = await db('orders as o')
         .leftJoin('users as u', 'u.id', 'o.userId')
         .where({ "o.userId": userId, "o.status": "pending", is_accept: true })
         .select(
@@ -35,7 +35,15 @@ const checkOrders = async (userId) => {
             'u.name',
             'u.profile'
         );
-    return { pendingOrder, continueOrder }
+    // const continueOrder = await db('orders as o')
+    //     .leftJoin('users as u', 'u.id', 'o.userId')
+    //     .where({ "o.userId": userId, "o.status": "continue" })
+    //     .select(
+    //         'o.*',
+    //         'u.name',
+    //         'u.profile'
+    //     );
+    return { waitforUserOrder, awaitforPanditOrder }
 }
 
 module.exports = { decodeJWT, checkOrders };
