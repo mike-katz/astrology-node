@@ -38,7 +38,7 @@ function emitToUser({ id, event, data }) {
 const checkOrders = async (userId) => {
     const pendingOrder = await db('orders as o')
         .leftJoin('users as u', 'u.id', 'o.userId')
-        .where({ "o.userId": userId, "o.status": "pending" })
+        .where({ "o.userId": userId, "o.status": "pending", is_accept: false })
         .select(
             'o.*',
             'u.name',
