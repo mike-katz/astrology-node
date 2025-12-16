@@ -160,7 +160,7 @@ io.on('connection', (socket) => {
             const key = `user_${response?.data?.userId}`;
             const userOrder = await checkOrders(response?.data?.userId);
             onlineUsers.set(key, socket.id);
-
+            console.log("userOrder", userOrder);
             if (userOrder?.pendingOrder?.length > 0) {
                 socket.to(socket.id).emit('wait_for_pandit', userOrder?.pendingOrder);
             }
