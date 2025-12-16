@@ -4,6 +4,7 @@ const http = require('http');
 const cors = require('cors');
 const { Server } = require('socket.io');
 const { decodeJWT, checkOrders } = require('./utils/decodeJWT');
+const RedisCache = require('./config/redisClient');
 
 const app = express();
 app.use(cors());
@@ -138,11 +139,10 @@ const io = new Server(server, {
  * - client emits 'private_message' with { sender_type, sender_id, receiver_type, receiver_id, message }
  * - client emits 'typing' and 'stop_typing' with { from_type, from_id, to_type, to_id }
  */
-const onlineUsers = new Map();
-
+// const onlineUsers = new Map();
+RedisCache.initializeRedis();
 io.on('connection', (socket) => {
     console.log('socket connected', socket.id);
-
     socket.on('go_online', ({ orderId, from_id, type, to_id }) => {
         socket.join(orderId);
         socket.orderId = orderId;
@@ -158,12 +158,13 @@ io.on('connection', (socket) => {
         const response = decodeJWT(token);
         if (response?.success && response?.data?.userId) {
             const key = `user_${response?.data?.userId}`;
-
-            onlineUsers.set(key, socket.id);
+            const socketId = socket.id
+            RedisCache.setCache(key, socketId);
+            // onlineUsers.set(key, socket.id);
             const userOrder = await checkOrders(response?.data?.userId);
             console.log("userOrder", userOrder);
             setTimeout(() => {
-                const socketId = onlineUsers.get(key);
+                // const socketId = onlineUsers.get(key);
                 if (userOrder?.pendingOrder?.length > 0) {
                     console.log('inside pending:', socketId);
                     socket.to(socketId).emit('wait_for_pandit', userOrder?.pendingOrder);
@@ -180,7 +181,8 @@ io.on('connection', (socket) => {
 
 
     socket.on('emit_to_user_for_register', ({ key, payload }) => {
-        const socketId = onlineUsers.get(key);
+        // const socketId = onlineUsers.get(key);
+        const socketId = RedisCache.getCache(key);
         console.log("socketId", socketId);
         if (socketId) {
             socket.to(socketId).emit('wait_for_pandit', payload);
@@ -188,7 +190,8 @@ io.on('connection', (socket) => {
     });
 
     socket.on('emit_to_user_for_pandit_accept', ({ key, payload }) => {
-        const socketId = onlineUsers.get(key);
+        // const socketId = onlineUsers.get(key);
+        const socketId = RedisCache.getCache(key);
         console.log("socketId", socketId);
         if (socketId) {
             socket.to(socketId).emit('pandit_accepted', payload);
