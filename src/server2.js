@@ -163,18 +163,18 @@ io.on('connection', (socket) => {
             // onlineUsers.set(key, socket.id);
             const userOrder = await checkOrders(response?.data?.userId);
             console.log("userOrder", userOrder);
-            setTimeout(() => {
-                // const socketId = onlineUsers.get(key);
-                if (userOrder?.awaitforPanditOrder?.length > 0) {
-                    console.log('inside pending:', socketId);
-                    io.to(socketId).emit('wait_for_pandit', userOrder?.awaitforPanditOrder);
-                }
-                if (userOrder?.waitforUserOrder?.length > 0) {
-                    console.log('inside continue order:', socketId);
+            // setTimeout(() => {
+            // const socketId = onlineUsers.get(key);
+            if (userOrder?.awaitforPanditOrder?.length > 0) {
+                console.log('inside pending:', socketId);
+                io.to(socketId).emit('wait_for_pandit', userOrder?.awaitforPanditOrder);
+            }
+            if (userOrder?.waitforUserOrder?.length > 0) {
+                console.log('inside continue order:', socketId);
 
-                    io.to(socketId).emit('pandit_accepted', userOrder?.waitforUserOrder);
-                }
-            }, 5000);
+                io.to(socketId).emit('pandit_accepted', userOrder?.waitforUserOrder);
+            }
+            // }, 5000);
             console.log('Registered:', key, socket.id);
         }
     });
@@ -185,7 +185,7 @@ io.on('connection', (socket) => {
         const socketId = await RedisCache.getCache(key);
         console.log("socketId", socketId);
         if (socketId) {
-            socket.to(socketId).emit('wait_for_pandit', payload);
+            io.to(socketId).emit('wait_for_pandit', payload);
         }
     });
 
@@ -194,7 +194,7 @@ io.on('connection', (socket) => {
         const socketId = await RedisCache.getCache(key);
         console.log("socketId", socketId);
         if (socketId) {
-            socket.to(socketId).emit('pandit_accepted', payload);
+            io.to(socketId).emit('pandit_accepted', payload);
         }
     });
 
