@@ -22,7 +22,7 @@ async function create(req, res) {
         const pandit = await db('pandits').where({ id: panditId }).first()
         if (!pandit) return res.status(400).json({ success: false, message: 'Pandit not found.' });
 
-        const continueOrder = await db('orders').where({ userId: req.userId, panditId, status: "continue", type }).first()
+        const continueOrder = await db('orders').where({ userId: req.userId, panditId, type }).whereIn('status', ['continue', 'pending']).first()
         if (continueOrder) return res.status(400).json({ success: false, message: 'Please complete your ongoing order.' });
 
         const order = await db('orders').where({ userId: req.userId, panditId }).first()
