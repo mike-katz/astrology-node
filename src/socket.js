@@ -1,6 +1,7 @@
 const { io } = require("socket.io-client");
 
-const socket = io("http://13.204.207.15:3001", {
+// const socket = io("http://localhost:3001", {
+const socket = io("https://socket.astrotalkguruji.com", {
     transports: ["websocket"],
     autoConnect: true,
 });
