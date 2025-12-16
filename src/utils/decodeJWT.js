@@ -18,33 +18,36 @@ const decodeJWT = (authHeader) => {
 };
 
 const checkOrders = async (userId) => {
-    const awaitforPanditOrder = await db('orders as o')
+    const orders = await db('orders as o')
         .leftJoin('users as u', 'u.id', 'o.userId')
-        .where({ "o.userId": userId, "o.status": "pending", is_accept: false })
+        .where('o.userId', userId)
+        .whereIn('o.status', ['pending', 'continue'])
         .select(
             'o.*',
             'u.name',
             'u.profile'
         );
-    ;
-    const waitforUserOrder = await db('orders as o')
-        .leftJoin('users as u', 'u.id', 'o.userId')
-        .where({ "o.userId": userId, "o.status": "pending", is_accept: true })
-        .select(
-            'o.*',
-            'u.name',
-            'u.profile'
-        );
-    const continueOrder = await db('orders as o')
-        .leftJoin('users as u', 'u.id', 'o.userId')
-        .where({ "o.userId": userId, "o.status": "continue" })
-        .select(
-            'o.*',
-            'u.name',
-            'u.profile'
-        );
-    return { waitforUserOrder, awaitforPanditOrder, continueOrder }
-}
+
+    const awaitforPanditOrder = [];
+    const waitforUserOrder = [];
+    const continueOrder = [];
+
+    for (const order of orders) {
+        if (order.status === 'pending' && order.is_accept === false) {
+            awaitforPanditOrder.push(order);
+        } else if (order.status === 'pending' && order.is_accept === true) {
+            waitforUserOrder.push(order);
+        } else if (order.status === 'continue') {
+            continueOrder.push(order);
+        }
+    }
+
+    return {
+        awaitforPanditOrder,
+        waitforUserOrder,
+        continueOrder
+    };
+};
 
 module.exports = { decodeJWT, checkOrders };
 
