@@ -237,6 +237,7 @@ io.on('connection', (socket) => {
         socket.leave(orderId);
     });
 
+
     // 🔹 JOIN ROOM
     // socket.on('join_chat', ({ orderId, userId, role }) => {
     //     socket.join(orderId);
@@ -266,7 +267,11 @@ io.on('connection', (socket) => {
     //     socket.to(orderId).emit('stop_typing');
     // });
 
-
+    socket.on('emit_to_chat_completed', ({ user, orderId }) => {
+        socket.to(orderId).emit('order_completed');
+        socket.leave(orderId);
+        console.log(`Socket ${socket.id} left room ${orderId}`);
+    });
 
     socket.on('emit_to_user', ({ toType, toId, orderId, payload }) => {
         console.log("cdscd", toType, toId, payload);
