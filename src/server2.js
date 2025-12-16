@@ -170,9 +170,12 @@ io.on('connection', (socket) => {
                 io.to(socketId).emit('wait_for_pandit', userOrder?.awaitforPanditOrder);
             }
             if (userOrder?.waitforUserOrder?.length > 0) {
-                console.log('inside continue order:', socketId);
-
+                console.log('inside pandit_accepted order:', socketId);
                 io.to(socketId).emit('pandit_accepted', userOrder?.waitforUserOrder);
+            }
+            if (userOrder?.continueOrder?.length > 0) {
+                console.log('inside continue order:', socketId);
+                io.to(socketId).emit('user_continue_order', userOrder?.continueOrder);
             }
             // }, 5000);
             console.log('Registered:', key, socket.id);

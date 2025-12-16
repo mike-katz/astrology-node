@@ -35,15 +35,15 @@ const checkOrders = async (userId) => {
             'u.name',
             'u.profile'
         );
-    // const continueOrder = await db('orders as o')
-    //     .leftJoin('users as u', 'u.id', 'o.userId')
-    //     .where({ "o.userId": userId, "o.status": "continue" })
-    //     .select(
-    //         'o.*',
-    //         'u.name',
-    //         'u.profile'
-    //     );
-    return { waitforUserOrder, awaitforPanditOrder }
+    const continueOrder = await db('orders as o')
+        .leftJoin('users as u', 'u.id', 'o.userId')
+        .where({ "o.userId": userId, "o.status": "continue" })
+        .select(
+            'o.*',
+            'u.name',
+            'u.profile'
+        );
+    return { waitforUserOrder, awaitforPanditOrder, continueOrder }
 }
 
 module.exports = { decodeJWT, checkOrders };
