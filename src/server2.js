@@ -159,7 +159,7 @@ io.on('connection', (socket) => {
         if (response?.success && response?.data?.userId) {
             const key = `user_${response?.data?.userId}`;
             const socketId = socket.id
-            RedisCache.setCache(key, socketId);
+            await RedisCache.setCache(key, socketId);
             // onlineUsers.set(key, socket.id);
             const userOrder = await checkOrders(response?.data?.userId);
             console.log("userOrder", userOrder);
@@ -180,18 +180,18 @@ io.on('connection', (socket) => {
     });
 
 
-    socket.on('emit_to_user_for_register', ({ key, payload }) => {
+    socket.on('emit_to_user_for_register', async ({ key, payload }) => {
         // const socketId = onlineUsers.get(key);
-        const socketId = RedisCache.getCache(key);
+        const socketId = await RedisCache.getCache(key);
         console.log("socketId", socketId);
         if (socketId) {
             socket.to(socketId).emit('wait_for_pandit', payload);
         }
     });
 
-    socket.on('emit_to_user_for_pandit_accept', ({ key, payload }) => {
+    socket.on('emit_to_user_for_pandit_accept', async ({ key, payload }) => {
         // const socketId = onlineUsers.get(key);
-        const socketId = RedisCache.getCache(key);
+        const socketId = await RedisCache.getCache(key);
         console.log("socketId", socketId);
         if (socketId) {
             socket.to(socketId).emit('pandit_accepted', payload);
