@@ -33,7 +33,9 @@ async function create(req, res) {
             deduction = (5 * pandit?.charge || 1);
 
         } else {
-            deduction = (1 * pandit?.charge || 1);
+            deduction = (5 * pandit?.charge || 1);
+            if (user?.balance < deduction) return res.status(400).json({ success: false, message: 'Min. 5 min balance required.' });
+            deduction = user?.balance / (pandit?.charge || 1)
         }
         if (user?.balance < deduction) return res.status(400).json({ success: false, message: 'Insufficient fund.' });
         const [saved] = await db('orders').insert({
@@ -169,4 +171,19 @@ async function acceptOrder(req, res) {
         res.status(500).json({ success: false, message: 'Server error' });
     }
 }
-module.exports = { create, list, acceptOrder };
+
+async function cancelOrder(req, res) {
+    try {
+        const { orderId } = req.body;
+        if (!orderId) return res.status(400).json({ success: false, message: 'Order id required.' });
+        const order = await db('orders').where({ orderId, userId: req.userId, status: "pending" }).first();
+        if (!order) return res.status(400).json({ success: false, message: 'You can not cancel this order.' });
+
+        await db('orders').where({ id: order?.id }).update({ status: "cancel" });
+        return res.status(200).json({ success: true, message: 'Order cancel Successfully' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+module.exports = { create, list, acceptOrder, cancelOrder };
