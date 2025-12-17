@@ -19,13 +19,13 @@ const decodeJWT = (authHeader) => {
 
 const checkOrders = async (userId) => {
     const orders = await db('orders as o')
-        .leftJoin('users as u', 'u.id', 'o.userId')
+        .leftJoin('pandits as p', 'p.id', 'o.panditId')
         .where('o.userId', userId)
         .whereIn('o.status', ['pending', 'continue'])
         .select(
             'o.*',
-            'u.name',
-            'u.profile'
+            'p.name',
+            'p.profile'
         );
 
     const awaitforPanditOrder = [];

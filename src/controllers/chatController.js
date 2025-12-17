@@ -118,7 +118,7 @@ async function sendMessage(req, res) {
         const order = await db('orders').where({ userId: req.userId, orderId, status: "continue" }).first();
         if (!order) return res.status(400).json({ success: false, message: 'Order is completed.' });
 
-        if (new Date(order?.endTime).getTime() > new Date()) {
+        if (new Date(order?.endTime).getTime() < new Date()) {
             await db('orders').where({ id: order?.id }).update({ status: "completed" });
             socket.emit("emit_to_chat_completed", {
                 user: order?.userId,
