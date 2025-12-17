@@ -48,12 +48,15 @@ async function create(req, res) {
             deduction,
             type
         }).returning('*');
-        const token = false;
+
+        const token = pandit?.token || false;
         if (token) {
+            const messages = `new ${type} request from ${user?.name}`
+            const continueOrder = await db('panditnotifications').insert({ userId: panditId, type: "order", message: messages })
             const message = {
                 token,
                 notification: {
-                    title: `You have received ${type} order`,
+                    title: messages,
                 },
 
                 // 🔔 Android
