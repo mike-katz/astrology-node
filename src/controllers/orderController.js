@@ -88,7 +88,7 @@ async function create(req, res) {
 
         socket.emit("emit_to_user_for_register", {
             key: `user_${req?.userId}`,
-            payload: [{ ...saved, name: user?.name, profile: user?.profile }],
+            payload: [{ ...saved, name: pandit?.name, profile: pandit?.profile }],
         });
         return res.status(200).json({ success: true, data: { orderId }, message: 'Order create Successfully' });
     } catch (err) {
