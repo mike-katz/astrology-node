@@ -30,4 +30,5 @@ router.get('/rooms', chat.getRoom);
 router.get('/messages', chat.getMessage);
 router.get('/getDetail', chat.getDetail);
 router.get('/getOrderDetail', chat.getOrderDetail);
+router.post('/endChat', chat.endChat);
 module.exports = router;
