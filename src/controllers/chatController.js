@@ -115,16 +115,22 @@ async function sendMessage(req, res) {
         return res.status(400).json({ success: false, message: 'Missing params.' });
     }
     try {
-        const order = await db('orders').where({ userId: req.userId, orderId, status: "continue" }).first();
-        if (!order) return res.status(400).json({ success: false, message: 'Order is completed.' });
+        const order = await db('orders').where({ userId: req.userId, orderId }).first();
+        if (!order) return res.status(400).json({ success: false, message: 'Order not found.' });
 
-        if (new Date(order?.endTime).getTime() < new Date()) {
+        if (order?.endTime && (new Date(order?.endTime).getTime() < new Date())) {
             await db('orders').where({ id: order?.id }).update({ status: "completed" });
             socket.emit("emit_to_chat_completed", {
                 user: order?.userId,
                 orderId: order?.orderId,
             });
             return res.status(400).json({ success: false, message: 'Order is completed.' });
+        }
+        if (order?.status == "completed") {
+            return res.status(400).json({ success: false, message: 'Order is completed.' });
+        }
+        if (order?.status == "pending") {
+            return res.status(400).json({ success: false, message: 'Order is pending.' });
         }
         const { files } = req
         let response = [];
@@ -179,13 +185,16 @@ async function getDetail(req, res) {
     try {
         const order = await db('pandits').where({ id: panditId }).first();
         if (!order) return res.status(400).json({ success: false, message: 'Pandit not found.' });
-
         let orderDetail
+        let isFirstOrder = true
+        const [{ total }] = await db('orders').where({ panditId, userId: req.userId }).count('id as total');
+        if (total > 1) {
+            isFirstOrder = false
+        }
         if (orderId) {
             orderDetail = await db('orders').where({ orderId }).first();
         }
-
-        const response = { id: panditId, name: order?.name, profile: order?.profile, isOnline: order?.isOnline }
+        const response = { id: panditId, name: order?.name, profile: order?.profile, isOnline: order?.isOnline, isFirstOrder }
         if (orderDetail) {
             response.startTime = orderDetail?.startTime;
             response.endTime = orderDetail?.endTime;
