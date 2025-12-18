@@ -124,7 +124,7 @@ async function sendMessage(req, res) {
                 user: order?.userId,
                 orderId: order?.orderId,
             });
-            return res.status(400).json({ success: false, message: 'Order is completed.' });
+            return res.status(400).json({ success: false, message: 'Please regenerate chat request.' });
         }
         if (order?.status == "completed") {
             return res.status(400).json({ success: false, message: 'Order is completed.' });
@@ -282,6 +282,10 @@ async function forceEndChat(req, res) {
         const order = await db('orders').where({ userId: req.userId, orderId }).first();
         if (!order) {
             return res.status(400).json({ success: false, message: 'Wrong order. Please enter correct' });
+        }
+
+        if (order?.endTime && (new Date(order?.endTime).getTime() > new Date())) {
+            return res.status(400).json({ success: false, message: 'Order is ongoing.' });
         }
 
         await db('orders').where({ orderId }).update({ status: "completed", endTime: new Date() });
