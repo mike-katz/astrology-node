@@ -100,10 +100,11 @@ io.on('connection', (socket) => {
         const { orderId, id, user_type, type } = data;
         const key = `${user_type}_${id}`
         const socketId = await RedisCache.getCache(key);
+        console.log("typing key", key, "socketId", socketId);
         // const targetSocket = (to_type === 'user') ? onlineUsers.get(String(to_id)) : onlinePandits.get(String(to_id));
         // if (targetSocket) io.to(targetSocket).emit('typing', { from_type, from_id });
         if (socketId) {
-            socket.to(socketId).emit('typing', { orderId, type });
+            io.to(socketId).emit('typing', { orderId, type });
         }
     });
 
@@ -111,11 +112,11 @@ io.on('connection', (socket) => {
         const { orderId, id, user_type, type } = data;
         const key = `${user_type}_${id}`
         const socketId = await RedisCache.getCache(key);
-        console.log("stop_typing orderId", { orderId, type });
+        console.log("stop_typing orderId", socketId, data);
         // const targetSocket = (to_type === 'user') ? onlineUsers.get(String(to_id)) : onlinePandits.get(String(to_id));
         // if (targetSocket) io.to(targetSocket).emit('stop_typing', { from_type, from_id });
         if (socketId) {
-            socket.to(orderId).emit('stop_typing', { orderId, type });
+            io.to(orderId).emit('stop_typing', { orderId, type });
         }
     });
 
