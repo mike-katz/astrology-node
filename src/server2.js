@@ -98,6 +98,7 @@ io.on('connection', (socket) => {
 
     socket.on('typing', async (data) => {
         const { orderId, id, user_type, type } = data;
+        console.log("typing data", data);
         const key = `${user_type}_${id}`
         const socketId = await RedisCache.getCache(key);
         console.log("typing key", key, "socketId", socketId);
