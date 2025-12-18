@@ -175,11 +175,23 @@ async function sendMessage(req, res) {
 }
 
 async function getDetail(req, res) {
-    const { panditId } = req.query;
+    const { panditId, orderId } = req.query;
     try {
         const order = await db('pandits').where({ id: panditId }).first();
         if (!order) return res.status(400).json({ success: false, message: 'Pandit not found.' });
-        return res.status(200).json({ success: true, data: { id: panditId, name: order?.name, profile: order?.profile, isOnline: order?.isOnline }, message: 'get detail Successfully' });
+
+        let orderDetail
+        if (orderId) {
+            orderDetail = await db('orders').where({ id: orderId }).first();
+        }
+
+        const response = { id: panditId, name: order?.name, profile: order?.profile, isOnline: order?.isOnline }
+        if (orderDetail) {
+            response.startTime = startTime;
+            response.endTime = endTime;
+        }
+
+        return res.status(200).json({ success: true, data: response, message: 'get detail Successfully' });
     } catch (err) {
         console.error(err);
         res.status(500).json({ success: false, message: 'Server error' });

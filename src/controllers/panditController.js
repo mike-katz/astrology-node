@@ -12,7 +12,18 @@ async function getPandits(req, res) {
     if (page < 1) page = 1;
     if (limit < 1) limit = 100;
     const offset = (page - 1) * limit;
+    const { type = "chat" } = req.query;
 
+    const filter = {
+        "p.status": "active",
+        "p.online": true
+    }
+    if (type == 'call') {
+        filter["p.call"] = true
+    }
+    if (type == 'chat') {
+        filter["p.chat"] = true
+    }
     const user = await db('pandits as p')
         .leftJoin('reviews as r', 'p.id', 'r.panditId')
         .select(
@@ -36,12 +47,13 @@ async function getPandits(req, res) {
               '[]'
             ) AS reviews
           `)
-        ).where('p.status', 'active')
+        ).where(filter)
+
         .groupBy('p.id')
         .limit(limit)
         .offset(offset);
-    const [{ count }] = await db('pandits')
-        .count('* as count').where('status', 'active');
+    const [{ count }] = await db('pandits as p')
+        .count('* as count').where(filter);
 
     const total = parseInt(count);
     const totalPages = Math.ceil(total / limit);
