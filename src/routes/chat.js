@@ -31,4 +31,5 @@ router.get('/messages', chat.getMessage);
 router.get('/getDetail', chat.getDetail);
 router.get('/getOrderDetail', chat.getOrderDetail);
 router.post('/endChat', chat.endChat);
+router.post('/forceEndChat', chat.forceEndChat);
 module.exports = router;

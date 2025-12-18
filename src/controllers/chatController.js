@@ -262,10 +262,38 @@ async function endChat(req, res) {
         }
 
         await db('orders').where({ orderId }).update({ status: "completed", endTime: new Date() });
+        socket.emit("emit_to_chat_completed", {
+            user: order?.userId,
+            orderId: order?.orderId,
+        });
         return res.status(200).json({ success: true, data: null, message: 'End chat successfully.' });
     } catch (err) {
         console.error(err);
         res.status(500).json({ success: false, message: 'Server error' });
     }
 }
-module.exports = { getRoom, getMessage, sendMessage, getDetail, getOrderDetail, endChat };
+
+async function forceEndChat(req, res) {
+    const { orderId } = req.body;
+    if (!orderId) {
+        return res.status(400).json({ success: false, message: 'Missing params.' });
+    }
+    try {
+        const order = await db('orders').where({ userId: req.userId, orderId }).first();
+        if (!order) {
+            return res.status(400).json({ success: false, message: 'Wrong order. Please enter correct' });
+        }
+
+        await db('orders').where({ orderId }).update({ status: "completed", endTime: new Date() });
+        socket.emit("emit_to_chat_completed", {
+            user: order?.userId,
+            orderId: order?.orderId,
+        });
+        return res.status(200).json({ success: true, data: null, message: 'End chat successfully.' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
+module.exports = { getRoom, getMessage, sendMessage, getDetail, getOrderDetail, endChat, forceEndChat };
