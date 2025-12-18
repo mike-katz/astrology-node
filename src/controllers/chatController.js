@@ -187,8 +187,8 @@ async function getDetail(req, res) {
 
         const response = { id: panditId, name: order?.name, profile: order?.profile, isOnline: order?.isOnline }
         if (orderDetail) {
-            response.startTime = startTime;
-            response.endTime = endTime;
+            response.startTime = orderDetail?.startTime;
+            response.endTime = orderDetail?.endTime;
         }
 
         return res.status(200).json({ success: true, data: response, message: 'get detail Successfully' });
