@@ -116,7 +116,7 @@ io.on('connection', (socket) => {
         // const targetSocket = (to_type === 'user') ? onlineUsers.get(String(to_id)) : onlinePandits.get(String(to_id));
         // if (targetSocket) io.to(targetSocket).emit('stop_typing', { from_type, from_id });
         if (socketId) {
-            io.to(orderId).emit('stop_typing', { orderId, type });
+            io.to(socketId).emit('stop_typing', { orderId, type });
         }
     });
 
