@@ -56,32 +56,61 @@ wss.on('connection', (ws) => {
             console.log("inside user register decode token", response);
             if (response?.success) {
                 const key = `user_${response.data.userId}`;
-                userSockets.set(key, ws);
                 await RedisCache.setCache(key, socketId);
-
                 const orders = await checkOrders(response.data.userId);
+                if (orders?.awaitforPanditOrder?.length)
+                    send(ws, 'wait_for_pandit', orders.awaitforPanditOrder);
 
-                setTimeout(() => {
-                    if (orders?.awaitforPanditOrder?.length)
-                        send(ws, 'wait_for_pandit', orders.awaitforPanditOrder);
+                if (orders?.waitforUserOrder?.length)
+                    send(ws, 'pandit_accepted', orders.waitforUserOrder);
 
-                    if (orders?.waitforUserOrder?.length)
-                        send(ws, 'pandit_accepted', orders.waitforUserOrder);
-
-                    if (orders?.continueOrder?.length)
-                        send(ws, 'user_continue_order', orders.continueOrder);
-                }, 10000);
-
+                if (orders?.continueOrder?.length)
+                    send(ws, 'user_continue_order', orders.continueOrder);
             }
+        }
+
+        if (event === 'pandit_register') {
+            const response = decodeJWT(data.token);
+            console.log("inside pandit register decode token", response);
+            if (response?.success) {
+                const key = `pandit_${response.data.userId}`;
+                await RedisCache.setCache(key, socketId);
+            }
+        }
+
+        if (event === 'emit_to_user_for_register') {
+            const socketId = await RedisCache.getCache(data?.key);
+            console.log("socketId", socketId);
+            if (socketId) send(socketId, 'wait_for_pandit', data?.payload);
+        }
+
+        if (event === 'typing' || event == 'stop_typing') {
+            const { orderId, id, user_type, type } = data;
+            console.log("typing data", data);
+            const key = `${user_type}_${id}`
+            const socketId = await RedisCache.getCache(key);
+            console.log("typing key", key, "socketId", socketId);
+            if (socketId) send(socketId, event, { orderId, type });
+        }
+
+        if (event === 'emit_to_chat_completed') {
+            const socketId = await RedisCache.getCache(data?.key);
+            console.log("socketId", socketId);
+            if (socketId) send(socketId, 'order_completed', { orderId: data?.orderId });
+        }
+
+        if (event === 'emit_to_user') {
+            const socketId = await RedisCache.getCache(data?.key);
+            console.log("socketId", socketId);
+            if (socketId) send(socketId, 'receive_message', { payload: data?.payload });
         }
     });
 
     ws.on('close', () => {
-        leaveRoom(ws);
-        clients.delete(ws.id);
-        for (const [key, socket] of userSockets.entries()) {
-            if (socket === ws) userSockets.delete(key);
-        }
+        // leaveRoom(ws);
+        // for (const [key, socket] of userSockets.entries()) {
+        //     if (socket === ws) userSockets.delete(key);
+        // }
         console.log('WS disconnected:', ws.id);
     });
 });

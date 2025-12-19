@@ -31,11 +31,10 @@ async function create(req, res) {
         if (!order) {
             //create 5 minute order
             deduction = (5 * pandit?.charge || 1);
-
         } else {
             deduction = (5 * pandit?.charge || 1);
             if (user?.balance < deduction) return res.status(400).json({ success: false, message: 'Min. 5 min balance required.' });
-            deduction = user?.balance / (pandit?.charge || 1)
+            deduction = (user?.balance - 50) / (pandit?.charge || 1)
         }
         if (user?.balance < deduction) return res.status(400).json({ success: false, message: 'Insufficient fund.' });
         const [saved] = await db('orders').insert({
@@ -89,10 +88,16 @@ async function create(req, res) {
             await admin.messaging().send(message);
         }
 
-        socket.emit("emit_to_user_for_register", {
+        socket.send(JSON.stringify({
+            event: "emit_to_user_for_register",
             key: `user_${req?.userId}`,
-            payload: [{ ...saved, name: pandit?.name, profile: pandit?.profile }],
-        });
+            payload: [{ ...saved, name: pandit?.name, profile: pandit?.profile }]
+        }));
+
+        // socket.emit("emit_to_user_for_register", {
+        //     key: `user_${req?.userId}`,
+        //     payload: [{ ...saved, name: pandit?.name, profile: pandit?.profile }],
+        // });
         return res.status(200).json({ success: true, data: { orderId }, message: 'Order create Successfully' });
     } catch (err) {
         console.error(err);

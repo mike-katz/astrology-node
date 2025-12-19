@@ -120,10 +120,15 @@ async function sendMessage(req, res) {
 
         if (order?.endTime && (new Date(order?.endTime).getTime() < new Date())) {
             await db('orders').where({ id: order?.id }).update({ status: "completed" });
-            socket.emit("emit_to_chat_completed", {
+            // socket.emit("emit_to_chat_completed", {
+            //     user: order?.userId,
+            //     orderId: order?.orderId,
+            // });
+            socket.send(JSON.stringify({
+                event: "emit_to_chat_completed",
                 user: order?.userId,
                 orderId: order?.orderId,
-            });
+            }));
             return res.status(400).json({ success: false, message: 'Please regenerate chat request.' });
         }
         if (order?.status == "completed") {
@@ -167,12 +172,21 @@ async function sendMessage(req, res) {
             }).returning('*');
             response = saved
         }
-        socket.emit("emit_to_user", {
+
+        socket.send(JSON.stringify({
+            event: "emit_to_user",
             toType: "user",
             toId: order?.userId,
             orderId: order?.orderId,
             payload: response,
-        });
+        }));
+
+        // socket.emit("emit_to_user", {
+        //     toType: "user",
+        //     toId: order?.userId,
+        //     orderId: order?.orderId,
+        //     payload: response,
+        // });
         return res.status(200).json({ success: true, data: response, message: 'Message send Successfully' });
     } catch (err) {
         console.error(err);
@@ -262,10 +276,16 @@ async function endChat(req, res) {
         }
 
         await db('orders').where({ orderId }).update({ status: "completed", endTime: new Date() });
-        socket.emit("emit_to_chat_completed", {
+        // socket.emit("emit_to_chat_completed", {
+        //     user: order?.userId,
+        //     orderId: order?.orderId,
+        // });
+
+        socket.send(JSON.stringify({
+            event: "emit_to_chat_completed",
             user: order?.userId,
             orderId: order?.orderId,
-        });
+        }));
         return res.status(200).json({ success: true, data: null, message: 'End chat successfully.' });
     } catch (err) {
         console.error(err);
@@ -289,10 +309,15 @@ async function forceEndChat(req, res) {
         }
 
         await db('orders').where({ orderId }).update({ status: "completed", endTime: new Date() });
-        socket.emit("emit_to_chat_completed", {
+        // socket.emit("emit_to_chat_completed", {
+        //     user: order?.userId,
+        //     orderId: order?.orderId,
+        // });
+        socket.send(JSON.stringify({
+            event: "emit_to_chat_completed",
             user: order?.userId,
             orderId: order?.orderId,
-        });
+        }));
         return res.status(200).json({ success: true, data: null, message: 'End chat successfully.' });
     } catch (err) {
         console.error(err);
