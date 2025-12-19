@@ -53,6 +53,7 @@ wss.on('connection', (ws) => {
         /* ---------------- USER REGISTER ---------------- */
         if (event === 'user_register') {
             const response = decodeJWT(data.token);
+            console.log("inside user register decode token", response);
             if (response?.success) {
                 const key = `user_${response.data.userId}`;
                 userSockets.set(key, ws);
