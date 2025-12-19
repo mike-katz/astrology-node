@@ -47,8 +47,9 @@ wss.on('connection', (ws) => {
     console.log('WS connected:', socketId);
 
     ws.on('message', async (message) => {
-        console.log("inside message log", message);
         const data = JSON.parse(message);
+        console.log("inside message log", data);
+
         const { event } = data;
 
         /* ---------------- USER REGISTER ---------------- */
