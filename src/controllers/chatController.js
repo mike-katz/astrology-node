@@ -174,8 +174,8 @@ async function sendMessage(req, res) {
         }
 
         callEvent("emit_to_user", {
-            toType: "user",
-            toId: order?.userId,
+            toType: "pandit",
+            toId: order?.panditId,
             orderId: order?.orderId,
             payload: response,
         });
