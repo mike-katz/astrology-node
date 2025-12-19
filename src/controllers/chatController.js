@@ -126,7 +126,7 @@ async function sendMessage(req, res) {
             // });
 
             callEvent("emit_to_chat_completed", {
-                user: order?.userId,
+                key: `user_${order?.userId}`,
                 orderId: order?.orderId
             });
             return res.status(400).json({ success: false, message: 'Please regenerate chat request.' });
@@ -281,7 +281,7 @@ async function endChat(req, res) {
         // });
 
         callEvent("emit_to_chat_completed", {
-            user: order?.userId,
+            key: `user_${order?.userId}`,
             orderId: order?.orderId,
         });
 
@@ -314,7 +314,7 @@ async function forceEndChat(req, res) {
         // });
 
         callEvent("emit_to_chat_completed", {
-            user: order?.userId,
+            key: `user_${order?.userId}`,
             orderId: order?.orderId,
         });
 
