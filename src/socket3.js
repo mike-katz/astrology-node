@@ -48,7 +48,7 @@ wss.on('connection', (ws) => {
 
     ws.on('message', async (message) => {
         const datas = socketParseEventData(message);
-        console.log("inside message log", data);
+        console.log("inside message log", datas);
         const { event, data } = datas;
         /* ---------------- USER REGISTER ---------------- */
         if (event === 'user_register') {
