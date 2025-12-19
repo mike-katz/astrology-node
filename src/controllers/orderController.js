@@ -11,10 +11,10 @@ admin.initializeApp({
 
 async function create(req, res) {
     const { panditId, type = 'chat' } = req.body;
-
     if (!panditId) {
         return res.status(400).json({ success: false, message: 'Please enter pandit' });
     }
+    console.log("create order req.body", req.body);
     try {
         const user = await db('users').where({ id: req.userId }).first()
         if (user?.balance < 1) return res.status(400).json({ success: false, message: 'Please recharge your wallet.' });
@@ -28,6 +28,7 @@ async function create(req, res) {
         const order = await db('orders').where({ userId: req.userId, panditId }).first()
         const orderId = ((parseInt(crypto.lib.WordArray.random(16).toString(), 16) % 1e6) + '').padStart(15, '0');
         let deduction = 0
+        console.log("last order", order);
         if (!order) {
             //create 5 minute order
             deduction = (5 * pandit?.charge || 1);
@@ -47,10 +48,12 @@ async function create(req, res) {
             deduction,
             type
         }).returning('*');
+        console.log("order inserted", saved);
 
         const token = pandit?.token || false;
         if (token) {
-            const messages = `new ${type} request from ${user?.name}`
+            console.log("start push notification");
+            const messages = `new ${type} request from ${user?.name} (Rs ${pandit?.charge}/min).`
             const continueOrder = await db('panditnotifications').insert({ userId: panditId, type: "order", message: messages })
             const message = {
                 token,
@@ -85,8 +88,11 @@ async function create(req, res) {
                 data: {},
 
             };
-            await admin.messaging().send(message);
+            const response = await admin.messaging().send(message);
+            console.log("push notification response", response);
+            console.log("end push notification");
         }
+        console.log("start socket call");
 
         socket.send(JSON.stringify({
             event: "emit_to_user_for_register",
@@ -95,6 +101,7 @@ async function create(req, res) {
                 payload: [{ ...saved, name: pandit?.name, profile: pandit?.profile }]
             }
         }));
+        console.log(" socket end call");
 
         // socket.emit("emit_to_user_for_register", {
         //     key: `user_${req?.userId}`,
