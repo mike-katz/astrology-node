@@ -83,7 +83,7 @@ wss.on('connection', (ws) => {
             const socketId = clients.get(data?.key);
 
             console.log("socketId", socketId);
-            if (socketId) send(ws, 'wait_for_pandit', data?.payload);
+            if (socketId) send(socketId, 'wait_for_pandit', data?.payload);
         }
 
         if (event === 'typing' || event == 'stop_typing') {
@@ -93,21 +93,21 @@ wss.on('connection', (ws) => {
             // const socketId = await RedisCache.getCache(key);
             const socketId = clients.get(key);
             console.log("typing key", key, "socketId", socketId);
-            if (socketId) send(JSON.parse(socketId), event, { orderId, type });
+            if (socketId) send(socketId, event, { orderId, type });
         }
 
         if (event === 'emit_to_chat_completed') {
             // const socketId = await RedisCache.getCache(data?.key);
             const socketId = clients.get(data?.key);
             console.log("socketId", socketId);
-            if (socketId) send(JSON.parse(socketId), 'order_completed', { orderId: data?.orderId });
+            if (socketId) send(socketId, 'order_completed', { orderId: data?.orderId });
         }
 
         if (event === 'emit_to_user') {
             // const socketId = await RedisCache.getCache(data?.key);
             const socketId = clients.get(data?.key);
             console.log("socketId", socketId);
-            if (socketId) send(JSON.parse(socketId), 'receive_message', { payload: data?.payload });
+            if (socketId) send(socketId, 'receive_message', { payload: data?.payload });
         }
     });
 
