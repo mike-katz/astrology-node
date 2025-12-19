@@ -50,6 +50,17 @@ async function create(req, res) {
         }).returning('*');
         console.log("order inserted", saved);
 
+        console.log("start socket call");
+
+        socket.send(JSON.stringify({
+            event: "emit_to_user_for_register",
+            data: {
+                key: `user_${req?.userId}`,
+                payload: [{ ...saved, name: pandit?.name, profile: pandit?.profile }]
+            }
+        }));
+        console.log(" socket end call");
+
         const token = pandit?.token || false;
         if (token) {
             console.log("start push notification");
@@ -92,17 +103,6 @@ async function create(req, res) {
             console.log("push notification response", response);
             console.log("end push notification");
         }
-        console.log("start socket call");
-
-        socket.send(JSON.stringify({
-            event: "emit_to_user_for_register",
-            data: {
-                key: `user_${req?.userId}`,
-                payload: [{ ...saved, name: pandit?.name, profile: pandit?.profile }]
-            }
-        }));
-        console.log(" socket end call");
-
         // socket.emit("emit_to_user_for_register", {
         //     key: `user_${req?.userId}`,
         //     payload: [{ ...saved, name: pandit?.name, profile: pandit?.profile }],
