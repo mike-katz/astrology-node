@@ -1,35 +1,52 @@
-// const { io } = require("socket.io-client");
 const WebSocket = require('ws');
 
-const socket = new WebSocket('wss://socket.astrotalkguruji.com');
+// const WS_URL = 'ws://localhost:3001';
+const WS_URL = 'wss://socket.astrotalkguruji.com';
 
-// const socket = io("http://localhost:3001", {
-// const socket = io("https://socket.astrotalkguruji.com", {
-//     transports: ["websocket"],
-//     autoConnect: true,
-// });
-// socket.onopen = () => console.log('Connected');
-// socket.on('message', (JSON.stringify({ event: "emit_to_user_for_register", key: "user_27" })) => {
-//     console.log('Received:');
-// });
-// socket.send(JSON.stringify({
-//     event: "emit_to_user_for_register",
-//     key: "user_27"
-// }));
-// socket.onclose = () => console.log('Disconnected');
+let socket;
+let retries = 0;
+const MAX_RETRIES = 20;
 
+function connect() {
+    console.log('🔌 Connecting WS...');
 
+    socket = new WebSocket(WS_URL);
 
-socket.on('open', () => {
-    console.log('Connected');
-});
+    socket.on('open', () => {
+        console.log('✅ Connected');
+        retries = 0;
+    });
 
-socket.on('message', (data) => {
-    const msg = JSON.parse(data.toString());
-    console.log('Received:', msg);
-});
+    socket.on('message', (data) => {
+        try {
+            const msg = JSON.parse(data.toString());
+            console.log('📩 Received:', msg);
+        } catch {
+            console.log('Raw:', data.toString());
+        }
+    });
 
-socket.on('close', () => {
-    console.log('Disconnected');
-});
+    socket.on('close', () => {
+        console.log('❌ Disconnected');
+        retryConnect();
+    });
+
+    socket.on('error', (err) => {
+        console.error('⚠️ Error:', err.message);
+        socket.close();
+    });
+}
+
+function retryConnect() {
+    if (retries >= MAX_RETRIES) return;
+
+    const delay = Math.min(1000 * 2 ** retries, 10000);
+    retries++;
+
+    console.log(`🔁 Reconnect in ${delay}ms`);
+    setTimeout(connect, delay);
+}
+
+connect();
+
 module.exports = socket;
