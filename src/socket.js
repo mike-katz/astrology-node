@@ -37,6 +37,13 @@ function connect() {
     });
 }
 
+function callEvent(event, data) {
+    socket.send(JSON.stringify({
+        event,
+        data
+    }))
+}
+
 function retryConnect() {
     if (retries >= MAX_RETRIES) return;
 
@@ -49,4 +56,4 @@ function retryConnect() {
 
 connect();
 
-module.exports = socket;
+module.exports = { callEvent };

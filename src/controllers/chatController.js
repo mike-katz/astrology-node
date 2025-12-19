@@ -1,6 +1,6 @@
 const db = require('../db');
 require('dotenv').config();
-const socket = require("../socket");
+const { callEvent } = require("../socket");
 const { uploadImageTos3 } = require('./uploader');
 
 async function getRoom(req, res) {
@@ -124,13 +124,11 @@ async function sendMessage(req, res) {
             //     user: order?.userId,
             //     orderId: order?.orderId,
             // });
-            socket.send(JSON.stringify({
-                event: "emit_to_chat_completed",
-                data: {
-                    user: order?.userId,
-                    orderId: order?.orderId
-                }
-            }));
+
+            callEvent("emit_to_chat_completed", {
+                user: order?.userId,
+                orderId: order?.orderId
+            });
             return res.status(400).json({ success: false, message: 'Please regenerate chat request.' });
         }
         if (order?.status == "completed") {
@@ -175,15 +173,12 @@ async function sendMessage(req, res) {
             response = saved
         }
 
-        socket.send(JSON.stringify({
-            event: "emit_to_user",
-            data: {
-                toType: "user",
-                toId: order?.userId,
-                orderId: order?.orderId,
-                payload: response,
-            }
-        }));
+        callEvent("emit_to_user", {
+            toType: "user",
+            toId: order?.userId,
+            orderId: order?.orderId,
+            payload: response,
+        });
 
         // socket.emit("emit_to_user", {
         //     toType: "user",
@@ -285,13 +280,11 @@ async function endChat(req, res) {
         //     orderId: order?.orderId,
         // });
 
-        socket.send(JSON.stringify({
-            event: "emit_to_chat_completed",
-            data: {
-                user: order?.userId,
-                orderId: order?.orderId,
-            }
-        }));
+        callEvent("emit_to_chat_completed", {
+            user: order?.userId,
+            orderId: order?.orderId,
+        });
+
         return res.status(200).json({ success: true, data: null, message: 'End chat successfully.' });
     } catch (err) {
         console.error(err);
@@ -319,11 +312,12 @@ async function forceEndChat(req, res) {
         //     user: order?.userId,
         //     orderId: order?.orderId,
         // });
-        socket.send(JSON.stringify({
-            event: "emit_to_chat_completed",
+
+        callEvent("emit_to_chat_completed", {
             user: order?.userId,
             orderId: order?.orderId,
-        }));
+        });
+
         return res.status(200).json({ success: true, data: null, message: 'End chat successfully.' });
     } catch (err) {
         console.error(err);

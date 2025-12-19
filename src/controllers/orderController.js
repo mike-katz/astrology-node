@@ -3,7 +3,7 @@ require('dotenv').config();
 const crypto = require('crypto-js');
 const serviceAccount = require('../config/astro-1e9f7-firebase-adminsdk-fbsvc-4f429f67a7.json');
 const admin = require("firebase-admin");
-const socket = require("../socket");
+const { callEvent } = require("../socket");
 
 admin.initializeApp({
     credential: admin.credential.cert(serviceAccount),
@@ -52,13 +52,10 @@ async function create(req, res) {
 
         console.log("start socket call");
 
-        socket.send(JSON.stringify({
-            event: "emit_to_user_for_register",
-            data: {
-                key: `user_${req?.userId}`,
-                payload: [{ ...saved, name: pandit?.name, profile: pandit?.profile }]
-            }
-        }));
+        callEvent("emit_to_user_for_register", {
+            key: `user_${req?.userId}`,
+            payload: [{ ...saved, name: pandit?.name, profile: pandit?.profile }]
+        });
         console.log(" socket end call");
 
         const token = pandit?.token || false;
