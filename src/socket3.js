@@ -61,14 +61,17 @@ wss.on('connection', (ws) => {
 
                 const orders = await checkOrders(response.data.userId);
 
-                if (orders?.awaitforPanditOrder?.length)
-                    send(ws, 'wait_for_pandit', orders.awaitforPanditOrder);
+                setTimeout(() => {
+                    if (orders?.awaitforPanditOrder?.length)
+                        send(ws, 'wait_for_pandit', orders.awaitforPanditOrder);
 
-                if (orders?.waitforUserOrder?.length)
-                    send(ws, 'pandit_accepted', orders.waitforUserOrder);
+                    if (orders?.waitforUserOrder?.length)
+                        send(ws, 'pandit_accepted', orders.waitforUserOrder);
 
-                if (orders?.continueOrder?.length)
-                    send(ws, 'user_continue_order', orders.continueOrder);
+                    if (orders?.continueOrder?.length)
+                        send(ws, 'user_continue_order', orders.continueOrder);
+                }, 10000);
+
             }
         }
     });
