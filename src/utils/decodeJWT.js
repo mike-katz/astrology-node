@@ -49,5 +49,9 @@ const checkOrders = async (userId) => {
     };
 };
 
-module.exports = { decodeJWT, checkOrders };
+const socketParseEventData = (message) => {
+    return JSON.parse(message);
+}
+
+module.exports = { decodeJWT, checkOrders, socketParseEventData };
 

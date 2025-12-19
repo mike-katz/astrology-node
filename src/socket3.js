@@ -2,7 +2,7 @@ const express = require('express');
 const http = require('http');
 const WebSocket = require('ws');
 const cors = require('cors');
-const { decodeJWT, checkOrders } = require('./utils/decodeJWT');
+const { decodeJWT, checkOrders, socketParseEventData } = require('./utils/decodeJWT');
 const RedisCache = require('./config/redisClient');
 
 const app = express();
@@ -47,11 +47,9 @@ wss.on('connection', (ws) => {
     console.log('WS connected:', socketId);
 
     ws.on('message', async (message) => {
-        const data = JSON.parse(message);
+        const datas = socketParseEventData(message);
         console.log("inside message log", data);
-
-        const { event } = data;
-
+        const { event, data } = datas;
         /* ---------------- USER REGISTER ---------------- */
         if (event === 'user_register') {
             const response = decodeJWT(data.token);
