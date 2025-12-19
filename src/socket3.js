@@ -70,46 +70,6 @@ wss.on('connection', (ws) => {
                     send(ws, 'user_continue_order', orders.continueOrder);
             }
         }
-
-        /* ---------------- PANDIT REGISTER ---------------- */
-        if (event === 'pandit_register') {
-            const response = decodeJWT(data.token);
-            if (response?.success) {
-                const key = `pandit_${response.data.userId}`;
-                userSockets.set(key, ws);
-                await RedisCache.setCache(key, socketId);
-            }
-        }
-
-        /* ---------------- JOIN CHAT (ORDER) ---------------- */
-        if (event === 'join_order') {
-            joinRoom(data.orderId, ws);
-            console.log(`joined order ${data.orderId}`);
-        }
-
-        /* ---------------- CHAT MESSAGE ---------------- */
-        if (event === 'emit_to_user') {
-            const room = orderRooms.get(data.orderId) || [];
-            room.forEach(client => {
-                if (client !== ws) {
-                    send(client, 'receive_message', data.payload);
-                }
-            });
-        }
-
-        /* ---------------- TYPING ---------------- */
-        if (event === 'typing' || event === 'stop_typing') {
-            const key = `${data.user_type}_${data.id}`;
-            const target = userSockets.get(key);
-            if (target) send(target, event, { orderId: data.orderId, type: data.type });
-        }
-
-        /* ---------------- ORDER COMPLETED ---------------- */
-        if (event === 'emit_to_chat_completed') {
-            const room = orderRooms.get(data.orderId) || [];
-            room.forEach(client => send(client, 'order_completed', {}));
-            orderRooms.delete(data.orderId);
-        }
     });
 
     ws.on('close', () => {
