@@ -126,8 +126,10 @@ async function sendMessage(req, res) {
             // });
             socket.send(JSON.stringify({
                 event: "emit_to_chat_completed",
-                user: order?.userId,
-                orderId: order?.orderId,
+                data: {
+                    user: order?.userId,
+                    orderId: order?.orderId
+                }
             }));
             return res.status(400).json({ success: false, message: 'Please regenerate chat request.' });
         }
@@ -175,10 +177,12 @@ async function sendMessage(req, res) {
 
         socket.send(JSON.stringify({
             event: "emit_to_user",
-            toType: "user",
-            toId: order?.userId,
-            orderId: order?.orderId,
-            payload: response,
+            data: {
+                toType: "user",
+                toId: order?.userId,
+                orderId: order?.orderId,
+                payload: response,
+            }
         }));
 
         // socket.emit("emit_to_user", {
@@ -283,8 +287,10 @@ async function endChat(req, res) {
 
         socket.send(JSON.stringify({
             event: "emit_to_chat_completed",
-            user: order?.userId,
-            orderId: order?.orderId,
+            data: {
+                user: order?.userId,
+                orderId: order?.orderId,
+            }
         }));
         return res.status(200).json({ success: true, data: null, message: 'End chat successfully.' });
     } catch (err) {

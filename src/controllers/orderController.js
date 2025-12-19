@@ -90,8 +90,10 @@ async function create(req, res) {
 
         socket.send(JSON.stringify({
             event: "emit_to_user_for_register",
-            key: `user_${req?.userId}`,
-            payload: [{ ...saved, name: pandit?.name, profile: pandit?.profile }]
+            data: {
+                key: `user_${req?.userId}`,
+                payload: [{ ...saved, name: pandit?.name, profile: pandit?.profile }]
+            }
         }));
 
         // socket.emit("emit_to_user_for_register", {
