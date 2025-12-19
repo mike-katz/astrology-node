@@ -3,7 +3,7 @@ const http = require('http');
 const WebSocket = require('ws');
 const cors = require('cors');
 const { decodeJWT, checkOrders, socketParseEventData } = require('./utils/decodeJWT');
-const RedisCache = require('./config/redisClient');
+// const RedisCache = require('./config/redisClient');
 
 const app = express();
 app.use(cors());
@@ -12,7 +12,7 @@ app.use(express.json());
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
-RedisCache.initializeRedis();
+// RedisCache.initializeRedis();
 
 function joinRoom(orderId, ws) {
     if (!orderRooms.has(orderId)) {
@@ -37,6 +37,8 @@ function send(ws, event, payload) {
     }
 }
 
+const clients = new Map();
+
 wss.on('connection', (ws) => {
     const socketId = Date.now() + '_' + Math.random();
     ws.id = socketId;
@@ -52,7 +54,8 @@ wss.on('connection', (ws) => {
             console.log("inside user register decode token", response);
             if (response?.success) {
                 const key = `user_${response.data.userId}`;
-                await RedisCache.setCache(key, JSON.stringify(ws));
+                // await RedisCache.setCache(key, JSON.stringify(ws));
+                clients.set(key, ws);
                 const orders = await checkOrders(response.data.userId);
                 if (orders?.awaitforPanditOrder?.length)
                     send(ws, 'wait_for_pandit', orders.awaitforPanditOrder);
@@ -70,12 +73,15 @@ wss.on('connection', (ws) => {
             console.log("inside pandit register decode token", response);
             if (response?.success) {
                 const key = `pandit_${response.data.userId}`;
-                await RedisCache.setCache(key, JSON.stringify(ws));
+                // await RedisCache.setCache(key, JSON.stringify(ws));
+                clients.set(key, ws);
             }
         }
 
         if (event === 'emit_to_user_for_register') {
-            const socketId = await RedisCache.getCache(data?.key);
+            // const socketId = await RedisCache.getCache(data?.key);
+            const socketId = clients.get(data?.key);
+
             console.log("socketId", socketId);
             if (socketId) send(ws, 'wait_for_pandit', data?.payload);
         }
@@ -84,19 +90,22 @@ wss.on('connection', (ws) => {
             const { orderId, id, user_type, type } = data;
             console.log("typing data", data);
             const key = `${user_type}_${id}`
-            const socketId = await RedisCache.getCache(key);
+            // const socketId = await RedisCache.getCache(key);
+            const socketId = clients.get(key);
             console.log("typing key", key, "socketId", socketId);
             if (socketId) send(JSON.parse(socketId), event, { orderId, type });
         }
 
         if (event === 'emit_to_chat_completed') {
-            const socketId = await RedisCache.getCache(data?.key);
+            // const socketId = await RedisCache.getCache(data?.key);
+            const socketId = clients.get(data?.key);
             console.log("socketId", socketId);
             if (socketId) send(JSON.parse(socketId), 'order_completed', { orderId: data?.orderId });
         }
 
         if (event === 'emit_to_user') {
-            const socketId = await RedisCache.getCache(data?.key);
+            // const socketId = await RedisCache.getCache(data?.key);
+            const socketId = clients.get(data?.key);
             console.log("socketId", socketId);
             if (socketId) send(JSON.parse(socketId), 'receive_message', { payload: data?.payload });
         }
