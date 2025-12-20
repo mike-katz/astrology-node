@@ -44,7 +44,7 @@ async function create(req, res) {
             orderId,
             status: "pending",
             rate: pandit?.charge || 1,
-            duration: 5,
+            duration: 60,
             deduction,
             type
         }).returning('*');
