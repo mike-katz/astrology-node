@@ -179,6 +179,12 @@ async function acceptOrder(req, res) {
         //     toType: `user_${order?.userId}`,
         //     payload: order,
         // });
+
+        callEvent("emit_to_user_chat_end_time", {
+            key: `pandit_${pandit?.id}`,
+            payload: { startTime, endTime, orderId }
+        });
+
         return res.status(200).json({ success: true, message: 'Order accept Successfully' });
     } catch (err) {
         console.error(err);
