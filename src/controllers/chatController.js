@@ -325,4 +325,17 @@ async function forceEndChat(req, res) {
     }
 }
 
-module.exports = { getRoom, getMessage, sendMessage, getDetail, getOrderDetail, endChat, forceEndChat };
+async function readMessage(req, res) {
+    const { chatId } = req.body
+    try {
+        await db('chats').where({ id: chatId }).update({ status: "read" });
+        return res.status(200).json({ success: true, message: 'Read success.' });
+    }
+    catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
+
+module.exports = { getRoom, getMessage, sendMessage, getDetail, getOrderDetail, endChat, forceEndChat, readMessage };
