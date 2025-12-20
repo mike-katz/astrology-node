@@ -16,13 +16,6 @@ async function getPandits(req, res) {
 
     const filter = {
         "p.status": "active",
-        "p.online": true
-    }
-    if (type == 'call') {
-        filter["p.call"] = true
-    }
-    if (type == 'chat') {
-        filter["p.chat"] = true
     }
     const user = await db('pandits as p')
         .leftJoin('reviews as r', 'p.id', 'r.panditId')
@@ -48,7 +41,16 @@ async function getPandits(req, res) {
             ) AS reviews
           `)
         ).where(filter)
-
+        .andWhere(function () {
+            if (type === 'call') {
+                this.where('p.call', true);
+            }
+            if (type === 'chat') {
+                this.where('p.chat', true);
+            }
+            // ✅ OR condition
+            this.orWhere('p.unlimited_free_calls_chats', true);
+        })
         .groupBy('p.id')
         .limit(limit)
         .offset(offset);
