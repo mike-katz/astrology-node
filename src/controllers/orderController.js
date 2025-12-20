@@ -181,7 +181,7 @@ async function acceptOrder(req, res) {
         // });
 
         callEvent("emit_to_user_chat_end_time", {
-            key: `pandit_${pandit?.id}`,
+            key: `pandit_${order?.panditId}`,
             payload: { startTime, endTime, orderId }
         });
 
