@@ -68,7 +68,7 @@ async function verifyOtp(req, res) {
         const token = jwt.sign({ userId: user.id, mobile: user.mobile }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '1h' });
         // hide password
         const encryptToken = encrypt(token);
-        return res.status(200).json({ success: true, data: { id: user?.id, mobile: user?.mobile, token: encryptToken }, message: 'Otp Verify Successfully' });
+        return res.status(200).json({ success: true, data: { id: user?.id, name: user?.name, mobile: user?.mobile, token: encryptToken }, message: 'Otp Verify Successfully' });
     } catch (err) {
         console.error(err);
         res.status(500).json({ success: false, message: 'Server error' });

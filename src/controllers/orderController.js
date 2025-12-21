@@ -213,48 +213,49 @@ async function acceptOrder(req, res) {
         const endTime = new Date(Date.now() + `${order?.duration}` * 60 * 1000);
         await db('orders').where({ id: order?.id }).update({ status: "continue", start_time: startTime, end_time: endTime });
 
-        const profile = await db('userprofiles').where({ id: order?.profile_id }).first();
+        if (order?.profile_id) {
+            const profile = await db('userprofiles').where({ id: order?.profile_id }).first();
 
-        let message = `Hello ${order?.name},\n Below are my details:
+            let message = `Hello ${order?.name},\n Below are my details:
     Name: ${formatValue(profile?.name)} 
     Gender: ${formatValue(profile?.gender)} 
     DOB: ${formatDOB(profile?.dob)} 
     Birth Time: ${profile?.birth_time} 
     Birth Place: ${formatValue(profile?.birth_place)} 
     Marital Status: ${formatValue(profile?.marital_status)} \n`;
-        if (profile?.occupation) {
-            message += `    Occupation: ${formatValue(profile?.occupation)}\n`
+            if (profile?.occupation) {
+                message += `    Occupation: ${formatValue(profile?.occupation)}\n`
+            }
+            if (profile?.topic_of_concern) {
+                message += `    Concern Topic: ${formatValue(profile?.topic_of_concern)}\n`
+            }
+            if (profile?.topic_of_concern_other) {
+                message += `    Other Concern: ${formatValue(profile?.topic_of_concern_other)}\n`
+            }
+            if (profile?.partner_name) {
+                message += `    Partner Name: ${formatValue(profile?.partner_name)}`
+            }
+            if (profile?.partner_dob) {
+                message += `    Partner DOB: ${formatDOB(profile?.partner_dob)}`
+            }
+            if (profile?.partner_dot) {
+                message += `    Partner Birth Time: ${formatValue(profile?.partner_dot)}`
+            }
+            if (profile?.partner_place) {
+                message += `    Partner Birth Place: ${formatValue(profile?.partner_place)} \n`
+            }
+            await db('chats').insert({
+                sender_type: "user",
+                sender_id: Number(req.userId),
+                receiver_type: "pandit",
+                order_id: orderId,
+                receiver_id: Number(order?.pandit_id),
+                lastmessage: message,
+                message: message,
+                status: "send",
+                type: "text"
+            });
         }
-        if (profile?.topic_of_concern) {
-            message += `    Concern Topic: ${formatValue(profile?.topic_of_concern)}\n`
-        }
-        if (profile?.topic_of_concern_other) {
-            message += `    Other Concern: ${formatValue(profile?.topic_of_concern_other)}\n`
-        }
-        if (profile?.partner_name) {
-            message += `    Partner Name: ${formatValue(profile?.partner_name)}`
-        }
-        if (profile?.partner_dob) {
-            message += `    Partner DOB: ${formatDOB(profile?.partner_dob)}`
-        }
-        if (profile?.partner_dot) {
-            message += `    Partner Birth Time: ${formatValue(profile?.partner_dot)}`
-        }
-        if (profile?.partner_place) {
-            message += `    Partner Birth Place: ${formatValue(profile?.partner_place)} \n`
-        }
-        await db('chats').insert({
-            sender_type: "user",
-            sender_id: Number(req.userId),
-            receiver_type: "pandit",
-            order_id: orderId,
-            receiver_id: Number(order?.pandit_id),
-            lastmessage: message,
-            message: message,
-            status: "send",
-            type: "text"
-        });
-
         // socket.emit("emit_to_user_for_pandit_accept", {
         //     toType: `user_${order?.userId}`,
         //     payload: order,
