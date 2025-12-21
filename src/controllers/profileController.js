@@ -24,7 +24,7 @@ async function addProfile(req, res) {
         }
 
         const [{ count }] = await db('userprofiles')
-            .count('* as count').where('userId', req?.userId);
+            .count('* as count').where('user_id', req?.userId);
         if (count > 5) {
             return res.status(400).json({ success: false, message: 'Your profile limit is over.' });
         }
@@ -50,8 +50,8 @@ async function addProfile(req, res) {
 
         if (count == 0) {
             delete ins.is_first
-            delete ins.userId
-            await db('user').where({ id: req.userId }).update(ins);
+            delete ins.user_id
+            await db('users').where({ id: req.userId }).update(ins);
         }
         return res.status(200).json({ success: true, message: 'Profile Successfully' });
     } catch (err) {
