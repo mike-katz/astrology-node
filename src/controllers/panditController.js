@@ -310,7 +310,7 @@ async function getReviewList(req, res) {
 
         if (!panditId) return res.status(400).json({ success: false, message: 'Please enter pandit.' });
         const user = await db('reviews as r')
-            .leftJoin('users as u', 'u.id', 'r.userId')
+            .leftJoin('users as u', 'u.id', 'r.user_id')
             .select(
                 "r.id",
                 "r.message",
