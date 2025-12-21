@@ -226,7 +226,7 @@ async function onboard(req, res) {
         if (user) return res.status(400).json({ message: 'Mobile number already exist.' });
         // profile_image
         const { file } = req
-        const ins = { name, dob, gender, email, mobile, country_code: countryCode }
+        const ins = { name, dob, status: "pending", gender, email, mobile, country_code: countryCode }
 
         if (phone_type) {
             const selected = phone_type.split(",").map(l => l.trim());
