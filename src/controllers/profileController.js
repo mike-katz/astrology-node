@@ -3,15 +3,31 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 require('dotenv').config();
 
+const MARITAL_STATUS = ['single', 'married', 'divorced', 'separated', 'widowed'];
+const OCCUPATION = ['private_sector', 'govt_sector', 'business_self_employed', 'civil_services', 'defence', 'not_working', 'student'];
+const TOPIC_OF_CONCERN = ['career_and_business', 'marriage', 'love_and_relationship', 'wealth_and_property', 'education', 'legal_matters', 'child_name_consultation',
+    'business_name_consultation', 'gem_stone_consultation', 'commodity_trading_consultation', 'match_making', 'birth_time_rectification', 'name_correction_consultation',
+    'travel_abroad_consulation', 'remedy_consultation', 'health_consultation', 'other'];
+const GENDER = ['male', 'female', 'other'];
+
 async function addProfile(req, res) {
     try {
         const { name, gender, dob, dot, is_enable_partner_detail, partner_place, partner_dot, partner_dob, partner_name, birth_place, marital_status, occupation, topic_of_concern, topic_of_concern_other } = req.body;
-        if (!name || !gender || !dob || !dot || !is_enable_partner_detail || !birth_place || !marital_status || !occupation) return res.status(400).json({ success: false, message: 'Please select pandit.' });
+        if (!name || !gender || !dob || !dot || !is_enable_partner_detail || !birth_place || !marital_status) return res.status(400).json({ success: false, message: 'Missing params.' });
+
+        if (gender && !GENDER.includes(gender)) return res.status(400).json({ success: false, message: 'Enter valid gender.' });
+        if (marital_status && !MARITAL_STATUS.includes(marital_status)) return res.status(400).json({ success: false, message: 'Enter valid marital status.' });
+        if (occupation && !OCCUPATION.includes(occupation)) return res.status(400).json({ success: false, message: 'Enter valid occupation.' });
+        if (topic_of_concern && !TOPIC_OF_CONCERN.includes(topic_of_concern)) return res.status(400).json({ success: false, message: 'Enter valid concern.' });
+        if (is_enable_partner_detail) {
+            if (!partner_place || !partner_dot || !partner_dob || !partner_name) return res.status(400).json({ success: false, message: 'Missing partner details.' });
+        }
 
         const [{ count }] = await db('userprofiles')
             .count('* as count').where('userId', req?.userId);
-
-        console.log("user", user);
+        if (count > 5) {
+            return res.status(400).json({ success: false, message: 'Your profile limit is over.' });
+        }
         const ins = {
             userId: req.userId,
             is_first: count != 0 ? false : true,
@@ -25,38 +41,19 @@ async function addProfile(req, res) {
             partner_dob,
             partner_name,
             topic_of_concern,
-            topic_of_concern_other
+            topic_of_concern_other,
+            occupation,
+            birth_place,
+            marital_status
         }
         await db('userprofiles').insert(ins);
 
         if (count == 0) {
             delete ins.is_first
+            delete ins.userId
             await db('user').where({ id: req.userId }).update(ins);
-
         }
-        return res.status(200).json({ success: true, message: 'Review Successfully' });
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ success: false, message: 'Server error' });
-    }
-}
-
-async function addReplay(req, res) {
-    try {
-        const { ratingId, replay } = req.body;
-        if (!ratingId || !replay) return res.status(400).json({ success: false, message: 'Please enter replay.' });
-        const user = await db('reviews')
-            .where('panditId', req?.userId)
-            .where('id', ratingId)
-            .first();
-        console.log("user", user);
-        if (!user) return res.status(400).json({ success: false, message: 'You already follow this pandit' });
-        if (user) {
-            await db('reviews')
-                .where('id', user?.id)
-                .update({ replay });
-        }
-        return res.status(200).json({ success: true, message: 'Replay Successfully' });
+        return res.status(200).json({ success: true, message: 'Profile Successfully' });
     } catch (err) {
         console.error(err);
         res.status(500).json({ success: false, message: 'Server error' });
@@ -65,36 +62,84 @@ async function addReplay(req, res) {
 
 async function getList(req, res) {
     try {
-        const { panditId } = req.query;
-        let page = parseInt(req.query.page) || 1;
-        let limit = parseInt(req.query.limit) || 20;
+        const user = await db('userprofiles')
+            .where('userId', req.userId)
 
-        if (page < 1) page = 1;
-        if (limit < 1) limit = 100;
-        const offset = (page - 1) * limit;
-
-        if (!panditId) return res.status(400).json({ success: false, message: 'Please enter pandit.' });
-        const user = await db('userprofile')
-            .where('userId', req.userId).limit(limit)
-            .offset(offset);
-
-        const [{ count }] = await db('reviews')
-            .count('* as count').where('panditId', panditId);
-        const total = parseInt(count);
-        const totalPages = Math.ceil(total / limit);
-
-        const response = {
-            page,
-            limit,
-            total,
-            totalPages,
-            results: user
-        }
-        return res.status(200).json({ success: true, data: response, message: 'Review get Successfully' });
+        return res.status(200).json({ success: true, data: user, message: 'Profile get Successfully' });
     } catch (err) {
         console.error(err);
         res.status(500).json({ success: false, message: 'Server error' });
     }
 }
 
-module.exports = { addProfile, addReplay, getList };
+async function updateProfile(req, res) {
+    try {
+        const { profileId, name, gender, dob, dot, is_enable_partner_detail, partner_place, partner_dot, partner_dob, partner_name, birth_place, marital_status, occupation, topic_of_concern, topic_of_concern_other } = req.body;
+        if (!profileId) return res.status(400).json({ success: false, message: 'Missing params.' });
+
+        if (gender && !GENDER.includes(gender)) return res.status(400).json({ success: false, message: 'Enter valid gender.' });
+        if (marital_status && !MARITAL_STATUS.includes(marital_status)) return res.status(400).json({ success: false, message: 'Enter valid marital status.' });
+        if (occupation && !OCCUPATION.includes(occupation)) return res.status(400).json({ success: false, message: 'Enter valid occupation.' });
+        if (topic_of_concern && !TOPIC_OF_CONCERN.includes(topic_of_concern)) return res.status(400).json({ success: false, message: 'Enter valid concern.' });
+        if (is_enable_partner_detail) {
+            if (!partner_place || !partner_dot || !partner_dob || !partner_name) return res.status(400).json({ success: false, message: 'Missing partner details.' });
+        }
+
+        const count = await db('userprofiles')
+            .where({ 'id': profileId, 'userId': req?.userId }).first();
+        if (!count) {
+            return res.status(400).json({ success: false, message: 'Profile not found.' });
+        }
+        const upd = {}
+        //     topic_of_concern,
+        //     topic_of_concern_other,
+        //     occupation,
+        //     birth_place,
+        //     marital_status
+        // }
+        if (name) {
+            upd.name = name
+        }
+        if (gender) {
+            upd.gender = gender
+        } if (dob) {
+            upd.dob = dob
+        } if (dot) {
+            upd.birth_time = dot
+        } if (is_enable_partner_detail != undefined) {
+            upd.is_enable_partner_detail = is_enable_partner_detail
+        } if (partner_place) {
+            upd.partner_place = partner_place
+        } if (partner_dot) {
+            upd.partner_dot = partner_dot
+        } if (partner_dob) {
+            upd.partner_dob = partner_dob
+        } if (partner_name) {
+            upd.partner_name = partner_name
+        } if (topic_of_concern) {
+            upd.topic_of_concern = topic_of_concern
+        } if (topic_of_concern_other) {
+            upd.topic_of_concern_other = topic_of_concern_other
+        }
+        if (occupation) {
+            upd.occupation = occupation
+        }
+        if (birth_place) {
+            upd.birth_place = birth_place
+        }
+        if (marital_status) {
+            upd.marital_status = marital_status
+        }
+        await db('userprofiles').where('id', profileId).update(upd);
+
+        if (count.is_first) {
+            await db('user').where({ id: req.userId }).update(upd);
+        }
+        return res.status(200).json({ success: true, message: 'Profile Successfully' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
+module.exports = { addProfile, getList, updateProfile };

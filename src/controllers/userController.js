@@ -29,10 +29,10 @@ async function updateProfile(req, res) {
             update.dob = dob
         }
         if (birthTime) {
-            update.birthTime = birthTime
+            update.birth_time = birthTime
         }
         if (birthPlace) {
-            update.birthPlace = birthPlace
+            update.birth_place = birthPlace
         }
         if (currentAddress) {
             update.currentAddress = currentAddress
