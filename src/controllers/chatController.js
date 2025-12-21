@@ -266,7 +266,7 @@ async function endChat(req, res) {
         if (!order) {
             return res.status(400).json({ success: false, message: 'Wrong order. Please enter correct' });
         }
-        const [{ total }] = await db('orders').where({ pandit_id: order?.panditId, user_id: req.userId }).count('id as total');
+        const [{ total }] = await db('orders').where({ pandit_id: order?.pandit_id, user_id: req.userId }).count('id as total');
         if (total == 1) {
             return res.status(400).json({ success: false, message: 'You can not end this chat.' });
         }
@@ -274,7 +274,7 @@ async function endChat(req, res) {
             return res.status(400).json({ success: false, message: 'order is pending or completed.' });
         }
 
-        await db('orders').where({ order_id: orderId }).update({ status: "completed", endTime: new Date() });
+        await db('orders').where({ id: order.id }).update({ status: "completed", end_time: new Date() });
         // socket.emit("emit_to_chat_completed", {
         //     user: order?.userId,
         //     orderId: order?.orderId,

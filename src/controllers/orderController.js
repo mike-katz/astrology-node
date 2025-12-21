@@ -10,7 +10,7 @@ admin.initializeApp({
 });
 
 async function create(req, res) {
-    const { panditId, type = 'chat' } = req.body;
+    const { panditId, type = 'chat', profile_id } = req.body;
     if (!panditId) {
         return res.status(400).json({ success: false, message: 'Please enter pandit' });
     }
@@ -46,7 +46,8 @@ async function create(req, res) {
             rate: pandit?.charge || 1,
             duration: 60,
             deduction,
-            type
+            type,
+            profile_id
         }).returning('*');
         console.log("order inserted", saved);
 
@@ -171,16 +172,88 @@ async function list(req, res) {
     }
 }
 
+function formatValue(value) {
+    if (!value) return '';
+
+    return value
+        .toString()
+        .replace(/_/g, ' ')
+        .replace(/\b\w/g, c => c.toUpperCase());
+}
+
+function formatDOB(dob) {
+    if (!dob) return '';
+    return new Date(dob).toLocaleDateString('en-GB', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric'
+    });
+}
+
 async function acceptOrder(req, res) {
     try {
         const { orderId } = req.body;
         if (!orderId) return res.status(400).json({ success: false, message: 'Order id required.' });
-        const order = await db('orders').where({ order_id: orderId, user_id: req.userId, status: "pending", is_accept: true }).first();
+        const order = await db('orders as o')
+            .leftJoin('pandits as p', 'p.id', 'o.pandit_id')
+            .where({
+                'o.order_id': orderId,
+                'o.user_id': req.userId,
+                'o.status': 'pending',
+                'o.is_accept': true
+            })
+            .select(
+                'o.*',
+                'p.name',
+            )
+            .first();
         if (!order) return res.status(400).json({ success: false, message: 'Order not accepted by pandit.' });
 
         const startTime = new Date()
         const endTime = new Date(Date.now() + `${order?.duration}` * 60 * 1000);
         await db('orders').where({ id: order?.id }).update({ status: "continue", start_time: startTime, end_time: endTime });
+
+        const profile = await db('userprofiles').where({ id: order?.profile_id }).first();
+
+        let message = `Hello ${order?.name},\n Below are my details:
+    Name: ${formatValue(profile?.name)} 
+    Gender: ${formatValue(profile?.gender)} 
+    DOB: ${formatDOB(profile?.dob)} 
+    Birth Time: ${profile?.birth_time} 
+    Birth Place: ${formatValue(profile?.birth_place)} 
+    Marital Status: ${formatValue(profile?.marital_status)} \n`;
+        if (profile?.occupation) {
+            message += `    Occupation: ${formatValue(profile?.occupation)}\n`
+        }
+        if (profile?.topic_of_concern) {
+            message += `    Concern Topic: ${formatValue(profile?.topic_of_concern)}\n`
+        }
+        if (profile?.topic_of_concern_other) {
+            message += `    Other Concern: ${formatValue(profile?.topic_of_concern_other)}\n`
+        }
+        if (profile?.partner_name) {
+            message += `    Partner Name: ${formatValue(profile?.partner_name)}`
+        }
+        if (profile?.partner_dob) {
+            message += `    Partner DOB: ${formatDOB(profile?.partner_dob)}`
+        }
+        if (profile?.partner_dot) {
+            message += `    Partner Birth Time: ${formatValue(profile?.partner_dot)}`
+        }
+        if (profile?.partner_place) {
+            message += `    Partner Birth Place: ${formatValue(profile?.partner_place)} \n`
+        }
+        await db('chats').insert({
+            sender_type: "user",
+            sender_id: Number(req.userId),
+            receiver_type: "pandit",
+            order_id: orderId,
+            receiver_id: Number(order?.pandit_id),
+            lastmessage: message,
+            message: message,
+            status: "send",
+            type: "text"
+        });
 
         // socket.emit("emit_to_user_for_pandit_accept", {
         //     toType: `user_${order?.userId}`,
