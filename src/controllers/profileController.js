@@ -151,7 +151,7 @@ async function deleteProfile(req, res) {
         if (!count) {
             return res.status(400).json({ success: false, message: 'Profile not found.' });
         }
-        if (count?.true) {
+        if (count?.is_first) {
             return res.status(400).json({ success: false, message: 'Your main profile not be delete.' });
         }
         await db('userprofiles')
