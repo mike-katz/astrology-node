@@ -65,7 +65,7 @@ async function getList(req, res) {
     try {
         const user = await db('userprofiles')
             .where('user_id', req.userId)
-
+            .orderBy('id', 'desc');
         return res.status(200).json({ success: true, data: user, message: 'Profile get Successfully' });
     } catch (err) {
         console.error(err);
