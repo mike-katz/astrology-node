@@ -25,7 +25,8 @@ async function addProfile(req, res) {
 
         const [{ count }] = await db('userprofiles')
             .count('* as count').where('user_id', req?.userId);
-        if (count > 5) {
+        console.log("count", count);
+        if (count > 4) {
             return res.status(400).json({ success: false, message: 'Your profile limit is over.' });
         }
         const ins = {
