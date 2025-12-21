@@ -160,7 +160,7 @@ async function deleteProfile(req, res) {
                 'user_id': req?.userId
             })
             .del();
-        return res.status(200).json({ success: true, data: user, message: 'Profile delete Successfully' });
+        return res.status(200).json({ success: true, data: null, message: 'Profile delete Successfully' });
     } catch (err) {
         console.error(err);
         res.status(500).json({ success: false, message: 'Server error' });
