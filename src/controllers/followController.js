@@ -53,10 +53,10 @@ async function getFollow(req, res) {
             "p.language",
             "p.experience",
         )
-        .where('f.user_id', req?.userId).limit(limit)
+        .where('f.user_id', Number(req?.userId)).limit(limit)
         .offset(offset);
     const [{ count }] = await db('follows')
-        .count('* as count').where('user_id', req?.userId);
+        .count('* as count').where('user_id', Number(req?.userId));
 
     const total = parseInt(count);
     const totalPages = Math.ceil(total / limit);
