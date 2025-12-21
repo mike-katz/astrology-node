@@ -13,7 +13,7 @@ const GENDER = ['male', 'female', 'other'];
 async function addProfile(req, res) {
     try {
         const { name, gender, dob, dot, is_enable_partner_detail, partner_place, partner_dot, partner_dob, partner_name, birth_place, marital_status, occupation, topic_of_concern, topic_of_concern_other } = req.body;
-        if (!name || !gender || !dob || !dot || !is_enable_partner_detail || !birth_place || !marital_status) return res.status(400).json({ success: false, message: 'Missing params.' });
+        if (!name || !gender || !dob || !dot || !birth_place || !marital_status) return res.status(400).json({ success: false, message: 'Missing params.' });
 
         if (gender && !GENDER.includes(gender)) return res.status(400).json({ success: false, message: 'Enter valid gender.' });
         if (marital_status && !MARITAL_STATUS.includes(marital_status)) return res.status(400).json({ success: false, message: 'Enter valid marital status.' });
@@ -29,7 +29,7 @@ async function addProfile(req, res) {
             return res.status(400).json({ success: false, message: 'Your profile limit is over.' });
         }
         const ins = {
-            userId: req.userId,
+            user_id: req.userId,
             is_first: count != 0 ? false : true,
             name,
             gender,
@@ -63,7 +63,7 @@ async function addProfile(req, res) {
 async function getList(req, res) {
     try {
         const user = await db('userprofiles')
-            .where('userId', req.userId)
+            .where('user_id', req.userId)
 
         return res.status(200).json({ success: true, data: user, message: 'Profile get Successfully' });
     } catch (err) {
@@ -86,7 +86,7 @@ async function updateProfile(req, res) {
         }
 
         const count = await db('userprofiles')
-            .where({ 'id': profileId, 'userId': req?.userId }).first();
+            .where({ 'id': profileId, 'user_id': req?.userId }).first();
         if (!count) {
             return res.status(400).json({ success: false, message: 'Profile not found.' });
         }
