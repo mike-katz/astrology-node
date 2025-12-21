@@ -22,10 +22,10 @@ async function create(req, res) {
         const pandit = await db('pandits').where({ id: panditId }).first()
         if (!pandit) return res.status(400).json({ success: false, message: 'Pandit not found.' });
 
-        const continueOrder = await db('orders').where({ userId: req.userId, panditId, type }).whereIn('status', ['continue', 'pending']).first()
+        const continueOrder = await db('orders').where({ user_id: req.userId, pandit_id: panditId, type }).whereIn('status', ['continue', 'pending']).first()
         if (continueOrder) return res.status(400).json({ success: false, message: 'Please complete your ongoing order.' });
 
-        const order = await db('orders').where({ userId: req.userId, panditId }).first()
+        const order = await db('orders').where({ user_id: req.userId, pandit_id: panditId }).first()
         const orderId = ((parseInt(crypto.lib.WordArray.random(16).toString(), 16) % 1e6) + '').padStart(15, '0');
         let deduction = 0
         console.log("last order", order);
@@ -39,9 +39,9 @@ async function create(req, res) {
         }
         if (user?.balance < deduction) return res.status(400).json({ success: false, message: 'Insufficient fund.' });
         const [saved] = await db('orders').insert({
-            panditId,
-            userId: req.userId,
-            orderId,
+            pandit_id: panditId,
+            user_id: req.userId,
+            order_id: orderId,
             status: "pending",
             rate: pandit?.charge || 1,
             duration: 60,
@@ -62,7 +62,7 @@ async function create(req, res) {
         if (token) {
             console.log("start push notification");
             const messages = `new ${type} request from ${user?.name} (Rs ${pandit?.charge}/min).`
-            const continueOrder = await db('panditnotifications').insert({ userId: panditId, type: "order", message: messages })
+            const continueOrder = await db('panditnotifications').insert({ user_id: panditId, type: "order", message: messages })
             const message = {
                 token,
                 notification: {
@@ -119,13 +119,21 @@ async function list(req, res) {
         if (page < 1) page = 1;
         if (limit < 1) limit = 20;
         const offset = (page - 1) * limit;
-        const order = await db('orders as o').where({ userId: req.userId })
-            .leftJoin('pandits as p', 'p.id', 'o.panditId')
-            .leftJoin('chats as c', 'o.orderId', 'c.orderId')
-
-            .groupBy(
-                'o.id',
-                'p.id'
+        const order = await db('orders as o')
+            .where('o.userId', req.userId)
+            .leftJoin('pandits as p', 'p.id', 'o.pandit_id')
+            .leftJoin(
+                db.raw(`
+                    (
+                        SELECT DISTINCT ON (order_id)
+                        "order_id",
+                            "lastmessage"
+                        FROM chats
+                        ORDER BY order_id, "id" DESC
+                    ) c
+                `),
+                'c.order_id',
+                'o.order_id'
             )
             .orderByRaw(`
             CASE trim(o.status)
@@ -134,18 +142,17 @@ async function list(req, res) {
                 WHEN 'completed' THEN 3
                 ELSE 4
             END
-            `).select(
-                "o.*",
-                "p.name",
-                "p.profile",
-                // "c.lastmessage"
-                db.raw('MAX(c.lastmessage) as lastmessage')
-
-            ).limit(limit)
+        `)
+            .select(
+                'o.*',
+                'p.name',
+                'p.profile',
+                'c.lastmessage'
+            )
+            .limit(limit)
             .offset(offset);
-
         const [{ count }] = await db('orders')
-            .count('* as count').where('userId', req?.userId);
+            .count('* as count').where('user_id', req?.userId);
 
         const total = parseInt(count);
         const totalPages = Math.ceil(total / limit);
@@ -168,12 +175,12 @@ async function acceptOrder(req, res) {
     try {
         const { orderId } = req.body;
         if (!orderId) return res.status(400).json({ success: false, message: 'Order id required.' });
-        const order = await db('orders').where({ orderId, userId: req.userId, status: "pending", is_accept: true }).first();
+        const order = await db('orders').where({ order_id: orderId, user_id: req.userId, status: "pending", is_accept: true }).first();
         if (!order) return res.status(400).json({ success: false, message: 'Order not accepted by pandit.' });
 
         const startTime = new Date()
         const endTime = new Date(Date.now() + `${order?.duration}` * 60 * 1000);
-        await db('orders').where({ id: order?.id }).update({ status: "continue", startTime, endTime });
+        await db('orders').where({ id: order?.id }).update({ status: "continue", start_time: startTime, end_time: endTime });
 
         // socket.emit("emit_to_user_for_pandit_accept", {
         //     toType: `user_${order?.userId}`,
@@ -181,7 +188,7 @@ async function acceptOrder(req, res) {
         // });
 
         callEvent("emit_to_user_chat_end_time", {
-            key: `pandit_${order?.panditId}`,
+            key: `pandit_${order?.pandit_id}`,
             payload: { startTime, endTime, orderId }
         });
 
@@ -196,7 +203,7 @@ async function cancelOrder(req, res) {
     try {
         const { orderId } = req.body;
         if (!orderId) return res.status(400).json({ success: false, message: 'Order id required.' });
-        const order = await db('orders').where({ orderId, userId: req.userId, status: "pending" }).first();
+        const order = await db('orders').where({ order_id: orderId, user_id: req.userId, status: "pending" }).first();
         if (!order) return res.status(400).json({ success: false, message: 'You can not cancel this order.' });
 
         await db('orders').where({ id: order?.id }).update({ status: "cancel" });

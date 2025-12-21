@@ -18,7 +18,7 @@ async function getPandits(req, res) {
         "p.status": "active",
     }
     const user = await db('pandits as p')
-        .leftJoin('reviews as r', 'p.id', 'r.panditId')
+        .leftJoin('reviews as r', 'p.id', 'r.pandit_id')
         .select(
             'p.name',
             'p.id',
@@ -75,7 +75,7 @@ async function getPanditDetail(req, res) {
     const user = await db('pandits').where('id', id).first();
     if (!user) return res.status(400).json({ success: false, message: 'pandit not available.' });
     const review = await db('reviews as r')
-        .leftJoin('users as u', 'u.id', 'r.userId')
+        .leftJoin('users as u', 'u.id', 'r.user_id')
         .select(
             "r.id",
             "r.message",
@@ -85,7 +85,7 @@ async function getPanditDetail(req, res) {
             "u.name",
             "u.profile",
         )
-        .where('r.panditId', id)
+        .where('r.pandit_id', id)
         .orderBy('r.created_at', 'desc')
         .limit(3);
 
@@ -108,7 +108,7 @@ async function getPanditDetail(req, res) {
         const decryptToken = decrypt(token);
         const verified = jwt.verify(decryptToken, process.env.JWT_SECRET);
         if (verified?.userId) {
-            const user = await db('follows').where({ 'panditId': id, 'userId': verified?.userId }).first();
+            const user = await db('follows').where({ 'pandit_id': id, 'user_id': verified?.userId }).first();
             console.log("user", user);
             if (user) {
                 response.isFollow = true
@@ -320,11 +320,11 @@ async function getReviewList(req, res) {
                 "u.name",
                 "u.profile",
             )
-            .where('r.panditId', panditId).limit(limit)
+            .where('r.pandit_id', panditId).limit(limit)
             .offset(offset);
 
         const [{ count }] = await db('reviews')
-            .count('* as count').where('panditId', panditId);
+            .count('* as count').where('pandit_id', panditId);
         const total = parseInt(count);
         const totalPages = Math.ceil(total / limit);
 

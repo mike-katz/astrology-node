@@ -8,22 +8,22 @@ async function addFollow(req, res) {
         const { panditId } = req.body;
         if (!panditId) return res.status(400).json({ success: false, message: 'Please select pandit.' });
         const user = await db('follows')
-            .where('userId', req?.userId)
-            .where('panditId', panditId)
+            .where('user_id', req?.userId)
+            .where('pandit_id', panditId)
             .where('type', 'user')
             .first();
         if (user) {
             await db('follows')
                 .where({
                     userId: req?.userId,
-                    panditId,
+                    pandit_id: panditId,
                     type: "user"
                 })
                 .del();
             return res.status(400).json({ success: false, message: 'UnFollow successful' });
         }
         if (!user) {
-            await db('follows').insert({ userId: req?.userId, panditId, type: "user" });
+            await db('follows').insert({ userId: req?.userId, pandit_id: panditId, type: "user" });
         }
         return res.status(200).json({ success: true, message: 'Follow Successfully' });
     } catch (err) {
@@ -42,7 +42,7 @@ async function getFollow(req, res) {
     const offset = (page - 1) * limit;
 
     const user = await db('follows as f')
-        .leftJoin('pandits as p', 'p.id', 'f.panditId')
+        .leftJoin('pandits as p', 'p.id', 'f.pandit_id')
         .select(
             "f.created_at",
             "p.id",
@@ -53,10 +53,10 @@ async function getFollow(req, res) {
             "p.language",
             "p.experience",
         )
-        .where('f.userId', req?.userId).limit(limit)
+        .where('f.user_id', req?.userId).limit(limit)
         .offset(offset);
     const [{ count }] = await db('follows')
-        .count('* as count').where('userId', req?.userId);
+        .count('* as count').where('user_id', req?.userId);
 
     const total = parseInt(count);
     const totalPages = Math.ceil(total / limit);

@@ -115,10 +115,10 @@ async function sendMessage(req, res) {
         return res.status(400).json({ success: false, message: 'Missing params.' });
     }
     try {
-        const order = await db('orders').where({ userId: req.userId, orderId }).first();
+        const order = await db('orders').where({ user_id: req.userId, order_id: orderId }).first();
         if (!order) return res.status(400).json({ success: false, message: 'Order not found.' });
 
-        if (order?.endTime && (new Date(order?.endTime).getTime() < new Date())) {
+        if (order?.end_time && (new Date(order?.end_time).getTime() < new Date())) {
             await db('orders').where({ id: order?.id }).update({ status: "completed" });
             // socket.emit("emit_to_chat_completed", {
             //     user: order?.userId,
@@ -126,8 +126,8 @@ async function sendMessage(req, res) {
             // });
 
             callEvent("emit_to_chat_completed", {
-                key: `user_${order?.userId}`,
-                orderId: order?.orderId
+                key: `user_${order?.user_id}`,
+                orderId: order?.order_id
             });
             return res.status(400).json({ success: false, message: 'Please regenerate chat request.' });
         }
@@ -147,8 +147,8 @@ async function sendMessage(req, res) {
                     sender_type: "user",
                     sender_id: Number(req.userId),
                     receiver_type: "pandit",
-                    orderId,
-                    receiver_id: Number(order?.panditId),
+                    order_id: orderId,
+                    receiver_id: Number(order?.pandit_id),
                     lastmessage: image.data.Location,
                     message: image.data.Location,
                     status: "send",
@@ -163,8 +163,8 @@ async function sendMessage(req, res) {
                 sender_type: "user",
                 sender_id: Number(req.userId),
                 receiver_type: "pandit",
-                orderId,
-                receiver_id: Number(order?.panditId),
+                order_id: orderId,
+                receiver_id: Number(order?.pandit_id),
                 lastmessage: message,
                 message,
                 status: "send",
@@ -175,8 +175,8 @@ async function sendMessage(req, res) {
 
         callEvent("emit_to_user", {
             toType: "pandit",
-            toId: order?.panditId,
-            orderId: order?.orderId,
+            toId: order?.pandit_id,
+            orderId: order?.order_id,
             payload: response,
         });
 
@@ -200,17 +200,17 @@ async function getDetail(req, res) {
         if (!order) return res.status(400).json({ success: false, message: 'Pandit not found.' });
         let orderDetail
         let isFirstOrder = true
-        const [{ total }] = await db('orders').where({ panditId, userId: req.userId }).count('id as total');
+        const [{ total }] = await db('orders').where({ pandit_id: panditId, user_id: req.userId }).count('id as total');
         if (total > 1) {
             isFirstOrder = false
         }
         if (orderId) {
-            orderDetail = await db('orders').where({ orderId }).first();
+            orderDetail = await db('orders').where({ order_id: orderId }).first();
         }
         const response = { id: panditId, name: order?.name, profile: order?.profile, isOnline: order?.isOnline, isFirstOrder }
         if (orderDetail) {
-            response.startTime = orderDetail?.startTime;
-            response.endTime = orderDetail?.endTime;
+            response.startTime = orderDetail?.start_time;
+            response.endTime = orderDetail?.end_time;
         }
         return res.status(200).json({ success: true, data: response, message: 'get detail Successfully' });
     } catch (err) {
@@ -225,7 +225,7 @@ async function getOrderDetail(req, res) {
         if (!orderId) {
             return res.status(400).json({ success: false, message: 'Missing params.' });
         }
-        const orderexist = await db('orders').where({ userId: req.userId, orderId }).first();
+        const orderexist = await db('orders').where({ user_id: req.userId, order_id: orderId }).first();
         if (!orderexist) return res.status(400).json({ success: false, message: 'Wrong order. Please enter correct' });
         let page = parseInt(req.query.page) || 1;
         let limit = parseInt(req.query.limit) || 50;
@@ -233,12 +233,12 @@ async function getOrderDetail(req, res) {
         if (page < 1) page = 1;
         if (limit < 1) limit = 50;
         const offset = (page - 1) * limit;
-        const order = await db('chats').where({ orderId })
+        const order = await db('chats').where({ order_id: orderId })
             .orderBy('created_at', 'desc')
             .limit(limit)
             .offset(offset);
         const [{ count }] = await db('chats')
-            .count('* as count').where({ orderId });
+            .count('* as count').where({ order_id: orderId });
         const total = parseInt(count);
         const totalPages = Math.ceil(total / limit);
 
@@ -262,11 +262,11 @@ async function endChat(req, res) {
         return res.status(400).json({ success: false, message: 'Missing params.' });
     }
     try {
-        const order = await db('orders').where({ userId: req.userId, orderId }).first();
+        const order = await db('orders').where({ user_id: req.userId, order_id: orderId }).first();
         if (!order) {
             return res.status(400).json({ success: false, message: 'Wrong order. Please enter correct' });
         }
-        const [{ total }] = await db('orders').where({ panditId: order?.panditId, userId: req.userId }).count('id as total');
+        const [{ total }] = await db('orders').where({ pandit_id: order?.panditId, user_id: req.userId }).count('id as total');
         if (total == 1) {
             return res.status(400).json({ success: false, message: 'You can not end this chat.' });
         }
@@ -274,15 +274,15 @@ async function endChat(req, res) {
             return res.status(400).json({ success: false, message: 'order is pending or completed.' });
         }
 
-        await db('orders').where({ orderId }).update({ status: "completed", endTime: new Date() });
+        await db('orders').where({ order_id: orderId }).update({ status: "completed", endTime: new Date() });
         // socket.emit("emit_to_chat_completed", {
         //     user: order?.userId,
         //     orderId: order?.orderId,
         // });
 
         callEvent("emit_to_chat_completed", {
-            key: `user_${order?.userId}`,
-            orderId: order?.orderId,
+            key: `user_${order?.user_id}`,
+            orderId: order?.order_id,
         });
 
         return res.status(200).json({ success: true, data: null, message: 'End chat successfully.' });
@@ -298,24 +298,24 @@ async function forceEndChat(req, res) {
         return res.status(400).json({ success: false, message: 'Missing params.' });
     }
     try {
-        const order = await db('orders').where({ userId: req.userId, orderId }).first();
+        const order = await db('orders').where({ user_id: req.userId, order_id: orderId }).first();
         if (!order) {
             return res.status(400).json({ success: false, message: 'Wrong order. Please enter correct' });
         }
 
-        if (order?.endTime && (new Date(order?.endTime).getTime() > new Date())) {
+        if (order?.end_time && (new Date(order?.end_time).getTime() > new Date())) {
             return res.status(400).json({ success: false, message: 'Order is ongoing.' });
         }
 
-        await db('orders').where({ orderId }).update({ status: "completed", endTime: new Date() });
+        await db('orders').where({ order_id: orderId }).update({ status: "completed", end_time: new Date() });
         // socket.emit("emit_to_chat_completed", {
         //     user: order?.userId,
         //     orderId: order?.orderId,
         // });
 
         callEvent("emit_to_chat_completed", {
-            key: `user_${order?.userId}`,
-            orderId: order?.orderId,
+            key: `user_${order?.user_id}`,
+            orderId: order?.order_id,
         });
 
         return res.status(200).json({ success: true, data: null, message: 'End chat successfully.' });

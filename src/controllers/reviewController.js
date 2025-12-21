@@ -9,12 +9,12 @@ async function addReview(req, res) {
         if (!panditId || !message || !rating) return res.status(400).json({ success: false, message: 'Please select pandit.' });
         const user = await db('reviews')
             .where('userId', req?.userId)
-            .where('panditId', panditId)
+            .where('pandit_id', panditId)
             .first();
         console.log("user", user);
         // if (user) return res.status(400).json({ success: false, message: 'You already follow this pandit' });
         if (!user) {
-            await db('reviews').insert({ userId: req?.userId, panditId, message, rating, type: "user" });
+            await db('reviews').insert({ user_id: req?.userId, pandit_id: panditId, message, rating, type: "user" });
         }
         return res.status(200).json({ success: true, message: 'Review Successfully' });
     } catch (err) {
@@ -28,7 +28,7 @@ async function addReplay(req, res) {
         const { ratingId, replay } = req.body;
         if (!ratingId || !replay) return res.status(400).json({ success: false, message: 'Please enter replay.' });
         const user = await db('reviews')
-            .where('panditId', req?.userId)
+            .where('pandit_id', req?.userId)
             .where('id', ratingId)
             .first();
         console.log("user", user);
@@ -57,11 +57,11 @@ async function getList(req, res) {
 
         if (!panditId) return res.status(400).json({ success: false, message: 'Please enter pandit.' });
         const user = await db('reviews')
-            .where('panditId', panditId).select('id', 'message', 'rating').limit(limit)
+            .where('pandit_id', panditId).select('id', 'message', 'rating').limit(limit)
             .offset(offset);
 
         const [{ count }] = await db('reviews')
-            .count('* as count').where('panditId', panditId);
+            .count('* as count').where('pandit_id', panditId);
         const total = parseInt(count);
         const totalPages = Math.ceil(total / limit);
 
