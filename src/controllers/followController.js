@@ -15,7 +15,7 @@ async function addFollow(req, res) {
         if (user) {
             await db('follows')
                 .where({
-                    userId: req?.userId,
+                    user_id: req?.userId,
                     pandit_id: panditId,
                     type: "user"
                 })
@@ -23,7 +23,7 @@ async function addFollow(req, res) {
             return res.status(400).json({ success: false, message: 'UnFollow successful' });
         }
         if (!user) {
-            await db('follows').insert({ userId: req?.userId, pandit_id: panditId, type: "user" });
+            await db('follows').insert({ user_id: req?.userId, pandit_id: panditId, type: "user" });
         }
         return res.status(200).json({ success: true, message: 'Follow Successfully' });
     } catch (err) {
