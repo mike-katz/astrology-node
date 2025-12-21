@@ -245,6 +245,7 @@ async function onboard(req, res) {
             ins.profile_image = image.data.Location;
         }
         if (!user) {
+            console.log("ins", ins);
             await db('onboardings').insert(ins).returning(['id', 'mobile']);
         }
         return res.status(200).json({ success: true, message: 'Onboard Successfully' });
