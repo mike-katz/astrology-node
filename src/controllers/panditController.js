@@ -26,7 +26,7 @@ async function getPandits(req, res) {
             'p.language',
             'p.experience',
             'p.profile',
-            'p.availableFor',
+            'p.available_for',
             'p.charge',
             db.raw(`
             COALESCE(
@@ -128,7 +128,7 @@ async function signup(req, res) {
         }).first();
 
         if (!user) {
-            await db('otpmanages').insert({ mobile, countryCode, otp: '1234' });
+            await db('otpmanages').insert({ mobile, country_code: countryCode, otp: '1234' });
         }
         return res.status(200).json({ success: true, message: 'Otp Send Successfully' });
     } catch (err) {
@@ -226,7 +226,7 @@ async function onboard(req, res) {
         if (user) return res.status(400).json({ message: 'Mobile number already exist.' });
         // profile_image
         const { file } = req
-        const ins = { name, dob, gender, email, mobile, countryCode }
+        const ins = { name, dob, gender, email, mobile, country_code: countryCode }
 
         if (phone_type) {
             const selected = phone_type.split(",").map(l => l.trim());
@@ -259,7 +259,7 @@ async function reSendOtp(req, res) {
         const { mobile, countryCode } = req.body;
         if (!mobile || !countryCode) return res.status(400).json({ success: false, message: 'Mobile number required.' });
 
-        const latestRecord = await db('otpmanages').where('mobile', mobile).where('countryCode', countryCode).first();
+        const latestRecord = await db('otpmanages').where('mobile', mobile).where('country_code', countryCode).first();
         const update = {};
         let response = {
             return: true,
@@ -283,9 +283,9 @@ async function reSendOtp(req, res) {
         // const OTP = Math.floor(1000 + Math.random() * 9000);
         const OTP = Math.floor(1000 + Math.random() * 9000);
 
-        await db('otpmanages').where('mobile', mobile).where('countryCode', countryCode).del();
+        await db('otpmanages').where('mobile', mobile).where('country_code', countryCode).del();
         await db('otpmanages').insert({
-            'mobile': mobile, countryCode, otp: '1234', sendattempt: update.sendattempt || 1,
+            'mobile': mobile, country_code: countryCode, otp: '1234', sendattempt: update.sendattempt || 1,
             sendexpiry: update.sendexpiry || new Date(new Date().getTime() + 4 * 60 * 60 * 1000)
         })
         response.return = true;
