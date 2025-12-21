@@ -143,4 +143,28 @@ async function updateProfile(req, res) {
     }
 }
 
-module.exports = { addProfile, getList, updateProfile };
+async function deleteProfile(req, res) {
+    const { profileId } = req.query;
+    try {
+        const count = await db('userprofiles')
+            .where({ 'id': profileId, 'user_id': req?.userId }).first();
+        if (!count) {
+            return res.status(400).json({ success: false, message: 'Profile not found.' });
+        }
+        if (count?.true) {
+            return res.status(400).json({ success: false, message: 'Your main profile not be delete.' });
+        }
+        await db('userprofiles')
+            .where({
+                'id': profileId,
+                'user_id': req?.userId
+            })
+            .del();
+        return res.status(200).json({ success: true, data: user, message: 'Profile delete Successfully' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
+module.exports = { addProfile, getList, updateProfile, deleteProfile };
