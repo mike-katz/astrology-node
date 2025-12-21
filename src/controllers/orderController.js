@@ -120,7 +120,7 @@ async function list(req, res) {
         if (limit < 1) limit = 20;
         const offset = (page - 1) * limit;
         const order = await db('orders as o')
-            .where('o.userId', req.userId)
+            .where('o.user_id', req.userId)
             .leftJoin('pandits as p', 'p.id', 'o.pandit_id')
             .leftJoin(
                 db.raw(`
