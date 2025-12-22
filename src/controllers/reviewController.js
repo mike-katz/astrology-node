@@ -5,16 +5,18 @@ require('dotenv').config();
 
 async function addReview(req, res) {
     try {
-        const { panditId, message, rating } = req.body;
+        const { panditId, message, orderId, rating } = req.body;
         if (!panditId || !message || !rating) return res.status(400).json({ success: false, message: 'Please select pandit.' });
         const user = await db('reviews')
             .where('userId', req?.userId)
-            .where('pandit_id', panditId)
+            .where('orderId', orderId)
             .first();
         console.log("user", user);
         // if (user) return res.status(400).json({ success: false, message: 'You already follow this pandit' });
         if (!user) {
-            await db('reviews').insert({ user_id: req?.userId, pandit_id: panditId, message, rating, type: "user" });
+            await db('reviews').insert({ user_id: req?.userId, pandit_id: panditId, orderId, message, rating, type: "user" });
+        } else {
+            await db('reviews').where({ id: user?.id }).update({ user_id: req?.userId, pandit_id: panditId, orderId, message, rating });
         }
         return res.status(200).json({ success: true, message: 'Review Successfully' });
     } catch (err) {
