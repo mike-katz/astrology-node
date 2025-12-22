@@ -8,7 +8,7 @@ async function addReview(req, res) {
         const { panditId, message, orderId, rating } = req.body;
         if (!panditId || !rating) return res.status(400).json({ success: false, message: 'Missing params.' });
         const user = await db('reviews')
-            .where('userId', req?.userId)
+            .where('user_id', req?.userId)
             .where('order_id', orderId)
             .first();
         console.log("user", user);
