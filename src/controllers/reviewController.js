@@ -9,14 +9,14 @@ async function addReview(req, res) {
         if (!panditId || !rating) return res.status(400).json({ success: false, message: 'Missing params.' });
         const user = await db('reviews')
             .where('userId', req?.userId)
-            .where('orderId', orderId)
+            .where('order_id', orderId)
             .first();
         console.log("user", user);
         // if (user) return res.status(400).json({ success: false, message: 'You already follow this pandit' });
         if (!user) {
-            await db('reviews').insert({ user_id: req?.userId, pandit_id: panditId, orderId, message, rating, type: "user" });
+            await db('reviews').insert({ user_id: req?.userId, pandit_id: panditId, order_id: orderId, message, rating, type: "user" });
         } else {
-            await db('reviews').where({ id: user?.id }).update({ user_id: req?.userId, pandit_id: panditId, orderId, message, rating });
+            await db('reviews').where({ id: user?.id }).update({ user_id: req?.userId, pandit_id: panditId, order_id: orderId, message, rating });
         }
         return res.status(200).json({ success: true, message: 'Review Successfully' });
     } catch (err) {
