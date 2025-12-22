@@ -27,24 +27,33 @@ async function create(req, res) {
 
         const order = await db('orders').where({ user_id: req.userId, pandit_id: panditId }).first()
         const orderId = ((parseInt(crypto.lib.WordArray.random(16).toString(), 16) % 1e6) + '').padStart(15, '0');
-        let deduction = 0
-        console.log("last order", order);
-        if (!order) {
-            //create 5 minute order
-            deduction = (5 * pandit?.charge || 1);
-        } else {
-            deduction = (5 * pandit?.charge || 1);
-            if (user?.balance < deduction) return res.status(400).json({ success: false, message: 'Min. 5 min balance required.' });
-            deduction = (user?.balance - 50) / (pandit?.charge || 1)
+        let duration = Math.floor(user?.balance / pandit?.charge);
+
+        if (duration < 5) {
+            return res.status(400).json({ success: false, message: 'Min. 5 min balance required.' });
         }
-        if (user?.balance < deduction) return res.status(400).json({ success: false, message: 'Insufficient fund.' });
+
+        const deduction = duration * pandit?.charge
+        // console.log("last order", order);
+        // if (!order) {
+        //     //create 5 minute order
+        //     deduction = (5 * pandit?.charge || 1);
+
+        // } else {
+        //     deduction = (5 * pandit?.charge || 1);
+        if (user?.balance < deduction) return res.status(400).json({ success: false, message: 'Min. 5 min balance required.' });
+        // deduction = (user?.balance - 50) / (pandit?.charge || 1)
+        // }
+        // if (user?.balance < deduction) return res.status(400).json({ success: false, message: 'Insufficient fund.' });
+
+
         const [saved] = await db('orders').insert({
             pandit_id: panditId,
             user_id: req.userId,
             order_id: orderId,
             status: "pending",
             rate: pandit?.charge || 1,
-            duration: 5,
+            duration,
             deduction,
             type,
             profile_id
