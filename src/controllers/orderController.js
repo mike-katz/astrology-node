@@ -121,29 +121,39 @@ async function list(req, res) {
         if (limit < 1) limit = 20;
         const offset = (page - 1) * limit;
         const order = await db('orders as o')
+            .distinctOn('o.pandit_id')
             .where('o.user_id', req.userId)
             .leftJoin('pandits as p', 'p.id', 'o.pandit_id')
             .leftJoin(
                 db.raw(`
-                    (
-                        SELECT DISTINCT ON (order_id)
-                        "order_id",
-                            "lastmessage"
-                        FROM chats
-                        ORDER BY order_id, "id" DESC
-                    ) c
-                `),
+            (
+              SELECT DISTINCT ON (order_id)
+                order_id,
+                lastmessage
+              FROM chats
+              ORDER BY order_id, id DESC
+            ) c
+          `),
                 'c.order_id',
                 'o.order_id'
             )
-            .orderByRaw(`
-            CASE trim(o.status)
+
+            // IMPORTANT: distinctOn column MUST be first in ORDER BY
+            .orderBy([
+                { column: 'o.pandit_id', order: 'asc' },
+                {
+                    column: db.raw(`
+              CASE trim(o.status)
                 WHEN 'continue' THEN 1
                 WHEN 'pending' THEN 2
                 WHEN 'completed' THEN 3
                 ELSE 4
-            END
-        `)
+              END
+            `),
+                    order: 'asc'
+                },
+                { column: 'o.id', order: 'desc' } // latest order per pandit
+            ])
             .select(
                 'o.*',
                 'p.name',
@@ -153,7 +163,8 @@ async function list(req, res) {
             .limit(limit)
             .offset(offset);
         const [{ count }] = await db('orders')
-            .count('* as count').where('user_id', req?.userId);
+            .where('user_id', req.userId)
+            .countDistinct('pandit_id as count');
 
         const total = parseInt(count);
         const totalPages = Math.ceil(total / limit);
