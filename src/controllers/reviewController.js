@@ -6,7 +6,7 @@ require('dotenv').config();
 async function addReview(req, res) {
     try {
         const { panditId, message, orderId, rating } = req.body;
-        if (!panditId || !message || !rating) return res.status(400).json({ success: false, message: 'Please select pandit.' });
+        if (!panditId || !rating) return res.status(400).json({ success: false, message: 'Missing params.' });
         const user = await db('reviews')
             .where('userId', req?.userId)
             .where('orderId', orderId)
