@@ -5,4 +5,5 @@ const { addReview, addReplay, getList } = require('../controllers/reviewControll
 router.post('/', addReview);
 router.post('/replay', addReplay);
 router.get('/', getList);
+router.get('/detail', getReviewDetail);
 module.exports = router;

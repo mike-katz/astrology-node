@@ -18,7 +18,7 @@ async function addReview(req, res) {
         } else {
             await db('reviews').where({ id: user?.id }).update({ user_id: req?.userId, pandit_id: panditId, order_id: orderId, message, rating });
         }
-        return res.status(200).json({ success: true, message: 'Review Successfully' });
+        return res.status(200).json({ success: true, message: 'Review added Successfully' });
     } catch (err) {
         console.error(err);
         res.status(500).json({ success: false, message: 'Server error' });
@@ -81,4 +81,18 @@ async function getList(req, res) {
     }
 }
 
-module.exports = { addReview, addReplay, getList };
+async function getReviewDetail(req, res) {
+    try {
+        const { order_id } = req.query
+        const user = await db('reviews')
+            .where('order_id', order_id).select('id', 'message', 'replay', 'rating').first();
+
+        return res.status(200).json({ success: true, data: user, message: 'Review get Successfully' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
+
+module.exports = { addReview, addReplay, getList, getReviewDetail };
