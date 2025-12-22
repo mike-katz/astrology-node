@@ -70,14 +70,73 @@ async function getMessage(req, res) {
     if (!panditId) {
         return res.status(400).json({ success: false, message: 'Missing params.' });
     }
-
     try {
         let page = parseInt(req.query.page) || 1;
-        let limit = parseInt(req.query.limit) || 1;
+        let limit = parseInt(req.query.limit) || 100;
 
         if (page < 1) page = 1;
-        if (limit < 1) limit = 1;
+        if (limit < 1) limit = 100;
         const offset = (page - 1) * limit;
+        // const messages = await db('chats')
+        // .where(function () {
+        //     this.where({
+        //         sender_type: 'user',
+        //         sender_id: req.userId,
+        //         receiver_type: 'pandit',
+        //         receiver_id: panditId
+        //     })
+        //         .orWhere({
+        //             sender_type: 'pandit',
+        //             sender_id: panditId,
+        //             receiver_type: 'user',
+        //             receiver_id: req.userId
+        //         });
+        // })
+        //     .groupBy('order_id')
+        //     .select(
+        //         'order_id as orderId',
+
+        //         // 🔹 Chat messages sorted DESC by id
+        //         db.raw(`
+        //     json_agg(
+        //       json_build_object(
+        //         'id', id,
+        //         'message', message,
+        //         'sender_type', sender_type,
+        //         'sender_id', sender_id,
+        //         'receiver_type', receiver_type,
+        //         'receiver_id', receiver_id,
+        //         'created_at', created_at
+        //       )
+        //       ORDER BY id DESC
+        //     ) AS chat
+        //   `),
+
+        //         // 🔹 Needed for outer sorting
+        //         db.raw('MAX(id) AS last_chat_id')
+        //     )
+        //     // 🔹 Sort orders by latest chat id DESC
+        // .orderBy('last_chat_id', 'desc')
+        // .limit(limit)
+        // .offset(offset);
+
+        // const [{ count }] = await db('chats')
+        //     .where(function () {
+        //         this.where({
+        //             sender_type: 'user',
+        //             sender_id: req.userId,
+        //             receiver_type: 'pandit',
+        //             receiver_id: panditId
+        //         })
+        //             .orWhere({
+        //                 sender_type: 'pandit',
+        //                 sender_id: panditId,
+        //                 receiver_type: 'user',
+        //                 receiver_id: req.userId
+        //             });
+        //     })
+        //     .countDistinct('order_id as count');
+
         const messages = await db('chats')
             .where(function () {
                 this.where({
@@ -93,35 +152,12 @@ async function getMessage(req, res) {
                         receiver_id: req.userId
                     });
             })
-            .groupBy('order_id')
-            .select(
-                'order_id as orderId',
-
-                // 🔹 Chat messages sorted DESC by id
-                db.raw(`
-            json_agg(
-              json_build_object(
-                'id', id,
-                'message', message,
-                'sender_type', sender_type,
-                'sender_id', sender_id,
-                'receiver_type', receiver_type,
-                'receiver_id', receiver_id,
-                'created_at', created_at
-              )
-              ORDER BY id DESC
-            ) AS chat
-          `),
-
-                // 🔹 Needed for outer sorting
-                db.raw('MAX(id) AS last_chat_id')
-            )
-            // 🔹 Sort orders by latest chat id DESC
-            .orderBy('last_chat_id', 'desc')
+            .orderBy('id', 'desc')
             .limit(limit)
             .offset(offset);
 
         const [{ count }] = await db('chats')
+            .count('* as count')
             .where(function () {
                 this.where({
                     sender_type: 'user',
@@ -135,9 +171,7 @@ async function getMessage(req, res) {
                         receiver_type: 'user',
                         receiver_id: req.userId
                     });
-            })
-            .countDistinct('order_id as count');
-
+            });
         const total = parseInt(count);
         const totalPages = Math.ceil(total / limit);
 
