@@ -83,7 +83,8 @@ async function getList(req, res) {
 
 async function getReviewDetail(req, res) {
     try {
-        const { order_id } = req.query
+        const { order_id } = req.query;
+        if (!order_id) return res.status(400).json({ success: false, message: 'Missing params.' });
         const user = await db('reviews')
             .where('order_id', order_id).select('id', 'message', 'replay', 'rating').first();
 
