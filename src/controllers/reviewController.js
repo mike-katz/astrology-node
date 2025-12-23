@@ -85,10 +85,33 @@ async function getReviewDetail(req, res) {
     try {
         const { order_id } = req.query;
         if (!order_id) return res.status(400).json({ success: false, message: 'Missing params.' });
-        const user = await db('reviews')
-            .where('order_id', order_id).select('id', 'message', 'replay', 'rating').first();
+        // const user = await db('reviews')
+        // .where('order_id', order_id).select('id', 'message', 'replay', 'rating').first();
 
-        return res.status(200).json({ success: true, data: user, message: 'Review get Successfully' });
+        const reviews = await db('reviews as r')
+            .where('r.order_id', order_id)
+            .leftJoin('pandits as p', 'p.id', 'r.pandit_id')
+            .leftJoin('orders as o', 'o.id', 'r.order_id') // change if column name differs
+            .select(
+                'r.id',
+                'r.message',
+                'r.rating',
+                'r.pandit_id',
+                'p.name',
+                'p.profile',
+                'o.order_id',
+                'o.type',
+                'o.rate',
+                'o.start_time',
+                'o.end_time',
+                'o.duration',
+                'o.deduction'
+            )
+            .orderBy('r.id', 'desc')
+            .first()
+
+
+        return res.status(200).json({ success: true, data: reviews, message: 'Review get Successfully' });
     } catch (err) {
         console.error(err);
         res.status(500).json({ success: false, message: 'Server error' });
