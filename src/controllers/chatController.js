@@ -138,7 +138,6 @@ async function getMessage(req, res) {
         //     .countDistinct('order_id as count');
 
         const messages = await db('chats')
-            .whereNull('deleted_at')
             .andWhere(function () {
                 this.where({
                     sender_type: 'user',
