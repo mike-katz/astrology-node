@@ -27,14 +27,17 @@ async function create(req, res) {
 
         // const order = await db('orders').where({ user_id: req.userId, pandit_id: panditId }).first()
         const orderId = ((parseInt(crypto.lib.WordArray.random(16).toString(), 16) % 1e6) + '').padStart(15, '0');
-        let duration = Math.floor(user?.balance / pandit?.charge);
+        let duration = Math.floor(Number(user?.balance) / Number(pandit?.charge));
+        console.log("duration", duration);
+        if (!Number.isFinite(duration)) {
+            return res.status(400).json({ success: false, message: 'Min. 5 min balance required.' });
+        }
 
         if (duration < 5) {
             return res.status(400).json({ success: false, message: 'Min. 5 min balance required.' });
         }
-
-        const deduction = duration * pandit?.charge
-        if (!isNaN(deduction)) {
+        const deduction = Number(duration) * Number(pandit?.charge)
+        if (isNaN(deduction)) {
             return res.status(400).json({ success: false, message: 'Balance could not be NaN.' });
         }
         // console.log("last order", order);
