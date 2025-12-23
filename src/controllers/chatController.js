@@ -346,10 +346,13 @@ async function balanceCut(user_id, order) {
     try {
         const user = await db('users').where({ id: user_id }).first();
         const diffMinutes = getDuration(order.start_time)
+        console.log("diffMinutes", diffMinutes);
         const perMinute = Number(order?.deduction) / Number(order?.duration);
+        console.log("perMinute", perMinute);
         const deduction = Number(diffMinutes) * Number(perMinute);
-
+        console.log("deduction", deduction);
         const newBalance = user.balance - deduction
+        console.log("newBalance", newBalance, "username", user?.name);
         await db('users').where({ id: req.userId }).update({ balance: newBalance });
         await db('orders').where({ id: order.id }).update({ status: "completed", deduction, duration: diffMinutes, end_time: new Date() });
         return true
