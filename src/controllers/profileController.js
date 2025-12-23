@@ -146,6 +146,8 @@ async function updateProfile(req, res) {
 async function deleteProfile(req, res) {
     const { profileId } = req.query;
     try {
+        console.log("req.query", req.query);
+        if (!profileId) return res.status(400).json({ success: false, message: 'Profile not found.' });
         const count = await db('userprofiles')
             .where({ 'id': profileId, 'user_id': req?.userId }).first();
         if (!count) {
