@@ -25,7 +25,7 @@ async function create(req, res) {
         const continueOrder = await db('orders').where({ user_id: req.userId, pandit_id: panditId, type }).whereIn('status', ['continue', 'pending']).first()
         if (continueOrder) return res.status(400).json({ success: false, message: 'Please complete your ongoing order.' });
 
-        const order = await db('orders').where({ user_id: req.userId, pandit_id: panditId }).first()
+        // const order = await db('orders').where({ user_id: req.userId, pandit_id: panditId }).first()
         const orderId = ((parseInt(crypto.lib.WordArray.random(16).toString(), 16) % 1e6) + '').padStart(15, '0');
         let duration = Math.floor(user?.balance / pandit?.charge);
 
@@ -34,6 +34,9 @@ async function create(req, res) {
         }
 
         const deduction = duration * pandit?.charge
+        if (!isNaN(deduction)) {
+            return res.status(400).json({ success: false, message: 'Balance could not be NaN.' });
+        }
         // console.log("last order", order);
         // if (!order) {
         //     //create 5 minute order
