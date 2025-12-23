@@ -54,7 +54,7 @@ async function addProfile(req, res) {
             delete ins.user_id
             await db('users').where({ id: req.userId }).update(ins);
         }
-        return res.status(200).json({ success: true, message: 'Profile Successfully' });
+        return res.status(200).json({ success: true, data: ins, message: 'Profile Successfully' });
     } catch (err) {
         console.error(err);
         res.status(500).json({ success: false, message: 'Server error' });
