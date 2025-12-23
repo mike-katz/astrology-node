@@ -458,5 +458,16 @@ async function readMessage(req, res) {
     }
 }
 
+async function deleteChat(req, res) {
+    try {
+        const { id } = req.query;
+        if (!id) return res.status(400).json({ success: false, message: 'Missing params.' });
+        await db('chats').where({ id, user_id: req.userId }).update({ deleted_at: new Date() });
+        return res.status(200).json({ success: true, message: 'Chat delete Successfully' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
 
-module.exports = { getRoom, getMessage, sendMessage, getDetail, getOrderDetail, endChat, forceEndChat, readMessage };
+module.exports = { getRoom, getMessage, sendMessage, getDetail, getOrderDetail, endChat, forceEndChat, readMessage, deleteChat };

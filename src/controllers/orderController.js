@@ -149,7 +149,7 @@ async function list(req, res) {
         const offset = (page - 1) * limit;
         const order = await db('orders as o')
             .distinctOn('o.pandit_id')
-            .where('o.user_id', req.userId)
+            .where({ 'o.user_id': req.userId, deleted_at: null })
             .leftJoin('pandits as p', 'p.id', 'o.pandit_id')
             .leftJoin(
                 db.raw(`
@@ -342,4 +342,21 @@ async function cancelOrder(req, res) {
         res.status(500).json({ success: false, message: 'Server error' });
     }
 }
-module.exports = { create, list, acceptOrder, cancelOrder };
+
+async function deleteOrder(req, res) {
+    try {
+        const { order_id } = req.query;
+        if (!order_id) return res.status(400).json({ success: false, message: 'Order id required.' });
+        const order = await db('orders').where({ order_id, user_id: req.userId }).first();
+        if (!order) return res.status(400).json({ success: false, message: 'You can not delete this order.' });
+
+        await db('orders').where({ id: order?.id }).update({ deleted_at: new Date() });
+        await db('chats').where({ order_id }).update({ deleted_at: new Date() });
+        return res.status(200).json({ success: true, message: 'Order cancel Successfully' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
+module.exports = { create, list, acceptOrder, cancelOrder, deleteOrder };
