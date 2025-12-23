@@ -231,7 +231,6 @@ async function sendMessage(req, res) {
                     receiver_type: "pandit",
                     order_id: orderId,
                     receiver_id: Number(order?.pandit_id),
-                    lastmessage: image.data.Location,
                     message: image.data.Location,
                     status: "send",
                     type
@@ -247,7 +246,6 @@ async function sendMessage(req, res) {
                 receiver_type: "pandit",
                 order_id: orderId,
                 receiver_id: Number(order?.pandit_id),
-                lastmessage: message,
                 message,
                 status: "send",
                 type
@@ -464,7 +462,31 @@ async function deleteChat(req, res) {
     try {
         const { id } = req.query;
         if (!id) return res.status(400).json({ success: false, message: 'Missing params.' });
-        await db('chats').where({ id, user_id: req.userId }).update({ deleted_at: new Date() });
+
+        const chat = await db('chats').where({ id })
+            .andWhere(function () {
+                this.where({
+                    sender_type: 'user',
+                    sender_id: req.userId,
+                })
+                    .orWhere({
+                        receiver_type: 'user',
+                        receiver_id: req.userId
+                    });
+            }).first();
+
+        if (!chat) return res.status(400).json({ success: false, message: 'You can not delete this message.' });
+        const upd = {
+            receiver_delete: false,
+            sender_delete: false,
+        }
+        if (chat?.sender_type == 'user') {
+            upd.sender_delete = true
+            upd.deleted_at = new Date()
+        } else {
+            upd.receiver_delete = true
+        }
+        await db('chats').where({ id }).update(upd);
         return res.status(200).json({ success: true, message: 'Chat delete Successfully' });
     } catch (err) {
         console.error(err);

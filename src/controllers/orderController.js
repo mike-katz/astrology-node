@@ -156,7 +156,7 @@ async function list(req, res) {
             (
               SELECT DISTINCT ON (order_id)
                 order_id,
-                lastmessage
+                message
               FROM chats
               ORDER BY order_id, id DESC
             ) c
@@ -185,7 +185,7 @@ async function list(req, res) {
                 'o.*',
                 'p.name',
                 'p.profile',
-                'c.lastmessage'
+                'c.message'
             )
             .limit(limit)
             .offset(offset);
@@ -305,7 +305,6 @@ async function acceptOrder(req, res) {
                 receiver_type: "pandit",
                 order_id: orderId,
                 receiver_id: Number(order?.pandit_id),
-                lastmessage: message,
                 message: message,
                 status: "send",
                 type: "text"
