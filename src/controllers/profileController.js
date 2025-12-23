@@ -47,14 +47,14 @@ async function addProfile(req, res) {
             birth_place,
             marital_status
         }
-        await db('userprofiles').insert(ins);
+        const response = await db('userprofiles').insert(ins).returning('*');
 
         if (count == 0) {
             delete ins.is_first
             delete ins.user_id
             await db('users').where({ id: req.userId }).update(ins);
         }
-        return res.status(200).json({ success: true, data: ins, message: 'Profile Successfully' });
+        return res.status(200).json({ success: true, data: response, message: 'Profile Successfully' });
     } catch (err) {
         console.error(err);
         res.status(500).json({ success: false, message: 'Server error' });
