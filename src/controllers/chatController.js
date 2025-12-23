@@ -374,7 +374,7 @@ async function endChat(req, res) {
             return res.status(400).json({ success: false, message: 'Wrong order. Please enter correct' });
         }
         const diffMinutes = getDuration(order.start_time)
-        if (diffMinutes < 1) return res.status(400).json({ success: false, message: 'Min 1 minutes required.' });
+        if (diffMinutes == 1) return res.status(400).json({ success: false, message: 'Min 1 minutes required.' });
         // const [{ total }] = await db('orders').where({ pandit_id: order?.pandit_id, user_id: req.userId }).count('id as total');
         // if (total == 1) {
         //     return res.status(400).json({ success: false, message: 'You can not end this chat.' });
