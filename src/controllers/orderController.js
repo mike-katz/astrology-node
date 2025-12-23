@@ -27,19 +27,19 @@ async function create(req, res) {
 
         //check order deduction
 
-        const pandingOrder = await db('orders').where({ user_id: req.userId }).whereIn('status', ['continue', 'pending'])
-        let pendingDeduction = 0
-        if (pandingOrder?.length > 0) {
-            pandingOrder.map(item => {
-                pendingDeduction += Number(item.deduction)
-            })
-        }
+        // const pandingOrder = await db('orders').where({ user_id: req.userId }).whereIn('status', ['continue', 'pending'])
+        // let pendingDeduction = 0
+        // if (pandingOrder?.length > 0) {
+        //     pandingOrder.map(item => {
+        //         pendingDeduction += Number(item.deduction)
+        //     })
+        // }
 
-        pendingDeduction = Number(user?.balance) - pendingDeduction
+        // pendingDeduction = Number(user?.balance) - pendingDeduction
 
         // const order = await db('orders').where({ user_id: req.userId, pandit_id: panditId }).first()
         const orderId = ((parseInt(crypto.lib.WordArray.random(16).toString(), 16) % 1e6) + '').padStart(15, '0');
-        let duration = Math.floor(Number(pendingDeduction) / Number(pandit?.charge));
+        let duration = Math.floor(Number(Number(user?.balance)) / Number(pandit?.charge));
         console.log("duration", duration);
         if (!Number.isFinite(duration)) {
             return res.status(400).json({ success: false, message: 'Min. 5 min balance required.' });
@@ -59,7 +59,7 @@ async function create(req, res) {
 
         // } else {
         //     deduction = (5 * pandit?.charge || 1);
-        if (pendingDeduction < deduction) return res.status(400).json({ success: false, message: 'Min. 5 min balance required.' });
+        if (Number(user?.balance) < deduction) return res.status(400).json({ success: false, message: 'Min. 5 min balance required.' });
         // deduction = (user?.balance - 50) / (pandit?.charge || 1)
         // }
         // if (user?.balance < deduction) return res.status(400).json({ success: false, message: 'Insufficient fund.' });
@@ -243,13 +243,30 @@ async function acceptOrder(req, res) {
             .select(
                 'o.*',
                 'p.name',
+                'p.charge',
             )
             .first();
         if (!order) return res.status(400).json({ success: false, message: 'Order not accepted by pandit.' });
 
+        const userDetail = await db('users').where({ id: req.userId }).first();
+
+        let duration = Math.floor(Number(Number(userDetail?.balance)) / Number(order?.charge));
+        console.log("duration", duration);
+        if (!Number.isFinite(duration)) {
+            return res.status(400).json({ success: false, message: 'Min. 5 min balance required.' });
+        }
+
+        if (duration < 5) {
+            return res.status(400).json({ success: false, message: 'Min. 5 min balance required.' });
+        }
+        const deduction = Number(duration) * Number(pandit?.charge)
+        if (isNaN(deduction)) {
+            return res.status(400).json({ success: false, message: 'Balance could not be NaN.' });
+        }
+
         const startTime = new Date()
-        const endTime = new Date(Date.now() + `${order?.duration}` * 60 * 1000);
-        await db('orders').where({ id: order?.id }).update({ status: "continue", start_time: startTime, end_time: endTime });
+        const endTime = new Date(Date.now() + `${duration}` * 60 * 1000);
+        await db('orders').where({ id: order?.id }).update({ status: "continue", duration, deduction, start_time: startTime, end_time: endTime });
 
         if (order?.profile_id) {
             const profile = await db('userprofiles').where({ id: order?.profile_id }).first();

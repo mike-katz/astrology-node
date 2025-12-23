@@ -336,6 +336,28 @@ async function getOrderDetail(req, res) {
     }
 }
 
+function getDuration(start_time) {
+    const diffMinutes = Math.ceil(
+        Math.abs(new Date() - new Date(start_time)) / (1000 * 60)
+    );
+    return diffMinutes
+}
+async function balanceCut(user_id, order) {
+    try {
+        const user = await db('users').where({ id: user_id }).first();
+        const diffMinutes = getDuration(order.start_time)
+        const perMinute = Number(order?.deduction) / Number(order?.duration);
+        const deduction = Number(diffMinutes) * Number(perMinute);
+
+        const newBalance = user.balance - deduction
+        await db('users').where({ id: req.userId }).update({ balance: newBalance });
+        await db('orders').where({ id: order.id }).update({ status: "completed", deduction, duration: diffMinutes, end_time: new Date() });
+        return true
+    } catch (err) {
+        return false
+    }
+}
+
 async function endChat(req, res) {
     const { orderId } = req.body;
     if (!orderId) {
@@ -346,15 +368,20 @@ async function endChat(req, res) {
         if (!order) {
             return res.status(400).json({ success: false, message: 'Wrong order. Please enter correct' });
         }
-        const [{ total }] = await db('orders').where({ pandit_id: order?.pandit_id, user_id: req.userId }).count('id as total');
-        if (total == 1) {
-            return res.status(400).json({ success: false, message: 'You can not end this chat.' });
-        }
+        const diffMinutes = getDuration(order.start_time)
+        if (diffMinutes < 1) return res.status(400).json({ success: false, message: 'Min 1 minutes required.' });
+        // const [{ total }] = await db('orders').where({ pandit_id: order?.pandit_id, user_id: req.userId }).count('id as total');
+        // if (total == 1) {
+        //     return res.status(400).json({ success: false, message: 'You can not end this chat.' });
+        // }
         if (order.status != 'continue') {
             return res.status(400).json({ success: false, message: 'order is pending or completed.' });
         }
-
-        await db('orders').where({ id: order.id }).update({ status: "completed", end_time: new Date() });
+        const res = balanceCut(req.userId, order);
+        if (!res) {
+            return res.status(400).json({ success: false, message: 'Something went wrong.' });
+        }
+        // calculate pandit and user balance 
         // socket.emit("emit_to_chat_completed", {
         //     user: order?.userId,
         //     orderId: order?.orderId,
@@ -387,7 +414,12 @@ async function forceEndChat(req, res) {
             return res.status(400).json({ success: false, message: 'Order is ongoing.' });
         }
 
-        await db('orders').where({ order_id: orderId }).update({ status: "completed", end_time: new Date() });
+        const res = balanceCut(req.userId, order);
+        if (!res) {
+            return res.status(400).json({ success: false, message: 'Something went wrong.' });
+        }
+
+        // await db('orders').where({ order_id: orderId }).update({ status: "completed", end_time: new Date() });
         // socket.emit("emit_to_chat_completed", {
         //     user: order?.userId,
         //     orderId: order?.orderId,
