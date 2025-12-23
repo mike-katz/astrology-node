@@ -207,7 +207,7 @@ async function sendMessage(req, res) {
 
             callEvent("emit_to_chat_completed", {
                 key: `user_${order?.user_id}`,
-                orderId: order?.order_id
+                order_id: order?.order_id
             });
             return res.status(400).json({ success: false, message: 'Please regenerate chat request.' });
         }
@@ -355,6 +355,7 @@ async function balanceCut(user_id, order) {
         console.log("newBalance", newBalance, "username", user?.name);
         const dd = await db('users').where({ id: user_id }).update({ balance: newBalance });
         const dds = await db('orders').where({ id: order.id }).update({ status: "completed", deduction, duration: diffMinutes, end_time: new Date() });
+        await db('pandits').where({ id: order.pandit_id }).increment({ total_chat_minutes: Number(diffMinutes), total_orders: 1 });
         console.log("user", dd);
         console.log("order", dds);
         return true
@@ -394,7 +395,7 @@ async function endChat(req, res) {
 
         callEvent("emit_to_chat_completed", {
             key: `user_${order?.user_id}`,
-            orderId: order?.order_id,
+            order_id: order?.order_id,
         });
 
         return res.status(200).json({ success: true, data: null, message: 'End chat successfully.' });
@@ -414,6 +415,9 @@ async function forceEndChat(req, res) {
         if (!order) {
             return res.status(400).json({ success: false, message: 'Wrong order. Please enter correct' });
         }
+        if (order.status != 'continue') {
+            return res.status(400).json({ success: false, message: 'order is pending or completed.' });
+        }
 
         if (order?.end_time && (new Date(order?.end_time).getTime() > new Date())) {
             return res.status(400).json({ success: false, message: 'Order is ongoing.' });
@@ -432,7 +436,7 @@ async function forceEndChat(req, res) {
 
         callEvent("emit_to_chat_completed", {
             key: `user_${order?.user_id}`,
-            orderId: order?.order_id,
+            order_id: order?.order_id,
         });
 
         return res.status(200).json({ success: true, data: null, message: 'End chat successfully.' });
