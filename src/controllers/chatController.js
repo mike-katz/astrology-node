@@ -353,7 +353,7 @@ async function balanceCut(user_id, order) {
         console.log("deduction", deduction);
         const newBalance = user.balance - deduction
         console.log("newBalance", newBalance, "username", user?.name);
-        const dd = await db('users').where({ id: req.userId }).update({ balance: newBalance });
+        const dd = await db('users').where({ id: user_id }).update({ balance: newBalance });
         const dds = await db('orders').where({ id: order.id }).update({ status: "completed", deduction, duration: diffMinutes, end_time: new Date() });
         console.log("user", dd);
         console.log("order", dds);
