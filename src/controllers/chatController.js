@@ -377,8 +377,8 @@ async function endChat(req, res) {
         if (order.status != 'continue') {
             return res.status(400).json({ success: false, message: 'order is pending or completed.' });
         }
-        const res = balanceCut(req.userId, order);
-        if (!res) {
+        const result = balanceCut(req.userId, order);
+        if (!result) {
             return res.status(400).json({ success: false, message: 'Something went wrong.' });
         }
         // calculate pandit and user balance 
@@ -414,8 +414,8 @@ async function forceEndChat(req, res) {
             return res.status(400).json({ success: false, message: 'Order is ongoing.' });
         }
 
-        const res = balanceCut(req.userId, order);
-        if (!res) {
+        const result = balanceCut(req.userId, order);
+        if (!result) {
             return res.status(400).json({ success: false, message: 'Something went wrong.' });
         }
 
