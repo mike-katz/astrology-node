@@ -353,8 +353,10 @@ async function balanceCut(user_id, order) {
         console.log("deduction", deduction);
         const newBalance = user.balance - deduction
         console.log("newBalance", newBalance, "username", user?.name);
-        await db('users').where({ id: req.userId }).update({ balance: newBalance });
-        await db('orders').where({ id: order.id }).update({ status: "completed", deduction, duration: diffMinutes, end_time: new Date() });
+        const dd = await db('users').where({ id: req.userId }).update({ balance: newBalance });
+        const dds = await db('orders').where({ id: order.id }).update({ status: "completed", deduction, duration: diffMinutes, end_time: new Date() });
+        console.log("user", dd);
+        console.log("order", dds);
         return true
     } catch (err) {
         return false
@@ -380,7 +382,7 @@ async function endChat(req, res) {
         if (order.status != 'continue') {
             return res.status(400).json({ success: false, message: 'order is pending or completed.' });
         }
-        const result = balanceCut(req.userId, order);
+        const result = await balanceCut(req.userId, order);
         if (!result) {
             return res.status(400).json({ success: false, message: 'Something went wrong.' });
         }
@@ -417,7 +419,7 @@ async function forceEndChat(req, res) {
             return res.status(400).json({ success: false, message: 'Order is ongoing.' });
         }
 
-        const result = balanceCut(req.userId, order);
+        const result = await balanceCut(req.userId, order);
         if (!result) {
             return res.status(400).json({ success: false, message: 'Something went wrong.' });
         }
