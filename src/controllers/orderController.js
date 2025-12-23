@@ -259,7 +259,7 @@ async function acceptOrder(req, res) {
         if (duration < 5) {
             return res.status(400).json({ success: false, message: 'Min. 5 min balance required.' });
         }
-        const deduction = Number(duration) * Number(pandit?.charge)
+        const deduction = Number(duration) * Number(order?.charge)
         if (isNaN(deduction)) {
             return res.status(400).json({ success: false, message: 'Balance could not be NaN.' });
         }
