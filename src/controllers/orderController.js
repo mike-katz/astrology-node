@@ -309,6 +309,17 @@ async function acceptOrder(req, res) {
                 status: "send",
                 type: "text"
             });
+
+            await db('chats').insert({
+                sender_type: "user",
+                sender_id: Number(req.userId),
+                receiver_type: "pandit",
+                order_id: orderId,
+                receiver_id: Number(order?.pandit_id),
+                message: "This is an automated message to confirm that chat has started.",
+                status: "send",
+                type: "text"
+            });
         }
         // socket.emit("emit_to_user_for_pandit_accept", {
         //     toType: `user_${order?.userId}`,
