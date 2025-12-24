@@ -4,13 +4,11 @@ const crypto = require('crypto-js');
 
 async function addPayment(req, res) {
     try {
-        console.log("req?.userId", req?.userId);
         const { amount } = req.body;
         if (!amount) return res.status(400).json({ success: false, message: 'Missing params.' });
         const user = await db('users')
             .where('id', req?.userId)
             .first();
-        console.log("user", user);
         if (!user) return res.status(400).json({ success: false, message: 'User not found.' });
         const orderId = ((parseInt(crypto.lib.WordArray.random(16).toString(), 16) % 1e6) + '').padStart(15, '0');
         const utr = Math.floor(100000000 + Math.random() * 900000000).toString();
