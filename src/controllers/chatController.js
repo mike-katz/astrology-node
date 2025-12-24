@@ -357,7 +357,7 @@ async function balanceCut(user_id, order) {
             sender_type: "user",
             sender_id: Number(user_id),
             receiver_type: "pandit",
-            order_id: order?.orderId,
+            order_id: order?.order_id,
             receiver_id: Number(order?.pandit_id),
             message: `${user?.name} ended the chat`,
             status: "send",
