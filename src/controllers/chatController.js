@@ -371,6 +371,7 @@ async function balanceCut(user_id, order) {
         console.log("order", dds);
         return true
     } catch (err) {
+        console.log("err", err);
         return false
     }
 }

@@ -91,15 +91,15 @@ async function getReviewDetail(req, res) {
 
         const reviews = await db('orders as o')
             .where('o.order_id', order_id)
-            .leftJoin('pandits as p', 'p.id', 'o.pandit_id')
+            .leftJoin('users as u', 'u.id', 'o.user_id')
             .leftJoin('reviews as r', 'r.order_id', 'o.order_id') // change if column name differs
             .select(
                 'o.id',
                 'r.message',
                 'r.rating',
                 'o.pandit_id',
-                'p.name',
-                'p.profile',
+                'u.name',
+                'u.profile',
                 'o.order_id',
                 'o.type',
                 'o.rate',
