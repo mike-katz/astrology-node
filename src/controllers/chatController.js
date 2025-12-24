@@ -484,18 +484,21 @@ async function deleteChat(req, res) {
             upd.sender_delete = true
             upd.deleted_at = new Date()
             pandit_id = chat?.receiver_id
+            const response = { ...chat, ...upd }
+            callEvent("emit_to_chat_deleted", {
+                userKey: `user_${req.userId}`,
+                panditKey: `pandit_${pandit_id}`,
+                data: response,
+            });
         } else {
             upd.receiver_delete = true
+            const response = { ...chat, ...upd }
+            callEvent("emit_to_chat_deleted", {
+                panditKey: `pandit_${pandit_id}`,
+                data: response,
+            });
         }
         await db('chats').where({ id }).update(upd);
-        const response = { ...chat, ...upd }
-
-        callEvent("emit_to_chat_deleted", {
-            userKey: `user_${req.userId}`,
-            panditKey: `pandit_${pandit_id}`,
-            data: response,
-        });
-
         return res.status(200).json({ success: true, message: 'Chat delete Successfully' });
     } catch (err) {
         console.error(err);
