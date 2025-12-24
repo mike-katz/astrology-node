@@ -10,6 +10,7 @@ const reviewRoutes = require('./routes/review');
 const userRoutes = require('./routes/user');
 const orderRoutes = require('./routes/order');
 const profileRoutes = require('./routes/profile');
+const paymentRoutes = require('./routes/payment');
 const multer = require('multer');
 
 const chatRoutes = require('./routes/chat');
@@ -31,6 +32,7 @@ app.use('/user', userRoutes);
 app.use('/follow', followRoutes);
 app.use('/review', reviewRoutes);
 app.use('/profile', profileRoutes);
+app.use('/payment', paymentRoutes);
 
 app.use((err, req, res, next) => {
     if (err instanceof multer.MulterError) {
