@@ -361,7 +361,8 @@ async function balanceCut(user_id, order) {
             receiver_id: Number(order?.pandit_id),
             message: `${user?.name} ended the chat`,
             status: "send",
-            type: "text"
+            type: "text",
+            is_system_generate: true
         })
         const panditDetail = await db('pandits').where({ id: order.pandit_id }).first()
         const dd = await db('users').where({ id: user_id }).update({ balance: newBalance });

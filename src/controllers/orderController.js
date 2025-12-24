@@ -318,6 +318,7 @@ async function acceptOrder(req, res) {
                 receiver_id: Number(order?.pandit_id),
                 message: "This is an automated message to confirm that chat has started.",
                 status: "send",
+                is_system_generate: true,
                 type: "text"
             });
         }
