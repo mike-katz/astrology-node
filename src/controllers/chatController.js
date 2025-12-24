@@ -352,6 +352,18 @@ async function balanceCut(user_id, order) {
         console.log("deduction", deduction);
         const newBalance = user.balance - deduction
         console.log("newBalance", newBalance, "username", user?.name);
+
+        await db('chats').insert({
+            sender_type: "user",
+            sender_id: Number(user_id),
+            receiver_type: "pandit",
+            order_id: order?.orderId,
+            receiver_id: Number(order?.pandit_id),
+            message: `${user?.name} ended the chat`,
+            status: "send",
+            type: "text"
+        })
+
         const dd = await db('users').where({ id: user_id }).update({ balance: newBalance });
         const dds = await db('orders').where({ id: order.id }).update({ status: "completed", deduction, duration: diffMinutes, end_time: new Date() });
         await db('pandits').where({ id: order.pandit_id }).increment({ total_chat_minutes: Number(diffMinutes), total_orders: 1 });
