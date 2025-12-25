@@ -61,6 +61,16 @@ async function updateProfile(req, res) {
             await db('userprofiles')
                 .where('id', isProfileExist?.id)
                 .update(update);
+        } else {
+            delete update.language
+            delete update.pincode
+            delete update.city
+            delete update.current_address
+
+            update.is_first = true;
+            update.user_id = req.userId
+            await db('userprofiles')
+                .insert(update);
         }
         return res.status(200).json({ success: true, message: 'Profile update Successfully' });
     } catch (err) {
