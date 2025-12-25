@@ -31,7 +31,8 @@ async function generateInvoicePDF(data) {
     const outputPath = path.join(__dirname, 'pdfs', fileName);
 
     const browser = await puppeteer.launch({
-        headless: 'new'
+        headless: 'new',
+        args: ["--no-sandbox", "--disable-setuid-sandbox"]
     });
 
     const page = await browser.newPage();
