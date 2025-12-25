@@ -35,7 +35,7 @@ async function updateProfile(req, res) {
             update.birth_place = birthPlace
         }
         if (currentAddress) {
-            update.currentAddress = currentAddress
+            update.current_address = currentAddress
         }
         if (city) {
             update.city = city
@@ -51,6 +51,17 @@ async function updateProfile(req, res) {
             .where('id', user?.id)
             .update(update);
 
+        const isProfileExist = await db('userprofiles')
+            .where({ 'user_id': req?.userId }).first();
+        if (isProfileExist) {
+            delete update.language
+            delete update.pincode
+            delete update.city
+            delete update.current_address
+            await db('userprofiles')
+                .where('id', isProfileExist?.id)
+                .update(update);
+        }
         return res.status(200).json({ success: true, message: 'Profile update Successfully' });
     } catch (err) {
         console.error(err);
@@ -58,4 +69,13 @@ async function updateProfile(req, res) {
     }
 }
 
-module.exports = { updateProfile, getProfile };
+async function getBalance(req, res) {
+    const user = await db('users')
+        .where('id', req?.userId)
+        .select('balance')
+        .first();
+    if (!user) return res.status(400).json({ success: false, message: 'Please enter correct user.' });
+    return res.status(200).json({ success: true, data: user, message: 'Profile get Successfully' });
+}
+
+module.exports = { updateProfile, getProfile, getBalance };
