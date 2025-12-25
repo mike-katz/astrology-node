@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Invoice Voucher</title>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f5f5f5; padding: 20px; }
+    .invoice { max-width: 900px; background: #fff; margin: auto; padding: 30px; border: 1px solid #ddd; }
+    h1, h2 { margin: 0; }
+    .top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; }
+    .label { font-weight: bold; }
+    .small { font-size: 12px; color: #333; }
+    .section { margin: 15px 0; }
+    table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+    th, td { border: 1px solid #ddd; padding: 10px; text-align: left; font-size: 14px; }
+    th { background: #f0f0f0; }
+    .total-box { margin-top: 20px; float: right; width: 300px; }
+    .total-box table { width: 100%; }
+    .note { margin-top: 50px; font-size: 12px; color: #555; }
+  </style>
+</head>
+<body>
+  <div class="invoice">
+    <div class="top">
+      <div style="width:15% ; height: 100px;" >
+        <img style="height: 100%; width: 100%" src="https://astrologer.astrotalkguruji.com/static/media/astrotalk-logo.d421dc48632b39a15906.png"/>
+      </div>
+      <div style="width:80% ; text-align:center">
+        <h3 style=" margin: 0; margin-top: 20px;">Invoice Voucher</h3>
+        <div class="small">(Original for recipient)</div>
+        <span style="font-size: 15px; margin: 2px;">M/S Astrotalk Guruji Services Private Limited (Formerly Codeyeti Software Solutions Pvt. Ltd.)</span>
+      <br/>
+        <span>Supplier GSTIN:09AAGCC0196A1ZZ, Website: www.astrotalkguruji.com</span>
+      </div>
+    </div>
+    <div style="text-align: center;"><span class="label">Address:</span> <span style="font-size: 14px;">4th and 5th Floor, Add India Tower Gate, Plot No-A 6 A, Sector 125, Noida, Gautam Buddha Nagar, Uttar Pradesh, 201303</span></div>
+
+    <div style="margin-top: 20px;">
+        <div style="width:30%">
+      <span class="label">Customer Address:</span>
+      <div> {{address}}, <br/>
+        {{city}} - {{pincode}}, India</div>
+      <div><span class="label">Place of Supply:</span> GJ</div>
+    </div>
+    <div style="width:60% ; margin-right: 0;">
+        <div><span class="label">Transaction Id:</span> {{transaction_id}}</div>
+        <div><span class="label">Payment Id:</span> {{utr}}</div>
+        <div><span class="label">Invoice Voucher Date:</span> {{date}}</div>
+        
+    </div>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Description</th>
+          <th>Total Value</th>
+          <th>Discount</th>
+          <th>Taxable Value</th>
+          <th>IGST Rate</th>
+          <th>IGST Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Purchase of AT-Money via razorpay</td>
+          <td>{{amount}}</td>
+          <td>0.00</td>
+          <td>{{with_tax_amount}}</td>
+          <td>18.0%</td>
+          <td>{{gst}}</td>
+        </tr>
+        <tr>
+          <td>Platform Fee</td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>0.00</td>
+          <td>18.0%</td>
+          <td>0.00</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="total-box">
+      <table>
+        <tr>
+          <th>Total Tax</th>
+          <td>INR {{gst}}</td>
+        </tr>
+        <tr>
+          <th>Total Amount</th>
+          <td><b>INR {{with_tax_amount}}</b></td>
+        </tr>
+        <tr>
+          <th>Amount Received</th>
+          <td>INR {{with_tax_amount}}</td>
+        </tr>
+      </table>
+    </div>
+
+    <div style="clear:both;"></div>
+
+    <div class="section">
+      <div><span class="label">Total Amount (in words):</span> INR {{total_in_word}}</div>
+      <div><span class="label">HSN/SAC:</span> 999799</div>
+      <div><span class="label">Reverse charge basis:</span> No</div>
+      <div><span class="label">PAN Number:</span> AAGCC0196A</div>
+    </div>
+
+    <div class="note">
+      Other details:<br/>
+      This is a computer generated invoice voucher, no signatures required.
+    </div>
+  </div>
+</body>
+</html>

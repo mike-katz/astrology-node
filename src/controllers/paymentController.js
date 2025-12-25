@@ -1,6 +1,75 @@
 const db = require('../db');
 require('dotenv').config();
-const crypto = require('crypto-js');
+const generateInvoicePDF = require('../utils/generatepdf');
+
+function numberToIndianWords(amount) {
+    if (amount === undefined || amount === null) return '';
+
+    const ones = [
+        '', 'One', 'Two', 'Three', 'Four', 'Five',
+        'Six', 'Seven', 'Eight', 'Nine', 'Ten',
+        'Eleven', 'Twelve', 'Thirteen', 'Fourteen',
+        'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'
+    ];
+
+    const tens = [
+        '', '', 'Twenty', 'Thirty', 'Forty',
+        'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'
+    ];
+
+    function convertBelowThousand(num) {
+        let str = '';
+
+        if (num > 99) {
+            str += ones[Math.floor(num / 100)] + ' Hundred ';
+            num %= 100;
+        }
+
+        if (num > 19) {
+            str += tens[Math.floor(num / 10)] + ' ';
+            num %= 10;
+        }
+
+        if (num > 0) {
+            str += ones[num] + ' ';
+        }
+
+        return str.trim();
+    }
+
+    function convertNumber(num) {
+        let result = '';
+
+        if (num >= 10000000) {
+            result += convertBelowThousand(Math.floor(num / 10000000)) + ' Crore ';
+            num %= 10000000;
+        }
+
+        if (num >= 100000) {
+            result += convertBelowThousand(Math.floor(num / 100000)) + ' Lakh ';
+            num %= 100000;
+        }
+
+        if (num >= 1000) {
+            result += convertBelowThousand(Math.floor(num / 1000)) + ' Thousand ';
+            num %= 1000;
+        }
+
+        result += convertBelowThousand(num);
+        return result.trim();
+    }
+
+    const rupees = Math.floor(amount);
+    const paise = Math.round((amount - rupees) * 100);
+
+    let words = convertNumber(rupees) + ' Rupees';
+
+    if (paise > 0) {
+        words += ' and ' + convertNumber(paise) + ' Paise';
+    }
+
+    return words + ' Only';
+}
 
 async function addPayment(req, res) {
     try {
@@ -10,11 +79,31 @@ async function addPayment(req, res) {
             .where('id', req?.userId)
             .first();
         if (!user) return res.status(400).json({ success: false, message: 'User not found.' });
-        const orderId = ((parseInt(crypto.lib.WordArray.random(16).toString(), 16) % 1e6) + '').padStart(15, '0');
+
+        const orderId = Math.floor(100000000000000 + Math.random() * 900000000000000).toString();
         const utr = Math.floor(100000000 + Math.random() * 900000000).toString();
+        const gst = (Number(amount) * 18) / 100
+
+        const with_tax_amount = Number(Number(gst) + Number(amount)).toFixed(2);
+        const total_in_word = numberToIndianWords(with_tax_amount)
+
+        const data = {
+            transaction_id: orderId,
+            utr,
+            amount,
+            with_tax_amount,
+            gst,
+            address: user?.current_address,
+            city: user?.city,
+            pincode: user?.pincode,
+            total_in_word
+        };
+        const invoice = await generateInvoicePDF(data)
+        console.log("invoice", invoice);
         await db('users').where({ id: user?.id }).increment({ balance: Number(amount) });
-        await db('payments').insert({ user_id: req?.userId, transaction_id: orderId, utr, amount, status: "success", type: "recharge" });
-        await db('balancelogs').insert({ user_id: req?.userId, message: "Purchase of AT-Money via razorpay", amount });
+        await db('payments').insert({ user_id: req?.userId, transaction_id: orderId, utr, gst, amount, status: "success", invoice, type: "recharge" });
+        await db('balancelogs').insert({ user_id: req?.userId, message: "Purchase of AT-Money via razorpay", amount, gst, invoice });
+
         return res.status(200).json({ success: true, message: 'Payment added Successfully' });
     } catch (err) {
         console.error(err);
