@@ -1,8 +1,13 @@
 const fs = require('fs');
 const path = require('path');
-const puppeteer = require('puppeteer');
+// const puppeteer = require('puppeteer');
 const AWS = require('aws-sdk');
 require('dotenv').config();
+// const { PDFDocument, StandardFonts } = require('pdf-lib');
+// const wkhtmltopdf = require("wkhtmltopdf");
+const pdf = require("html-pdf");
+
+
 
 async function generateInvoicePDF(data) {
     const { transaction_id, } = data;
@@ -30,21 +35,20 @@ async function generateInvoicePDF(data) {
     const fileName = `invoice_${transaction_id.replace(/\s+/g, '_')}_${Date.now()}.pdf`;
     const outputPath = path.join(__dirname, 'pdfs', fileName);
 
-    const browser = await puppeteer.launch({
-        headless: 'new',
-        args: ["--no-sandbox", "--disable-setuid-sandbox"]
+
+
+    const options = {
+        format: "A3",
+        border: "10mm",
+        timeout: 30000,
+    };
+
+    await new Promise((resolve, reject) => {
+        pdf.create(html, options).toFile(outputPath, (err, res) => {
+            if (err) return reject(err);
+            resolve(res);
+        });
     });
-
-    const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: 'networkidle0' });
-
-    await page.pdf({
-        path: outputPath,
-        format: 'A4',
-        printBackground: true
-    });
-
-    await browser.close();
 
     const s3 = new AWS.S3({
         accessKeyId: process.env.AWS_ACCESS_KEY,
@@ -53,18 +57,60 @@ async function generateInvoicePDF(data) {
     });
 
     const fileContent = fs.readFileSync(outputPath);
+    const bucketName = process.env.AWS_BUCKET_NAME;
     const Key = `invoice/${transaction_id}.pdf`;
-    const bucketName = process.env.AWS_BUCKET_NAME
-    const params = {
+
+    await s3.putObject({
         Bucket: bucketName,
         Key,
         Body: fileContent,
-    };
+        ContentType: 'application/pdf'
+    }).promise();
 
-    await s3.putObject(params).promise();
-    await fs.unlinkSync(outputPath)
+    fs.unlinkSync(outputPath);
+
     const s3FileUrl = `https://${bucketName}.s3.amazonaws.com/${Key}`;
-    return s3FileUrl;
+
+    return s3FileUrl; // ✅ ACTUAL RESPONSE
+
+
+    // const browser = await puppeteer.launch({
+    //     headless: 'new',
+    //     args: ["--no-sandbox", "--disable-setuid-sandbox"]
+    // });
+
+    // Create PDF
+    // const pdfDoc = await PDFDocument.create();
+    // const page = pdfDoc.addPage([595, 842]); // A4 size
+
+    // const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    // page.drawText(html, {
+    //     x: 50,
+    //     y: 800,
+    //     size: 14,
+    //     font
+    // });
+
+    // // Save PDF
+    // const pdfBytes = await pdfDoc.save();
+
+    // fs.writeFileSync(outputPath, pdfBytes);
+
+
+    // wkhtmltopdf(html, { output: fileName });
+    // return "test";
+    // const page = await browser.newPage();
+    // await page.setContent(html, { waitUntil: 'networkidle0' });
+
+    // await page.pdf({
+    //     path: outputPath,
+    //     format: 'A4',
+    //     printBackground: true
+    // });
+
+    // await browser.close();
+
+
     // return outputPath;
 }
 
