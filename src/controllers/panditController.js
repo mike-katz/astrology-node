@@ -244,7 +244,7 @@ async function onboard(req, res) {
         } = req.body;
         if (!step || !token) return res.status(400).json({ success: false, message: 'Missing params.' });
 
-        const tokenData = decodeJWT(token)
+        const tokenData = decodeJWT(`Bearer ${token}`)
         if (!tokenData?.success) return res.status(400).json({ success: false, message: 'Missing params.' });
         const skill = ["signature_reading", "vedic", "tarot", "kp", "numerology", "lal_kitab", "psychic", "palmistry", "cartomancy", "prashana", "loshu_grid", "nadi", "face_reading", "horary", "life_coach", "western", "gemology", "vastu"]
 
