@@ -182,4 +182,59 @@ async function getTransactions(req, res) {
         res.status(500).json({ success: false, message: 'Server error' });
     }
 }
-module.exports = { addPayment, getPayment, getTransactions };
+
+async function deleteSinglePayment(req, res) {
+    const { id } = req.query;
+    try {
+        if (!id) return res.status(400).json({ success: false, message: 'Missing params.' });
+        await db('payments').where({
+            'id': id,
+            'user_id': req?.userId
+        }).update({ deleted_at: new Date() });
+        return res.status(200).json({ success: true, data: null, message: 'Delete Successfully' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
+async function deleteSingleTransaction(req, res) {
+    const { id } = req.query;
+    try {
+        if (!id) return res.status(400).json({ success: false, message: 'Missing params.' });
+        await db('balancelogs').where({
+            'id': id,
+            'user_id': req?.userId
+        }).update({ deleted_at: new Date() });
+        return res.status(200).json({ success: true, data: null, message: 'Delete Successfully' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
+async function deleteAllPayment(req, res) {
+    try {
+        await db('payments').where({
+            'user_id': req?.userId
+        }).update({ deleted_at: new Date() });
+        return res.status(200).json({ success: true, data: null, message: 'Delete Successfully' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
+async function deleteAllTransaction(req, res) {
+    try {
+        await db('balancelogs').where({
+            'user_id': req?.userId
+        }).update({ deleted_at: new Date() });
+        return res.status(200).json({ success: true, data: null, message: 'Delete Successfully' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
+module.exports = { addPayment, getPayment, getTransactions, deleteSinglePayment, deleteSingleTransaction, deleteAllPayment, deleteAllTransaction };

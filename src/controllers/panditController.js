@@ -1,5 +1,5 @@
 const db = require('../db');
-const { decrypt } = require('../utils/crypto');
+const { decrypt, encrypt } = require('../utils/crypto');
 require('dotenv').config();
 const { uploadImageTos3 } = require('./uploader');
 const jwt = require('jsonwebtoken');
@@ -146,10 +146,12 @@ async function verifyOtp(req, res) {
         if (!mobile || !country_code || !otp) return res.status(400).json({ success: false, message: 'Mobile number and otp required.' });
 
         const latestRecord = await db('otpmanages').where('mobile', mobile).first();
+        console.log("latestRecord", latestRecord);
         if (!latestRecord) return res.status(400).json({ success: false, message: 'Wrong Otp' });
 
         const currentDate = new Date();
         if (latestRecord.attempt === 3 && latestRecord.expiry > new Date()) {
+            const response = {}
             response.return = false;
             response.message = 'Your otp attempt is over. Please try after sometimes.';
             return res.status(400).json({ success: false, data: null, message: response?.message });
@@ -160,17 +162,13 @@ async function verifyOtp(req, res) {
         } else {
             update.attempt = 1;
         }
-        if (otp == latestRecord?.otp) {
+        if (otp != latestRecord?.otp) {
             update.expiry = new Date(currentDate.getTime() + 4 * 60 * 60 * 1000);
             await db('otpmanages')
                 .where('id', latestRecord?.id)
                 .update(update);
             return res.status(400).json({ success: false, data: null, message: 'Wrong otp' });
         }
-
-        response.return = true;
-        response.message = 'OTP Matched Successfully!';
-
         update.attempt = 0;
         update.expiry = null;
 
@@ -180,7 +178,7 @@ async function verifyOtp(req, res) {
 
         let user = await db('onboardings').where('mobile', mobile).first();
         if (!user) {
-            user = await db('onboardings').insert({ mobile, country_code, step: 0 }).returning(['id', 'mobile', 'step']);
+            user = await db('onboardings').insert({ mobile, country_code, step: 0, status: "pending" }).returning(['id', 'mobile', 'step']);
         }
         const token = jwt.sign({ userId: user.id, mobile: user.mobile }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '1h' });
         // hide password
@@ -245,37 +243,149 @@ function is18OrAbove(dobString) {
 
 async function onboard(req, res) {
     try {
-        const { name, display_name, country_code, mobile, email, city, country, experience, primary_expertise, secondary_expertise, other_working, daily_horoscope, step } = req.body;
-        if (!step) return res.status(400).json({ success: false, message: 'Mobile number required.' });
+        const { name, display_name, country_code, mobile, email, city, country, gender, experience, primary_expertise, secondary_expertise, other_working, daily_horoscope, step = 1,
+            languages, consaltance_language, available_for, offer_live_session, live_start_time, live_end_time, dedicated_time, response_time,
+            chat_rate, call_rate, is_first_chat_free, training_type, guru_name,
+            id_type, id_number, about, achievement_url,
+            terms, no_false, consent_profile
+        } = req.body;
+        if (!step) return res.status(400).json({ success: false, message: 'Missing params.' });
 
-        if (step == 1) {
-            const isAbove18 = is18OrAbove(dob)
-            if (!isAbove18) return res.status(400).json({ success: false, message: 'You are not a 18+ year.' });
-        }
         const skill = ["signature_reading", "vedic", "tarot", "kp", "numerology", "lal_kitab", "psychic", "palmistry", "cartomancy", "prashana", "loshu_grid", "nadi", "face_reading", "horary", "life_coach", "western", "gemology", "vastu"]
 
         const language = ["english", "hindi", "tamil", "panjabi", "marathi", "gujarati", "bangali", "french", "odia", "telugu", "kannada", "malayalam", "sanskrit", "assamese", "german", "spanish", "marwari", "manipuri", "urdu", "sindhi", "kashmiri", "bodo", "nepali", "konkani", "maithili", "arabic", "bhojpuri", "dutch", "rajasthanii"]
+        const { files } = req
+        if (step == 1) {
+            if (!name || !display_name || !country_code || !mobile || !email || !city || !country || !gender || !primary_expertise || !experience) return res.status(400).json({ success: false, message: 'Missing params.' });
+        }
+        if (step == 2) {
+            if (!languages || !consaltance_language || !available_for || !live_start_time || !live_end_time || !response_time) return res.status(400).json({ success: false, message: 'Missing params.' });
+            const selected = languages.split(",").map(l => l.trim());  // ["english", "hindi"]
+            const isValidLanguage = selected.every(l => language.includes(l));
+            if (!isValidLanguage) return res.status(400).json({ success: false, message: 'enter valid languages.' });
 
-        // const selected = languages.split(",").map(l => l.trim());  // ["english", "hindi"]
-
-        // const isValidLanguage = selected.every(l => language.includes(l));
+            const selecteds = consaltance_language.split(",").map(l => l.trim());  // ["english", "hindi"]
+            const isValidLanguage_consalt = selecteds.every(l => language.includes(l));
+            if (!isValidLanguage_consalt) return res.status(400).json({ success: false, message: 'enter valid Consultation languages.' });
+        }
+        if (step == 3) {
+            if (!chat_rate || !call_rate || !training_type || !guru_name || files?.certificate?.length == 0) return res.status(400).json({ success: false, message: 'Missing params.' });
+        }
+        if (step == 4) {
+            if (!id_type || !id_number || files?.certificate?.length == 0) return res.status(400).json({ success: false, message: 'Missing params.' });
+        }
 
         // const selectedskill = skills.split(",").map(l => l.trim());  // ["english", "hindi"]
 
         // const isValidSkill = selectedskill.every(l => skill.includes(l));
 
-        // if (!isValidLanguage) return res.status(400).json({ success: false, message: 'enter valid languages.' });
-        // if (!isValidSkill) return res.status(400).json({ success: false, message: 'enter valid skills.' });
-        if (step == 1) {
-            const user = await db('onboardings').where(function () {
-                this.where('mobile', mobile);
-            }).first();
-            if (user) return res.status(400).json({ message: 'Mobile number already exist.' });
-        }
-        // profile_image
-        // const { file } = req
-        const ins = { status: "pending", name, display_name, country_code, mobile, email, city, country, experience, primary_expertise, secondary_expertise, other_working, daily_horoscope, step }
 
+        // if (!isValidSkill) return res.status(400).json({ success: false, message: 'enter valid skills.' });
+
+
+        const user = await db('onboardings').where(function () {
+            this.where('mobile', mobile);
+        }).first();
+        if (!user) return res.status(400).json({ message: 'Wrong mobile number.' });
+
+        // profile_image
+        const ins = {}
+        if (consent_profile != undefined) {
+            ins.consent_profile = consent_profile
+        }
+        if (no_false != undefined) {
+            ins.no_false = no_false
+        }
+        if (terms != undefined) {
+            ins.terms = terms
+        }
+        if (achievement_url) {
+            ins.achievement_url = achievement_url
+        }
+        if (about) {
+            ins.about = about
+        }
+        if (id_number) {
+            ins.id_number = id_number
+        }
+        if (id_type) {
+            ins.id_type = id_type
+        }
+        if (guru_name) {
+            ins.guru_name = guru_name
+        }
+        if (training_type) {
+            ins.training_type = training_type
+        }
+        if (is_first_chat_free != undefined) {
+            ins.is_first_chat_free = is_first_chat_free
+        }
+        if (call_rate) {
+            ins.call_rate = call_rate
+        }
+        if (chat_rate) {
+            ins.chat_rate = chat_rate
+        }
+        if (dedicated_time) {
+            ins.dedicated_time = dedicated_time
+        }
+        if (live_end_time) {
+            ins.live_end_time = live_end_time
+        }
+        if (live_start_time) {
+            ins.live_start_time = live_start_time
+        }
+        if (offer_live_session != undefined) {
+            ins.offer_live_session = offer_live_session
+        }
+        if (available_for) {
+            ins.available_for = available_for
+        }
+        if (consaltance_language) {
+            ins.consaltance_language = consaltance_language
+        }
+        if (languages) {
+            ins.languages = languages
+        }
+        if (step) {
+            ins.step = step
+        }
+        if (daily_horoscope != undefined) {
+            ins.daily_horoscope = daily_horoscope
+        }
+        if (other_working) {
+            ins.other_working = other_working
+        }
+        if (secondary_expertise) {
+            ins.secondary_expertise = secondary_expertise
+        }
+        if (primary_expertise) {
+            ins.primary_expertise = primary_expertise
+        }
+        if (experience) {
+            ins.experience = experience
+        }
+        if (country) {
+            ins.country = country
+        }
+        if (city) {
+            ins.city = city
+        }
+        if (email) {
+            ins.email = email
+        }
+        if (mobile) {
+            ins.mobile = mobile
+        }
+        if (country_code) {
+            ins.country_code = country_code
+        }
+        if (display_name) {
+            ins.display_name = display_name
+        }
+        if (name) {
+            ins.name = name
+        }
         // if (phone_type) {
         //     const selected = phone_type.split(",").map(l => l.trim());
         //     ins.phone_type = phone_type ? JSON.stringify(selected) : {}
@@ -287,15 +397,43 @@ async function onboard(req, res) {
         //     ins.skill = selectedskill ? JSON.stringify(selectedskill) : {}
         // }
 
-        // if (file) {
-        //     const image = await uploadImageTos3('profile_image', file, 'pandit');
-        //     console.log("image", image.data.Location);
-        //     ins.profile_image = image.data.Location;
-        // }
-        if (!user && step == 1) {
-            console.log("ins", ins);
-            await db('onboardings').insert(ins).returning(['id', 'mobile', 'step']);
+        if (files?.profile?.length > 0) {
+            const image = await uploadImageTos3('profile', files?.profile[0], 'pandit');
+            ins.profile = image.data.Location;
         }
+        if (files?.selfie?.length > 0) {
+            const image = await uploadImageTos3('selfie', files?.selfie[0], 'document');
+            ins.selfie = image.data.Location;
+        }
+
+        if (files?.achievement?.length > 0) {
+            const image = await uploadImageTos3('achievement', files?.achievement[0], 'document');
+            ins.achievement_url = image.data.Location;
+        }
+
+        if (files?.certificate?.length > 0) {
+            const certificates = await Promise.all(
+                files.certificate.map(file =>
+                    uploadImageTos3('certificate', file, 'document')
+                        .then(res => res.data.Location)
+                )
+            );
+            ins.certificate = JSON.stringify(certificates);
+        }
+
+        if (files?.address?.length > 0) {
+            const addresss = await Promise.all(
+                files.address.map(file =>
+                    uploadImageTos3('address', file, 'document')
+                        .then(res => res.data.Location)
+                )
+            );
+            ins.address = JSON.stringify(addresss);
+        }
+
+        console.log("ins", ins);
+        await db('onboardings').where({ mobile }).update(ins);
+
         return res.status(200).json({ success: true, message: 'Onboard Successfully' });
     } catch (err) {
         console.error(err);

@@ -13,7 +13,8 @@ exports.uploadImageTos3 = ((directoryPath, image, type) => new Promise(async (re
 
   const folderName = type === 'chat' ? process.env.CHAT_FOLDER_NAME
     : type === 'pandit' ? process.env.PANDIT_FOLDER_NAME
-      : process.env.CHAT_FOLDER_NAME || '';
+      : type === 'document' ? process.env.DOCUMENT_FOLDER_NAME
+        : process.env.CHAT_FOLDER_NAME || '';
 
   // const folderName = process.env.PANDIT_FOLDER_NAME
   const s3Params = {
