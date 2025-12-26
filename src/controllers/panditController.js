@@ -1,5 +1,6 @@
 const db = require('../db');
 const { decrypt, encrypt } = require('../utils/crypto');
+const { decodeJWT } = require('../utils/decodeJWT');
 require('dotenv').config();
 const { uploadImageTos3 } = require('./uploader');
 const jwt = require('jsonwebtoken');
@@ -239,7 +240,7 @@ async function onboard(req, res) {
             languages, consaltance_language, available_for, offer_live_session, live_start_time, live_end_time, dedicated_time, response_time,
             chat_rate, call_rate, is_first_chat_free, training_type, guru_name,
             id_type, id_number, about, achievement_url,
-            terms, no_false, consent_profile
+            terms, no_false, consent_profile, token
         } = req.body;
         if (!step || !token) return res.status(400).json({ success: false, message: 'Missing params.' });
 
