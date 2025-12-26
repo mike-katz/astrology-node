@@ -180,7 +180,7 @@ async function verifyOtp(req, res) {
         if (!user) {
             user = await db('onboardings').insert({ mobile, country_code, step: 0, status: "pending" }).returning(['id', 'mobile', 'step']);
         }
-        const token = jwt.sign({ userId: user.id, mobile: user.mobile }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '1h' });
+        const token = jwt.sign({ userId: user.id, mobile: user.mobile, country_code: user.country_code }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '1h' });
         // hide password
         const encryptToken = encrypt(token);
 
@@ -277,9 +277,7 @@ async function onboard(req, res) {
         // if (!isValidSkill) return res.status(400).json({ success: false, message: 'enter valid skills.' });
 
 
-        const user = await db('onboardings').where(function () {
-            this.where('mobile', tokenData?.data?.mobile);
-        }).first();
+        const user = await db('onboardings').where({ "mobile": tokenData?.data?.mobile, country_code: tokenData?.data?.country_code }).first();
         if (!user) return res.status(400).json({ message: 'Wrong mobile number.' });
 
         // profile_image
