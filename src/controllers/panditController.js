@@ -184,39 +184,31 @@ async function verifyOtp(req, res) {
         // hide password
         const encryptToken = encrypt(token);
 
-        const { name, display_name, profile, email, city, country, experience, primary_expertise, secondary_expertise, other_working, daily_horoscope,
+        const { name, display_name, gender, profile, email, city, country, experience, primary_expertise, secondary_expertise, other_working, daily_horoscope,
             languages, consaltance_language, available_for, offer_live_session, live_start_time, live_end_time, dedicated_time, response_time,
             chat_rate, call_rate, is_first_chat_free, training_type, guru_name, certificate,
             id_type, id_number, about, achievement_url, address, selfie,
             terms, no_false, consent_profile
         } = user
-        const response = [
-            {
-                "step1": {
-                    name, profile, display_name, country_code, email, city, country, experience, primary_expertise, secondary_expertise, other_working, daily_horoscope
-                }
+        const response = {
+            "step1": {
+                name, profile, display_name, gender, country_code, email, city, country, experience,
+                primary_expertise: primary_expertise ? JSON.parse(primary_expertise) : [],
+                secondary_expertise, other_working: other_working ? JSON.parse(other_working) : [], daily_horoscope
             },
-            {
-                "step2": {
-                    languages, consaltance_language, available_for, offer_live_session, live_start_time, live_end_time, dedicated_time, response_time
-                }
+            "step2": {
+                languages, consaltance_language, available_for, offer_live_session, live_start_time, live_end_time, dedicated_time, response_time
             },
-            {
-                "step3": {
-                    chat_rate, call_rate, is_first_chat_free, training_type, guru_name, certificate
-                }
+            "step3": {
+                chat_rate, call_rate, is_first_chat_free, training_type, guru_name, certificate
             },
-            {
-                "step4": {
-                    id_type, id_number, about, achievement_url, address, selfie
-                }
+            "step4": {
+                id_type, id_number, about, achievement_url, address, selfie
             },
-            {
-                "step5": {
-                    terms, no_false, consent_profile
-                }
+            "step5": {
+                terms, no_false, consent_profile
             }
-        ]
+        }
 
         return res.status(200).json({ success: true, data: { token: encryptToken, step: user?.step, profile_data: response }, message: 'Otp Verify Successfully' });
     } catch (err) {
@@ -290,6 +282,9 @@ async function onboard(req, res) {
 
         // profile_image
         const ins = {}
+        if (gender) {
+            ins.gender = gender
+        }
         if (consent_profile != undefined) {
             ins.consent_profile = consent_profile
         }
