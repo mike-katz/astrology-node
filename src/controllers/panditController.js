@@ -422,7 +422,7 @@ async function onboard(req, res) {
         }
 
         console.log("ins", ins);
-        await db('onboardings').where({ mobile }).update(ins);
+        await db('onboardings').where({ id: user?.id }).update(ins);
 
         return res.status(200).json({ success: true, message: 'Onboard Successfully' });
     } catch (err) {
