@@ -241,8 +241,10 @@ async function onboard(req, res) {
             id_type, id_number, about, achievement_url,
             terms, no_false, consent_profile
         } = req.body;
-        if (!step) return res.status(400).json({ success: false, message: 'Missing params.' });
+        if (!step || !token) return res.status(400).json({ success: false, message: 'Missing params.' });
 
+        const tokenData = decodeJWT(token)
+        if (!tokenData?.success) return res.status(400).json({ success: false, message: 'Missing params.' });
         const skill = ["signature_reading", "vedic", "tarot", "kp", "numerology", "lal_kitab", "psychic", "palmistry", "cartomancy", "prashana", "loshu_grid", "nadi", "face_reading", "horary", "life_coach", "western", "gemology", "vastu"]
 
         const language = ["english", "hindi", "tamil", "panjabi", "marathi", "gujarati", "bangali", "french", "odia", "telugu", "kannada", "malayalam", "sanskrit", "assamese", "german", "spanish", "marwari", "manipuri", "urdu", "sindhi", "kashmiri", "bodo", "nepali", "konkani", "maithili", "arabic", "bhojpuri", "dutch", "rajasthanii"]
@@ -276,7 +278,7 @@ async function onboard(req, res) {
 
 
         const user = await db('onboardings').where(function () {
-            this.where('mobile', mobile);
+            this.where('mobile', tokenData?.data?.mobile);
         }).first();
         if (!user) return res.status(400).json({ message: 'Wrong mobile number.' });
 
