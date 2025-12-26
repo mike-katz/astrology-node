@@ -201,52 +201,56 @@ function is18OrAbove(dobString) {
 
 async function onboard(req, res) {
     try {
-        const { name, dob, gender, phone_type, email, mobile, countryCode, languages, skills } = req.body;
-        if (!mobile || !countryCode || !dob) return res.status(400).json({ success: false, message: 'Mobile number required.' });
+        const { name, display_name, country_code, mobile, email, city, country, experience, primary_expertise, secondary_expertise, other_working, daily_horoscope, step } = req.body;
+        if (!step) return res.status(400).json({ success: false, message: 'Mobile number required.' });
 
-        const isAbove18 = is18OrAbove(dob)
-        if (!isAbove18) return res.status(400).json({ success: false, message: 'You are not a 18+ year.' });
+        if (step == 1) {
+            const isAbove18 = is18OrAbove(dob)
+            if (!isAbove18) return res.status(400).json({ success: false, message: 'You are not a 18+ year.' });
+        }
         const skill = ["signature_reading", "vedic", "tarot", "kp", "numerology", "lal_kitab", "psychic", "palmistry", "cartomancy", "prashana", "loshu_grid", "nadi", "face_reading", "horary", "life_coach", "western", "gemology", "vastu"]
 
         const language = ["english", "hindi", "tamil", "panjabi", "marathi", "gujarati", "bangali", "french", "odia", "telugu", "kannada", "malayalam", "sanskrit", "assamese", "german", "spanish", "marwari", "manipuri", "urdu", "sindhi", "kashmiri", "bodo", "nepali", "konkani", "maithili", "arabic", "bhojpuri", "dutch", "rajasthanii"]
 
-        const selected = languages.split(",").map(l => l.trim());  // ["english", "hindi"]
+        // const selected = languages.split(",").map(l => l.trim());  // ["english", "hindi"]
 
-        const isValidLanguage = selected.every(l => language.includes(l));
+        // const isValidLanguage = selected.every(l => language.includes(l));
 
-        const selectedskill = skills.split(",").map(l => l.trim());  // ["english", "hindi"]
+        // const selectedskill = skills.split(",").map(l => l.trim());  // ["english", "hindi"]
 
-        const isValidSkill = selectedskill.every(l => skill.includes(l));
+        // const isValidSkill = selectedskill.every(l => skill.includes(l));
 
-        if (!isValidLanguage) return res.status(400).json({ success: false, message: 'enter valid languages.' });
-        if (!isValidSkill) return res.status(400).json({ success: false, message: 'enter valid skills.' });
-        const user = await db('onboardings').where(function () {
-            this.where('mobile', mobile);
-        }).first();
-        if (user) return res.status(400).json({ message: 'Mobile number already exist.' });
+        // if (!isValidLanguage) return res.status(400).json({ success: false, message: 'enter valid languages.' });
+        // if (!isValidSkill) return res.status(400).json({ success: false, message: 'enter valid skills.' });
+        if (step == 1) {
+            const user = await db('onboardings').where(function () {
+                this.where('mobile', mobile);
+            }).first();
+            if (user) return res.status(400).json({ message: 'Mobile number already exist.' });
+        }
         // profile_image
-        const { file } = req
-        const ins = { name, dob, status: "pending", gender, email, mobile, country_code: countryCode }
+        // const { file } = req
+        const ins = { status: "pending", name, display_name, country_code, mobile, email, city, country, experience, primary_expertise, secondary_expertise, other_working, daily_horoscope, step }
 
-        if (phone_type) {
-            const selected = phone_type.split(",").map(l => l.trim());
-            ins.phone_type = phone_type ? JSON.stringify(selected) : {}
-        }
-        if (Array.isArray(selected) && selected?.length > 0) {
-            ins.language = selected ? JSON.stringify(selected) : {}
-        }
-        if (Array.isArray(selectedskill) && selectedskill?.length > 0) {
-            ins.skill = selectedskill ? JSON.stringify(selectedskill) : {}
-        }
+        // if (phone_type) {
+        //     const selected = phone_type.split(",").map(l => l.trim());
+        //     ins.phone_type = phone_type ? JSON.stringify(selected) : {}
+        // }
+        // if (Array.isArray(selected) && selected?.length > 0) {
+        //     ins.language = selected ? JSON.stringify(selected) : {}
+        // }
+        // if (Array.isArray(selectedskill) && selectedskill?.length > 0) {
+        //     ins.skill = selectedskill ? JSON.stringify(selectedskill) : {}
+        // }
 
-        if (file) {
-            const image = await uploadImageTos3('profile_image', file, 'pandit');
-            console.log("image", image.data.Location);
-            ins.profile_image = image.data.Location;
-        }
-        if (!user) {
+        // if (file) {
+        //     const image = await uploadImageTos3('profile_image', file, 'pandit');
+        //     console.log("image", image.data.Location);
+        //     ins.profile_image = image.data.Location;
+        // }
+        if (!user && step == 1) {
             console.log("ins", ins);
-            await db('onboardings').insert(ins).returning(['id', 'mobile']);
+            await db('onboardings').insert(ins).returning(['id', 'mobile', 'step']);
         }
         return res.status(200).json({ success: true, message: 'Onboard Successfully' });
     } catch (err) {
