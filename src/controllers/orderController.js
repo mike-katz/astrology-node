@@ -11,8 +11,8 @@ admin.initializeApp({
 
 async function create(req, res) {
     const { panditId, type = 'chat', profile_id } = req.body;
-    if (!panditId) {
-        return res.status(400).json({ success: false, message: 'Please enter pandit' });
+    if (!panditId || !profile_id) {
+        return res.status(400).json({ success: false, message: 'Missing params' });
     }
     console.log("create order req.body", req.body);
     try {
