@@ -350,13 +350,13 @@ async function onboard(req, res) {
             ins.daily_horoscope = daily_horoscope
         }
         if (other_working) {
-            ins.other_working = other_working
+            ins.other_working = JSON.stringify(other_working)
         }
         if (secondary_expertise) {
             ins.secondary_expertise = secondary_expertise
         }
         if (primary_expertise) {
-            ins.primary_expertise = primary_expertise
+            ins.primary_expertise = JSON.stringify(primary_expertise)
         }
         if (experience) {
             ins.experience = experience
@@ -424,7 +424,9 @@ async function onboard(req, res) {
         console.log("ins", ins);
         await db('onboardings').where({ id: user?.id }).update(ins);
 
-        return res.status(200).json({ success: true, message: 'Onboard Successfully' });
+        return res.status(200).json({
+            success: true, message: `step${step} update Successfully`
+        });
     } catch (err) {
         console.error(err);
         res.status(500).json({ success: false, message: 'Server error' });
