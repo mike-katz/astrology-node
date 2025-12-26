@@ -369,12 +369,6 @@ async function onboard(req, res) {
         if (email) {
             ins.email = email
         }
-        if (mobile) {
-            ins.mobile = mobile
-        }
-        if (country_code) {
-            ins.country_code = country_code
-        }
         if (display_name) {
             ins.display_name = display_name
         }
