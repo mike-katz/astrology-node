@@ -121,14 +121,17 @@ async function getPanditDetail(req, res) {
 
 async function signup(req, res) {
     try {
-        const { mobile, countryCode } = req.body;
-        if (!mobile || !countryCode) return res.status(400).json({ success: false, message: 'Mobile number required.' });
+        const { mobile, country_code } = req.body;
+        if (!mobile || !country_code) return res.status(400).json({ success: false, message: 'Mobile number required.' });
+        const pandit = await db('pandits').where('mobile', mobile).first();
+        if (pandit) return res.status(400).json({ success: false, message: 'Your mobile number already registered.' });
+
         const user = await db('otpmanages').where(function () {
             this.where('mobile', mobile);
         }).first();
 
         if (!user) {
-            await db('otpmanages').insert({ mobile, country_code: countryCode, otp: '1234' });
+            await db('otpmanages').insert({ mobile, country_code, otp: '1234' });
         }
         return res.status(200).json({ success: true, message: 'Otp Send Successfully' });
     } catch (err) {
@@ -138,7 +141,6 @@ async function signup(req, res) {
 }
 
 async function verifyOtp(req, res) {
-    const response = {};
     try {
         const { mobile, countryCode, otp } = req.body;
         if (!mobile || !countryCode || !otp) return res.status(400).json({ success: false, message: 'Mobile number and otp required.' });
@@ -176,7 +178,49 @@ async function verifyOtp(req, res) {
             .where('id', latestRecord?.id)
             .update(update);
 
-        return res.status(200).json({ success: true, data: null, message: 'Otp Verify Successfully' });
+        let user = await db('onboardings').where('mobile', mobile).first();
+        if (!user) {
+            user = await db('onboardings').insert({ mobile, country_code, step: 0 }).returning(['id', 'mobile', 'step']);
+        }
+        const token = jwt.sign({ userId: user.id, mobile: user.mobile }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '1h' });
+        // hide password
+        const encryptToken = encrypt(token);
+
+        const { name, display_name, profile, country_code, email, city, country, experience, primary_expertise, secondary_expertise, other_working, daily_horoscope,
+            languages, consaltance_language, available_for, offer_live_session, live_start_time, live_end_time, dedicated_time, response_time,
+            chat_rate, call_rate, is_first_chat_free, training_type, guru_name, certificate,
+            id_type, id_number, about, achievement_url, address,
+            terms, no_false, consent_profile
+        } = user
+        const response = [
+            {
+                "step1": {
+                    name, profile, display_name, country_code, email, city, country, experience, primary_expertise, secondary_expertise, other_working, daily_horoscope
+                }
+            },
+            {
+                "step2": {
+                    languages, consaltance_language, available_for, offer_live_session, live_start_time, live_end_time, dedicated_time, response_time
+                }
+            },
+            {
+                "step3": {
+                    chat_rate, call_rate, is_first_chat_free, training_type, guru_name, certificate
+                }
+            },
+            {
+                "step4": {
+                    id_type, id_number, about, achievement_url, address
+                }
+            },
+            {
+                "step5": {
+                    terms, no_false, consent_profile
+                }
+            }
+        ]
+
+        return res.status(200).json({ success: true, data: { token: encryptToken, step: user?.step, profile_data: response }, message: 'Otp Verify Successfully' });
     } catch (err) {
         console.error(err);
         res.status(500).json({ success: false, message: 'Server error' });
