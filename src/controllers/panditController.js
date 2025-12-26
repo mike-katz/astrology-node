@@ -142,8 +142,8 @@ async function signup(req, res) {
 
 async function verifyOtp(req, res) {
     try {
-        const { mobile, countryCode, otp } = req.body;
-        if (!mobile || !countryCode || !otp) return res.status(400).json({ success: false, message: 'Mobile number and otp required.' });
+        const { mobile, country_code, otp } = req.body;
+        if (!mobile || !country_code || !otp) return res.status(400).json({ success: false, message: 'Mobile number and otp required.' });
 
         const latestRecord = await db('otpmanages').where('mobile', mobile).first();
         if (!latestRecord) return res.status(400).json({ success: false, message: 'Wrong Otp' });
@@ -186,10 +186,10 @@ async function verifyOtp(req, res) {
         // hide password
         const encryptToken = encrypt(token);
 
-        const { name, display_name, profile, country_code, email, city, country, experience, primary_expertise, secondary_expertise, other_working, daily_horoscope,
+        const { name, display_name, profile, email, city, country, experience, primary_expertise, secondary_expertise, other_working, daily_horoscope,
             languages, consaltance_language, available_for, offer_live_session, live_start_time, live_end_time, dedicated_time, response_time,
             chat_rate, call_rate, is_first_chat_free, training_type, guru_name, certificate,
-            id_type, id_number, about, achievement_url, address,
+            id_type, id_number, about, achievement_url, address, selfie,
             terms, no_false, consent_profile
         } = user
         const response = [
@@ -210,7 +210,7 @@ async function verifyOtp(req, res) {
             },
             {
                 "step4": {
-                    id_type, id_number, about, achievement_url, address
+                    id_type, id_number, about, achievement_url, address, selfie
                 }
             },
             {
