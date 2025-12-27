@@ -255,11 +255,11 @@ async function onboard(req, res) {
         }
         if (step == 2) {
             if (!languages || !consaltance_language || !available_for || !live_start_time || !live_end_time || !response_time) return res.status(400).json({ success: false, message: 'Missing params.' });
-            const selected = languages.split(",").map(l => l.trim());  // ["english", "hindi"]
+            const selected = languages;  // ["english", "hindi"]
             const isValidLanguage = selected.every(l => language.includes(l));
             if (!isValidLanguage) return res.status(400).json({ success: false, message: 'enter valid languages.' });
 
-            const selecteds = consaltance_language.split(",").map(l => l.trim());  // ["english", "hindi"]
+            const selecteds = consaltance_language;  // ["english", "hindi"]
             const isValidLanguage_consalt = selecteds.every(l => language.includes(l));
             if (!isValidLanguage_consalt) return res.status(400).json({ success: false, message: 'enter valid Consultation languages.' });
         }
@@ -338,10 +338,10 @@ async function onboard(req, res) {
             ins.available_for = available_for
         }
         if (consaltance_language) {
-            ins.consaltance_language = consaltance_language
+            ins.consaltance_language = JSON.stringify(consaltance_language)
         }
         if (languages) {
-            ins.languages = languages
+            ins.languages = JSON.stringify(languages)
         }
         if (step) {
             ins.step = step
