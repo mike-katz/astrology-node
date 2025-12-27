@@ -243,7 +243,7 @@ async function onboard(req, res) {
         const { name, display_name, country_code, mobile, email, city, country, gender, experience, primary_expertise, secondary_expertise, other_working, daily_horoscope, step = 1,
             languages, consaltance_language, available_for, offer_live_session, live_start_time, live_end_time, dedicated_time, response_time,
             chat_rate, call_rate, is_first_chat_free, training_type, guru_name, certificate,
-            govt_id, about, achievement_url,
+            govt_id, about, achievement_url, address,
             terms, no_false, consent_profile, token
         } = req.body;
         if (!step || !token) return res.status(400).json({ success: false, message: 'Missing params.' });
@@ -340,6 +340,9 @@ async function onboard(req, res) {
         if (languages) {
             ins.languages = JSON.stringify(languages)
         }
+        if (address) {
+            ins.address = JSON.stringify(address)
+        }
         if (step > user?.step) {
             ins.step = step
         }
@@ -414,16 +417,16 @@ async function onboard(req, res) {
         //     ins.certificate = JSON.stringify(certificates);
         // }
 
-        if (files?.address?.length > 0) {
-            const addresss = await Promise.all(
-                files.address.map(file =>
-                    uploadImageTos3('address', file, 'document')
-                        .then(res => res.data.Location)
-                )
-            );
-            console.log("addresss", addresss);
-            ins.address = JSON.stringify(addresss);
-        }
+        // if (files?.address?.length > 0) {
+        //     const addresss = await Promise.all(
+        //         files.address.map(file =>
+        //             uploadImageTos3('address', file, 'document')
+        //                 .then(res => res.data.Location)
+        //         )
+        //     );
+        //     console.log("addresss", addresss);
+        //     ins.address = JSON.stringify(addresss);
+        // }
 
         console.log("ins", ins);
         await db('onboardings').where({ id: user?.id }).update(ins);
