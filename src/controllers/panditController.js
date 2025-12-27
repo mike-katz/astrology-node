@@ -203,7 +203,7 @@ async function verifyOtp(req, res) {
                 available_for, offer_live_session, live_start_time, live_end_time, dedicated_time, response_time
             },
             "step3": {
-                chat_rate, call_rate, is_first_chat_free, training_type, guru_name, certificate: certificate ? JSON.parse(certificate) : [],
+                chat_rate, call_rate, is_first_chat_free, training_type, guru_name, certificate: certificate ? JSON.parse(certificate) : [null],
             },
             "step4": {
                 id_type, id_number, about, achievement_url, address, selfie
