@@ -44,4 +44,10 @@ router.post('/onboard',
     pandits.onboard);
 router.get('/reviewList', pandits.getReviewList);
 
+router.post('/file',
+    upload.fields([
+        { name: 'file', maxCount: 1 },
+    ]),
+    pandits.uploadImage);
+
 module.exports = router;

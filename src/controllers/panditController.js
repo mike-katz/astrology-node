@@ -520,4 +520,25 @@ async function getReviewList(req, res) {
     }
 }
 
-module.exports = { getPandits, onboard, signup, verifyOtp, reSendOtp, getPanditDetail, getReviewList };
+async function uploadImage(req, res) {
+    try {
+        const { type = 'upload', token } = req.body
+        const { files } = req
+        let url = "";
+        const tokenData = decodeJWT(`Bearer ${token}`)
+        if (!tokenData?.success) return res.status(400).json({ success: false, message: 'Missing params.' });
+
+        if (type == 'upload') {
+            if (files?.file?.length > 0) {
+                const image = await uploadImageTos3('file', files?.file[0], 'upload');
+                url = image.data.Location;
+            }
+        }
+        return res.status(200).json({ success: true, data: url, message: `Image ${type} Successfully` });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
+module.exports = { getPandits, onboard, signup, verifyOtp, reSendOtp, getPanditDetail, getReviewList, uploadImage };
