@@ -27,13 +27,14 @@ app.use('/pandit', panditRoutes);
 
 app.use(auth)
 app.use('/chat', chatRoutes);
+app.use('/upload', panditRoutes);
 app.use('/order', orderRoutes);
 app.use('/user', userRoutes);
 app.use('/follow', followRoutes);
 app.use('/review', reviewRoutes);
 app.use('/profile', profileRoutes);
 app.use('/payment', paymentRoutes);
-app.use('/upload', panditRoutes);
+
 
 app.use((err, req, res, next) => {
     if (err instanceof multer.MulterError) {
