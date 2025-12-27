@@ -200,7 +200,8 @@ async function verifyOtp(req, res) {
             "step2": {
                 languages: languages ? JSON.parse(languages) : [],
                 consaltance_language: consaltance_language ? JSON.parse(consaltance_language) : [],
-                available_for, offer_live_session, live_start_time, live_end_time, dedicated_time, response_time
+                available_for: available_for ? JSON.parse(available_for) : [],
+                offer_live_session, live_start_time, live_end_time, dedicated_time, response_time
             },
             "step3": {
                 chat_rate, call_rate, is_first_chat_free, training_type, guru_name, certificate: certificate ? JSON.parse(certificate) : [],
@@ -261,7 +262,7 @@ async function onboard(req, res) {
             if (!languages || !consaltance_language || !available_for || !live_start_time || !live_end_time || !response_time) return res.status(400).json({ success: false, message: 'Missing params.' });
         }
         if (step == 3) {
-            if (!chat_rate || !call_rate || !training_type || !guru_name || files?.certificate?.length == 0) return res.status(400).json({ success: false, message: 'Missing params.' });
+            if (!chat_rate || !call_rate || !training_type || !guru_name) return res.status(400).json({ success: false, message: 'Missing params.' });
         }
         if (step == 4) {
             if (!govt_id || files?.certificate?.length == 0) return res.status(400).json({ success: false, message: 'Missing params.' });
@@ -294,6 +295,7 @@ async function onboard(req, res) {
         }
         if (achievement_url) {
             ins.achievement_url = achievement_url
+            ins.achievement_file = ""
         }
         if (about) {
             ins.about = about
@@ -332,7 +334,7 @@ async function onboard(req, res) {
             ins.offer_live_session = offer_live_session
         }
         if (available_for) {
-            ins.available_for = available_for
+            ins.available_for = JSON.stringify(available_for)
         }
         if (consaltance_language) {
             ins.consaltance_language = JSON.stringify(consaltance_language)
@@ -381,6 +383,7 @@ async function onboard(req, res) {
         }
         if (achievement_file) {
             ins.achievement_file = achievement_file
+            ins.achievement_url = ""
         }
         if (name) {
             ins.name = name
