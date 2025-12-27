@@ -198,7 +198,9 @@ async function verifyOtp(req, res) {
                 secondary_expertise, other_working: other_working ? JSON.parse(other_working) : [], daily_horoscope
             },
             "step2": {
-                languages, consaltance_language, available_for, offer_live_session, live_start_time, live_end_time, dedicated_time, response_time
+                languages: languages ? JSON.parse(languages) : [],
+                consaltance_language: consaltance_language ? JSON.parse(consaltance_language) : [],
+                available_for, offer_live_session, live_start_time, live_end_time, dedicated_time, response_time
             },
             "step3": {
                 chat_rate, call_rate, is_first_chat_free, training_type, guru_name, certificate
@@ -255,13 +257,6 @@ async function onboard(req, res) {
         }
         if (step == 2) {
             if (!languages || !consaltance_language || !available_for || !live_start_time || !live_end_time || !response_time) return res.status(400).json({ success: false, message: 'Missing params.' });
-            const selected = languages;  // ["english", "hindi"]
-            const isValidLanguage = selected.every(l => language.includes(l));
-            if (!isValidLanguage) return res.status(400).json({ success: false, message: 'enter valid languages.' });
-
-            const selecteds = consaltance_language;  // ["english", "hindi"]
-            const isValidLanguage_consalt = selecteds.every(l => language.includes(l));
-            if (!isValidLanguage_consalt) return res.status(400).json({ success: false, message: 'enter valid Consultation languages.' });
         }
         if (step == 3) {
             if (!chat_rate || !call_rate || !training_type || !guru_name || files?.certificate?.length == 0) return res.status(400).json({ success: false, message: 'Missing params.' });
