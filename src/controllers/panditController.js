@@ -373,6 +373,9 @@ async function onboard(req, res) {
         if (display_name) {
             ins.display_name = display_name
         }
+        if (response_time) {
+            ins.response_time = response_time
+        }
         if (name) {
             ins.name = name
         }
