@@ -189,7 +189,7 @@ async function verifyOtp(req, res) {
             languages, consaltance_language, available_for, offer_live_session, live_start_time, live_end_time, dedicated_time, response_time,
             chat_rate, call_rate, is_first_chat_free, training_type, guru_name, certificate,
             govt_id, about, achievement_url, address, selfie, achievement_file,
-            terms, no_false, consent_profile, step
+            terms, no_false, consent_profile, step = 0
         } = user
         const response = {
             "step1": {
