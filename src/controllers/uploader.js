@@ -9,7 +9,7 @@ exports.uploadImageTos3 = ((directoryPath, image, type) => new Promise(async (re
 
   const originalFileName = image.originalname;
   const splitedFileName = originalFileName.split('.');
-  fileName = `${new Date().getTime().toString()}.${splitedFileName[splitedFileName.length - 1]}`;
+  fileName = `${new Date().getTime().toString()}@$!${splitedFileName[0]}.${splitedFileName[splitedFileName.length - 1]}`;
 
   const folderName = type === 'chat' ? process.env.CHAT_FOLDER_NAME
     : type === 'pandit' ? process.env.PANDIT_FOLDER_NAME
