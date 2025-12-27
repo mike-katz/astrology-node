@@ -243,7 +243,7 @@ async function onboard(req, res) {
         const { name, display_name, country_code, mobile, email, city, country, gender, experience, primary_expertise, secondary_expertise, other_working, daily_horoscope, step = 1,
             languages, consaltance_language, available_for, offer_live_session, live_start_time, live_end_time, dedicated_time, response_time,
             chat_rate, call_rate, is_first_chat_free, training_type, guru_name, certificate,
-            govt_id, about, achievement_url, address,
+            govt_id, about, achievement_url, address, achievement_file,
             terms, no_false, consent_profile, token
         } = req.body;
         if (!step || !token) return res.status(400).json({ success: false, message: 'Missing params.' });
@@ -379,6 +379,9 @@ async function onboard(req, res) {
         if (response_time) {
             ins.response_time = response_time
         }
+        if (achievement_file) {
+            ins.achievement_file = achievement_file
+        }
         if (name) {
             ins.name = name
         }
@@ -402,10 +405,10 @@ async function onboard(req, res) {
             ins.selfie = image.data.Location;
         }
 
-        if (files?.achievement?.length > 0) {
-            const image = await uploadImageTos3('achievement', files?.achievement[0], 'document');
-            ins.achievement_file = image.data.Location;
-        }
+        // if (files?.achievement?.length > 0) {
+        //     const image = await uploadImageTos3('achievement', files?.achievement[0], 'document');
+        //     ins.achievement_file = image.data.Location;
+        // }
 
         // if (files?.certificate?.length > 0) {
         //     const certificates = await Promise.all(
