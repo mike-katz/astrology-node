@@ -564,4 +564,21 @@ async function uploadImage(req, res) {
     }
 }
 
-module.exports = { getPandits, onboard, signup, verifyOtp, reSendOtp, getPanditDetail, getReviewList, uploadImage };
+async function submitOnboard(req, res) {
+    try {
+        const tokenData = decodeJWT(`Bearer ${token}`)
+        if (!tokenData?.success) return res.status(400).json({ success: false, message: 'Missing params.' });
+        const user = await db('onboardings').where({ "mobile": tokenData?.data?.mobile, country_code: tokenData?.data?.country_code }).first();
+        if (!user) return res.status(400).json({ message: 'Wrong mobile number.' });
+
+        if (user?.step == 5) {
+            if (!user?.terms || !user?.no_false || !user?.consent_profile) return res.status(400).json({ success: false, message: 'Please submit full onboard process.' });
+        }
+        await db('onboardings').where({ id: user?.id }).update({ status: "pending" })
+        return res.status(200).json({ success: true, data: url, message: `Submit Successfully` });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+module.exports = { getPandits, onboard, signup, verifyOtp, reSendOtp, getPanditDetail, getReviewList, uploadImage, submitOnboard };
