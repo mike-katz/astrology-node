@@ -177,7 +177,7 @@ async function verifyOtp(req, res) {
             .where('id', latestRecord?.id)
             .update(update);
 
-        let user = await db('onboardings').where('mobile', mobile).first();
+        let user = await db('onboardings').where({ 'mobile': mobile }).first();
         if (!user) {
             user = await db('onboardings').insert({ mobile, country_code, step: 0, status: "verify number" }).returning(['id', 'mobile', 'step']);
         }
@@ -189,7 +189,7 @@ async function verifyOtp(req, res) {
             languages, consaltance_language, available_for, offer_live_session, live_start_time, live_end_time, dedicated_time, response_time,
             chat_rate, call_rate, is_first_chat_free, training_type, guru_name, certificate,
             govt_id, about, achievement_url, address, selfie, achievement_file,
-            terms, no_false, consent_profile
+            terms, no_false, consent_profile, step
         } = user
         const response = {
             "step1": {
@@ -216,7 +216,7 @@ async function verifyOtp(req, res) {
             }
         }
 
-        return res.status(200).json({ success: true, data: { token: encryptToken, step: user?.step, profile_data: response }, message: 'Otp Verify Successfully' });
+        return res.status(200).json({ success: true, data: { token: encryptToken, step, profile_data: response }, message: 'Otp Verify Successfully' });
     } catch (err) {
         console.error(err);
         res.status(500).json({ success: false, message: 'Server error' });
