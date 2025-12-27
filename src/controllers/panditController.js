@@ -263,7 +263,7 @@ async function onboard(req, res) {
             if (!chat_rate || !call_rate || !training_type || !guru_name || files?.certificate?.length == 0) return res.status(400).json({ success: false, message: 'Missing params.' });
         }
         if (step == 4) {
-            if (!id_type || !id_number || files?.certificate?.length == 0) return res.status(400).json({ success: false, message: 'Missing params.' });
+            if (!govt_id || files?.certificate?.length == 0) return res.status(400).json({ success: false, message: 'Missing params.' });
         }
 
         // const selectedskill = skills.split(",").map(l => l.trim());  // ["english", "hindi"]
