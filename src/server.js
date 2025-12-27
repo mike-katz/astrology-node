@@ -33,6 +33,7 @@ app.use('/follow', followRoutes);
 app.use('/review', reviewRoutes);
 app.use('/profile', profileRoutes);
 app.use('/payment', paymentRoutes);
+app.use('/upload', chatRoutes);
 
 app.use((err, req, res, next) => {
     if (err instanceof multer.MulterError) {

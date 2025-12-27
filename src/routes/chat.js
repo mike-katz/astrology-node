@@ -34,5 +34,9 @@ router.post('/endChat', chat.endChat);
 router.post('/forceEndChat', chat.forceEndChat);
 router.post('/readMessage', chat.readMessage);
 router.delete('/delete', chat.deleteChat);
-
+router.post('/upload',
+    upload.fields([
+        { name: 'file', maxCount: 1 },
+    ]),
+    chat.uploadImage);
 module.exports = router;

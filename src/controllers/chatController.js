@@ -521,4 +521,22 @@ async function deleteChat(req, res) {
     }
 }
 
-module.exports = { getRoom, getMessage, sendMessage, getDetail, getOrderDetail, endChat, forceEndChat, readMessage, deleteChat };
+async function uploadImage(req, res) {
+    try {
+        const { type = 'upload' } = req.body
+        const { files } = req
+        let url = "";
+        if (type == 'upload') {
+            if (files?.file?.length > 0) {
+                const image = await uploadImageTos3('file', files?.file[0], 'upload');
+                url = image.data.Location;
+            }
+        }
+        return res.status(200).json({ success: true, data: url, message: `Image ${type} Successfully` });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
+module.exports = { getRoom, getMessage, sendMessage, getDetail, getOrderDetail, endChat, forceEndChat, readMessage, deleteChat, uploadImage };
