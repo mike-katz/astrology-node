@@ -2,7 +2,7 @@ const db = require('../db');
 const { decrypt, encrypt } = require('../utils/crypto');
 const { decodeJWT } = require('../utils/decodeJWT');
 require('dotenv').config();
-const { uploadImageTos3 } = require('./uploader');
+const { uploadImageTos3, deleteFileFroms3 } = require('./uploader');
 const jwt = require('jsonwebtoken');
 
 async function getPandits(req, res) {
@@ -188,7 +188,7 @@ async function verifyOtp(req, res) {
         const { name, display_name, gender, profile, email, city, country, experience, primary_expertise, secondary_expertise, other_working, daily_horoscope,
             languages, consaltance_language, available_for, offer_live_session, live_start_time, live_end_time, dedicated_time, response_time,
             chat_rate, call_rate, is_first_chat_free, training_type, guru_name, certificate,
-            id_type, id_number, about, achievement_url, address, selfie,
+            govt_id, about, achievement_url, address, selfie,
             terms, no_false, consent_profile
         } = user
         const response = {
@@ -206,7 +206,8 @@ async function verifyOtp(req, res) {
                 chat_rate, call_rate, is_first_chat_free, training_type, guru_name, certificate: certificate ? JSON.parse(certificate) : [],
             },
             "step4": {
-                id_type, id_number, about, achievement_url, address, selfie
+                govt_id: govt_id ? JSON.parse(govt_id) : [],
+                about, achievement_url, address, selfie
             },
             "step5": {
                 terms, no_false, consent_profile
@@ -241,7 +242,7 @@ async function onboard(req, res) {
         const { name, display_name, country_code, mobile, email, city, country, gender, experience, primary_expertise, secondary_expertise, other_working, daily_horoscope, step = 1,
             languages, consaltance_language, available_for, offer_live_session, live_start_time, live_end_time, dedicated_time, response_time,
             chat_rate, call_rate, is_first_chat_free, training_type, guru_name, certificate,
-            id_type, id_number, about, achievement_url,
+            govt_id, about, achievement_url,
             terms, no_false, consent_profile, token
         } = req.body;
         if (!step || !token) return res.status(400).json({ success: false, message: 'Missing params.' });
@@ -296,11 +297,11 @@ async function onboard(req, res) {
         if (about) {
             ins.about = about
         }
-        if (id_number) {
-            ins.id_number = id_number
-        }
-        if (id_type) {
-            ins.id_type = id_type
+        // if (id_number) {
+        //     ins.id_number = id_number
+        // }
+        if (govt_id) {
+            ins.govt_id = JSON.stringify(govt_id)
         }
         if (guru_name) {
             ins.guru_name = guru_name
@@ -525,7 +526,7 @@ async function getReviewList(req, res) {
 
 async function uploadImage(req, res) {
     try {
-        const { type = 'upload', token } = req.body
+        const { type = 'upload', token, file } = req.body
         const { files } = req
         let url = "";
         const tokenData = decodeJWT(`Bearer ${token}`)
@@ -536,6 +537,11 @@ async function uploadImage(req, res) {
                 const image = await uploadImageTos3('file', files?.file[0], 'upload');
                 url = image.data.Location;
             }
+        }
+        console.log("type", type);
+        if (type == 'delete') {
+            const dd = await deleteFileFroms3(file)
+            console.log("dd", dd);
         }
         return res.status(200).json({ success: true, data: url, message: `Image ${type} Successfully` });
     } catch (err) {

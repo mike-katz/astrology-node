@@ -38,3 +38,32 @@ exports.uploadImageTos3 = ((directoryPath, image, type) => new Promise(async (re
     }
   });
 }));
+
+
+exports.deleteFileFroms3 = (filePath = "") => new Promise(async (resolve, reject) => {
+  const s3bucket = new aws.S3({
+    accessKeyId: process.env.AWS_ACCESS_KEY,
+    secretAccessKey: process.env.AWS_SECRET_KEY,
+  });
+  const splitedFileName = filePath.split('.amazonaws.com/');
+  if (splitedFileName.length == 2 && splitedFileName?.[1]) {
+    const s3Params = {
+      Bucket: process.env.AWS_BUCKET_NAME,
+      Key: splitedFileName?.[1],
+      // ACL: 'public-read'
+    };
+    s3bucket.deleteObject(s3Params, (err, data) => {
+      if (err) {
+        console.log('err', err);
+        reject(err);
+      } else {
+        resolve({ data });
+      }
+    });
+  } else {
+    reject(0);
+  }
+})
+
+
+
