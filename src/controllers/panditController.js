@@ -207,7 +207,8 @@ async function verifyOtp(req, res) {
             },
             "step4": {
                 govt_id: govt_id ? JSON.parse(govt_id) : [],
-                about, achievement_url, address, selfie, achievement_file
+                about, achievement_url, address: address ? JSON.parse(address) : [],
+                selfie, achievement_file
             },
             "step5": {
                 terms, no_false, consent_profile
