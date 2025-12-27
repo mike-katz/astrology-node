@@ -188,7 +188,7 @@ async function verifyOtp(req, res) {
         const { name, display_name, gender, profile, email, city, country, experience, primary_expertise, secondary_expertise, other_working, daily_horoscope,
             languages, consaltance_language, available_for, offer_live_session, live_start_time, live_end_time, dedicated_time, response_time,
             chat_rate, call_rate, is_first_chat_free, training_type, guru_name, certificate,
-            govt_id, about, achievement_url, address, selfie,
+            govt_id, about, achievement_url, address, selfie, achievement_file,
             terms, no_false, consent_profile
         } = user
         const response = {
@@ -207,7 +207,7 @@ async function verifyOtp(req, res) {
             },
             "step4": {
                 govt_id: govt_id ? JSON.parse(govt_id) : [],
-                about, achievement_url, address, selfie
+                about, achievement_url, address, selfie, achievement_file
             },
             "step5": {
                 terms, no_false, consent_profile
@@ -400,7 +400,7 @@ async function onboard(req, res) {
 
         if (files?.achievement?.length > 0) {
             const image = await uploadImageTos3('achievement', files?.achievement[0], 'document');
-            ins.achievement_url = image.data.Location;
+            ins.achievement_file = image.data.Location;
         }
 
         // if (files?.certificate?.length > 0) {
