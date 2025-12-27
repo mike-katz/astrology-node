@@ -421,6 +421,7 @@ async function onboard(req, res) {
                         .then(res => res.data.Location)
                 )
             );
+            console.log("addresss", addresss);
             ins.address = JSON.stringify(addresss);
         }
 
