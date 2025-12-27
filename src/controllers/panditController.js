@@ -179,7 +179,7 @@ async function verifyOtp(req, res) {
 
         let user = await db('onboardings').where('mobile', mobile).first();
         if (!user) {
-            user = await db('onboardings').insert({ mobile, country_code, step: 0, status: "pending" }).returning(['id', 'mobile', 'step']);
+            user = await db('onboardings').insert({ mobile, country_code, step: 0, status: "verify number" }).returning(['id', 'mobile', 'step']);
         }
         const token = jwt.sign({ userId: user.id, mobile: user.mobile, country_code: user.country_code }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '1h' });
         // hide password
@@ -266,6 +266,9 @@ async function onboard(req, res) {
         }
         if (step == 4) {
             if (!govt_id || files?.certificate?.length == 0) return res.status(400).json({ success: false, message: 'Missing params.' });
+        }
+        if (step == 5) {
+            if (!terms || !no_false || !consent_profile) return res.status(400).json({ success: false, message: 'Missing params.' });
         }
 
         // const selectedskill = skills.split(",").map(l => l.trim());  // ["english", "hindi"]
