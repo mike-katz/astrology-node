@@ -566,6 +566,7 @@ async function uploadImage(req, res) {
 
 async function submitOnboard(req, res) {
     try {
+        const { token } = req.body
         const tokenData = decodeJWT(`Bearer ${token}`)
         if (!tokenData?.success) return res.status(400).json({ success: false, message: 'Missing params.' });
         const user = await db('onboardings').where({ "mobile": tokenData?.data?.mobile, country_code: tokenData?.data?.country_code }).first();
