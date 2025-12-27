@@ -11,8 +11,10 @@ const userRoutes = require('./routes/user');
 const orderRoutes = require('./routes/order');
 const profileRoutes = require('./routes/profile');
 const paymentRoutes = require('./routes/payment');
+// const cors = require('cors');
 const multer = require('multer');
-
+// const RedisCache = require('./config/redisClient');
+// const agoraRoutes = require('./routes/agora');
 const chatRoutes = require('./routes/chat');
 const { decryptRequest } = require('./middleware/decryptRequest.js');
 const { encryptResponse } = require('./middleware/encryptResponse.js')
@@ -21,13 +23,18 @@ app.use(express.json());
 
 app.use(decryptRequest);
 app.use(encryptResponse);
+// RedisCache.initializeRedis();
 
+// app.use(cors());
 app.use('/auth', authRoutes);
 app.use('/pandit', panditRoutes);
+app.use('/upload', panditRoutes);
+
+// app.use('/agora', agoraRoutes);
+
 
 app.use(auth)
 app.use('/chat', chatRoutes);
-app.use('/upload', panditRoutes);
 app.use('/order', orderRoutes);
 app.use('/user', userRoutes);
 app.use('/follow', followRoutes);

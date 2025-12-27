@@ -240,7 +240,7 @@ async function onboard(req, res) {
     try {
         const { name, display_name, country_code, mobile, email, city, country, gender, experience, primary_expertise, secondary_expertise, other_working, daily_horoscope, step = 1,
             languages, consaltance_language, available_for, offer_live_session, live_start_time, live_end_time, dedicated_time, response_time,
-            chat_rate, call_rate, is_first_chat_free, training_type, guru_name,
+            chat_rate, call_rate, is_first_chat_free, training_type, guru_name, certificate,
             id_type, id_number, about, achievement_url,
             terms, no_false, consent_profile, token
         } = req.body;
@@ -338,7 +338,7 @@ async function onboard(req, res) {
         if (languages) {
             ins.languages = JSON.stringify(languages)
         }
-        if (step) {
+        if (step > user?.step) {
             ins.step = step
         }
         if (daily_horoscope != undefined) {
@@ -352,6 +352,9 @@ async function onboard(req, res) {
         }
         if (primary_expertise) {
             ins.primary_expertise = JSON.stringify(primary_expertise)
+        }
+        if (certificate) {
+            ins.certificate = JSON.stringify(certificate)
         }
         if (experience) {
             ins.experience = experience
@@ -399,15 +402,15 @@ async function onboard(req, res) {
             ins.achievement_url = image.data.Location;
         }
 
-        if (files?.certificate?.length > 0) {
-            const certificates = await Promise.all(
-                files.certificate.map(file =>
-                    uploadImageTos3('certificate', file, 'document')
-                        .then(res => res.data.Location)
-                )
-            );
-            ins.certificate = JSON.stringify(certificates);
-        }
+        // if (files?.certificate?.length > 0) {
+        //     const certificates = await Promise.all(
+        //         files.certificate.map(file =>
+        //             uploadImageTos3('certificate', file, 'document')
+        //                 .then(res => res.data.Location)
+        //         )
+        //     );
+        //     ins.certificate = JSON.stringify(certificates);
+        // }
 
         if (files?.address?.length > 0) {
             const addresss = await Promise.all(
