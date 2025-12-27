@@ -576,7 +576,7 @@ async function submitOnboard(req, res) {
             if (!user?.terms || !user?.no_false || !user?.consent_profile) return res.status(400).json({ success: false, message: 'Please submit full onboard process.' });
         }
         await db('onboardings').where({ id: user?.id }).update({ status: "pending" })
-        return res.status(200).json({ success: true, data: url, message: `Submit Successfully` });
+        return res.status(200).json({ success: true, data: null, message: `Submit Successfully` });
     } catch (err) {
         console.error(err);
         res.status(500).json({ success: false, message: 'Server error' });
