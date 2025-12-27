@@ -540,7 +540,7 @@ async function uploadImage(req, res) {
         }
         console.log("type", type);
         if (type == 'delete') {
-            const dd = await deleteFileFroms3(file)
+            const dd = await deleteFileFroms3(decodeURIComponent(file))
             console.log("dd", dd);
         }
         return res.status(200).json({ success: true, data: url, message: `Image ${type} Successfully` });
