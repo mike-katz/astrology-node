@@ -36,7 +36,7 @@ async function register(req, res) {
 
 async function login(req, res) {
     try {
-        const { mobile, country_code } = req.body;
+        const { mobile, country_code = '+91' } = req.body;
         if (!mobile || !country_code) return res.status(400).json({ success: false, message: 'Mobile number required.' });
         const user = await db('users').where({ country_code, mobile }).first();
         if (!user) {
@@ -52,7 +52,7 @@ async function login(req, res) {
 async function verifyOtp(req, res) {
     try {
 
-        const { mobile, country_code, otp } = req.body;
+        const { mobile, country_code = '+91', otp } = req.body;
         if (!mobile || !otp || !country_code) return res.status(400).json({ success: false, message: 'Mobile number and otp required.' });
 
         const existing = await db('users').where({ mobile, country_code, otp }).first();
