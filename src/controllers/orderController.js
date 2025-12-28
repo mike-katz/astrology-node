@@ -1,6 +1,5 @@
 const db = require('../db');
 require('dotenv').config();
-const crypto = require('crypto-js');
 const serviceAccount = require('../config/astro-1e9f7-firebase-adminsdk-fbsvc-4f429f67a7.json');
 const admin = require("firebase-admin");
 const { callEvent } = require("../socket");
@@ -38,7 +37,7 @@ async function create(req, res) {
         // pendingDeduction = Number(user?.balance) - pendingDeduction
 
         // const order = await db('orders').where({ user_id: req.userId, pandit_id: panditId }).first()
-        const orderId = `${new Date().getTime().toString()}${Math.floor(100000000000000 + Math.random() * 900000000000000).toString()}`;
+        const orderId = `${new Date().getTime().toString()}${Math.floor(100000 + Math.random() * 900000).toString()}`;
         let duration = Math.floor(Number(Number(user?.balance)) / Number(pandit?.charge));
         console.log("duration", duration);
         if (!Number.isFinite(duration)) {
