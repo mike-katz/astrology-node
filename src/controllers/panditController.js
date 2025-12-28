@@ -193,26 +193,31 @@ async function verifyOtp(req, res) {
         } = user
         const response = {
             "step1": {
-                name, profile, display_name, gender, country_code, email, city, country, experience,
+                name: name || "", profile: profile || "",
+                display_name: display_name || "",
+                gender: gender || "",
+                country_code: country_code || "", email: email || "", city: city || "", country: country || "", experience: experience || "",
                 primary_expertise: primary_expertise ? JSON.parse(primary_expertise) : [],
-                secondary_expertise, other_working: other_working ? JSON.parse(other_working) : [], daily_horoscope
+                secondary_expertise: secondary_expertise || "",
+                other_working: other_working ? JSON.parse(other_working) : [], daily_horoscope: daily_horoscope || ""
             },
             "step2": {
                 languages: languages ? JSON.parse(languages) : [],
                 consaltance_language: consaltance_language ? JSON.parse(consaltance_language) : [],
                 available_for: available_for ? JSON.parse(available_for) : [],
-                offer_live_session, live_start_time, live_end_time, dedicated_time, response_time
+                offer_live_session: offer_live_session || "", live_start_time: live_start_time || "", live_end_time: live_end_time || "", dedicated_time: dedicated_time || "", response_time: response_time || ""
             },
             "step3": {
-                chat_rate, call_rate, is_first_chat_free, training_type, guru_name, certificate: certificate ? JSON.parse(certificate) : [],
+                chat_rate: chat_rate || "", call_rate: call_rate || "", is_first_chat_free: is_first_chat_free || "", training_type: training_type || "", guru_name: guru_name || "", certificate: certificate ? JSON.parse(certificate) : [],
             },
             "step4": {
                 govt_id: govt_id ? JSON.parse(govt_id) : [],
-                about, achievement_url, address: address ? JSON.parse(address) : [],
-                selfie, achievement_file
+                about: about || "", achievement_url: achievement_url || "",
+                address: address ? JSON.parse(address) : [],
+                selfie: selfie || "", achievement_file: achievement_file || ""
             },
             "step5": {
-                terms, no_false, consent_profile
+                terms: terms || "", no_false: no_false || "", consent_profile: consent_profile || ""
             }
         }
 
