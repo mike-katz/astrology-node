@@ -283,7 +283,7 @@ async function onboard(req, res) {
 
         // if (!isValidSkill) return res.status(400).json({ success: false, message: 'enter valid skills.' });
 
-
+        console.log("tokenData", JSON.stringify(tokenData));
         const user = await db('onboardings').where({ "mobile": tokenData?.data?.mobile, country_code: tokenData?.data?.country_code }).first();
         if (!user) return res.status(400).json({ message: 'Wrong mobile number.' });
 
