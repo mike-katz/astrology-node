@@ -4,6 +4,7 @@ const jwt = require('jsonwebtoken');
 require('dotenv').config();
 const { validationResult } = require('express-validator');
 const { encrypt } = require("../utils/crypto")
+const { checkOrders, isValidMobile } = require('../utils/decodeJWT');
 
 const SALT_ROUNDS = parseInt(process.env.BCRYPT_SALT_ROUNDS || '12', 10);
 
@@ -37,7 +38,10 @@ async function register(req, res) {
 async function login(req, res) {
     try {
         const { mobile, country_code = '+91' } = req.body;
+
         if (!mobile || !country_code) return res.status(400).json({ success: false, message: 'Mobile number required.' });
+        const isValid = isValidMobile(mobile);
+        if (!isValid) return res.status(400).json({ success: false, message: 'Enter valid mobile number.' });
         const user = await db('users').where({ country_code, mobile }).first();
         if (!user) {
             const random = Math.floor(Math.random() * 72) + 1;
@@ -52,10 +56,11 @@ async function login(req, res) {
 
 async function verifyOtp(req, res) {
     try {
-
         const { mobile, country_code = '+91', otp } = req.body;
         if (!mobile || !otp || !country_code) return res.status(400).json({ success: false, message: 'Mobile number and otp required.' });
 
+        const isValid = isValidMobile(mobile);
+        if (!isValid) return res.status(400).json({ success: false, message: 'Enter valid mobile number.' });
         const existing = await db('users').where({ mobile, country_code, otp }).first();
         if (!existing) return res.status(400).json({ success: false, message: 'Wrong Otp' });
 

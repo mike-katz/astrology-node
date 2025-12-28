@@ -4,6 +4,7 @@ const { decodeJWT } = require('../utils/decodeJWT');
 require('dotenv').config();
 const { uploadImageTos3, deleteFileFroms3 } = require('./uploader');
 const jwt = require('jsonwebtoken');
+const { isValidMobile } = require('../utils/decodeJWT');
 
 async function getPandits(req, res) {
 
@@ -124,6 +125,8 @@ async function signup(req, res) {
     try {
         const { mobile, country_code } = req.body;
         if (!mobile || !country_code) return res.status(400).json({ success: false, message: 'Mobile number required.' });
+        const isValid = isValidMobile(mobile);
+        if (!isValid) return res.status(400).json({ success: false, message: 'Enter valid mobile number.' });
         const pandit = await db('pandits').where('mobile', mobile).first();
         if (pandit) return res.status(400).json({ success: false, message: 'Your mobile number already registered.' });
 
@@ -145,7 +148,8 @@ async function verifyOtp(req, res) {
     try {
         const { mobile, country_code, otp } = req.body;
         if (!mobile || !country_code || !otp) return res.status(400).json({ success: false, message: 'Mobile number and otp required.' });
-
+        const isValid = isValidMobile(mobile);
+        if (!isValid) return res.status(400).json({ success: false, message: 'Enter valid mobile number.' });
         const latestRecord = await db('otpmanages').where('mobile', mobile).first();
         console.log("latestRecord", latestRecord);
         if (!latestRecord) return res.status(400).json({ success: false, message: 'Wrong Otp' });
@@ -459,7 +463,8 @@ async function reSendOtp(req, res) {
     try {
         const { mobile, countryCode } = req.body;
         if (!mobile || !countryCode) return res.status(400).json({ success: false, message: 'Mobile number required.' });
-
+        const isValid = isValidMobile(mobile);
+        if (!isValid) return res.status(400).json({ success: false, message: 'Enter valid mobile number.' });
         const latestRecord = await db('otpmanages').where('mobile', mobile).where('country_code', countryCode).first();
         const update = {};
         let response = {
