@@ -38,7 +38,7 @@ async function create(req, res) {
         // pendingDeduction = Number(user?.balance) - pendingDeduction
 
         // const order = await db('orders').where({ user_id: req.userId, pandit_id: panditId }).first()
-        const orderId = ((parseInt(crypto.lib.WordArray.random(16).toString(), 16) % 1e6) + '').padStart(15, '0');
+        const orderId = `${new Date().getTime().toString()}${Math.floor(100000000000000 + Math.random() * 900000000000000).toString()}`;
         let duration = Math.floor(Number(Number(user?.balance)) / Number(pandit?.charge));
         console.log("duration", duration);
         if (!Number.isFinite(duration)) {
