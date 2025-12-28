@@ -88,4 +88,20 @@ async function getBalance(req, res) {
     return res.status(200).json({ success: true, data: user, message: 'Profile get Successfully' });
 }
 
-module.exports = { updateProfile, getProfile, getBalance };
+async function updateToken(req, res) {
+    const { token } = req.body;
+    try {
+        const order = await db('users').where({ id: req.userId }).first();
+        if (!order) return res.status(400).json({ success: false, message: 'Pandit not found.' });
+        const update = {}
+        if (token) {
+            update.token = token
+        }
+        await db('users').where({ id: req.userId }).update(update);
+        return res.status(200).json({ success: true, data: null, message: 'Update successfully' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+module.exports = { updateProfile, getProfile, getBalance, updateToken };
