@@ -36,14 +36,11 @@ async function register(req, res) {
 
 async function login(req, res) {
     try {
-        const { mobile } = req.body;
-        if (!mobile) return res.status(400).json({ success: false, message: 'Mobile number required.' });
-        const user = await db('users').where(function () {
-            this.where('mobile', mobile);
-        }).first();
-
+        const { mobile, country_code } = req.body;
+        if (!mobile || !country_code) return res.status(400).json({ success: false, message: 'Mobile number required.' });
+        const user = await db('users').where({ country_code, mobile }).first();
         if (!user) {
-            await db('users').insert({ mobile, otp: '1234' }).returning(['id', 'mobile', 'otp']);
+            await db('users').insert({ mobile, country_code, otp: '1234' }).returning(['id', 'mobile', 'country_code', 'otp']);
         }
         return res.status(200).json({ success: true, message: 'Otp Send Successfully' });
     } catch (err) {
@@ -55,20 +52,16 @@ async function login(req, res) {
 async function verifyOtp(req, res) {
     try {
 
-        const { mobile, otp } = req.body;
-        if (!mobile || !otp) return res.status(400).json({ success: false, message: 'Mobile number and otp required.' });
+        const { mobile, country_code, otp } = req.body;
+        if (!mobile || !otp || !country_code) return res.status(400).json({ success: false, message: 'Mobile number and otp required.' });
 
-        const user = await db('users').where(function () {
-            this.where('mobile', mobile);
-        }).first();
-
-        const existing = await db('users').where('mobile', mobile).where('otp', otp).first();
+        const existing = await db('users').where({ mobile, country_code, otp }).first();
         if (!existing) return res.status(400).json({ success: false, message: 'Wrong Otp' });
 
-        const token = jwt.sign({ userId: user.id, mobile: user.mobile }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '1h' });
+        const token = jwt.sign({ userId: existing.id, mobile: existing.mobile }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '1h' });
         // hide password
         const encryptToken = encrypt(token);
-        return res.status(200).json({ success: true, data: { id: user?.id, name: user?.name, mobile: user?.mobile, token: encryptToken }, message: 'Otp Verify Successfully' });
+        return res.status(200).json({ success: true, data: { id: existing?.id, name: existing?.name, mobile: existing?.mobile, token: encryptToken }, message: 'Otp Verify Successfully' });
     } catch (err) {
         console.error(err);
         res.status(500).json({ success: false, message: 'Server error' });
