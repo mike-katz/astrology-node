@@ -179,8 +179,9 @@ async function verifyOtp(req, res) {
 
         let user = await db('onboardings').where({ 'mobile': mobile }).first();
         if (!user) {
-            user = await db('onboardings').insert({ mobile, country_code, step: 0, status: "verify number" }).returning(['id', 'mobile', 'step']);
+            [user] = await db('onboardings').insert({ mobile, country_code, step: 0, status: "verify number" }).returning(['id', 'mobile', 'step']);
         }
+        console.log("user", user);
         const token = jwt.sign({ userId: user.id, mobile: user.mobile, country_code: user.country_code }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '1h' });
         // hide password
         const encryptToken = encrypt(token);
