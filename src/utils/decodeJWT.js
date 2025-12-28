@@ -53,5 +53,7 @@ const socketParseEventData = (message) => {
     return JSON.parse(message);
 }
 
-module.exports = { decodeJWT, checkOrders, socketParseEventData };
+const isValidMobile = (mobile) => /^[0-9]{8,12}$/.test(mobile);
+
+module.exports = { decodeJWT, checkOrders, socketParseEventData, isValidMobile };
 
