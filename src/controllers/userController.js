@@ -12,12 +12,18 @@ async function getProfile(req, res) {
 
 async function updateProfile(req, res) {
     try {
-        const { name, gender, dob, birthTime = '12:00 AM', birthPlace, currentAddress, city, pincode, language } = req.body;
+        const { name, gender, dob, birthTime = '12:00 AM', birthPlace, currentAddress, city_state_country, pincode, language, astromall_chat, live_event, my_interest } = req.body;
         if (!name) return res.status(400).json({ success: false, message: 'Please enter name.' });
         const user = await db('users')
             .where('id', req?.userId)
             .first();
         if (!user) return res.status(400).json({ success: false, message: 'Please enter correct user.' });
+        if (language && language?.length > 5) {
+            return res.status(400).json({ success: false, message: 'Max 5 language allowed.' });
+        }
+        if (my_interest && my_interest?.length > 5) {
+            return res.status(400).json({ success: false, message: 'Max 5 interest allowed.' });
+        }
         const update = {}
         if (name) {
             update.name = name
@@ -37,14 +43,23 @@ async function updateProfile(req, res) {
         if (currentAddress) {
             update.current_address = currentAddress
         }
-        if (city) {
-            update.city = city
+        if (city_state_country) {
+            update.city_state_country = city_state_country
         }
         if (pincode) {
             update.pincode = pincode
         }
         if (language?.length > 0) {
             update.language = language ? JSON.stringify(language) : {}
+        }
+        if (my_interest?.length > 0) {
+            update.my_interest = my_interest ? JSON.stringify(my_interest) : {}
+        }
+        if (astromall_chat != undefined) {
+            update.astromall_chat = astromall_chat
+        }
+        if (live_event != undefined) {
+            update.live_event = live_event
         }
 
         await db('users')
@@ -53,20 +68,20 @@ async function updateProfile(req, res) {
 
         const isProfileExist = await db('userprofiles')
             .where({ 'user_id': req?.userId }).first();
+
+        delete update.language
+        delete update.my_interest
+        delete update.pincode
+        delete update.city_state_country
+        delete update.current_address
+        delete update.astromall_chat
+        delete update.live_event
+
         if (isProfileExist) {
-            delete update.language
-            delete update.pincode
-            delete update.city
-            delete update.current_address
             await db('userprofiles')
                 .where('id', isProfileExist?.id)
                 .update(update);
         } else {
-            delete update.language
-            delete update.pincode
-            delete update.city
-            delete update.current_address
-
             update.is_first = true;
             update.user_id = req.userId
             await db('userprofiles')
