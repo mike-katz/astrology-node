@@ -40,7 +40,8 @@ async function login(req, res) {
         if (!mobile || !country_code) return res.status(400).json({ success: false, message: 'Mobile number required.' });
         const user = await db('users').where({ country_code, mobile }).first();
         if (!user) {
-            await db('users').insert({ mobile, country_code, otp: '1234' }).returning(['id', 'mobile', 'country_code', 'otp']);
+            const random = Math.floor(Math.random() * 72) + 1;
+            await db('users').insert({ mobile, country_code, otp: '1234', avatar: Number(random) }).returning(['id', 'mobile', 'avatar', 'country_code', 'otp']);
         }
         return res.status(200).json({ success: true, message: 'Otp Send Successfully' });
     } catch (err) {
