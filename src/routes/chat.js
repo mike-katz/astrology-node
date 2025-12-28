@@ -9,7 +9,7 @@ const upload = multer({
     storage,
     limits: {
         files: 5,               // max 5 files
-        fileSize: 2 * 1024 * 1024 // (optional) 5MB per file
+        fileSize: 5 * 1024 * 1024 // (optional) 5MB per file
     },
     fileFilter: (req, file, cb) => {
         if (
