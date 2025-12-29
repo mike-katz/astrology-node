@@ -199,13 +199,15 @@ async function sendMessage(req, res) {
         const order = await db('orders').where({ user_id: req.userId, order_id: orderId }).first();
         if (!order) return res.status(400).json({ success: false, message: 'Order not found.' });
 
-        if (order?.end_time && (new Date(order?.end_time).getTime() < new Date())) {
-            await db('orders').where({ id: order?.id }).update({ status: "completed" });
+        if (order?.end_time && (new Date(order?.end_time).getTime() < new Date()) && order.status == 'continue') {
             // socket.emit("emit_to_chat_completed", {
             //     user: order?.userId,
             //     orderId: order?.orderId,
             // });
-
+            const result = balanceCut(req.userId, order, order?.end_time)
+            if (!result) {
+                return res.status(400).json({ success: false, message: 'Something went wrong.' });
+            }
             callEvent("emit_to_chat_completed", {
                 key: `user_${order?.user_id}`,
                 order_id: order?.order_id
@@ -291,6 +293,18 @@ async function getDetail(req, res) {
             response.startTime = orderDetail?.start_time;
             response.endTime = orderDetail?.end_time;
         }
+
+        if (orderDetail?.end_time && (new Date(orderDetail?.end_time).getTime() < new Date()) && orderDetail.status == 'continue') {
+            const result = balanceCut(req.userId, orderDetail, orderDetail?.end_time)
+            if (!result) {
+                return res.status(400).json({ success: false, message: 'Something went wrong.' });
+            }
+            callEvent("emit_to_chat_completed", {
+                key: `user_${orderDetail?.user_id}`,
+                order_id: orderDetail?.order_id
+            });
+            return res.status(400).json({ success: false, message: 'Time is over! regenerate to continue.' });
+        }
         return res.status(200).json({ success: true, data: response, message: 'get detail Successfully' });
     } catch (err) {
         console.error(err);
@@ -335,18 +349,18 @@ async function getOrderDetail(req, res) {
     }
 }
 
-function getDuration(start_time) {
+function getDuration(start_time, end_time) {
     const diffMinutes = Math.ceil(
-        Math.abs(new Date() - new Date(start_time)) / (1000 * 60)
+        Math.abs(new Date(end_time) - new Date(start_time)) / (1000 * 60)
     );
     return diffMinutes
 }
-async function balanceCut(user_id, order) {
+async function balanceCut(user_id, order, end_time) {
     try {
         const user = await db('users').where({ id: user_id }).first();
-        const diffMinutes = getDuration(order.start_time)
+        const diffMinutes = getDuration(order.start_time, end_time)
         console.log("diffMinutes", diffMinutes);
-        const perMinute = Number(order?.deduction) / Number(order?.duration);
+        const perMinute = Number(order?.rate);
         console.log("perMinute", perMinute);
         const deduction = Number(diffMinutes) * Number(perMinute);
         console.log("deduction", deduction);
@@ -366,7 +380,7 @@ async function balanceCut(user_id, order) {
         })
         const panditDetail = await db('pandits').where({ id: order.pandit_id }).first()
         const dd = await db('users').where({ id: user_id }).update({ balance: newBalance });
-        const dds = await db('orders').where({ id: order.id }).update({ status: "completed", deduction, duration: diffMinutes, end_time: new Date() });
+        const dds = await db('orders').where({ id: order.id }).update({ status: "completed", deduction, duration: diffMinutes, end_time: new Date(end_time) });
         await db('pandits').where({ id: order.pandit_id }).increment({ total_chat_minutes: Number(diffMinutes), total_orders: 1, balance: deduction });
         await db('balancelogs').insert({ user_id, message: `Chat with ${panditDetail?.name} for ${diffMinutes} minutes`, pandit_id: panditDetail?.id, pandit_message: `Chat with ${user?.name} for ${diffMinutes} minutes`, amount: - deduction });
         console.log("user", dd);
@@ -397,7 +411,7 @@ async function endChat(req, res) {
         if (order.status != 'continue') {
             return res.status(400).json({ success: false, message: 'order is pending or completed.' });
         }
-        const result = await balanceCut(req.userId, order);
+        const result = await balanceCut(req.userId, order, new Date());
         if (!result) {
             return res.status(400).json({ success: false, message: 'Something went wrong.' });
         }
@@ -437,7 +451,7 @@ async function forceEndChat(req, res) {
             return res.status(400).json({ success: false, message: 'Order is ongoing.' });
         }
 
-        const result = await balanceCut(req.userId, order);
+        const result = await balanceCut(req.userId, order, order?.end_time);
         if (!result) {
             return res.status(400).json({ success: false, message: 'Something went wrong.' });
         }
@@ -520,6 +534,5 @@ async function deleteChat(req, res) {
         res.status(500).json({ success: false, message: 'Server error' });
     }
 }
-
 
 module.exports = { getRoom, getMessage, sendMessage, getDetail, getOrderDetail, endChat, forceEndChat, readMessage, deleteChat };
