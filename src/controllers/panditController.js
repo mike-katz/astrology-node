@@ -29,6 +29,8 @@ async function getPandits(req, res) {
             'p.experience',
             'p.profile',
             'p.available_for',
+            'p.chat_rate',
+            'p.call_rate',
             'p.charge',
             db.raw(`
             COALESCE(
