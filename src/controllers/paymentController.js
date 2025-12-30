@@ -98,11 +98,11 @@ async function addPayment(req, res) {
             pincode: user?.pincode,
             total_in_word
         };
-        // const invoice = await generateInvoicePDF(data)
-        // console.log("invoice", invoice);
+        const invoice = await generateInvoicePDF(data)
+        console.log("invoice", invoice);
         await db('users').where({ id: user?.id }).increment({ balance: Number(amount) });
-        await db('payments').insert({ user_id: req?.userId, transaction_id: orderId, utr, gst, amount, status: "success", invoice: "", type: "recharge" });
-        await db('balancelogs').insert({ user_id: req?.userId, message: "Purchase of ATG-Money via razorpay", amount, gst, invoice: "" });
+        await db('payments').insert({ user_id: req?.userId, transaction_id: orderId, utr, gst, amount, status: "success", invoice, type: "recharge" });
+        await db('balancelogs').insert({ user_id: req?.userId, message: "Purchase of ATG-Money via razorpay", amount, gst, invoice });
 
         return res.status(200).json({ success: true, message: 'Payment added Successfully' });
     } catch (err) {
