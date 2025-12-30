@@ -15,11 +15,11 @@ async function getPandits(req, res) {
     if (limit < 1) limit = 100;
     const offset = (page - 1) * limit;
     const { type = "chat" } = req.query;
-
+    const { search } = req.query
     const filter = {
         "p.status": "active",
     }
-    const user = await db('pandits as p')
+    let query = db('pandits as p')
         .leftJoin('reviews as r', 'p.id', 'r.pandit_id')
         .select(
             'p.name',
@@ -31,6 +31,13 @@ async function getPandits(req, res) {
             'p.available_for',
             'p.chat_rate',
             'p.call_rate',
+            'p.rating_1',
+            'p.rating_2',
+            'p.rating_3',
+            'p.rating_5',
+            'p.rating_4',
+            'p.total_orders',
+            'p.tag',
             'p.charge',
             db.raw(`
             COALESCE(
@@ -58,9 +65,14 @@ async function getPandits(req, res) {
         .groupBy('p.id')
         .limit(limit)
         .offset(offset);
-    const [{ count }] = await db('pandits as p')
+    const countQuery = db('pandits as p')
         .count('* as count').where(filter);
-
+    if (search && search.trim()) {
+        query.andWhere('p.name', 'ilike', `%${search.trim()}%`);
+        countQuery.andWhere('p.name', 'ilike', `%${search.trim()}%`);
+    }
+    const user = await query;
+    const [{ count }] = await countQuery
     const total = parseInt(count);
     const totalPages = Math.ceil(total / limit);
 
