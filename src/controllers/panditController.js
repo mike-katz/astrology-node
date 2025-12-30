@@ -20,7 +20,6 @@ async function getPandits(req, res) {
         "p.status": "active",
     }
     let query = db('pandits as p')
-        .leftJoin('reviews as r', 'p.id', 'r.pandit_id')
         .select(
             'p.name',
             'p.id',
@@ -41,18 +40,6 @@ async function getPandits(req, res) {
             'p.total_orders',
             'p.tag',
             'p.charge',
-            db.raw(`
-            COALESCE(
-              json_agg(
-                json_build_object(
-                  'id', r.id,
-                  'rating', r.rating,
-                  'message', r.message
-                )
-              ) FILTER (WHERE r.id IS NOT NULL),
-              '[]'
-            ) AS reviews
-          `)
         ).where(filter)
         .andWhere(function () {
             if (type === 'call') {
