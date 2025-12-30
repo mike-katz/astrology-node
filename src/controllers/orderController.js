@@ -145,10 +145,15 @@ async function list(req, res) {
 
         if (page < 1) page = 1;
         if (limit < 1) limit = 20;
+        const { type } = req.query
+        const filter = { 'o.user_id': req.userId, deleted_at: null }
+        if (type) {
+            filter['o.type'] = type
+        }
         const offset = (page - 1) * limit;
         const order = await db('orders as o')
             .distinctOn('o.pandit_id')
-            .where({ 'o.user_id': req.userId, deleted_at: null })
+            .where(filter)
             .leftJoin('pandits as p', 'p.id', 'o.pandit_id')
             .leftJoin(
                 db.raw(`
@@ -188,9 +193,9 @@ async function list(req, res) {
             )
             .limit(limit)
             .offset(offset);
-        const [{ count }] = await db('orders')
-            .where('user_id', req.userId)
-            .countDistinct('pandit_id as count');
+        const [{ count }] = await db('orders as o')
+            .where(filter)
+            .countDistinct('o.pandit_id as count');
 
         const total = parseInt(count);
         const totalPages = Math.ceil(total / limit);
