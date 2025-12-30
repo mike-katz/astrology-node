@@ -30,6 +30,8 @@ async function getPandits(req, res) {
             'p.profile',
             'p.available_for',
             'p.chat_rate',
+            'p.primary_expertise',
+            'p.secondary_expertise',
             'p.call_rate',
             'p.rating_1',
             'p.rating_2',
@@ -104,7 +106,6 @@ async function getPanditDetail(req, res) {
         .where('r.pandit_id', id)
         .orderBy('r.created_at', 'desc')
         .limit(3);
-
     const response = {
         id: user?.id,
         name: user?.name,
@@ -117,6 +118,8 @@ async function getPanditDetail(req, res) {
         available_for: user?.available_for,
         chat_rate: user?.chat_rate,
         call_rate: user?.call_rate,
+        primary_expertise: user?.primary_expertise,
+        secondary_expertise: user?.secondary_expertise,
         about: user?.about,
         total_chat_minutes: user?.total_chat_minutes,
         total_call_minutes: user?.total_call_minutes,
@@ -542,6 +545,8 @@ async function getReviewList(req, res) {
         const offset = (page - 1) * limit;
 
         if (!panditId) return res.status(400).json({ success: false, message: 'Please enter pandit.' });
+        const pandit = await db('pandits').where({ id: Number(panditId) }).first()
+
         const user = await db('reviews as r')
             .leftJoin('users as u', 'u.id', 'r.user_id')
             .select(
@@ -566,7 +571,15 @@ async function getReviewList(req, res) {
             limit,
             total,
             totalPages,
-            results: user
+            results: user,
+            panditDetail: {
+                rating_1: pandit?.rating_1,
+                rating_2: pandit?.rating_2,
+                rating_3: pandit?.rating_3,
+                rating_4: pandit?.rating_4,
+                rating_5: pandit?.rating_5,
+                total_orders: pandit?.total_orders,
+            }
         }
 
         return res.status(200).json({ success: true, data: response, message: 'Review get Successfully' });
