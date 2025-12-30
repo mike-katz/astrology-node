@@ -67,7 +67,7 @@ async function updateProfile(req, res) {
             .update(update);
 
         const isProfileExist = await db('userprofiles')
-            .where({ 'user_id': req?.userId }).first();
+            .where({ 'user_id': req?.userId, is_first: true }).first();
 
         delete update.language
         delete update.my_interest
