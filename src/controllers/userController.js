@@ -109,7 +109,7 @@ async function updateToken(req, res) {
     const { token } = req.body;
     try {
         const order = await db('users').where({ id: req.userId }).first();
-        if (!order) return res.status(400).json({ success: false, message: 'Pandit not found.' });
+        if (!order) return res.status(400).json({ success: false, message: 'User not found.' });
         const update = {}
         if (token) {
             update.token = token
@@ -121,4 +121,28 @@ async function updateToken(req, res) {
         res.status(500).json({ success: false, message: 'Server error' });
     }
 }
-module.exports = { updateProfile, getProfile, getBalance, updateToken };
+
+async function profileUpdate(req, res) {
+    try {
+        const order = await db('users').where({ id: req.userId }).first();
+        if (!order) return res.status(400).json({ success: false, message: 'User not found.' });
+        const update = {}
+        const { files } = req
+        if (files?.profile?.length > 0) {
+            const image = await uploadImageTos3('profile', files?.profile[0], 'upload');
+            update.profile = image.data.Location;
+        }
+        if (order?.profile?.length > 0) {
+            const dd = await deleteFileFroms3(decodeURIComponent(order?.profile))
+            console.log("dd", dd);
+        }
+        await db('users').where({ id: req.userId }).update(update);
+        return res.status(200).json({ success: true, data: null, message: 'Update successfully' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
+
+module.exports = { updateProfile, getProfile, getBalance, updateToken, profileUpdate };
