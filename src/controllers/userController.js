@@ -1,6 +1,7 @@
 const db = require('../db');
 
 require('dotenv').config();
+const { uploadImageTos3, deleteFileFroms3 } = require('./uploader');
 
 async function getProfile(req, res) {
     const user = await db('users')
