@@ -138,7 +138,7 @@ async function profileUpdate(req, res) {
             console.log("dd", dd);
         }
         await db('users').where({ id: req.userId }).update(update);
-        return res.status(200).json({ success: true, data: null, message: 'Update successfully' });
+        return res.status(200).json({ success: true, data: { url: update?.profile }, message: 'Update successfully' });
     } catch (err) {
         console.error(err);
         res.status(500).json({ success: false, message: 'Server error' });
