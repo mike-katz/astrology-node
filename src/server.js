@@ -11,6 +11,8 @@ const userRoutes = require('./routes/user');
 const orderRoutes = require('./routes/order');
 const profileRoutes = require('./routes/profile');
 const paymentRoutes = require('./routes/payment');
+const kundliRoutes = require('./routes/kundli');
+
 // const cors = require('cors');
 const multer = require('multer');
 // const RedisCache = require('./config/redisClient');
@@ -29,6 +31,7 @@ app.use(encryptResponse);
 app.use('/auth', authRoutes);
 app.use('/pandit', panditRoutes);
 app.use('/upload', panditRoutes);
+app.use('/kundli', kundliRoutes);
 
 // app.use('/agora', agoraRoutes);
 
