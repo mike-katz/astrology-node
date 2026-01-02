@@ -3,6 +3,43 @@ require('dotenv').config();
 const { decodeJWT } = require('../utils/decodeJWT');
 const axios = require('axios');
 const FormData = require('form-data');
+
+async function basicKundliApiCall(dob, birth_time, name, gender, birth_place) {
+
+    const url = ' https://astroapi-3.divineapi.com/indian-api/v3/basic-astro-details'
+    const formData = new FormData();
+    const [year, month, day] = dob.split('-');
+    const [hour, min, sec] = birth_time.split(':');
+
+    formData.append('api_key', process.env.KUNDLI_API_KEY);
+    formData.append('full_name', name);
+    formData.append('day', day);
+    formData.append('month', month);
+    formData.append('year', year);
+    formData.append('hour', hour);
+    formData.append('min', min);
+    formData.append('sec', sec || 0);
+    formData.append('gender', gender);
+    formData.append('place', birth_place);
+    formData.append('lat', '25.7041');
+    formData.append('lon', '77.1025');
+    formData.append('tzone', '5.5');
+    formData.append('lan', 'en');
+
+    const config = {
+        method: 'post',
+        url,
+        headers: {
+            Authorization: `Bearer ${process.env.KUNDLI_API_TOKEN}`,
+            ...formData.getHeaders(),
+        },
+        data: formData,
+    };
+    console.log("config", config);
+    const response = await axios(config);
+    return response?.data
+}
+
 async function findBasicKundli(req, res) {
     try {
         let { profile_id, name, dob, type, birth_time, gender, birth_place } = req.query;
@@ -21,6 +58,24 @@ async function findBasicKundli(req, res) {
             birth_time = user?.birth_time
             dob = user?.dob
             birth_place = user?.birth_place
+
+            let kundli = await db('kundlis')
+                .where({ profile_id })
+                .first();
+
+            if (user?.is_updated || !kundli) {
+                const response = await basicKundliApiCall(dob, birth_time, name, gender, birth_place)
+
+                const kundli = { name, gender, dob, birth_place, birth_time, profile_id }
+                kundli.basic = JSON.stringify(response?.data)
+                await db('kundlis')
+                    .insert(kundli)
+                    .onConflict('profile_id')
+                    .merge();
+
+                await db('userprofiles').where({ 'id': Number(profile_id) }).update({ is_updated: false })
+            }
+            return res.status(200).json({ success: true, data: kundli, message: 'Kundli get Successfully' });
         }
         let user = await db('kundlis')
             .where({ name, gender, dob, birth_place, birth_time })
@@ -28,44 +83,14 @@ async function findBasicKundli(req, res) {
 
         if (!user) {
             console.log("inside api");
-            const url = ' https://astroapi-3.divineapi.com/indian-api/v3/basic-astro-details'
-            const formData = new FormData();
-            const [year, month, day] = dob.split('-');
-            const [hour, min, sec] = birth_time.split(':');
-
-            formData.append('api_key', process.env.KUNDLI_API_KEY);
-            formData.append('full_name', name);
-            formData.append('day', day);
-            formData.append('month', month);
-            formData.append('year', year);
-            formData.append('hour', hour);
-            formData.append('min', min);
-            formData.append('sec', sec || 0);
-            formData.append('gender', gender);
-            formData.append('place', birth_place);
-            formData.append('lat', '25.7041');
-            formData.append('lon', '77.1025');
-            formData.append('tzone', '5.5');
-            formData.append('lan', 'en');
-
-            const config = {
-                method: 'post',
-                url,
-                headers: {
-                    Authorization: `Bearer ${process.env.KUNDLI_API_TOKEN}`,
-                    ...formData.getHeaders(),
-                },
-                data: formData,
-            };
-            console.log("config", config);
-            const response = await axios(config);
+            const response = await basicKundliApiCall(dob, birth_time, name, gender, birth_place)
             console.log(response.data);
 
             user = { name, gender, dob, birth_place, birth_time }
             if (profile_id) {
                 user.profile_id = profile_id
             }
-            user.basic = JSON.stringify(response.data?.data)
+            user.basic = JSON.stringify(response?.data)
             await db('kundlis').insert(user);
             // await db('follows').insert({ user_id: req?.userId, pandit_id: panditId, type: "user" });
         }

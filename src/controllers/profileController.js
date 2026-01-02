@@ -91,7 +91,7 @@ async function updateProfile(req, res) {
         if (!count) {
             return res.status(400).json({ success: false, message: 'Profile not found.' });
         }
-        const upd = {}
+        const upd = { is_updated: true }
         //     topic_of_concern,
         //     topic_of_concern_other,
         //     occupation,
