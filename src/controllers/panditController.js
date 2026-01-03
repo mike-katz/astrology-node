@@ -77,6 +77,8 @@ async function getPandits(req, res) {
 
 async function getPanditDetail(req, res) {
     const { id } = req.query;
+    console.log("authHeader", req.headers.authorization);
+    console.log("getPanditDetail id", id);
     const user = await db('pandits').where('id', id).first();
     if (!user) return res.status(400).json({ success: false, message: 'pandit not available.' });
     const review = await db('reviews as r')
