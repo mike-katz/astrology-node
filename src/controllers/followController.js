@@ -20,7 +20,7 @@ async function addFollow(req, res) {
                     type: "user"
                 })
                 .del();
-            return res.status(400).json({ success: false, message: 'UnFollow successful' });
+            return res.status(200).json({ success: true, message: 'UnFollow successful' });
         }
         if (!user) {
             await db('follows').insert({ user_id: req?.userId, pandit_id: panditId, type: "user" });
