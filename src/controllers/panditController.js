@@ -126,6 +126,7 @@ async function getPanditDetail(req, res) {
         const token = authHeader.split(' ')[1];
         const decryptToken = decrypt(token);
         const verified = jwt.verify(decryptToken, process.env.JWT_SECRET);
+        console.log("verified", verified);
         if (verified?.userId) {
             const user = await db('follows').where({ 'pandit_id': id, 'user_id': verified?.userId }).first();
             console.log("user", user);
