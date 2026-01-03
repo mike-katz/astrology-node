@@ -122,6 +122,7 @@ async function getPanditDetail(req, res) {
         isFollow: false
     }
     const authHeader = req.headers.authorization;
+    console.log("authHeader", authHeader);
     if (authHeader && authHeader.startsWith('Bearer ')) {
         const token = authHeader.split(' ')[1];
         const decryptToken = decrypt(token);
