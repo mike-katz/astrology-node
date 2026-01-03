@@ -271,6 +271,7 @@ async function acceptOrder(req, res) {
         const startTime = new Date()
         const endTime = new Date(Date.now() + `${duration}` * 60 * 1000);
         await db('orders').where({ id: order?.id }).update({ status: "continue", duration, deduction, start_time: startTime, end_time: endTime });
+        await db('pandits').where({ id: order?.pandit_id }).update({ waiting_time: Number(duration) });
 
         if (order?.profile_id) {
             const profile = await db('userprofiles').where({ id: order?.profile_id }).first();

@@ -381,7 +381,8 @@ async function balanceCut(user_id, order, end_time) {
         const panditDetail = await db('pandits').where({ id: order.pandit_id }).first()
         const dd = await db('users').where({ id: user_id }).update({ balance: newBalance });
         const dds = await db('orders').where({ id: order.id }).update({ status: "completed", deduction, duration: diffMinutes, end_time: new Date(end_time) });
-        await db('pandits').where({ id: order.pandit_id }).increment({ total_chat_minutes: Number(diffMinutes), total_orders: 1, balance: deduction });
+        await db('pandits').where({ id: order.pandit_id }).increment({ total_chat_minutes: Number(diffMinutes), total_orders: 1, balance: deduction }).update({ waiting_time: 0 });
+
         await db('balancelogs').insert({ user_id, message: `Chat with ${panditDetail?.name} for ${diffMinutes} minutes`, pandit_id: panditDetail?.id, pandit_message: `Chat with ${user?.name} for ${diffMinutes} minutes`, amount: - deduction });
         console.log("user", dd);
         console.log("order", dds);

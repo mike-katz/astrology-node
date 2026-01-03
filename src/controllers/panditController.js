@@ -7,72 +7,78 @@ const jwt = require('jsonwebtoken');
 const { isValidMobile } = require('../utils/decodeJWT');
 
 async function getPandits(req, res) {
+    try {
+        let page = parseInt(req.query.page) || 1;
+        let limit = parseInt(req.query.limit) || 20;
 
-    let page = parseInt(req.query.page) || 1;
-    let limit = parseInt(req.query.limit) || 20;
+        if (page < 1) page = 1;
+        if (limit < 1) limit = 100;
+        const offset = (page - 1) * limit;
+        const { type = "chat" } = req.query;
+        const { search } = req.query
+        const filter = {
+            "p.status": "active",
+        }
+        let query = db('pandits as p')
+            .select(
+                'p.name',
+                'p.id',
+                'p.knowledge',
+                'p.language',
+                'p.experience',
+                'p.profile',
+                'p.available_for',
+                'p.chat_rate',
+                'p.primary_expertise',
+                'p.secondary_expertise',
+                'p.waiting_time',
+                'p.call_rate',
+                'p.rating_1',
+                'p.rating_2',
+                'p.rating_3',
+                'p.rating_5',
+                'p.rating_4',
+                'p.total_orders',
+                'p.tag',
+                'p.charge',
+            ).where(filter)
+            .andWhere(function () {
+                if (type === 'call') {
+                    this.where('p.call', true);
+                }
+                if (type === 'chat') {
+                    this.where('p.chat', true);
+                }
+                // ✅ OR condition
+                this.orWhere('p.unlimited_free_calls_chats', true);
+            })
+            .groupBy('p.id')
+            .limit(limit)
+            .offset(offset);
+        const countQuery = db('pandits as p')
+            .count('* as count').where(filter);
+        if (search && search.trim()) {
+            query.andWhere('p.name', 'ilike', `%${search.trim()}%`);
+            countQuery.andWhere('p.name', 'ilike', `%${search.trim()}%`);
+        }
+        const user = await query;
+        const [{ count }] = await countQuery
+        const total = parseInt(count);
+        const totalPages = Math.ceil(total / limit);
 
-    if (page < 1) page = 1;
-    if (limit < 1) limit = 100;
-    const offset = (page - 1) * limit;
-    const { type = "chat" } = req.query;
-    const { search } = req.query
-    const filter = {
-        "p.status": "active",
+        const response = {
+            page,
+            limit,
+            total,
+            totalPages,
+            results: user
+        }
+        return res.status(200).json({ success: true, data: response, message: 'List success' });
     }
-    let query = db('pandits as p')
-        .select(
-            'p.name',
-            'p.id',
-            'p.knowledge',
-            'p.language',
-            'p.experience',
-            'p.profile',
-            'p.available_for',
-            'p.chat_rate',
-            'p.primary_expertise',
-            'p.secondary_expertise',
-            'p.call_rate',
-            'p.rating_1',
-            'p.rating_2',
-            'p.rating_3',
-            'p.rating_5',
-            'p.rating_4',
-            'p.total_orders',
-            'p.tag',
-            'p.charge',
-        ).where(filter)
-        .andWhere(function () {
-            if (type === 'call') {
-                this.where('p.call', true);
-            }
-            if (type === 'chat') {
-                this.where('p.chat', true);
-            }
-            // ✅ OR condition
-            this.orWhere('p.unlimited_free_calls_chats', true);
-        })
-        .groupBy('p.id')
-        .limit(limit)
-        .offset(offset);
-    const countQuery = db('pandits as p')
-        .count('* as count').where(filter);
-    if (search && search.trim()) {
-        query.andWhere('p.name', 'ilike', `%${search.trim()}%`);
-        countQuery.andWhere('p.name', 'ilike', `%${search.trim()}%`);
+    catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
     }
-    const user = await query;
-    const [{ count }] = await countQuery
-    const total = parseInt(count);
-    const totalPages = Math.ceil(total / limit);
-
-    const response = {
-        page,
-        limit,
-        total,
-        totalPages,
-        results: user
-    }
-    return res.status(200).json({ success: true, data: response, message: 'List success' });
 }
 
 async function getPanditDetail(req, res) {
@@ -102,6 +108,7 @@ async function getPanditDetail(req, res) {
         language: JSON.parse(user?.languages),
         experience: user?.experience,
         profile: user?.profile,
+        waiting_time: user?.waiting_time,
         availableFor: user?.availableFor,
         charge: user?.charge,
         available_for: user?.available_for,
