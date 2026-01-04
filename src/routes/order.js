@@ -9,4 +9,6 @@ router.post('/cancelOrder', order.cancelOrder);
 router.get('/list', order.list);
 router.delete('/delete', order.deleteOrder);
 
+router.post('/sendGift', order.sendGift);
+
 module.exports = router;
