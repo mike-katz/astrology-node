@@ -83,6 +83,11 @@ async function create(req, res) {
             key: `user_${req?.userId}`,
             payload: [{ ...saved, name: pandit?.name, profile: pandit?.profile }]
         });
+
+        callEvent("emit_to_pending_order", {
+            key: `pandit_${order?.pandit_id}`,
+            payload: { pandit_id: pandit?.id }
+        });
         console.log(" socket end call");
 
         const token = pandit?.token || false;
@@ -335,6 +340,11 @@ async function acceptOrder(req, res) {
         callEvent("emit_to_user_chat_end_time", {
             key: `pandit_${order?.pandit_id}`,
             payload: { startTime, endTime, orderId }
+        });
+
+        callEvent("emit_to_pending_order", {
+            key: `pandit_${order?.pandit_id}`,
+            payload: { pandit_id: order?.pandit_id }
         });
 
         return res.status(200).json({ success: true, message: 'Order accept Successfully' });
