@@ -134,6 +134,7 @@ async function updateProfile(req, res) {
         await db('userprofiles').where('id', profileId).update(upd);
 
         if (count.is_first) {
+            delete upd.is_updated
             await db('users').where({ id: req.userId }).update(upd);
         }
         return res.status(200).json({ success: true, message: 'Profile Successfully' });
