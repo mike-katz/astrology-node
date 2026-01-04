@@ -225,7 +225,7 @@ async function sendMessage(req, res) {
         if (files?.length > 0) {
             for (const file of files) {
                 const image = await uploadImageTos3('message', file, 'chat');
-                console.log("image", image.data.Location);
+                // console.log("image", image.data.Location);
                 const [saved] = await db('chats').insert({
                     sender_type: "user",
                     sender_id: Number(req.userId),
@@ -253,13 +253,14 @@ async function sendMessage(req, res) {
             }).returning('*');
             response = saved
         }
-
+        console.log("start emit_to_user socket ");
         callEvent("emit_to_user", {
             toType: "pandit",
             toId: order?.pandit_id,
             orderId: order?.order_id,
             payload: response,
         });
+        console.log("end emit_to_user socket ");
 
         // socket.emit("emit_to_user", {
         //     toType: "user",
@@ -359,13 +360,13 @@ async function balanceCut(user_id, order, end_time) {
     try {
         const user = await db('users').where({ id: user_id }).first();
         const diffMinutes = getDuration(order.start_time, end_time)
-        console.log("diffMinutes", diffMinutes);
+        // console.log("diffMinutes", diffMinutes);
         const perMinute = Number(order?.rate);
-        console.log("perMinute", perMinute);
+        // console.log("perMinute", perMinute);
         const deduction = Number(diffMinutes) * Number(perMinute);
-        console.log("deduction", deduction);
+        // console.log("deduction", deduction);
         const newBalance = user.balance - deduction
-        console.log("newBalance", newBalance, "username", user?.name);
+        // console.log("newBalance", newBalance, "username", user?.name);
 
         await db('chats').insert({
             sender_type: "user",
@@ -384,11 +385,11 @@ async function balanceCut(user_id, order, end_time) {
         await db('pandits').where({ id: order.pandit_id }).increment({ total_chat_minutes: Number(diffMinutes), total_orders: 1, balance: deduction }).update({ waiting_time: 0 });
 
         await db('balancelogs').insert({ user_id, message: `Chat with ${panditDetail?.name} for ${diffMinutes} minutes`, pandit_id: panditDetail?.id, pandit_message: `Chat with ${user?.name} for ${diffMinutes} minutes`, amount: - deduction });
-        console.log("user", dd);
-        console.log("order", dds);
+        // console.log("user", dd);
+        // console.log("order", dds);
         return true
     } catch (err) {
-        console.log("err", err);
+        // console.log("err", err);
         return false
     }
 }
