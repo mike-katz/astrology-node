@@ -29,6 +29,8 @@ async function getPandits(req, res) {
                 'p.profile',
                 'p.available_for',
                 'p.chat_rate',
+                'p.total_chat_minutes',
+                'p.total_call_minutes',
                 'p.primary_expertise',
                 'p.secondary_expertise',
                 'p.waiting_time',
