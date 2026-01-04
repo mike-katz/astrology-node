@@ -104,6 +104,8 @@ async function getPanditDetail(req, res) {
         .where('r.pandit_id', id)
         .orderBy('r.created_at', 'desc')
         .limit(3);
+
+    const gallery = await db('panditgallery').where({ pandit_id: id }).orderBy('order', 'asc');
     const response = {
         id: user?.id,
         name: user?.name,
@@ -132,7 +134,8 @@ async function getPanditDetail(req, res) {
         tag: user?.tag,
         isverified: user?.isverified,
         reviews: review,
-        isFollow: false
+        isFollow: false,
+        gallery
     }
     const authHeader = req.headers.authorization;
     console.log("authHeader", authHeader);
