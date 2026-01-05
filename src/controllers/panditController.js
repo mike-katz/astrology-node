@@ -119,7 +119,7 @@ async function getPandits(req, res) {
             countQuery.andWhere('p.name', 'ilike', `%${search.trim()}%`);
         }
 
-        if (secondary_expertise != 'All') {
+        if (secondary_expertise && secondary_expertise != 'All') {
             query.andWhereRaw('p.secondary_expertise::text ILIKE ?', [secondary_expertise]);
             countQuery.andWhereRaw('p.secondary_expertise::text ILIKE ?', [secondary_expertise]);
         }
@@ -487,6 +487,13 @@ async function onboard(req, res) {
         }
         if (step == 5) {
             if (!terms || !no_false || !consent_profile) return res.status(400).json({ success: false, message: 'Missing params.' });
+        }
+
+        if (display_name) {
+            if (display_name.length > 15) return res.status(400).json({ success: false, message: 'Max 15 character accept.' });
+            const onboard = await db('onboardings').where({ "display_name": display_name }).first();
+            const user = await db('pandits').where({ "display_name": display_name }).first();
+            if (onboard || user) return res.status(400).json({ success: false, message: 'Display name already exist.' });
         }
 
         // const selectedskill = skills.split(",").map(l => l.trim());  // ["english", "hindi"]
