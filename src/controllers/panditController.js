@@ -14,7 +14,7 @@ async function getPandits(req, res) {
         if (page < 1) page = 1;
         if (limit < 1) limit = 100;
         const offset = (page - 1) * limit;
-        const { type = "chat", search, sort_by, skill, language, gender, country, offer, top_astrologer } = req.query
+        const { type = "chat", search, sort_by, skill, language, gender, country, offer, top_astrologer, secondary_expertise } = req.query
         const filter = {
             "p.status": "active",
             "p.deleted_at": null
@@ -117,6 +117,11 @@ async function getPandits(req, res) {
         if (search && search.trim()) {
             query.andWhere('p.name', 'ilike', `%${search.trim()}%`);
             countQuery.andWhere('p.name', 'ilike', `%${search.trim()}%`);
+        }
+
+        if (secondary_expertise != 'All') {
+            query.andWhereRaw('p.secondary_expertise::text ILIKE ?', [secondary_expertise]);
+            countQuery.andWhereRaw('p.secondary_expertise::text ILIKE ?', [secondary_expertise]);
         }
 
         if (Array.isArray(skill) && skill.length) {
