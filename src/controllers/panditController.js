@@ -203,13 +203,14 @@ async function getPandits(req, res) {
         //     });
         // }
 
-        if (country && country.length == 1) {
+        if (Array.isArray(country) && country.length == 1) {
+            console.log("country", country[0]);
             if (country[0] == 'India') {
-                query.andWhere('p.country', country[0].trim());
-                countQuery.andWhere('p.country', country[0].trim());
+                query.andWhere('p.country', "India");
+                countQuery.andWhere('p.country', "India");
             } else {
-                query.andWhereNot('p.country', country[0].trim());
-                countQuery.andWhereNot('p.country', country[0].trim());
+                query.andWhereNot('p.country', "India");
+                countQuery.andWhereNot('p.country', "India");
             }
         }
 
