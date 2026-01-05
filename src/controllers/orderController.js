@@ -151,7 +151,7 @@ async function list(req, res) {
         if (page < 1) page = 1;
         if (limit < 1) limit = 20;
         const { type } = req.query
-        const filter = { 'o.user_id': req.userId, deleted_at: null }
+        const filter = { 'o.user_id': req.userId, 'o.deleted_at': null }
         if (type) {
             filter['o.type'] = type
         }
