@@ -14,10 +14,64 @@ async function getPandits(req, res) {
         if (page < 1) page = 1;
         if (limit < 1) limit = 100;
         const offset = (page - 1) * limit;
-        const { type = "chat" } = req.query;
-        const { search } = req.query
+        const { type = "chat", search, sort_by, skill, language, gender, country, offer, top_astrologer } = req.query
         const filter = {
             "p.status": "active",
+        }
+        let sort
+        let orderBy
+        let sorting = []
+        if (sort_by) {
+            if (sort_by == 'popularity') {
+                sort = 'popular'
+            }
+            if (sort_by == 'experience_high_to_low') {
+                sort = 'experience'
+                orderBy = 'desc'
+            }
+
+            if (sort_by == 'experience_low_to_high') {
+                sort = 'experience'
+                orderBy = 'asc'
+            }
+            if (sort_by == 'order_low_to_high') {
+                sort = 'total_orders'
+                orderBy = 'asc'
+            }
+            if (sort_by == 'order_high_to_low') {
+                sort = 'experience'
+                orderBy = 'desc'
+            }
+            if (sort_by == 'price_low_to_high') {
+                sort = 'charge'
+                orderBy = 'asc'
+            }
+            if (sort_by == 'price_high_to_low') {
+                sort = 'charge'
+                orderBy = 'desc'
+            }
+
+            sorting.push({
+                column: sort, order: orderBy
+            })
+            if (sort_by == 'rating_high_to_low') {
+                sorting = [
+                    { column: 'rating5', order: 'desc' },
+                    { column: 'rating4', order: 'desc' },
+                    { column: 'rating3', order: 'desc' },
+                    { column: 'rating2', order: 'desc' },
+                    { column: 'rating1', order: 'desc' }
+                ]
+            }
+            if (sort_by == 'rating_low_to_high') {
+                sorting = [
+                    { column: 'rating1', order: 'asc' },
+                    { column: 'rating2', order: 'asc' },
+                    { column: 'rating3', order: 'asc' },
+                    { column: 'rating4', order: 'asc' },
+                    { column: 'rating5', order: 'asc' }
+                ]
+            }
         }
         let query = db('pandits as p')
             .select(
@@ -63,6 +117,38 @@ async function getPandits(req, res) {
         if (search && search.trim()) {
             query.andWhere('p.name', 'ilike', `%${search.trim()}%`);
             countQuery.andWhere('p.name', 'ilike', `%${search.trim()}%`);
+        }
+
+        if (skill && skill.trim()) {
+            query.andWhere('p.primary_expertise', 'ilike', `%${skill.trim()}%`);
+            countQuery.andWhere('p.primary_expertise', 'ilike', `%${skill.trim()}%`);
+        }
+
+        if (language && language.trim()) {
+            query.andWhere('p.languages', 'ilike', `%${language.trim()}%`);
+            countQuery.andWhere('p.languages', 'ilike', `%${language.trim()}%`);
+        }
+        if (gender && gender.trim()) {
+            query.andWhere('p.gender', 'ilike', `%${gender.trim()}%`);
+            countQuery.andWhere('p.gender', 'ilike', `%${gender.trim()}%`);
+        }
+        if (top_astrologer && top_astrologer.trim()) {
+            query.andWhere('p.tag', 'ilike', `%${top_astrologer.trim()}%`);
+            countQuery.andWhere('p.tag', 'ilike', `%${top_astrologer.trim()}%`);
+        }
+
+        if (country && country.trim()) {
+            query.andWhere('p.country', 'ilike', `%${country.trim()}%`);
+            countQuery.andWhere('p.country', 'ilike', `%${country.trim()}%`);
+        }
+
+        if (offer && offer.trim()) {
+            query.andWhere('p.tag', 'ilike', `%${offer.trim()}%`);
+            countQuery.andWhere('p.tag', 'ilike', `%${offer.trim()}%`);
+        }
+
+        if (sorting?.length > 0) {
+            query.orderBy(sorting)
         }
         const user = await query;
         const [{ count }] = await countQuery
