@@ -22,9 +22,9 @@ async function getPandits(req, res) {
         let orderBy
         let sorting = []
         if (sort_by) {
-            if (sort_by == 'popularity') {
-                sort = 'popular'
-            }
+            // if (sort_by == 'popularity') {
+            //     sort = 'popular'
+            // }
             if (sort_by == 'experience_high_to_low') {
                 sort = 'experience'
                 orderBy = 'desc'
@@ -112,7 +112,7 @@ async function getPandits(req, res) {
             .groupBy('p.id')
             .limit(limit)
             .offset(offset);
-        const countQuery = db('pandits as p')
+        let countQuery = db('pandits as p')
             .count('* as count').where(filter);
         if (search && search.trim()) {
             query.andWhere('p.name', 'ilike', `%${search.trim()}%`);
