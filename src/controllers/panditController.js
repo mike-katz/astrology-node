@@ -119,38 +119,100 @@ async function getPandits(req, res) {
             countQuery.andWhere('p.name', 'ilike', `%${search.trim()}%`);
         }
 
-        if (skill && skill.trim()) {
-            query.andWhere('p.primary_expertise', 'ilike', `%${skill.trim()}%`);
-            countQuery.andWhere('p.primary_expertise', 'ilike', `%${skill.trim()}%`);
+        if (Array.isArray(skill) && skill.length) {
+            query.andWhere(builder => {
+                skill.forEach((s, index) => {
+                    const condition = ['ilike', `%${s.trim()}%`];
+                    index === 0
+                        ? builder.where('p.primary_expertise', ...condition)
+                        : builder.orWhere('p.primary_expertise', ...condition);
+                });
+            });
+
+            countQuery.andWhere(builder => {
+                skill.forEach((s, index) => {
+                    const condition = ['ilike', `%${s.trim()}%`];
+                    index === 0
+                        ? builder.where('p.primary_expertise', ...condition)
+                        : builder.orWhere('p.primary_expertise', ...condition);
+                });
+            });
         }
 
-        if (language && language.trim()) {
-            query.andWhere('p.languages', 'ilike', `%${language.trim()}%`);
-            countQuery.andWhere('p.languages', 'ilike', `%${language.trim()}%`);
-        }
-        if (gender && gender.trim()) {
-            query.andWhere('p.gender', 'ilike', `%${gender.trim()}%`);
-            countQuery.andWhere('p.gender', 'ilike', `%${gender.trim()}%`);
-        }
-        if (top_astrologer && top_astrologer.trim() && top_astrologer != 'all') {
-            query.andWhere('p.tag', 'ilike', `%${top_astrologer.trim()}%`);
-            countQuery.andWhere('p.tag', 'ilike', `%${top_astrologer.trim()}%`);
+        if (Array.isArray(language) && language.length) {
+            query.andWhere(builder => {
+                language.forEach((s, index) => {
+                    const condition = ['ilike', `%${s.trim()}%`];
+                    index === 0
+                        ? builder.where('p.languages', ...condition)
+                        : builder.orWhere('p.languages', ...condition);
+                });
+            });
+
+            countQuery.andWhere(builder => {
+                language.forEach((s, index) => {
+                    const condition = ['ilike', `%${s.trim()}%`];
+                    index === 0
+                        ? builder.where('p.languages', ...condition)
+                        : builder.orWhere('p.languages', ...condition);
+                });
+            });
         }
 
-        if (country && country.trim()) {
-            if (country == 'India') {
-                query.andWhere('p.country', country.trim());
-                countQuery.andWhere('p.country', country.trim());
+        if (Array.isArray(gender) && gender.length) {
+            query.andWhere(builder => {
+                gender.forEach((s, index) => {
+                    const condition = ['ilike', `%${s.trim()}%`];
+                    index === 0
+                        ? builder.where('p.gender', ...condition)
+                        : builder.orWhere('p.gender', ...condition);
+                });
+            });
+
+            countQuery.andWhere(builder => {
+                gender.forEach((s, index) => {
+                    const condition = ['ilike', `%${s.trim()}%`];
+                    index === 0
+                        ? builder.where('p.gender', ...condition)
+                        : builder.orWhere('p.gender', ...condition);
+                });
+            });
+        }
+
+        if (Array.isArray(top_astrologer) && top_astrologer.length && !top_astrologer.includes("all")) {
+            query.andWhere(builder => {
+                top_astrologer.forEach((s, index) => {
+                    const condition = ['ilike', `%${s.trim()}%`];
+                    index === 0
+                        ? builder.where('p.tag', ...condition)
+                        : builder.orWhere('p.tag', ...condition);
+                });
+            });
+
+            countQuery.andWhere(builder => {
+                top_astrologer.forEach((s, index) => {
+                    const condition = ['ilike', `%${s.trim()}%`];
+                    index === 0
+                        ? builder.where('p.tag', ...condition)
+                        : builder.orWhere('p.tag', ...condition);
+                });
+            });
+        }
+
+        if (country && country.length == 1) {
+            if (country[0] == 'India') {
+                query.andWhere('p.country', country[0].trim());
+                countQuery.andWhere('p.country', country[0].trim());
             } else {
-                query.andWhereNot('p.country', country.trim());
-                countQuery.andWhereNot('p.country', country.trim());
+                query.andWhereNot('p.country', country[0].trim());
+                countQuery.andWhereNot('p.country', country[0].trim());
             }
         }
 
-        if (offer && offer.trim()) {
-            query.andWhere('p.tag', 'ilike', `%${offer.trim()}%`);
-            countQuery.andWhere('p.tag', 'ilike', `%${offer.trim()}%`);
-        }
+        // if (offer && offer.trim()) {
+        //     query.andWhere('p.tag', 'ilike', `%${offer.trim()}%`);
+        //     countQuery.andWhere('p.tag', 'ilike', `%${offer.trim()}%`);
+        // }
 
         if (sorting?.length > 0) {
             query.orderBy(sorting)
