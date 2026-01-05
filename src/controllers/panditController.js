@@ -22,9 +22,10 @@ async function getPandits(req, res) {
         let orderBy
         let sorting = []
         if (sort_by) {
-            // if (sort_by == 'popularity') {
-            //     sort = 'popular'
-            // }
+            if (sort_by == 'popularity') {
+                sort = 'tag'
+                sort = 'desc'
+            }
             if (sort_by == 'experience_high_to_low') {
                 sort = 'experience'
                 orderBy = 'desc'
