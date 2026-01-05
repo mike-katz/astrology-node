@@ -38,7 +38,7 @@ async function create(req, res) {
 
         // const order = await db('orders').where({ user_id: req.userId, pandit_id: panditId }).first()
         const orderId = `${new Date().getTime().toString()}${Math.floor(100000 + Math.random() * 900000).toString()}`;
-        let duration = Math.floor(Number(Number(user?.balance)) / Number(pandit?.charge));
+        let duration = Math.floor(Number(Number(user?.balance)) / Number(pandit?.chat_call_rate));
         console.log("duration", duration);
         if (!Number.isFinite(duration)) {
             return res.status(400).json({ success: false, message: 'Min. 5 min balance required.' });
@@ -47,19 +47,19 @@ async function create(req, res) {
         if (duration < 5) {
             return res.status(400).json({ success: false, message: 'Min. 5 min balance required.' });
         }
-        const deduction = Number(duration) * Number(pandit?.charge)
+        const deduction = Number(duration) * Number(pandit?.chat_call_rate)
         if (isNaN(deduction)) {
             return res.status(400).json({ success: false, message: 'Balance could not be NaN.' });
         }
         // console.log("last order", order);
         // if (!order) {
         //     //create 5 minute order
-        //     deduction = (5 * pandit?.charge || 1);
+        //     deduction = (5 * pandit?.chat_call_rate || 1);
 
         // } else {
-        //     deduction = (5 * pandit?.charge || 1);
+        //     deduction = (5 * pandit?.chat_call_rate || 1);
         if (Number(user?.balance) < deduction) return res.status(400).json({ success: false, message: 'Min. 5 min balance required.' });
-        // deduction = (user?.balance - 50) / (pandit?.charge || 1)
+        // deduction = (user?.balance - 50) / (pandit?.chat_call_rate || 1)
         // }
         // if (user?.balance < deduction) return res.status(400).json({ success: false, message: 'Insufficient fund.' });
 
@@ -69,7 +69,7 @@ async function create(req, res) {
             user_id: req.userId,
             order_id: orderId,
             status: "pending",
-            rate: pandit?.charge || 1,
+            rate: pandit?.chat_call_rate || 1,
             duration,
             deduction,
             type,
@@ -93,7 +93,7 @@ async function create(req, res) {
         const token = pandit?.token || false;
         if (token) {
             console.log("start push notification");
-            const messages = `new ${type} request from ${user?.name} (Rs ${pandit?.charge}/min).`
+            const messages = `new ${type} request from ${user?.name} (Rs ${pandit?.chat_call_rate}/min).`
             const continueOrder = await db('panditnotifications').insert({ user_id: panditId, type: "order", message: messages })
             const message = {
                 token,
@@ -252,14 +252,14 @@ async function acceptOrder(req, res) {
             .select(
                 'o.*',
                 'p.name',
-                'p.charge',
+                'p.chat_call_rate',
             )
             .first();
         if (!order) return res.status(400).json({ success: false, message: 'Order not accepted by pandit.' });
 
         const userDetail = await db('users').where({ id: req.userId }).first();
 
-        let duration = Math.floor(Number(Number(userDetail?.balance)) / Number(order?.charge));
+        let duration = Math.floor(Number(Number(userDetail?.balance)) / Number(order?.chat_call_rate));
         console.log("duration", duration);
         if (!Number.isFinite(duration)) {
             return res.status(400).json({ success: false, message: 'Min. 5 min balance required.' });
@@ -268,7 +268,7 @@ async function acceptOrder(req, res) {
         if (duration < 5) {
             return res.status(400).json({ success: false, message: 'Min. 5 min balance required.' });
         }
-        const deduction = Number(duration) * Number(order?.charge)
+        const deduction = Number(duration) * Number(order?.chat_call_rate)
         if (isNaN(deduction)) {
             return res.status(400).json({ success: false, message: 'Balance could not be NaN.' });
         }

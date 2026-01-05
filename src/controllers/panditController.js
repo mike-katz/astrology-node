@@ -17,6 +17,7 @@ async function getPandits(req, res) {
         const { type = "chat", search, sort_by, skill, language, gender, country, offer, top_astrologer } = req.query
         const filter = {
             "p.status": "active",
+            "p.deleted_at": null
         }
         let sort
         let orderBy
@@ -44,11 +45,11 @@ async function getPandits(req, res) {
                 orderBy = 'desc'
             }
             if (sort_by == 'price_low_to_high') {
-                sort = 'charge'
+                sort = 'chat_call_rate'
                 orderBy = 'asc'
             }
             if (sort_by == 'price_high_to_low') {
-                sort = 'charge'
+                sort = 'chat_call_rate'
                 orderBy = 'desc'
             }
 
@@ -83,14 +84,12 @@ async function getPandits(req, res) {
                 'p.experience',
                 'p.profile',
                 'p.available_for',
-                'p.chat_rate',
                 'p.total_chat_minutes',
                 'p.total_call_minutes',
                 'p.primary_expertise',
                 'p.secondary_expertise',
                 'p.waiting_time',
                 'p.online',
-                'p.call_rate',
                 'p.rating_1',
                 'p.rating_2',
                 'p.rating_3',
@@ -98,7 +97,7 @@ async function getPandits(req, res) {
                 'p.rating_4',
                 'p.total_orders',
                 'p.tag',
-                'p.charge',
+                'p.chat_call_rate',
             ).where(filter)
             .andWhere(function () {
                 if (type === 'call') {
@@ -227,6 +226,17 @@ async function getPandits(req, res) {
         const total = parseInt(count);
         const totalPages = Math.ceil(total / limit);
 
+        user.map(item => {
+            item.govt_id = item?.govt_id ? JSON.parse(item?.govt_id) : [];
+            item.available_for = item?.available_for ? JSON.parse(item?.available_for) : [];
+            item.consaltance_language = item?.consaltance_language ? JSON.parse(item?.consaltance_language) : [];
+            item.languages = item?.languages ? JSON.parse(item?.languages) : [];
+            item.address = item?.address ? JSON.parse(item?.address) : [];
+            item.other_working = item?.other_working ? JSON.parse(item?.other_working) : [];
+            item.primary_expertise = item?.primary_expertise ? JSON.parse(item?.primary_expertise) : [];
+            item.secondary_expertise = item?.secondary_expertise ? JSON.parse(item?.secondary_expertise) : [];
+            item.certificate = item?.certificate ? JSON.parse(item?.certificate) : [];
+        })
         const response = {
             page,
             limit,
@@ -274,10 +284,8 @@ async function getPanditDetail(req, res) {
         waiting_time: user?.waiting_time,
         online: user?.online,
         availableFor: user?.availableFor,
-        charge: user?.charge,
+        chat_call_rate: user?.chat_call_rate,
         available_for: user?.available_for,
-        chat_rate: user?.chat_rate,
-        call_rate: user?.call_rate,
         primary_expertise: user?.primary_expertise,
         secondary_expertise: user?.secondary_expertise,
         about: user?.about,
@@ -385,7 +393,7 @@ async function verifyOtp(req, res) {
 
         const { name, display_name, gender, profile, email, city, country, experience, primary_expertise, secondary_expertise, other_working, other_working_text, daily_horoscope,
             languages, consaltance_language, available_for, offer_live_session, live_start_time, live_end_time, dedicated_time, response_time,
-            chat_rate, call_rate, is_first_chat_free, training_type, guru_name, certificate,
+            chat_call_rate, is_first_chat_free, training_type, guru_name, certificate,
             govt_id, about, achievement_url, address, selfie, achievement_file,
             terms, no_false, consent_profile, step = 0
         } = user
@@ -396,7 +404,7 @@ async function verifyOtp(req, res) {
                 gender: gender || "",
                 country_code: country_code || "", email: email || "", city: city || "", country: country || "", experience: experience || "",
                 primary_expertise: primary_expertise ? JSON.parse(primary_expertise) : [],
-                secondary_expertise: secondary_expertise || "",
+                secondary_expertise: secondary_expertise ? JSON.parse(secondary_expertise) : [],
                 other_working_text: other_working_text || "",
                 other_working: other_working ? JSON.parse(other_working) : [], daily_horoscope: daily_horoscope || ""
             },
@@ -407,7 +415,7 @@ async function verifyOtp(req, res) {
                 offer_live_session: offer_live_session || "", live_start_time: live_start_time || "", live_end_time: live_end_time || "", dedicated_time: dedicated_time || "", response_time: response_time || ""
             },
             "step3": {
-                chat_rate: chat_rate || "", call_rate: call_rate || "", is_first_chat_free: is_first_chat_free || "", training_type: training_type || "", guru_name: guru_name || "", certificate: certificate ? JSON.parse(certificate) : [],
+                chat_call_rate: chat_call_rate || "", is_first_chat_free: is_first_chat_free || "", training_type: training_type || "", guru_name: guru_name || "", certificate: certificate ? JSON.parse(certificate) : [],
             },
             "step4": {
                 govt_id: govt_id ? JSON.parse(govt_id) : [],
@@ -447,7 +455,7 @@ async function onboard(req, res) {
     try {
         const { name, display_name, country_code, mobile, email, city, country, gender, experience, primary_expertise, secondary_expertise, other_working, other_working_text, daily_horoscope, step = 1,
             languages, consaltance_language, available_for, offer_live_session, live_start_time, live_end_time, dedicated_time, response_time,
-            chat_rate, call_rate, is_first_chat_free, training_type, guru_name, certificate,
+            chat_call_rate, is_first_chat_free, training_type, guru_name, certificate,
             govt_id, about, achievement_url, address, achievement_file,
             terms, no_false, consent_profile, token
         } = req.body;
@@ -467,7 +475,7 @@ async function onboard(req, res) {
             if (!languages || !consaltance_language || !offer_live_session || !available_for || !live_start_time || !live_end_time || !response_time) return res.status(400).json({ success: false, message: 'Missing params.' });
         }
         if (step == 3) {
-            if (!chat_rate || !call_rate || !training_type || !guru_name) return res.status(400).json({ success: false, message: 'Missing params.' });
+            if (!chat_call_rate || !training_type || !guru_name) return res.status(400).json({ success: false, message: 'Missing params.' });
         }
         if (step == 4) {
             if (!govt_id || files?.certificate?.length == 0) return res.status(400).json({ success: false, message: 'Missing params.' });
@@ -526,11 +534,8 @@ async function onboard(req, res) {
         if (is_first_chat_free != undefined) {
             ins.is_first_chat_free = is_first_chat_free
         }
-        if (call_rate) {
-            ins.call_rate = call_rate
-        }
-        if (chat_rate) {
-            ins.chat_rate = chat_rate
+        if (chat_call_rate) {
+            ins.chat_call_rate = chat_call_rate
         }
         if (dedicated_time) {
             ins.dedicated_time = dedicated_time
@@ -566,7 +571,7 @@ async function onboard(req, res) {
             ins.other_working = JSON.stringify(other_working)
         }
         if (secondary_expertise) {
-            ins.secondary_expertise = secondary_expertise
+            ins.secondary_expertise = JSON.stringify(secondary_expertise)
         }
         if (primary_expertise) {
             ins.primary_expertise = JSON.stringify(primary_expertise)

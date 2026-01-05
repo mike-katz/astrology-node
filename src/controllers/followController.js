@@ -46,7 +46,7 @@ async function getFollow(req, res) {
         .select(
             "f.created_at",
             "p.id",
-            "p.charge",
+            "p.chat_call_rate",
             "p.name",
             "p.profile",
             "p.knowledge",
