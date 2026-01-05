@@ -180,25 +180,28 @@ async function getPandits(req, res) {
             });
         }
 
-        if (Array.isArray(top_astrologer) && top_astrologer.length && !top_astrologer.includes("all")) {
-            query.andWhere(builder => {
-                top_astrologer.forEach((s, index) => {
-                    const condition = ['ilike', `%${s.trim()}%`];
-                    index === 0
-                        ? builder.where('p.tag', ...condition)
-                        : builder.orWhere('p.tag', ...condition);
-                });
-            });
+        // if (Array.isArray(top_astrologer) && top_astrologer.length) {
 
-            countQuery.andWhere(builder => {
-                top_astrologer.forEach((s, index) => {
-                    const condition = ['ilike', `%${s.trim()}%`];
-                    index === 0
-                        ? builder.where('p.tag', ...condition)
-                        : builder.orWhere('p.tag', ...condition);
-                });
-            });
-        }
+        //     top_astrologer.includes("All")
+
+        //     query.andWhere(builder => {
+        //         top_astrologer.forEach((s, index) => {
+        //             const condition = ['ilike', `%${s.trim()}%`];
+        //             index === 0
+        //                 ? builder.where('p.tag', ...condition)
+        //                 : builder.orWhere('p.tag', ...condition);
+        //         });
+        //     });
+
+        //     countQuery.andWhere(builder => {
+        //         top_astrologer.forEach((s, index) => {
+        //             const condition = ['ilike', `%${s.trim()}%`];
+        //             index === 0
+        //                 ? builder.where('p.tag', ...condition)
+        //                 : builder.orWhere('p.tag', ...condition);
+        //         });
+        //     });
+        // }
 
         if (country && country.length == 1) {
             if (country[0] == 'India') {
