@@ -132,14 +132,19 @@ async function getPandits(req, res) {
             query.andWhere('p.gender', 'ilike', `%${gender.trim()}%`);
             countQuery.andWhere('p.gender', 'ilike', `%${gender.trim()}%`);
         }
-        if (top_astrologer && top_astrologer.trim()) {
+        if (top_astrologer && top_astrologer.trim() && top_astrologer != 'all') {
             query.andWhere('p.tag', 'ilike', `%${top_astrologer.trim()}%`);
             countQuery.andWhere('p.tag', 'ilike', `%${top_astrologer.trim()}%`);
         }
 
         if (country && country.trim()) {
-            query.andWhere('p.country', 'ilike', `%${country.trim()}%`);
-            countQuery.andWhere('p.country', 'ilike', `%${country.trim()}%`);
+            if (country == 'India') {
+                query.andWhere('p.country', country.trim());
+                countQuery.andWhere('p.country', country.trim());
+            } else {
+                query.andWhereNot('p.country', country.trim());
+                countQuery.andWhereNot('p.country', country.trim());
+            }
         }
 
         if (offer && offer.trim()) {
