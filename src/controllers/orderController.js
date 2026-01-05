@@ -85,7 +85,7 @@ async function create(req, res) {
         });
 
         callEvent("emit_to_pending_order", {
-            key: `pandit_${order?.pandit_id}`,
+            key: `pandit_${pandit?.id}`,
             payload: { pandit_id: pandit?.id }
         });
         console.log(" socket end call");
