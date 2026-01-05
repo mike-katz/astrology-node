@@ -119,7 +119,7 @@ async function getPandits(req, res) {
             countQuery.andWhere('p.name', 'ilike', `%${search.trim()}%`);
         }
 
-        if (secondary_expertise && secondary_expertise != 'All') {
+        if (secondary_expertise && secondary_expertise != 'all') {
             query.andWhereRaw('p.secondary_expertise::text ILIKE ?', [secondary_expertise]);
             countQuery.andWhereRaw('p.secondary_expertise::text ILIKE ?', [secondary_expertise]);
         }
