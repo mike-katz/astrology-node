@@ -396,7 +396,7 @@ async function verifyOtp(req, res) {
         // hide password
         const encryptToken = encrypt(token);
 
-        const { name, display_name, gender, profile, email, city, country, experience, primary_expertise, secondary_expertise, other_working, other_working_text, daily_horoscope,
+        const { name, display_name, gender, profile, email, dob, city, country, experience, primary_expertise, secondary_expertise, other_working, other_working_text, daily_horoscope,
             languages, consaltance_language, available_for, offer_live_session, live_start_time, live_end_time, dedicated_time, response_time,
             chat_call_rate, is_first_chat_free, training_type, guru_name, certificate,
             govt_id, about, achievement_url, address, selfie, achievement_file,
@@ -407,6 +407,7 @@ async function verifyOtp(req, res) {
                 name: name || "", profile: profile || "",
                 display_name: display_name || "",
                 gender: gender || "",
+                dob: dob || "",
                 country_code: country_code || "", email: email || "", city: city || "", country: country || "", experience: experience || "",
                 primary_expertise: primary_expertise ? JSON.parse(primary_expertise) : [],
                 secondary_expertise: secondary_expertise ? JSON.parse(secondary_expertise) : [],
@@ -458,7 +459,7 @@ function is18OrAbove(dobString) {
 
 async function onboard(req, res) {
     try {
-        const { name, display_name, country_code, mobile, email, city, country, gender, experience, primary_expertise, secondary_expertise, other_working, other_working_text, daily_horoscope, step = 1,
+        const { name, display_name, dob, country_code, mobile, email, city, country, gender, experience, primary_expertise, secondary_expertise, other_working, other_working_text, daily_horoscope, step = 1,
             languages, consaltance_language, available_for, offer_live_session, live_start_time, live_end_time, dedicated_time, response_time,
             chat_call_rate, is_first_chat_free, training_type, guru_name, certificate,
             govt_id, about, achievement_url, address, achievement_file,
@@ -473,8 +474,9 @@ async function onboard(req, res) {
         const language = ["english", "hindi", "tamil", "panjabi", "marathi", "gujarati", "bangali", "french", "odia", "telugu", "kannada", "malayalam", "sanskrit", "assamese", "german", "spanish", "marwari", "manipuri", "urdu", "sindhi", "kashmiri", "bodo", "nepali", "konkani", "maithili", "arabic", "bhojpuri", "dutch", "rajasthanii"]
         const { files } = req
         if (step == 1) {
-            if (!name || !display_name || !email || !city || !country || !gender || !primary_expertise || !experience || !daily_horoscope) return res.status(400).json({ success: false, message: 'Missing params.' });
+            if (!name || !display_name || !dob || !email || !city || !country || !gender || !primary_expertise || !experience || !daily_horoscope) return res.status(400).json({ success: false, message: 'Missing params.' });
             if (other_working == 'other' && !other_working_text) return res.status(400).json({ success: false, message: 'Missing params.' });
+            if (!is18OrAbove(dob)) return res.status(400).json({ success: false, message: 'Enter DOB above 18+ year.' });
         }
         if (step == 2) {
             if (!languages || !consaltance_language || !offer_live_session || !available_for || !live_start_time || !live_end_time || !response_time) return res.status(400).json({ success: false, message: 'Missing params.' });
@@ -530,6 +532,9 @@ async function onboard(req, res) {
         }
         if (about) {
             ins.about = about
+        }
+        if (dob) {
+            ins.dob = dob
         }
         // if (id_number) {
         //     ins.id_number = id_number
