@@ -17,7 +17,7 @@ async function generateInvoicePDF(data) {
 
     const browser = await puppeteer.launch({
         headless: 'new',
-        // executablePath: '/snap/bin/chromium',
+        executablePath: '/snap/bin/chromium',
         args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
