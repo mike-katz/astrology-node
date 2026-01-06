@@ -491,9 +491,13 @@ async function onboard(req, res) {
             if (!terms || !no_false || !consent_profile) return res.status(400).json({ success: false, message: 'Missing params.' });
         }
 
+        console.log("tokenData", JSON.stringify(tokenData));
+        const user = await db('onboardings').where({ "mobile": tokenData?.data?.mobile, country_code: tokenData?.data?.country_code }).first();
+        if (!user) return res.status(400).json({ message: 'Wrong mobile number.' });
+
         if (display_name) {
             if (display_name.length > 15) return res.status(400).json({ success: false, message: 'Max 15 character accept.' });
-            const onboard = await db('onboardings').where({ "display_name": display_name }).first();
+            const onboard = await db('onboardings').where({ "display_name": display_name }).whereNot({ id: user?.id }).first();
             const user = await db('pandits').where({ "display_name": display_name }).first();
             if (onboard || user) return res.status(400).json({ success: false, message: 'Display name already exist.' });
         }
@@ -505,9 +509,6 @@ async function onboard(req, res) {
 
         // if (!isValidSkill) return res.status(400).json({ success: false, message: 'enter valid skills.' });
 
-        console.log("tokenData", JSON.stringify(tokenData));
-        const user = await db('onboardings').where({ "mobile": tokenData?.data?.mobile, country_code: tokenData?.data?.country_code }).first();
-        if (!user) return res.status(400).json({ message: 'Wrong mobile number.' });
 
         // profile_image
         const ins = {}
