@@ -289,7 +289,7 @@ async function getDetail(req, res) {
         if (orderId) {
             orderDetail = await db('orders').where({ order_id: orderId }).first();
         }
-        const response = { id: panditId, name: order?.name, profile: order?.profile, isOnline: order?.chat, isFirstOrder }
+        const response = { id: panditId, name: order?.name, status: order?.status, profile: order?.profile, isOnline: order?.chat, isFirstOrder }
         if (orderDetail) {
             response.startTime = orderDetail?.start_time;
             response.endTime = orderDetail?.end_time;

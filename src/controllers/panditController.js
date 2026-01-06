@@ -676,11 +676,11 @@ async function onboard(req, res) {
 
 async function reSendOtp(req, res) {
     try {
-        const { mobile, countryCode } = req.body;
-        if (!mobile || !countryCode) return res.status(400).json({ success: false, message: 'Mobile number required.' });
+        const { mobile, country_code } = req.body;
+        if (!mobile || !country_code) return res.status(400).json({ success: false, message: 'Mobile number required.' });
         const isValid = isValidMobile(mobile);
         if (!isValid) return res.status(400).json({ success: false, message: 'Enter valid mobile number.' });
-        const latestRecord = await db('otpmanages').where('mobile', mobile).where('country_code', countryCode).first();
+        const latestRecord = await db('otpmanages').where('mobile', mobile).where('country_code', country_code).first();
         const update = {};
         let response = {
             return: true,
@@ -704,9 +704,9 @@ async function reSendOtp(req, res) {
         // const OTP = Math.floor(1000 + Math.random() * 9000);
         const OTP = Math.floor(1000 + Math.random() * 9000);
 
-        await db('otpmanages').where('mobile', mobile).where('country_code', countryCode).del();
+        await db('otpmanages').where('mobile', mobile).where('country_code', country_code).del();
         await db('otpmanages').insert({
-            'mobile': mobile, country_code: countryCode, otp: '1234', sendattempt: update.sendattempt || 1,
+            'mobile': mobile, country_code: country_code, otp: '1234', sendattempt: update.sendattempt || 1,
             sendexpiry: update.sendexpiry || new Date(new Date().getTime() + 4 * 60 * 60 * 1000)
         })
         response.return = true;
