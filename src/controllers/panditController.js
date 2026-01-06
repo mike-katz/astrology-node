@@ -333,7 +333,7 @@ async function signup(req, res) {
         if (!mobile || !country_code) return res.status(400).json({ success: false, message: 'Mobile number required.' });
         const isValid = isValidMobile(mobile);
         if (!isValid) return res.status(400).json({ success: false, message: 'Enter valid mobile number.' });
-        const pandit = await db('pandits').where('mobile', mobile).first();
+        const pandit = await db('pandits').where({ 'mobile': mobile, "deleted_at": null }).first();
         if (pandit) return res.status(400).json({ success: false, message: 'Your mobile number already registered.' });
 
         const user = await db('otpmanages').where(function () {
@@ -387,7 +387,7 @@ async function verifyOtp(req, res) {
             .where('id', latestRecord?.id)
             .update(update);
 
-        let user = await db('onboardings').where({ 'mobile': mobile }).first();
+        let user = await db('onboardings').where({ 'mobile': mobile, country_code, deleted_at: null }).first();
         if (!user) {
             [user] = await db('onboardings').insert({ mobile, country_code, step: 0, status: "verify number" }).returning(['id', 'mobile', 'country_code', 'step']);
         }
@@ -492,13 +492,13 @@ async function onboard(req, res) {
         }
 
         console.log("tokenData", JSON.stringify(tokenData));
-        const user = await db('onboardings').where({ "mobile": tokenData?.data?.mobile, country_code: tokenData?.data?.country_code }).first();
+        const user = await db('onboardings').where({ "mobile": tokenData?.data?.mobile, country_code: tokenData?.data?.country_code, deleted_at: null }).first();
         if (!user) return res.status(400).json({ message: 'Wrong mobile number.' });
 
         if (display_name) {
             if (display_name.length > 15) return res.status(400).json({ success: false, message: 'Max 15 character accept.' });
-            const onboard = await db('onboardings').where({ "display_name": display_name }).whereNot({ id: user?.id }).first();
-            const pandit = await db('pandits').where({ "display_name": display_name }).first();
+            const onboard = await db('onboardings').where({ "display_name": display_name, deleted_at: null }).whereNot({ id: user?.id }).first();
+            const pandit = await db('pandits').where({ "display_name": display_name, deleted_at: null }).first();
             if (onboard || pandit) return res.status(400).json({ success: false, message: 'Display name already exist.' });
         }
 
