@@ -93,9 +93,9 @@ async function addPayment(req, res) {
             amount,
             with_tax_amount,
             gst,
-            address: user?.current_address,
-            city: user?.city,
-            pincode: user?.pincode,
+            address: user?.current_address || "",
+            city: user?.city_state_country || "",
+            pincode: user?.pincode || "",
             total_in_word
         };
         const invoice = await generateInvoicePDF(data)

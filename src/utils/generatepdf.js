@@ -2,6 +2,8 @@ const fs = require('fs');
 const path = require('path');
 const puppeteer = require('puppeteer');
 const AWS = require('aws-sdk');
+// const imgPath = `file://${path.resolve(__dirname, 'logo.svg')}`;
+
 require('dotenv').config();
 // const { PDFDocument, StandardFonts } = require('pdf-lib');
 // const wkhtmltopdf = require("wkhtmltopdf");
@@ -15,7 +17,7 @@ async function generateInvoicePDF(data) {
 
     const browser = await puppeteer.launch({
         headless: 'new',
-        executablePath: '/snap/bin/chromium',
+        // executablePath: '/snap/bin/chromium',
         args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
@@ -28,7 +30,9 @@ async function generateInvoicePDF(data) {
     for (const [key, value] of Object.entries(data)) {
         html = html.replace(new RegExp(`{{${key}}}`, 'g'), value);
     }
+
     html = html.replace('{{date}}', new Date().toDateString())
+    // html = html.replace('{{imgPath}}', imgPath)
     // html = html
     //     .replace('{{transaction_id}}', transaction_id)
     //     .replace('{{utr}}', utr)
@@ -52,12 +56,12 @@ async function generateInvoicePDF(data) {
         path: outputPath,
         format: 'A4',
         printBackground: true,
-        margin: {
-            top: '20mm',
-            bottom: '20mm',
-            left: '15mm',
-            right: '15mm'
-        }
+        // margin: {
+        //     top: '20mm',
+        //     bottom: '20mm',
+        //     left: '15mm',
+        //     right: '15mm'
+        // }
     });
 
     await browser.close();
