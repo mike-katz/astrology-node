@@ -498,8 +498,8 @@ async function onboard(req, res) {
         if (display_name) {
             if (display_name.length > 15) return res.status(400).json({ success: false, message: 'Max 15 character accept.' });
             const onboard = await db('onboardings').where({ "display_name": display_name }).whereNot({ id: user?.id }).first();
-            const user = await db('pandits').where({ "display_name": display_name }).first();
-            if (onboard || user) return res.status(400).json({ success: false, message: 'Display name already exist.' });
+            const pandit = await db('pandits').where({ "display_name": display_name }).first();
+            if (onboard || pandit) return res.status(400).json({ success: false, message: 'Display name already exist.' });
         }
 
         // const selectedskill = skills.split(",").map(l => l.trim());  // ["english", "hindi"]
