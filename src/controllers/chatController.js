@@ -368,7 +368,7 @@ async function balanceCut(user_id, order, end_time) {
         const newBalance = user.balance - deduction
         // console.log("newBalance", newBalance, "username", user?.name);
 
-        await db('chats').insert({
+        const [saved] = await db('chats').insert({
             sender_type: "user",
             sender_id: Number(user_id),
             receiver_type: "pandit",
@@ -378,7 +378,19 @@ async function balanceCut(user_id, order, end_time) {
             status: "send",
             type: "text",
             is_system_generate: true
-        })
+        }).returning('*');
+        callEvent("emit_to_user", {
+            toType: "pandit",
+            toId: order?.pandit_id,
+            orderId: order?.order_id,
+            payload: saved,
+        });
+        callEvent("emit_to_user", {
+            toType: "user",
+            toId: order?.user_id,
+            orderId: order?.order_id,
+            payload: saved,
+        });
         const panditDetail = await db('pandits').where({ id: order.pandit_id }).first()
         const dd = await db('users').where({ id: user_id }).update({ balance: newBalance });
         const dds = await db('orders').where({ id: order.id }).update({ status: "completed", deduction, duration: diffMinutes, end_time: new Date(end_time) });

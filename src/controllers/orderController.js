@@ -309,7 +309,8 @@ async function acceptOrder(req, res) {
             if (profile?.partner_place) {
                 message += `    Partner Birth Place: ${formatValue(profile?.partner_place)} \n`
             }
-            await db('chats').insert({
+
+            let [saved] = await db('chats').insert({
                 sender_type: "user",
                 sender_id: Number(req.userId),
                 receiver_type: "pandit",
@@ -318,9 +319,21 @@ async function acceptOrder(req, res) {
                 message: message,
                 status: "send",
                 type: "text"
+            }).returning('*');
+            callEvent("emit_to_user", {
+                toType: "pandit",
+                toId: order?.pandit_id,
+                orderId: order?.order_id,
+                payload: saved,
+            });
+            callEvent("emit_to_user", {
+                toType: "user",
+                toId: req.userId,
+                orderId: order?.order_id,
+                payload: saved,
             });
 
-            await db('chats').insert({
+            [saved] = await db('chats').insert({
                 sender_type: "user",
                 sender_id: Number(req.userId),
                 receiver_type: "pandit",
@@ -330,6 +343,19 @@ async function acceptOrder(req, res) {
                 status: "send",
                 is_system_generate: true,
                 type: "text"
+            }).returning('*');
+
+            callEvent("emit_to_user", {
+                toType: "pandit",
+                toId: order?.pandit_id,
+                orderId: order?.order_id,
+                payload: saved,
+            });
+            callEvent("emit_to_user", {
+                toType: "user",
+                toId: req.userId,
+                orderId: order?.order_id,
+                payload: saved,
             });
         }
         // socket.emit("emit_to_user_for_pandit_accept", {
