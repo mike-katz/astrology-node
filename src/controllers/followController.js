@@ -12,6 +12,12 @@ async function addFollow(req, res) {
             .where('pandit_id', panditId)
             .where('type', 'user')
             .first();
+
+        let increment = 1
+        if (user) {
+            increment = -1
+        }
+        await db('pandits').where({ id: Number(panditId) }).increment({ total_follows: increment })
         if (user) {
             await db('follows')
                 .where({
