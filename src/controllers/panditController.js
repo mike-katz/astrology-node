@@ -391,7 +391,7 @@ async function verifyOtp(req, res) {
 
         let user = await db('onboardings').where({ 'mobile': mobile, country_code, deleted_at: null }).first();
         if (!user) {
-            [user] = await db('onboardings').insert({ mobile, country_code, step: 0, status: "verify number" }).returning(['id', 'mobile', 'country_code', 'step']);
+            [user] = await db('onboardings').insert({ mobile, country_code, step: 0, status: "Number" }).returning(['id', 'mobile', 'country_code', 'step']);
         }
         console.log("user", user);
         const token = jwt.sign({ userId: user.id, mobile: user.mobile, country_code: user.country_code }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '1h' });
@@ -819,7 +819,7 @@ async function submitOnboard(req, res) {
         if (user?.step == 5) {
             if (!user?.terms || !user?.no_false || !user?.consent_profile) return res.status(400).json({ success: false, message: 'Please submit full onboard process.' });
         }
-        await db('onboardings').where({ id: user?.id }).update({ status: "pending" })
+        await db('onboardings').where({ id: user?.id }).update({ status: "Pending" })
         return res.status(200).json({ success: true, data: null, message: `Submit Successfully` });
     } catch (err) {
         console.error(err);
