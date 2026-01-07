@@ -53,7 +53,8 @@ async function getFollow(req, res) {
             "p.languages",
             "p.primary_expertise",
             "p.experience",
-            "p.online"
+            "p.online",
+            "p.total_orders"
         )
         .where('f.user_id', Number(req?.userId)).limit(limit)
         .offset(offset);
