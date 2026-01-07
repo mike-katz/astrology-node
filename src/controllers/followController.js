@@ -50,11 +50,19 @@ async function getFollow(req, res) {
             "p.name",
             "p.profile",
             "p.knowledge",
-            "p.language",
+            "p.languages",
+            "p.primary_expertise",
             "p.experience",
+            "p.online"
         )
         .where('f.user_id', Number(req?.userId)).limit(limit)
         .offset(offset);
+
+    user?.map(item => {
+        item.languages = JSON.parse(item?.languages)
+        item.primary_expertise = JSON.parse(item?.primary_expertise)
+    })
+
     const [{ count }] = await db('follows')
         .count('* as count').where('user_id', Number(req?.userId));
 
