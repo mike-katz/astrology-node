@@ -92,8 +92,24 @@ async function create(req, res) {
 
         const token = pandit?.token || false;
         if (token) {
+            sendNotification(token, user?.name, pandit?.chat_call_rate, panditId)
+        }
+        // socket.emit("emit_to_user_for_register", {
+        //     key: `user_${req?.userId}`,
+        //     payload: [{ ...saved, name: pandit?.name, profile: pandit?.profile }],
+        // });
+        return res.status(200).json({ success: true, data: { orderId }, message: 'Order create Successfully' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
+async function sendNotification(token, username, chat_call_rate, panditId) {
+    try {
+        if (token) {
             console.log("start push notification");
-            const messages = `new ${type} request from ${user?.name} (Rs ${pandit?.chat_call_rate}/min).`
+            const messages = `new ${type} request from ${username} (Rs ${chat_call_rate}/min).`
             const continueOrder = await db('panditnotifications').insert({ user_id: panditId, type: "order", message: messages })
             const message = {
                 token,
@@ -131,15 +147,10 @@ async function create(req, res) {
             const response = await admin.messaging().send(message);
             console.log("push notification response", response);
             console.log("end push notification");
+            return true;
         }
-        // socket.emit("emit_to_user_for_register", {
-        //     key: `user_${req?.userId}`,
-        //     payload: [{ ...saved, name: pandit?.name, profile: pandit?.profile }],
-        // });
-        return res.status(200).json({ success: true, data: { orderId }, message: 'Order create Successfully' });
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ success: false, message: 'Server error' });
+    } catch (e) {
+        return true;
     }
 }
 
