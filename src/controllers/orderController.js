@@ -92,7 +92,7 @@ async function create(req, res) {
 
         const token = pandit?.token || false;
         if (token) {
-            sendNotification(token, user?.name, pandit?.chat_call_rate, panditId)
+            sendNotification(token, user?.name, pandit?.chat_call_rate, panditId, type)
         }
         // socket.emit("emit_to_user_for_register", {
         //     key: `user_${req?.userId}`,
@@ -105,7 +105,7 @@ async function create(req, res) {
     }
 }
 
-async function sendNotification(token, username, chat_call_rate, panditId) {
+async function sendNotification(token, username, chat_call_rate, panditId, type) {
     try {
         if (token) {
             console.log("start push notification");
