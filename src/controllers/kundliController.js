@@ -118,7 +118,7 @@ async function findkundliTab(req, res) {
             .where({ id: kundli_id })
             .first();
         if (!kundli) return res.status(400).json({ success: false, message: 'Kundli not found.' });
-        const { dob, birth_time, name, gender, birth_place, birth_chart, navamsa_chart, planets, maha_dasha, antar_dasha, pratyantar_dasha, sookshma_dasha } = kundli
+        const { dob, birth_time, name, gender, birth_place, birth_chart, navamsa_chart, planets, sookshma_dasha } = kundli
         const upd = {}
         if (birth_chart == null) {
             console.log("here");
@@ -137,21 +137,6 @@ async function findkundliTab(req, res) {
             upd.planets = JSON.stringify(Planetsresponse?.data);
         }
         const Vimshottari = 'https://astroapi-3.divineapi.com/indian-api/v1/vimshottari-dasha'
-        if (maha_dasha == null) {
-            const mahaDasharesponse = await basicKundliApiCall(dob, birth_time, name, gender, birth_place, Vimshottari, [{ key: "dasha_type", value: "maha-dasha" }])
-            upd.maha_dasha = JSON.stringify(mahaDasharesponse?.data);
-        }
-
-        if (antar_dasha == null) {
-            const antardasharesponse = await basicKundliApiCall(dob, birth_time, name, gender, birth_place, Vimshottari, [{ key: "dasha_type", value: "antar-dasha" }])
-            upd.antar_dasha = JSON.stringify(antardasharesponse?.data);
-        }
-
-        if (pratyantar_dasha == null) {
-            const pratyantardasharesponse = await basicKundliApiCall(dob, birth_time, name, gender, birth_place, Vimshottari, [{ key: "dasha_type", value: "pratyantar-dasha" }])
-            upd.pratyantar_dasha = JSON.stringify(pratyantardasharesponse?.data);
-        }
-
         if (sookshma_dasha == null) {
             const sookshmadasharesponse = await basicKundliApiCall(dob, birth_time, name, gender, birth_place, Vimshottari, [{ key: "dasha_type", value: "sookshma-dasha" }])
             upd.sookshma_dasha = JSON.stringify(sookshmadasharesponse?.data);
@@ -169,9 +154,6 @@ async function findkundliTab(req, res) {
             birth_chart: JSON.parse(kundli.birth_chart),
             navamsa_chart: JSON.parse(kundli.navamsa_chart),
             planets: JSON.parse(kundli.planets),
-            maha_dasha: JSON.parse(kundli.maha_dasha),
-            antar_dasha: JSON.parse(kundli.antar_dasha),
-            pratyantar_dasha: JSON.parse(kundli.pratyantar_dasha),
             sookshma_dasha: JSON.parse(kundli.sookshma_dasha),
         }
         return res.status(200).json({ success: true, data: response, message: 'Kundli get Successfully' });
@@ -425,13 +407,44 @@ async function findDashaTab(req, res) {
             .where({ id: kundli_id })
             .first();
         if (!kundli) return res.status(400).json({ success: false, message: 'Kundli not found.' });
-        const { dob, birth_time, name, gender, birth_place, ashtakvarga } = kundli
+        const { dob, birth_time, name, gender, birth_place, sun_dasha, moon_dasha, mars_dasha, mercury_dasha, venus_dasha, saturn_dasha, jupiter_dasha, ketu_dasha, rahu_dasha } = kundli
         const upd = {}
-        if (ashtakvarga == null) {
-            console.log("here");
-            const ChartUrl = 'https://astroapi-3.divineapi.com/indian-api/v1/bhinnashtakvarga/ashtakvarga'
-            const chalitChartresponse = await basicKundliApiCall(dob, birth_time, name, gender, birth_place, ChartUrl)
-            upd.ashtakvarga = JSON.stringify(chalitChartresponse?.data?.chart);
+        const ChartUrl = 'https://astroapi-3.divineapi.com/indian-api/v1/maha-dasha-analysis'
+        if (sun_dasha == null) {
+            const chalitChartresponse = await basicKundliApiCall(dob, birth_time, name, gender, birth_place, ChartUrl, [{ key: "maha_dasha", value: "sun" }])
+            upd.sun_dasha = JSON.stringify(chalitChartresponse?.data);
+        }
+        if (moon_dasha == null) {
+            const chalitChartresponse = await basicKundliApiCall(dob, birth_time, name, gender, birth_place, ChartUrl, [{ key: "maha_dasha", value: "moon" }])
+            upd.moon_dasha = JSON.stringify(chalitChartresponse?.data);
+        }
+        if (mars_dasha == null) {
+            const chalitChartresponse = await basicKundliApiCall(dob, birth_time, name, gender, birth_place, ChartUrl, [{ key: "maha_dasha", value: "mars" }])
+            upd.mars_dasha = JSON.stringify(chalitChartresponse?.data);
+        }
+        if (mercury_dasha == null) {
+            const chalitChartresponse = await basicKundliApiCall(dob, birth_time, name, gender, birth_place, ChartUrl, [{ key: "maha_dasha", value: "mercury" }])
+            upd.mercury_dasha = JSON.stringify(chalitChartresponse?.data);
+        }
+        if (venus_dasha == null) {
+            const chalitChartresponse = await basicKundliApiCall(dob, birth_time, name, gender, birth_place, ChartUrl, [{ key: "maha_dasha", value: "venus" }])
+            upd.venus_dasha = JSON.stringify(chalitChartresponse?.data);
+        }
+        if (saturn_dasha == null) {
+            const chalitChartresponse = await basicKundliApiCall(dob, birth_time, name, gender, birth_place, ChartUrl, [{ key: "maha_dasha", value: "saturn" }])
+            upd.saturn_dasha = JSON.stringify(chalitChartresponse?.data);
+        }
+        if (jupiter_dasha == null) {
+            const chalitChartresponse = await basicKundliApiCall(dob, birth_time, name, gender, birth_place, ChartUrl, [{ key: "maha_dasha", value: "jupiter" }])
+            upd.jupiter_dasha = JSON.stringify(chalitChartresponse?.data);
+        }
+        if (ketu_dasha == null) {
+            const chalitChartresponse = await basicKundliApiCall(dob, birth_time, name, gender, birth_place, ChartUrl, [{ key: "maha_dasha", value: "ketu" }])
+            upd.ketu_dasha = JSON.stringify(chalitChartresponse?.data);
+        }
+        if (rahu_dasha == null) {
+            const chalitChartresponse = await basicKundliApiCall(dob, birth_time, name, gender, birth_place, ChartUrl, [{ key: "maha_dasha", value: "rahu" }])
+            upd.rahu_dasha = JSON.stringify(chalitChartresponse?.data);
         }
 
         if (Object.keys(upd).length > 0) {
@@ -443,7 +456,15 @@ async function findDashaTab(req, res) {
 
         const response = {
             id: kundli_id,
-            ashtakvarga: JSON.parse(kundli.ashtakvarga),
+            sun_dasha: JSON.parse(kundli.sun_dasha),
+            moon_dasha: JSON.parse(kundli.moon_dasha),
+            mars_dasha: JSON.parse(kundli.mars_dasha),
+            mercury_dasha: JSON.parse(kundli.mercury_dasha),
+            venus_dasha: JSON.parse(kundli.venus_dasha),
+            saturn_dasha: JSON.parse(kundli.saturn_dasha),
+            ketu_dasha: JSON.parse(kundli.ketu_dasha),
+            rahu_dasha: JSON.parse(kundli.rahu_dasha),
+            jupiter_dasha: JSON.parse(kundli.jupiter_dasha),
         }
         return res.status(200).json({ success: true, data: response, message: 'Kundli get Successfully' });
     } catch (err) {
@@ -451,4 +472,65 @@ async function findDashaTab(req, res) {
         res.status(500).json({ success: false, message: 'Server error' });
     }
 }
-module.exports = { findBasicKundli, findkundliTab, findkpTab, findAshtakvargaTab, findChartTab, findDashaTab };
+
+async function findReportTab(req, res) {
+    try {
+        const { kundli_id } = req.query;
+        if (!kundli_id) return res.status(400).json({ success: false, message: 'Missing params.' });
+
+        let kundli = await db('kundlis')
+            .where({ id: kundli_id })
+            .first();
+        if (!kundli) return res.status(400).json({ success: false, message: 'Kundli not found.' });
+        const { dob, birth_time, name, gender, birth_place, general_report, sookshma_dasha, kalsarpa_dosha, manglik_dosha, sadesati_dosha } = kundli
+        const upd = {}
+        if (general_report == null) {
+            console.log("here");
+            const ChartUrl = 'https://astroapi-3.divineapi.com/indian-api/v2/ascendant-report'
+            const chalitChartresponse = await basicKundliApiCall(dob, birth_time, name, gender, birth_place, ChartUrl)
+            upd.general_report = JSON.stringify(chalitChartresponse?.data);
+        }
+
+        if (kalsarpa_dosha == null) {
+            const Vimshottari = 'https://astroapi-3.divineapi.com/indian-api/v1/kaal-sarpa-yoga'
+            const sookshmadasharesponse = await basicKundliApiCall(dob, birth_time, name, gender, birth_place, Vimshottari, [{ key: "dasha_type", value: "sookshma-dasha" }])
+            upd.kalsarpa_dosha = JSON.stringify(sookshmadasharesponse?.data);
+        }
+
+        if (sookshma_dasha == null) {
+            const Vimshottari = 'https://astroapi-3.divineapi.com/indian-api/v1/vimshottari-dasha'
+            const sookshmadasharesponse = await basicKundliApiCall(dob, birth_time, name, gender, birth_place, Vimshottari, [{ key: "dasha_type", value: "sookshma-dasha" }])
+            upd.sookshma_dasha = JSON.stringify(sookshmadasharesponse?.data);
+        }
+
+        if (sookshma_dasha == null) {
+            const Vimshottari = 'https://astroapi-3.divineapi.com/indian-api/v1/vimshottari-dasha'
+            const sookshmadasharesponse = await basicKundliApiCall(dob, birth_time, name, gender, birth_place, Vimshottari, [{ key: "dasha_type", value: "sookshma-dasha" }])
+            upd.sookshma_dasha = JSON.stringify(sookshmadasharesponse?.data);
+        }
+
+        if (sookshma_dasha == null) {
+            const Vimshottari = 'https://astroapi-3.divineapi.com/indian-api/v1/vimshottari-dasha'
+            const sookshmadasharesponse = await basicKundliApiCall(dob, birth_time, name, gender, birth_place, Vimshottari, [{ key: "dasha_type", value: "sookshma-dasha" }])
+            upd.sookshma_dasha = JSON.stringify(sookshmadasharesponse?.data);
+        }
+        if (Object.keys(upd).length > 0) {
+            [kundli] = await db('kundlis')
+                .where('id', kundli?.id)
+                .update(upd)
+                .returning('*');
+        }
+
+        const response = {
+            id: kundli_id,
+            general_report: JSON.parse(kundli.general_report),
+            sookshma_dasha: JSON.parse(kundli.sookshma_dasha),
+        }
+        return res.status(200).json({ success: true, data: response, message: 'Kundli get Successfully' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
+module.exports = { findBasicKundli, findkundliTab, findkpTab, findAshtakvargaTab, findChartTab, findDashaTab, findReportTab };
