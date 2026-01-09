@@ -20,8 +20,8 @@ async function basicKundliApiCall(dob, birth_time, name, gender, birth_place, ur
     formData.append('sec', sec || 0);
     formData.append('gender', gender);
     formData.append('place', birth_place);
-    formData.append('lat', '25.7041');
-    formData.append('lon', '77.1025');
+    formData.append('lat', '22.82');
+    formData.append('lon', '70.84');
     formData.append('tzone', '5.5');
     formData.append('lan', 'en');
 
