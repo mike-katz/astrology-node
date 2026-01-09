@@ -485,7 +485,6 @@ async function findReportTab(req, res) {
         const { dob, birth_time, name, gender, birth_place, general_report, sookshma_dasha, kalsarpa_dosha, manglik_dosha, sadesati_dosha } = kundli
         const upd = {}
         if (general_report == null) {
-            console.log("here");
             const ChartUrl = 'https://astroapi-3.divineapi.com/indian-api/v2/ascendant-report'
             const chalitChartresponse = await basicKundliApiCall(dob, birth_time, name, gender, birth_place, ChartUrl)
             upd.general_report = JSON.stringify(chalitChartresponse?.data);
@@ -497,10 +496,16 @@ async function findReportTab(req, res) {
             upd.kalsarpa_dosha = JSON.stringify(sookshmadasharesponse?.data);
         }
 
-        if (sookshma_dasha == null) {
-            const Vimshottari = 'https://astroapi-3.divineapi.com/indian-api/v1/vimshottari-dasha'
-            const sookshmadasharesponse = await basicKundliApiCall(dob, birth_time, name, gender, birth_place, Vimshottari, [{ key: "dasha_type", value: "sookshma-dasha" }])
-            upd.sookshma_dasha = JSON.stringify(sookshmadasharesponse?.data);
+        if (manglik_dosha == null) {
+            const Vimshottari = 'https://astroapi-3.divineapi.com/indian-api/v2/manglik-dosha'
+            const sookshmadasharesponse = await basicKundliApiCall(dob, birth_time, name, gender, birth_place, Vimshottari)
+            upd.manglik_dosha = JSON.stringify(sookshmadasharesponse?.data);
+        }
+
+        if (sadesati_dosha == null) {
+            const Vimshottari = 'https://astroapi-3.divineapi.com/indian-api/v2/sadhe-sati'
+            const sookshmadasharesponse = await basicKundliApiCall(dob, birth_time, name, gender, birth_place, Vimshottari)
+            upd.sadesati_dosha = JSON.stringify(sookshmadasharesponse?.data);
         }
 
         if (sookshma_dasha == null) {
@@ -509,11 +514,6 @@ async function findReportTab(req, res) {
             upd.sookshma_dasha = JSON.stringify(sookshmadasharesponse?.data);
         }
 
-        if (sookshma_dasha == null) {
-            const Vimshottari = 'https://astroapi-3.divineapi.com/indian-api/v1/vimshottari-dasha'
-            const sookshmadasharesponse = await basicKundliApiCall(dob, birth_time, name, gender, birth_place, Vimshottari, [{ key: "dasha_type", value: "sookshma-dasha" }])
-            upd.sookshma_dasha = JSON.stringify(sookshmadasharesponse?.data);
-        }
         if (Object.keys(upd).length > 0) {
             [kundli] = await db('kundlis')
                 .where('id', kundli?.id)
@@ -524,6 +524,9 @@ async function findReportTab(req, res) {
         const response = {
             id: kundli_id,
             general_report: JSON.parse(kundli.general_report),
+            kalsarpa_dosha: JSON.parse(kundli.kalsarpa_dosha),
+            manglik_dosha: JSON.parse(kundli.manglik_dosha),
+            sadesati_dosha: JSON.parse(kundli.sadesati_dosha),
             sookshma_dasha: JSON.parse(kundli.sookshma_dasha),
         }
         return res.status(200).json({ success: true, data: response, message: 'Kundli get Successfully' });
