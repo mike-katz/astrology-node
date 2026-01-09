@@ -304,7 +304,6 @@ async function getDetail(req, res) {
                 key: `user_${orderDetail?.user_id}`,
                 order_id: orderDetail?.order_id
             });
-            return res.status(400).json({ success: false, message: 'Time is over! regenerate to continue.' });
         }
         return res.status(200).json({ success: true, data: response, message: 'get detail Successfully' });
     } catch (err) {

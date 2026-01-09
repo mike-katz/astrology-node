@@ -434,6 +434,8 @@ async function sendGift(req, res) {
         if (!pandit_id) return res.status(400).json({ success: false, message: 'Missing params.' });
         const pandit = await db('pandits').where({ id: pandit_id }).first();
         const user = await db('users').where({ id: req.userId }).first();
+        const order = await db('orders').where({ user_id: req.userId, status: "continue" }).first();
+        if (order) return res.status(400).json({ success: false, message: 'please finish your continue order.' });
         if (user?.balance < amount) return res.status(400).json({ success: false, message: 'Insufficient balance.' });
         if (!pandit) return res.status(400).json({ success: false, message: 'Pandit not found.' });
         if (isNaN(amount)) return res.status(400).json({ success: false, message: 'Invalid amount.' });
