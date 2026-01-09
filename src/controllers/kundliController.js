@@ -94,6 +94,7 @@ async function findBasicKundli(req, res) {
             await db('kundlis').insert(user);
             // await db('follows').insert({ user_id: req?.userId, pandit_id: panditId, type: "user" });
         }
+        user.basic = JSON.parse(user.basic)
         return res.status(200).json({ success: true, data: user, message: 'Kundli get Successfully' });
     } catch (err) {
         console.error(err);
