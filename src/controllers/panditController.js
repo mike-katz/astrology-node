@@ -108,7 +108,7 @@ async function getPandits(req, res) {
                     this.where('p.chat', true);
                 }
                 // ✅ OR condition
-                this.orWhere('p.unlimited_free_calls_chats', true);
+                // this.orWhere('p.unlimited_free_calls_chats', true);
             })
             .groupBy('p.id')
             .limit(limit)
