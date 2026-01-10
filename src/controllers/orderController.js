@@ -430,18 +430,21 @@ async function deleteOrder(req, res) {
 
 async function sendGift(req, res) {
     try {
-        const { name, pandit_id, amount } = req.body;
-        if (!pandit_id) return res.status(400).json({ success: false, message: 'Missing params.' });
+        const { name, pandit_id, amount, qty } = req.body;
+        if (!pandit_id || !amount || !qty) return res.status(400).json({ success: false, message: 'Missing params.' });
+        if (isNaN(qty)) return res.status(400).json({ success: false, message: 'Missing params.' });
         const pandit = await db('pandits').where({ id: pandit_id }).first();
         const user = await db('users').where({ id: req.userId }).first();
         const order = await db('orders').where({ user_id: req.userId, status: "continue" }).first();
         if (order) return res.status(400).json({ success: false, message: 'please finish your continue order.' });
-        if (user?.balance < amount) return res.status(400).json({ success: false, message: 'Insufficient balance.' });
+
+        const final = qty * amount
+        if (user?.balance < Number(final)) return res.status(400).json({ success: false, message: 'Insufficient balance.' });
         if (!pandit) return res.status(400).json({ success: false, message: 'Pandit not found.' });
-        if (isNaN(amount)) return res.status(400).json({ success: false, message: 'Invalid amount.' });
-        await db('pandits').where({ id: pandit.id }).increment({ balance: Number(amount) });
-        await db('users').where({ id: user?.id }).increment({ balance: -Number(amount) });
-        await db('balancelogs').insert({ user_id: req.userId, message: `send gift to ${pandit?.name} (${name})`, pandit_id: pandit?.id, pandit_message: `receive gift from ${user?.name} (${name})`, amount: - amount });
+        if (isNaN(final)) return res.status(400).json({ success: false, message: 'Invalid amount.' });
+        await db('pandits').where({ id: pandit.id }).increment({ balance: Number(final) });
+        await db('users').where({ id: user?.id }).increment({ balance: -Number(final) });
+        await db('balancelogs').insert({ user_id: req.userId, message: `send gift to ${pandit?.name} (${name}) - ${qty}`, pandit_id: pandit?.id, pandit_message: `receive gift from ${user?.name} (${name}) - ${qty}`, amount: - final });
         return res.status(200).json({ success: true, message: 'Order cancel Successfully' });
     } catch (err) {
         console.error(err);
