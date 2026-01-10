@@ -38,7 +38,7 @@ async function create(req, res) {
 
         // const order = await db('orders').where({ user_id: req.userId, pandit_id: panditId }).first()
         const orderId = `${new Date().getTime().toString()}${Math.floor(100000 + Math.random() * 900000).toString()}`;
-        let duration = Math.floor(Number(Number(user?.balance)) / Number(pandit?.discounted_chat_call_rate));
+        let duration = Math.floor(Number(Number(user?.balance)) / Number(pandit?.final_chat_call_rate));
         console.log("duration", duration);
         if (!Number.isFinite(duration)) {
             return res.status(400).json({ success: false, message: 'Min. 5 min balance required.' });
@@ -47,7 +47,7 @@ async function create(req, res) {
         if (duration < 5) {
             return res.status(400).json({ success: false, message: 'Min. 5 min balance required.' });
         }
-        const deduction = Number(duration) * Number(pandit?.discounted_chat_call_rate)
+        const deduction = Number(duration) * Number(pandit?.final_chat_call_rate)
         if (isNaN(deduction)) {
             return res.status(400).json({ success: false, message: 'Balance could not be NaN.' });
         }
@@ -69,7 +69,7 @@ async function create(req, res) {
             user_id: req.userId,
             order_id: orderId,
             status: "pending",
-            rate: pandit?.discounted_chat_call_rate || 1,
+            rate: pandit?.final_chat_call_rate || 1,
             duration,
             deduction,
             type,
@@ -92,7 +92,7 @@ async function create(req, res) {
 
         const token = pandit?.token || false;
         if (token) {
-            sendNotification(token, user?.name, pandit?.discounted_chat_call_rate, panditId, type)
+            sendNotification(token, user?.name, pandit?.final_chat_call_rate, panditId, type)
         }
         // socket.emit("emit_to_user_for_register", {
         //     key: `user_${req?.userId}`,
