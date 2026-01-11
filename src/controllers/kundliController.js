@@ -41,6 +41,33 @@ async function basicKundliApiCall(dob, birth_time, name, gender, birth_place, ur
     };
     // console.log("config", config);
     const response = await axios(config);
+    console.log("response", response.data);
+    return response?.data
+}
+
+async function horoscopeApiCall(url, extraparam = []) {
+    const formData = new FormData();
+    formData.append('api_key', process.env.KUNDLI_API_KEY);
+    formData.append('sign', sign);
+    formData.append('tzone', '5.5');
+    formData.append('lan', 'en');
+
+    if (extraparam?.length > 0) {
+        extraparam.map(item => {
+            formData.append(item.key, item.value);
+        })
+    }
+    const config = {
+        method: 'post',
+        url,
+        headers: {
+            Authorization: `Bearer ${process.env.KUNDLI_API_TOKEN}`,
+            ...formData.getHeaders(),
+        },
+        data: formData,
+    };
+    // console.log("config", config);
+    const response = await axios(config);
     return response?.data
 }
 
@@ -193,11 +220,11 @@ async function findkpTab(req, res) {
         //     const Navamsharesponse = await basicKundliApiCall(dob, birth_time, name, gender, birth_place, Navamsha)
         //     upd.ruling_planet = JSON.stringify(Navamsharesponse?.data);
         // }
-        // if (kp_planet == null) {
-        //     const Planets = 'https://astroapi-3.divineapi.com/indian-api/v2/planetary-positions'
-        //     const Planetsresponse = await basicKundliApiCall(dob, birth_time, name, gender, birth_place, Planets)
-        //     upd.kp_planet = JSON.stringify(Planetsresponse?.data);
-        // }
+        if (kp_planet == null) {
+            const Planets = 'https://astroapi-3.divineapi.com/indian-api/v2/sub-planet-positions'
+            const Planetsresponse = await basicKundliApiCall(dob, birth_time, name, gender, birth_place, Planets)
+            upd.kp_planet = JSON.stringify(Planetsresponse?.data);
+        }
         // const Vimshottari = 'https://astroapi-3.divineapi.com/indian-api/v1/vimshottari-dasha'
         // if (kp_cusps == null) {
         //     const mahaDasharesponse = await basicKundliApiCall(dob, birth_time, name, gender, birth_place, Vimshottari, [{ key: "dasha_type", value: "maha-dasha" }])
@@ -454,6 +481,11 @@ async function findDashaTab(req, res) {
             const chalitChartresponse = await basicKundliApiCall(dob, birth_time, name, gender, birth_place, ChartUrl, [{ key: "maha_dasha", value: "rahu" }])
             upd.rahu_dasha = JSON.stringify(chalitChartresponse?.data);
         }
+        if (rahu_dasha == null) {
+            const url = 'https://astroapi-3.divineapi.com/indian-api/v2/yogini-dasha'
+            const chalitChartresponse = await basicKundliApiCall(dob, birth_time, name, gender, birth_place, url)
+            upd.rahu_dasha = JSON.stringify(chalitChartresponse?.data);
+        }
 
         if (Object.keys(upd).length > 0) {
             [kundli] = await db('kundlis')
@@ -544,4 +576,21 @@ async function findReportTab(req, res) {
     }
 }
 
-module.exports = { findBasicKundli, findkundliTab, findkpTab, findAshtakvargaTab, findChartTab, findDashaTab, findReportTab };
+async function getHororscope(req, res) {
+    try {
+        const { type, rashi } = req.query;
+        if (!type) return res.status(400).json({ success: false, message: 'Missing params.' });
+
+        let kundli = await db('horoscope')
+            .where({ type, rashi })
+        const response = [];
+        kundli?.map(item => {
+            item.data = JSON.parse(item.data)
+        })
+        return res.status(200).json({ success: true, data: response, message: 'Kundli get Successfully' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+module.exports = { findBasicKundli, findkundliTab, findkpTab, findAshtakvargaTab, findChartTab, findDashaTab, findReportTab, getHororscope };

@@ -9,5 +9,6 @@ router.get('/ashtakvarga', kundli.findAshtakvargaTab);
 router.get('/chart', kundli.findChartTab);
 router.get('/dasha', kundli.findDashaTab);
 router.get('/report', kundli.findReportTab);
+router.get('/horoscope', kundli.getHororscope);
 
 module.exports = router;
