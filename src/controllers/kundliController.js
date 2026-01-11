@@ -564,7 +564,7 @@ async function getHororscope(req, res) {
         kundli?.map(item => {
             item.data = JSON.parse(item.data)
         })
-        return res.status(200).json({ success: true, data: response, message: 'Kundli get Successfully' });
+        return res.status(200).json({ success: true, data: kundli, message: 'Kundli get Successfully' });
     } catch (err) {
         console.error(err);
         res.status(500).json({ success: false, message: 'Server error' });
