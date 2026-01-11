@@ -74,9 +74,12 @@ async function horoscopeApiCall(url, extraparam = []) {
 async function findBasicKundli(req, res) {
     try {
         let { profile_id, name, dob, type, birth_time, gender, birth_place } = req.query;
+
+        console.log("req.query", req.query);
         if (!type) return res.status(400).json({ success: false, message: 'Missing params.' });
 
         const authHeader = req.headers.authorization;
+        console.log("authHeader", authHeader);
         const url = 'https://astroapi-3.divineapi.com/indian-api/v3/basic-astro-details'
         if (type == 'profile' && (!authHeader.startsWith('Bearer ')) || !authHeader) {
             return res.status(400).json({ success: false, message: 'Missing params.' });
