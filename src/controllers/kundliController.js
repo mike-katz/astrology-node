@@ -556,8 +556,17 @@ async function findReportTab(req, res) {
 
 async function getHororscope(req, res) {
     try {
-        const { type, rashi } = req.query;
+        let { type, rashi } = req.query;
         if (!type || !rashi) return res.status(400).json({ success: false, message: 'Missing params.' });
+        if (type == 'monthly') {
+            type = 'month'
+        }
+        if (type == 'weekly') {
+            type = 'week'
+        }
+        if (type == 'annual') {
+            type = 'year'
+        }
         let kundli = await db('horoscope')
             .where({ type, rashi }).first();
         kundli.data = JSON.parse(kundli.data) || []
