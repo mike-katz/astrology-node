@@ -45,32 +45,6 @@ async function basicKundliApiCall(dob, birth_time, name, gender, birth_place, ur
     return response?.data
 }
 
-async function horoscopeApiCall(url, extraparam = []) {
-    const formData = new FormData();
-    formData.append('api_key', process.env.KUNDLI_API_KEY);
-    formData.append('sign', sign);
-    formData.append('tzone', '5.5');
-    formData.append('lan', 'en');
-
-    if (extraparam?.length > 0) {
-        extraparam.map(item => {
-            formData.append(item.key, item.value);
-        })
-    }
-    const config = {
-        method: 'post',
-        url,
-        headers: {
-            Authorization: `Bearer ${process.env.KUNDLI_API_TOKEN}`,
-            ...formData.getHeaders(),
-        },
-        data: formData,
-    };
-    // console.log("config", config);
-    const response = await axios(config);
-    return response?.data
-}
-
 async function findBasicKundli(req, res) {
     try {
         let { profile_id, name, dob, type, birth_time, gender, birth_place } = req.query;
@@ -583,8 +557,7 @@ async function findReportTab(req, res) {
 async function getHororscope(req, res) {
     try {
         const { type, rashi } = req.query;
-        if (!type) return res.status(400).json({ success: false, message: 'Missing params.' });
-
+        if (!type || !rashi) return res.status(400).json({ success: false, message: 'Missing params.' });
         let kundli = await db('horoscope')
             .where({ type, rashi })
         const response = [];
