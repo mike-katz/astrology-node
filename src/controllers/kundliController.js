@@ -576,4 +576,31 @@ async function getHororscope(req, res) {
         res.status(500).json({ success: false, message: 'Server error' });
     }
 }
-module.exports = { findBasicKundli, findkundliTab, findkpTab, findAshtakvargaTab, findChartTab, findDashaTab, findReportTab, getHororscope };
+
+async function getPersonalHororscope(req, res) {
+    try {
+        let { type } = req.query;
+        if (!type) return res.status(400).json({ success: false, message: 'Missing params.' });
+        if (type == 'monthly') {
+            type = 'month'
+        }
+        if (type == 'weekly') {
+            type = 'week'
+        }
+        if (type == 'annual') {
+            type = 'year'
+        }
+        let kundli = await db('horoscope')
+            .where({ type });
+
+        kundli.map(item => {
+            const data = JSON.parse(item.data) || [];
+            item.data = data?.prediction?.personal || data?.yearly_horoscope?.personal || data?.monthly_horoscope?.personal || data?.weekly_horoscope?.personal
+        })
+        return res.status(200).json({ success: true, data: kundli, message: 'Kundli get Successfully' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+module.exports = { findBasicKundli, findkundliTab, findkpTab, findAshtakvargaTab, findChartTab, findDashaTab, findReportTab, getHororscope, getPersonalHororscope };

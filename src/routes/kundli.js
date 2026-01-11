@@ -10,5 +10,7 @@ router.get('/chart', kundli.findChartTab);
 router.get('/dasha', kundli.findDashaTab);
 router.get('/report', kundli.findReportTab);
 router.get('/horoscope', kundli.getHororscope);
+router.get('/horoscope/overview', kundli.getPersonalHororscope);
+
 
 module.exports = router;
