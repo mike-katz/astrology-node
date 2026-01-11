@@ -82,6 +82,7 @@ async function findBasicKundli(req, res) {
             return res.status(400).json({ success: false, message: 'Missing params.' });
         }
         if (authHeader && type == 'profile' && authHeader.startsWith('Bearer ')) {
+            console.log("authHeader", authHeader);
             const tokenData = decodeJWT(authHeader)
             if (!tokenData?.success) return res.status(400).json({ success: false, message: 'Your session expired.' });
             const user = await db('userprofiles')
