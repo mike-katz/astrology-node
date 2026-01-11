@@ -420,7 +420,7 @@ async function findDashaTab(req, res) {
             .where({ id: kundli_id })
             .first();
         if (!kundli) return res.status(400).json({ success: false, message: 'Kundli not found.' });
-        const { dob, birth_time, name, gender, birth_place, sun_dasha, moon_dasha, mars_dasha, mercury_dasha, venus_dasha, saturn_dasha, jupiter_dasha, ketu_dasha, rahu_dasha } = kundli
+        const { dob, birth_time, name, gender, birth_place, sun_dasha, moon_dasha, mars_dasha, mercury_dasha, venus_dasha, saturn_dasha, jupiter_dasha, ketu_dasha, rahu_dasha, yogini_dasha } = kundli
         const upd = {}
         const ChartUrl = 'https://astroapi-3.divineapi.com/indian-api/v1/maha-dasha-analysis'
         if (sun_dasha == null) {
@@ -459,10 +459,10 @@ async function findDashaTab(req, res) {
             const chalitChartresponse = await basicKundliApiCall(dob, birth_time, name, gender, birth_place, ChartUrl, [{ key: "maha_dasha", value: "rahu" }])
             upd.rahu_dasha = JSON.stringify(chalitChartresponse?.data);
         }
-        if (rahu_dasha == null) {
+        if (yogini_dasha == null) {
             const url = 'https://astroapi-3.divineapi.com/indian-api/v2/yogini-dasha'
             const chalitChartresponse = await basicKundliApiCall(dob, birth_time, name, gender, birth_place, url)
-            upd.rahu_dasha = JSON.stringify(chalitChartresponse?.data);
+            upd.yogini_dasha = JSON.stringify(chalitChartresponse?.data);
         }
 
         if (Object.keys(upd).length > 0) {
