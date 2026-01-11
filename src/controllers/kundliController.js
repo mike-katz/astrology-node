@@ -559,11 +559,8 @@ async function getHororscope(req, res) {
         const { type, rashi } = req.query;
         if (!type || !rashi) return res.status(400).json({ success: false, message: 'Missing params.' });
         let kundli = await db('horoscope')
-            .where({ type, rashi })
-        const response = [];
-        kundli?.map(item => {
-            item.data = JSON.parse(item.data)
-        })
+            .where({ type, rashi }).first();
+        kundli.data = JSON.parse(kundli.data) || []
         return res.status(200).json({ success: true, data: kundli, message: 'Kundli get Successfully' });
     } catch (err) {
         console.error(err);
