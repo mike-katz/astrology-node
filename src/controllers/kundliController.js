@@ -51,6 +51,9 @@ async function findBasicKundli(req, res) {
 
         const authHeader = req.headers.authorization;
         const url = 'https://astroapi-3.divineapi.com/indian-api/v3/basic-astro-details'
+        if (type == 'profile' && (!authHeader.startsWith('Bearer ')) || !authHeader) {
+            return res.status(400).json({ success: false, message: 'Missing params.' });
+        }
         if (authHeader && type == 'profile' && authHeader.startsWith('Bearer ')) {
             const tokenData = decodeJWT(authHeader)
             if (!tokenData?.success) return res.status(400).json({ success: false, message: 'Your session expired.' });
@@ -58,10 +61,12 @@ async function findBasicKundli(req, res) {
                 .where({ 'id': Number(profile_id), user_id: tokenData?.data?.userId })
                 .first();
             if (!user) return res.status(400).json({ success: false, message: 'Your session expired.' });
+            const date = new Date(user?.dob).toISOString().slice(0, 10);
+
             name = user?.name
             gender = user?.gender
             birth_time = user?.birth_time
-            dob = user?.dob
+            dob = date
             birth_place = user?.birth_place
 
             let kundli = await db('kundlis')
@@ -69,15 +74,18 @@ async function findBasicKundli(req, res) {
                 .first();
 
             if (user?.is_updated || !kundli) {
+                console.log("dob, birth_time, name, gender, birth_place, url", dob, birth_time, name, gender, birth_place, url);
                 const response = await basicKundliApiCall(dob, birth_time, name, gender, birth_place, url)
-
-                kundli = { name, gender, dob, birth_place, birth_time, profile_id }
+                kundli = { ...kundli, name, gender, dob, birth_place, birth_time, profile_id: Number(profile_id) }
                 kundli.basic = JSON.stringify(response?.data)
-                await db('kundlis')
-                    .insert(kundli)
-                    .onConflict('profile_id')
-                    .merge();
-
+                console.log("kundli", kundli);
+                if (kundli.id) {
+                    await db('kundlis')
+                        .where({ id: kundli.id }).update(kundli)
+                } else {
+                    await db('kundlis')
+                        .insert(kundli)
+                }
                 await db('userprofiles').where({ 'id': Number(profile_id) }).update({ is_updated: false })
             }
             kundli.basic = JSON.parse(kundli.basic)
