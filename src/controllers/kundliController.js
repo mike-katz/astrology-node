@@ -81,7 +81,7 @@ async function findBasicKundli(req, res) {
         const authHeader = req.headers.authorization;
         console.log("authHeader", authHeader);
         const url = 'https://astroapi-3.divineapi.com/indian-api/v3/basic-astro-details'
-        if (type == 'profile' && (!authHeader.startsWith('Bearer ')) || !authHeader) {
+        if (type == 'profile' && !authHeader?.startsWith('Bearer ')) {
             return res.status(400).json({ success: false, message: 'Missing params.' });
         }
         if (authHeader && type == 'profile' && authHeader.startsWith('Bearer ')) {
