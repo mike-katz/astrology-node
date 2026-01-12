@@ -646,7 +646,8 @@ async function findReportTab(req, res) {
             .first();
         if (!kundli) return res.status(400).json({ success: false, message: 'Kundli not found.' });
         const { dob, birth_time, name, gender, birth_place, general_report, kalsarpa_dosha, manglik_dosha, sadesati_dosha, general_yoga_tab,
-            gemstones, planetary_sun, planetary_moon, planetary_mercury, planetary_venus, planetary_mars, planetary_jupiter, planetary_saturn, planetary_rahu, planetary_ketu, general_vimshottari_dasha
+            gemstones, planetary_sun, planetary_moon, planetary_mercury, planetary_venus, planetary_mars, planetary_jupiter, planetary_saturn, planetary_rahu, planetary_ketu,
+            sun_dasha, moon_dasha, mars_dasha, mercury_dasha, venus_dasha, saturn_dasha, jupiter_dasha, ketu_dasha, rahu_dasha
         } = kundli
         const upd = {}
         if (general_report == null) {
@@ -729,6 +730,44 @@ async function findReportTab(req, res) {
             upd.sadesati_dosha = JSON.stringify(sookshmadasharesponse?.data);
         }
 
+        const ChartUrl = 'https://astroapi-3.divineapi.com/indian-api/v1/maha-dasha-analysis'
+        if (sun_dasha == null) {
+            const chalitChartresponse = await basicKundliApiCall(dob, birth_time, name, gender, birth_place, ChartUrl, [{ key: "maha_dasha", value: "sun" }])
+            upd.sun_dasha = JSON.stringify(chalitChartresponse?.data);
+        }
+        if (moon_dasha == null) {
+            const chalitChartresponse = await basicKundliApiCall(dob, birth_time, name, gender, birth_place, ChartUrl, [{ key: "maha_dasha", value: "moon" }])
+            upd.moon_dasha = JSON.stringify(chalitChartresponse?.data);
+        }
+        if (mars_dasha == null) {
+            const chalitChartresponse = await basicKundliApiCall(dob, birth_time, name, gender, birth_place, ChartUrl, [{ key: "maha_dasha", value: "mars" }])
+            upd.mars_dasha = JSON.stringify(chalitChartresponse?.data);
+        }
+        if (mercury_dasha == null) {
+            const chalitChartresponse = await basicKundliApiCall(dob, birth_time, name, gender, birth_place, ChartUrl, [{ key: "maha_dasha", value: "mercury" }])
+            upd.mercury_dasha = JSON.stringify(chalitChartresponse?.data);
+        }
+        if (venus_dasha == null) {
+            const chalitChartresponse = await basicKundliApiCall(dob, birth_time, name, gender, birth_place, ChartUrl, [{ key: "maha_dasha", value: "venus" }])
+            upd.venus_dasha = JSON.stringify(chalitChartresponse?.data);
+        }
+        if (saturn_dasha == null) {
+            const chalitChartresponse = await basicKundliApiCall(dob, birth_time, name, gender, birth_place, ChartUrl, [{ key: "maha_dasha", value: "saturn" }])
+            upd.saturn_dasha = JSON.stringify(chalitChartresponse?.data);
+        }
+        if (jupiter_dasha == null) {
+            const chalitChartresponse = await basicKundliApiCall(dob, birth_time, name, gender, birth_place, ChartUrl, [{ key: "maha_dasha", value: "jupiter" }])
+            upd.jupiter_dasha = JSON.stringify(chalitChartresponse?.data);
+        }
+        if (ketu_dasha == null) {
+            const chalitChartresponse = await basicKundliApiCall(dob, birth_time, name, gender, birth_place, ChartUrl, [{ key: "maha_dasha", value: "ketu" }])
+            upd.ketu_dasha = JSON.stringify(chalitChartresponse?.data);
+        }
+        if (rahu_dasha == null) {
+            const chalitChartresponse = await basicKundliApiCall(dob, birth_time, name, gender, birth_place, ChartUrl, [{ key: "maha_dasha", value: "rahu" }])
+            upd.rahu_dasha = JSON.stringify(chalitChartresponse?.data);
+        }
+
         if (Object.keys(upd).length > 0) {
             [kundli] = await db('kundlis')
                 .where('id', kundli?.id)
@@ -753,7 +792,15 @@ async function findReportTab(req, res) {
             planetary_saturn: JSON.parse(kundli.planetary_saturn),
             planetary_rahu: JSON.parse(kundli.planetary_rahu),
             planetary_ketu: JSON.parse(kundli.planetary_ketu),
-            general_vimshottari_dasha: ""
+            sun_dasha: JSON.parse(kundli.sun_dasha),
+            moon_dasha: JSON.parse(kundli.moon_dasha),
+            mars_dasha: JSON.parse(kundli.mars_dasha),
+            mercury_dasha: JSON.parse(kundli.mercury_dasha),
+            venus_dasha: JSON.parse(kundli.venus_dasha),
+            saturn_dasha: JSON.parse(kundli.saturn_dasha),
+            jupiter_dasha: JSON.parse(kundli.jupiter_dasha),
+            ketu_dasha: JSON.parse(kundli.ketu_dasha),
+            rahu_dasha: JSON.parse(kundli.rahu_dasha),
         }
         return res.status(200).json({ success: true, data: response, message: 'Kundli get Successfully' });
     } catch (err) {
