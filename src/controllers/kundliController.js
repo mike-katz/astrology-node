@@ -655,58 +655,58 @@ async function findReportTab(req, res) {
             const chalitChartresponse = await basicKundliApiCall(dob, birth_time, name, gender, birth_place, ChartUrl)
             upd.general_report = JSON.stringify(chalitChartresponse?.data);
         }
-        const planetUrl = 'https://developers.divineapi.com/indian-api/kundli-api/planet-analysis'
-        if (planetary_sun) {
+        const planetUrl = 'https://astroapi-3.divineapi.com/indian-api/v2/planet-analysis'
+        if (planetary_sun == null) {
             const sookshmadasharesponse = await basicKundliApiCall(dob, birth_time, name, gender, birth_place, planetUrl, [{ key: "analysis_planet", value: "sun" }])
             upd.planetary_sun = JSON.stringify(sookshmadasharesponse?.data);
         }
 
-        if (planetary_moon) {
+        if (planetary_moon == null) {
             const sookshmadasharesponse = await basicKundliApiCall(dob, birth_time, name, gender, birth_place, planetUrl, [{ key: "analysis_planet", value: "moon" }])
             upd.planetary_moon = JSON.stringify(sookshmadasharesponse?.data);
         }
 
-        if (planetary_mercury) {
+        if (planetary_mercury == null) {
             const sookshmadasharesponse = await basicKundliApiCall(dob, birth_time, name, gender, birth_place, planetUrl, [{ key: "analysis_planet", value: "mercury" }])
             upd.planetary_mercury = JSON.stringify(sookshmadasharesponse?.data);
         }
 
-        if (planetary_venus) {
+        if (planetary_venus == null) {
             const sookshmadasharesponse = await basicKundliApiCall(dob, birth_time, name, gender, birth_place, planetUrl, [{ key: "analysis_planet", value: "venus" }])
             upd.planetary_venus = JSON.stringify(sookshmadasharesponse?.data);
         }
 
-        if (planetary_mars) {
+        if (planetary_mars == null) {
             const sookshmadasharesponse = await basicKundliApiCall(dob, birth_time, name, gender, birth_place, planetUrl, [{ key: "analysis_planet", value: "mars" }])
             upd.planetary_mars = JSON.stringify(sookshmadasharesponse?.data);
         }
 
-        if (planetary_jupiter) {
+        if (planetary_jupiter == null) {
             const sookshmadasharesponse = await basicKundliApiCall(dob, birth_time, name, gender, birth_place, planetUrl, [{ key: "analysis_planet", value: "jupiter" }])
             upd.planetary_jupiter = JSON.stringify(sookshmadasharesponse?.data);
         }
-        if (planetary_saturn) {
+        if (planetary_saturn == null) {
             const sookshmadasharesponse = await basicKundliApiCall(dob, birth_time, name, gender, birth_place, planetUrl, [{ key: "analysis_planet", value: "saturn" }])
             upd.planetary_saturn = JSON.stringify(sookshmadasharesponse?.data);
         }
 
-        if (planetary_rahu) {
+        if (planetary_rahu == null) {
             const sookshmadasharesponse = await basicKundliApiCall(dob, birth_time, name, gender, birth_place, planetUrl, [{ key: "analysis_planet", value: "rahu" }])
             upd.planetary_rahu = JSON.stringify(sookshmadasharesponse?.data);
         }
 
-        if (planetary_ketu) {
+        if (planetary_ketu == null) {
             const sookshmadasharesponse = await basicKundliApiCall(dob, birth_time, name, gender, birth_place, planetUrl, [{ key: "analysis_planet", value: "ketu" }])
             upd.planetary_ketu = JSON.stringify(sookshmadasharesponse?.data);
         }
 
-        if (general_yoga_tab) {
+        if (general_yoga_tab == null) {
             const url = 'https://astroapi-3.divineapi.com/indian-api/v2/yogas'
             const sookshmadasharesponse = await basicKundliApiCall(dob, birth_time, name, gender, birth_place, url)
             upd.general_yoga_tab = JSON.stringify(sookshmadasharesponse?.data);
         }
 
-        if (gemstones) {
+        if (gemstones == null) {
             const url = 'https://astroapi-3.divineapi.com/indian-api/v2/gemstone-suggestion'
             const sookshmadasharesponse = await basicKundliApiCall(dob, birth_time, name, gender, birth_place, url)
             upd.gemstones = JSON.stringify(sookshmadasharesponse?.data);
