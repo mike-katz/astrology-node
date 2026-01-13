@@ -76,6 +76,7 @@ async function getPandits(req, res) {
             }
         }
         let query = db('pandits as p')
+            .distinctOn('p.id')
             .select(
                 'p.name',
                 'p.id',
@@ -111,7 +112,6 @@ async function getPandits(req, res) {
                 // ✅ OR condition
                 // this.orWhere('p.unlimited_free_calls_chats', true);
             })
-            .groupBy('p.id')
             .limit(limit)
             .offset(offset);
         let countQuery = db('pandits as p')
