@@ -557,7 +557,7 @@ async function findDashaTab(req, res) {
             .where({ id: kundli_id })
             .first();
         if (!kundli) return res.status(400).json({ success: false, message: 'Kundli not found.' });
-        const { dob, birth_time, name, gender, birth_place, sun_dasha, south_chalit_chart, moon_dasha, mars_dasha, mercury_dasha, venus_dasha, saturn_dasha, jupiter_dasha, ketu_dasha, rahu_dasha, yogini_dasha } = kundli
+        const { dob, birth_time, name, gender, birth_place, sun_dasha, south_chalit_chart, moon_dasha, mars_dasha, mercury_dasha, venus_dasha, saturn_dasha, jupiter_dasha, ketu_dasha, rahu_dasha, yogini_dasha, birth_chart, south_birth_chart } = kundli
         const upd = {}
         const ChartUrl = 'https://astroapi-3.divineapi.com/indian-api/v1/maha-dasha-analysis'
         if (sun_dasha == null) {
@@ -609,6 +609,18 @@ async function findDashaTab(req, res) {
             upd.south_chalit_chart = JSON.stringify(data?.data);
         }
 
+        if (birth_chart == null) {
+            const birthChartUrl = 'https://astroapi-3.divineapi.com/indian-api/v1/horoscope-chart/D1'
+            const birthChartresponse = await basicKundliApiCall(dob, birth_time, name, gender, birth_place, birthChartUrl, [{ key: "chart_type", value: "north" }])
+            upd.birth_chart = JSON.stringify(birthChartresponse?.data);
+        }
+
+        if (south_birth_chart == null) {
+            const birthChartUrl = 'https://astroapi-3.divineapi.com/indian-api/v1/horoscope-chart/D1'
+            const birthChartresponse = await basicKundliApiCall(dob, birth_time, name, gender, birth_place, birthChartUrl, [{ key: "chart_type", value: "south" }])
+            upd.south_birth_chart = JSON.stringify(birthChartresponse?.data);
+        }
+
         if (Object.keys(upd).length > 0) {
             [kundli] = await db('kundlis')
                 .where('id', kundli?.id)
@@ -628,7 +640,9 @@ async function findDashaTab(req, res) {
             rahu_dasha: JSON.parse(kundli.rahu_dasha),
             jupiter_dasha: JSON.parse(kundli.jupiter_dasha),
             south_chalit_chart: JSON.parse(kundli.south_chalit_chart),
-            yogini_dasha: JSON.parse(kundli.yogini_dasha)
+            yogini_dasha: JSON.parse(kundli.yogini_dasha),
+            birth_chart: JSON.parse(kundli.birth_chart),
+            south_birth_chart: JSON.parse(kundli.south_birth_chart)
         }
         return res.status(200).json({ success: true, data: response, message: 'Kundli get Successfully' });
     } catch (err) {
