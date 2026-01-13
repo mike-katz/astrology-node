@@ -15,7 +15,8 @@ async function getProfile(req, res) {
 
 async function updateProfile(req, res) {
     try {
-        const { name, gender, dob, birthTime = '12:00 AM', birthPlace, currentAddress, city_state_country, pincode, language, astromall_chat, live_event, my_interest } = req.body;
+        const { name, gender, dob, birthTime = '12:00:00', birth_place, current_address, city_state_country, pincode, language, astromall_chat, live_event, my_interest } = req.body;
+
         if (!name) return res.status(400).json({ success: false, message: 'Please enter name.' });
         const user = await db('users')
             .where('id', req?.userId)
@@ -40,11 +41,11 @@ async function updateProfile(req, res) {
         if (birthTime) {
             update.birth_time = birthTime
         }
-        if (birthPlace) {
-            update.birth_place = birthPlace
+        if (birth_place) {
+            update.birth_place = birth_place
         }
-        if (currentAddress) {
-            update.current_address = currentAddress
+        if (current_address) {
+            update.current_address = current_address
         }
         if (city_state_country) {
             update.city_state_country = city_state_country
