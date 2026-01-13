@@ -627,7 +627,8 @@ async function findDashaTab(req, res) {
             ketu_dasha: JSON.parse(kundli.ketu_dasha),
             rahu_dasha: JSON.parse(kundli.rahu_dasha),
             jupiter_dasha: JSON.parse(kundli.jupiter_dasha),
-            south_chalit_chart: JSON.parse(kundli.south_chalit_chart)
+            south_chalit_chart: JSON.parse(kundli.south_chalit_chart),
+            yogini_dasha: JSON.parse(kundli.yogini_dasha)
         }
         return res.status(200).json({ success: true, data: response, message: 'Kundli get Successfully' });
     } catch (err) {
