@@ -503,6 +503,24 @@ async function basicOnboard(req, res) {
                 other_working: [],
                 daily_horoscope: ""
             },
+            "step2": {
+                languages: languages ? JSON.parse(languages) : [],
+                consaltance_language: [],
+                available_for: [],
+                offer_live_session: "", live_start_time: "", live_end_time: "", dedicated_time: "", response_time: ""
+            },
+            "step3": {
+                chat_call_rate: "", is_first_chat_free: "", training_type: "", guru_name: "", certificate: [],
+            },
+            "step4": {
+                govt_id: [],
+                about: "", achievement_url: "",
+                address: [],
+                selfie: "", achievement_file: ""
+            },
+            "step5": {
+                terms: "", no_false: "", consent_profile: ""
+            }
         }
         return res.status(200).json({ success: true, data: response, message: 'Basic onboard Successfully' });
     } catch (err) {
