@@ -469,7 +469,7 @@ async function basicOnboard(req, res) {
         if (!user) return res.status(400).json({ message: 'Mobile number already exist.' });
         const orderId = Math.floor(1000000000000000 + Math.random() * 9000000000000000).toString();
         const ins = {
-            name, dob, email, gender, profile, country_code, mobile, application_id: orderId
+            name, dob, email, gender, country_code, mobile, application_id: orderId
         }
         if (files?.profile?.length > 0) {
             const image = await uploadImageTos3('profile', files?.profile[0], 'pandit');
