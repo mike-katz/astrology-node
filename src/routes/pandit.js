@@ -35,6 +35,12 @@ router.post('/verifyOtp', pandits.verifyOtp);
 router.post('/reSendOtp', pandits.reSendOtp);
 router.post('/submitOnboard', pandits.submitOnboard);
 
+router.post('/basicOnboard',
+    upload.fields([
+        { name: 'profile', maxCount: 1 },
+    ]),
+    pandits.basicOnboard);
+
 router.post('/onboard',
     upload.fields([
         { name: 'certificate', maxCount: 5 },

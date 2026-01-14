@@ -461,6 +461,28 @@ function is18OrAbove(dobString) {
     return realAge >= 18;
 }
 
+async function basicOnboard(req, res) {
+    try {
+        const { name, dob, email, gender, primary_expertise, country_code, mobile } = req.body
+
+        // const user = await db('onboardings').where({ "mobile": mobile, country_code: country_code, deleted_at: null }).first();
+        // if (!user) return res.status(400).json({ message: 'Mobile number already exist.' });
+        const orderId = Math.floor(1000000000000000 + Math.random() * 9000000000000000).toString();
+        const ins = {
+            name, dob, email, gender, primary_expertise, profile, country_code, mobile, application_id: orderId
+        }
+        if (files?.profile?.length > 0) {
+            const image = await uploadImageTos3('profile', files?.profile[0], 'pandit');
+            ins.profile = image.data.Location;
+        }
+        const [result] = await db('onboardings').insert(ins).returning("*")
+        return res.status(200).json({ success: true, data: result, message: 'Basic onboard Successfully' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
 async function onboard(req, res) {
     try {
         const { name, display_name, dob, country_code, mobile, email, city, country, gender, experience, primary_expertise, secondary_expertise, other_working, other_working_text, daily_horoscope, step = 1,
@@ -828,4 +850,4 @@ async function submitOnboard(req, res) {
         res.status(500).json({ success: false, message: 'Server error' });
     }
 }
-module.exports = { getPandits, onboard, signup, verifyOtp, reSendOtp, getPanditDetail, getReviewList, uploadImage, submitOnboard };
+module.exports = { getPandits, onboard, signup, verifyOtp, reSendOtp, getPanditDetail, getReviewList, uploadImage, submitOnboard, basicOnboard };
