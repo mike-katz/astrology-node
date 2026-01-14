@@ -404,9 +404,10 @@ async function verifyOtp(req, res) {
             languages, consaltance_language, available_for, offer_live_session, live_start_time, live_end_time, dedicated_time, response_time,
             chat_call_rate, is_first_chat_free, training_type, guru_name, certificate,
             govt_id, about, achievement_url, address, selfie, achievement_file,
-            terms, no_false, consent_profile, step = 0
+            terms, no_false, consent_profile, step = 0, application_id
         } = user
         const response = {
+            "application_id": application_id,
             "step1": {
                 name: name || "", profile: profile || "",
                 display_name: display_name || "",
@@ -469,7 +470,7 @@ async function basicOnboard(req, res) {
         if (!user) return res.status(400).json({ message: 'Mobile number already exist.' });
         const orderId = Math.floor(1000000000000000 + Math.random() * 9000000000000000).toString();
         const ins = {
-            name, dob, email, gender, country_code, mobile, application_id: orderId
+            name, dob, email, gender, country_code, mobile, application_id: orderId, step: 0,
         }
         if (files?.profile?.length > 0) {
             const image = await uploadImageTos3('profile', files?.profile[0], 'pandit');
