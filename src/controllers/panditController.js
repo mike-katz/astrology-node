@@ -463,17 +463,23 @@ function is18OrAbove(dobString) {
 
 async function basicOnboard(req, res) {
     try {
-        const { name, dob, email, gender, primary_expertise, country_code, mobile } = req.body
+        const { name, dob, email, gender, primary_expertise, languages, country_code, mobile } = req.body
 
         // const user = await db('onboardings').where({ "mobile": mobile, country_code: country_code, deleted_at: null }).first();
         // if (!user) return res.status(400).json({ message: 'Mobile number already exist.' });
         const orderId = Math.floor(1000000000000000 + Math.random() * 9000000000000000).toString();
         const ins = {
-            name, dob, email, gender, primary_expertise, profile, country_code, mobile, application_id: orderId
+            name, dob, email, gender, profile, country_code, mobile, application_id: orderId
         }
         if (files?.profile?.length > 0) {
             const image = await uploadImageTos3('profile', files?.profile[0], 'pandit');
             ins.profile = image.data.Location;
+        }
+        if (languages) {
+            ins.languages = JSON.stringify(languages)
+        }
+        if (primary_expertise) {
+            ins.primary_expertise = JSON.stringify(primary_expertise)
         }
         const [result] = await db('onboardings').insert(ins).returning("*")
         return res.status(200).json({ success: true, data: result, message: 'Basic onboard Successfully' });
