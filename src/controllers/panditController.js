@@ -497,14 +497,14 @@ async function basicOnboard(req, res) {
                 city: "",
                 country: "",
                 experience: "",
-                primary_expertise: primary_expertise ? JSON.parse(primary_expertise) : [],
+                primary_expertise: primary_expertise || [],
                 secondary_expertise: [],
                 other_working_text: "",
                 other_working: [],
                 daily_horoscope: ""
             },
             "step2": {
-                languages: languages ? JSON.parse(languages) : [],
+                languages: languages || [],
                 consaltance_language: [],
                 available_for: [],
                 offer_live_session: "", live_start_time: "", live_end_time: "", dedicated_time: "", response_time: ""
