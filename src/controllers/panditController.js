@@ -488,6 +488,7 @@ async function basicOnboard(req, res) {
         const [result] = await db('onboardings').where({ id: user?.id }).update(ins).returning("*")
 
         const response = {
+            "step": 0,
             "application_id": orderId,
             "step1": {
                 name: name || "",
