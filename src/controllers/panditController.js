@@ -472,6 +472,9 @@ async function basicOnboard(req, res) {
         const ins = {
             name, dob, email, gender, application_id: orderId, step: 0,
         }
+
+        if (!is18OrAbove(dob)) return res.status(400).json({ success: false, message: 'Enter DOB above 18+ year.' });
+
         if (files?.profile?.length > 0) {
             const image = await uploadImageTos3('profile', files?.profile[0], 'pandit');
             ins.profile = image.data.Location;
