@@ -483,7 +483,28 @@ async function basicOnboard(req, res) {
             ins.primary_expertise = JSON.stringify(primary_expertise)
         }
         const [result] = await db('onboardings').where({ id: user?.id }).update(ins).returning("*")
-        return res.status(200).json({ success: true, data: result, message: 'Basic onboard Successfully' });
+
+        const response = {
+            "application_id": orderId,
+            "step1": {
+                name: name || "",
+                profile: ins?.profile || "",
+                display_name: "",
+                gender: gender || "",
+                dob: dob || "",
+                country_code: country_code || "",
+                email: email || "",
+                city: "",
+                country: "",
+                experience: "",
+                primary_expertise: primary_expertise ? JSON.parse(primary_expertise) : [],
+                secondary_expertise: [],
+                other_working_text: "",
+                other_working: [],
+                daily_horoscope: ""
+            },
+        }
+        return res.status(200).json({ success: true, data: response, message: 'Basic onboard Successfully' });
     } catch (err) {
         console.error(err);
         res.status(500).json({ success: false, message: 'Server error' });
