@@ -465,8 +465,8 @@ async function basicOnboard(req, res) {
     try {
         const { name, dob, email, gender, primary_expertise, languages, country_code, mobile } = req.body
 
-        // const user = await db('onboardings').where({ "mobile": mobile, country_code: country_code, deleted_at: null }).first();
-        // if (!user) return res.status(400).json({ message: 'Mobile number already exist.' });
+        const user = await db('onboardings').where({ mobile, country_code, deleted_at: null }).first();
+        if (!user) return res.status(400).json({ message: 'Mobile number already exist.' });
         const orderId = Math.floor(1000000000000000 + Math.random() * 9000000000000000).toString();
         const ins = {
             name, dob, email, gender, profile, country_code, mobile, application_id: orderId
