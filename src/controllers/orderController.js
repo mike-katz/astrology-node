@@ -263,14 +263,14 @@ async function acceptOrder(req, res) {
             .select(
                 'o.*',
                 'p.name',
-                'p.chat_call_rate',
+                'p.final_chat_call_rate',
             )
             .first();
         if (!order) return res.status(400).json({ success: false, message: 'Order not accepted by pandit.' });
 
         const userDetail = await db('users').where({ id: req.userId }).first();
 
-        let duration = Math.floor(Number(Number(userDetail?.balance)) / Number(order?.chat_call_rate));
+        let duration = Math.floor(Number(Number(userDetail?.balance)) / Number(order?.final_chat_call_rate));
         console.log("duration", duration);
         if (!Number.isFinite(duration)) {
             return res.status(400).json({ success: false, message: 'Min. 5 min balance required.' });
@@ -279,7 +279,7 @@ async function acceptOrder(req, res) {
         if (duration < 5) {
             return res.status(400).json({ success: false, message: 'Min. 5 min balance required.' });
         }
-        const deduction = Number(duration) * Number(order?.chat_call_rate)
+        const deduction = Number(duration) * Number(order?.final_chat_call_rate)
         if (isNaN(deduction)) {
             return res.status(400).json({ success: false, message: 'Balance could not be NaN.' });
         }
