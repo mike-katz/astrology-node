@@ -54,6 +54,8 @@ async function addProfile(req, res) {
         if (count == 0) {
             delete ins.is_first
             delete ins.user_id
+            delete ins.lat
+            delete ins.lng
             await db('users').where({ id: req.userId }).update(ins);
         }
         return res.status(200).json({ success: true, data: response, message: 'Profile Successfully' });
@@ -143,6 +145,8 @@ async function updateProfile(req, res) {
 
         if (count.is_first) {
             delete upd.is_updated
+            delete upd.lat
+            delete upd.lng
             await db('users').where({ id: req.userId }).update(upd);
         }
         return res.status(200).json({ success: true, message: 'Profile Successfully' });
