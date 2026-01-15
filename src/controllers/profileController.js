@@ -12,7 +12,7 @@ const GENDER = ['male', 'female', 'other'];
 
 async function addProfile(req, res) {
     try {
-        const { name, gender, dob, dot, is_enable_partner_detail, partner_place, partner_dot, partner_dob, partner_name, birth_place, marital_status, occupation, topic_of_concern, topic_of_concern_other } = req.body;
+        const { name, gender, dob, dot, is_enable_partner_detail, partner_place, partner_dot, partner_dob, partner_name, birth_place, marital_status, occupation, topic_of_concern, topic_of_concern_other, lat = '22.82', lng = '70.84' } = req.body;
         if (!name || !gender || !dob || !dot || !birth_place) return res.status(400).json({ success: false, message: 'Missing params.' });
 
         if (gender && !GENDER.includes(gender)) return res.status(400).json({ success: false, message: 'Enter valid gender.' });
@@ -45,6 +45,8 @@ async function addProfile(req, res) {
             topic_of_concern_other,
             occupation,
             birth_place,
+            lng,
+            lat,
             marital_status
         }
         const response = await db('userprofiles').insert(ins).returning('*');
@@ -75,7 +77,7 @@ async function getList(req, res) {
 
 async function updateProfile(req, res) {
     try {
-        const { profileId, name, gender, dob, dot, is_enable_partner_detail, partner_place, partner_dot, partner_dob, partner_name, birth_place, marital_status, occupation, topic_of_concern, topic_of_concern_other } = req.body;
+        const { profileId, name, gender, dob, dot, is_enable_partner_detail, partner_place, partner_dot, partner_dob, partner_name, birth_place, marital_status, occupation, topic_of_concern, topic_of_concern_other, lat, lng } = req.body;
         if (!profileId) return res.status(400).json({ success: false, message: 'Missing params.' });
 
         if (gender && !GENDER.includes(gender)) return res.status(400).json({ success: false, message: 'Enter valid gender.' });
@@ -130,6 +132,12 @@ async function updateProfile(req, res) {
         }
         if (marital_status) {
             upd.marital_status = marital_status
+        }
+        if (lat) {
+            upd.lat = lat
+        }
+        if (lng) {
+            upd.lng = lng
         }
         await db('userprofiles').where('id', profileId).update(upd);
 
