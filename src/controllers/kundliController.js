@@ -6,6 +6,8 @@ const FormData = require('form-data');
 
 async function basicKundliApiCall(lat, lng, dob, birth_time, name, gender, birth_place, url, extraparam = []) {
 
+    lat = lat ?? '22.82';
+    lng = lng ?? '70.84';
     const formData = new FormData();
     const [year, month, day] = dob.split('-');
     const [hour, min, sec] = birth_time.split(':');
@@ -73,8 +75,8 @@ async function findBasicKundli(req, res) {
             birth_time = user?.birth_time
             dob = date
             birth_place = user?.birth_place
-            lat = user?.lat
-            lng = user?.lng
+            lat = user?.lat || lat
+            lng = user?.lng || lng
 
             let kundli = await db('kundlis')
                 .where({ profile_id }).select('dob', 'birth_time', 'name', 'gender', 'birth_place', 'basic', 'id')
