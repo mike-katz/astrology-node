@@ -76,7 +76,7 @@ async function getPandits(req, res) {
             }
         }
         let query = db('pandits as p')
-            .distinctOn('p.id')
+            //.distinctOn('p.id')
             .select(
                 'p.name',
                 'p.id',
