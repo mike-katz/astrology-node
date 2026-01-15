@@ -113,7 +113,7 @@ async function findBasicKundli(req, res) {
                 user.profile_id = profile_id
             }
             user.basic = JSON.stringify(response?.data)
-            await db('kundlis').insert(user);
+            [user] = await db('kundlis').insert(user).returning("*");
             // await db('follows').insert({ user_id: req?.userId, pandit_id: panditId, type: "user" });
         }
         user.basic = JSON.parse(user.basic)
