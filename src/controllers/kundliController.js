@@ -90,8 +90,9 @@ async function findBasicKundli(req, res) {
                     await db('kundlis')
                         .where({ id: kundli.id }).update(kundli)
                 } else {
-                    await db('kundlis')
-                        .insert(kundli)
+                    const [saved] = await db('kundlis')
+                        .insert(kundli);
+                    kundli.id = saved.id
                 }
                 await db('userprofiles').where({ 'id': Number(profile_id) }).update({ is_updated: false })
             }
@@ -113,9 +114,11 @@ async function findBasicKundli(req, res) {
                 user.profile_id = profile_id
             }
             user.basic = JSON.stringify(response?.data)
-            [user] = await db('kundlis').insert(user).returning("*");
+            const [saved] = await db('kundlis').insert(user).returning("*");
             // await db('follows').insert({ user_id: req?.userId, pandit_id: panditId, type: "user" });
+            user.id = saved.id
         }
+        console.log("user", user);
         user.basic = JSON.parse(user.basic)
         return res.status(200).json({ success: true, data: user, message: 'Kundli get Successfully' });
     } catch (err) {
