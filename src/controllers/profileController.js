@@ -81,7 +81,7 @@ async function updateProfile(req, res) {
     try {
         const { profileId, name, gender, dob, dot, is_enable_partner_detail, partner_place, partner_dot, partner_dob, partner_name, birth_place, marital_status, occupation, topic_of_concern, topic_of_concern_other, lat, lng } = req.body;
         if (!profileId) return res.status(400).json({ success: false, message: 'Missing params.' });
-
+        console.log("req.body", req.body);
         if (gender && !GENDER.includes(gender)) return res.status(400).json({ success: false, message: 'Enter valid gender.' });
         if (marital_status && !MARITAL_STATUS.includes(marital_status)) return res.status(400).json({ success: false, message: 'Enter valid marital status.' });
         if (occupation && !OCCUPATION.includes(occupation)) return res.status(400).json({ success: false, message: 'Enter valid occupation.' });
