@@ -93,7 +93,7 @@ async function findBasicKundli(req, res) {
                         .where({ id: kundli.id }).update(kundli)
                 } else {
                     const [saved] = await db('kundlis')
-                        .insert(kundli);
+                        .insert(kundli).returning("*");
                     kundli.id = saved.id
                 }
                 await db('userprofiles').where({ 'id': Number(profile_id) }).update({ is_updated: false })
