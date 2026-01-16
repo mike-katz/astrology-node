@@ -872,7 +872,7 @@ async function getPersonalHororscope(req, res) {
 
         kundli.map(item => {
             const data = JSON.parse(item.data) || [];
-            item.data = data?.prediction?.personal || data?.yearly_horoscope?.personal || data?.monthly_horoscope?.personal || data?.weekly_horoscope?.personal
+            item.data = data?.detail?.personal || ""
         })
         return res.status(200).json({ success: true, data: kundli, message: 'Kundli get Successfully' });
     } catch (err) {
