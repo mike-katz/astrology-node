@@ -391,7 +391,7 @@ async function acceptOrder(req, res) {
             payload: { pandit_id: order?.pandit_id }
         });
 
-        return res.status(200).json({ success: true, message: 'Order accept Successfully' });
+        return res.status(200).json({ success: true, data: { startTime, endTime, orderId }, message: 'Order accept Successfully' });
     } catch (err) {
         console.error(err);
         res.status(500).json({ success: false, message: 'Server error' });
