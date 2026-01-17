@@ -422,7 +422,7 @@ async function endChat(req, res) {
         }
         const diffMinutes = getDuration(order.start_time, new Date())
         console.log("endChat diffMinutes", diffMinutes, "startTime", order.start_time, "endTime", new Date());
-        if (diffMinutes == 1) return res.status(400).json({ success: false, message: "Can't end chat in first 1 minute." });
+        // if (diffMinutes == 1) return res.status(400).json({ success: false, message: "Can't end chat in first 1 minute." });
         // const [{ total }] = await db('orders').where({ pandit_id: order?.pandit_id, user_id: req.userId }).count('id as total');
         // if (total == 1) {
         //     return res.status(400).json({ success: false, message: 'You can not end this chat.' });
