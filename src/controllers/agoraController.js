@@ -13,6 +13,25 @@ const s3 = new AWS.S3({
     region: process.env.S3_REGION || 'us-east-1'
 });
 
+const getAgoraRegionCode = (awsRegion) => {
+    const regionMap = {
+        'us-east-1': 1,      // US East (N. Virginia)
+        'us-east-2': 2,      // US East (Ohio)
+        'us-west-1': 3,      // US West (N. California)
+        'us-west-2': 4,      // US West (Oregon)
+        'eu-west-1': 5,      // Europe (Ireland)
+        'eu-central-1': 6,   // Europe (Frankfurt)
+        'ap-southeast-1': 7, // Asia Pacific (Singapore)
+        'ap-northeast-1': 8, // Asia Pacific (Tokyo)
+        'ap-southeast-2': 9, // Asia Pacific (Sydney)
+        'ap-south-1': 10,    // Asia Pacific (Mumbai)
+        'ca-central-1': 11,  // Canada (Central)
+        'sa-east-1': 12      // South America (São Paulo)
+    };
+    return regionMap[awsRegion?.toLowerCase()] || 1; // Default to US East 1
+};
+
+
 async function getRtcToken(req, res) {
     try {
         const { channelName } = req.body;
@@ -89,165 +108,224 @@ async function getRtcToken(req, res) {
 //     res.json({ token, appId: APP_ID });
 // }
 
-// async function recordingStart(req, res) {
-//     try {
-//         const { channelName, uid, token } = req.body;
+async function recordingStart(req, res) {
+    try {
+        const { channelName, uid, token } = req.body;
 
-//         if (!channelName || !uid || !token) {
-//             return res
-//                 .status(400)
-//                 .json({ error: "channelName, uid, and token are required" });
-//         }
+        // Check for null/undefined explicitly (uid can be 0 which is falsy but valid)
+        if (!channelName || uid == null || !token) {
+            return res.status(400).json({
+                error: 'channelName, uid, and token are required',
+                received: { channelName, uid, hasToken: !!token }
+            });
+        }
 
-//         // Recording UID - you can use a fixed numeric string, MUST be a string
-//         const recordingUid = String(uid); // or "1000", but then token must match that UID
+        const appId = process.env.AGORA_APP_ID;
+        const customerKey = process.env.AGORA_CUSTOMER_KEY;
+        const customerSecret = process.env.AGORA_CUSTOMER_SECRET;
+        const s3BucketName = process.env.AWS_BUCKET_NAME;
+        const s3AccessKey = process.env.AWS_ACCESS_KEY;
+        const s3SecretKey = process.env.AWS_SECRET_KEY;
+        const s3Region = process.env.S3_REGION || 'us-east-1';
+        const agoraRegionCode = getAgoraRegionCode(s3Region);
 
-//         // Base URL for cloud recording
-//         const baseUrl = `https://api.agora.io/v1/apps/${APP_ID}/cloud_recording`;
+        if (!appId || !customerKey || !customerSecret) {
+            return res.status(500).json({
+                error: 'Agora recording credentials not configured. Please set AGORA_CUSTOMER_KEY and AGORA_CUSTOMER_SECRET in .env file'
+            });
+        }
 
-//         // Basic auth for Agora RESTful
-//         const auth = {
-//             username: AGORA_CUSTOMER_ID,
-//             password: AGORA_CUSTOMER_CERTIFICATE,
-//         };
+        // Validate S3 credentials before starting recording
+        if (!s3BucketName || !s3AccessKey || !s3SecretKey) {
+            return res.status(500).json({
+                error: 'S3 credentials not configured for recording upload. Please set S3_BUCKET_NAME, S3_ACCESS_KEY, and S3_SECRET_KEY in .env file',
+                missing: {
+                    bucket: !s3BucketName,
+                    accessKey: !s3AccessKey,
+                    secretKey: !s3SecretKey
+                }
+            });
+        }
 
-//         // 1) ACQUIRE
-//         const acquirePayload = {
-//             cname: channelName,
-//             uid: recordingUid,
-//             clientRequest: {
-//                 resourceExpiredHour: 24, // keep resource for 24h
-//             },
-//         };
+        // Acquire resource
+        const acquireResponse = await axios.post(
+            `https://api.agora.io/v1/apps/${appId}/cloud_recording/acquire`,
+            {
+                cname: channelName,
+                uid: String(uid),
+                clientRequest: {
+                    resourceExpiredHour: 24
+                }
+            },
+            {
+                auth: {
+                    username: customerKey,
+                    password: customerSecret
+                },
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            }
+        );
 
-//         const acquireResp = await axios.post(
-//             `${baseUrl}/acquire`,
-//             acquirePayload,
-//             { auth }
-//         );
+        const resourceId = acquireResponse.data.resourceId;
 
-//         const resourceId = acquireResp.data.resourceId;
-//         if (!resourceId) {
-//             return res.status(500).json({ error: "Failed to acquire resourceId", detail: acquireResp.data });
-//         }
+        // Start recording
+        const startResponse = await axios.post(
+            `https://api.agora.io/v1/apps/${appId}/cloud_recording/resourceid/${resourceId}/mode/mix/start`,
+            {
+                cname: channelName,
+                uid: String(uid),
+                clientRequest: {
+                    token: token,
+                    recordingConfig: {
+                        maxIdleTime: 30,
+                        streamTypes: 2, // Audio only
+                        audioProfile: 1,
+                        channelType: 0
+                    },
+                    recordingFileConfig: {
+                        avFileType: ['hls'] // HLS format is supported for mix mode recording (audio-only)
+                    },
+                    storageConfig: {
+                        vendor: 1, // Amazon S3
+                        region: agoraRegionCode, // Dynamically mapped from S3_REGION env variable
+                        bucket: s3BucketName,
+                        accessKey: s3AccessKey,
+                        secretKey: s3SecretKey
+                    }
+                }
+            },
+            {
+                auth: {
+                    username: customerKey,
+                    password: customerSecret
+                },
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            }
+        );
 
-//         // 2) START
-//         const startPayload = {
-//             cname: channelName,
-//             uid: recordingUid,
-//             clientRequest: {
-//                 token: token,
+        console.log('Recording started successfully:', {
+            resourceId,
+            sid: startResponse.data.sid,
+            bucket: s3BucketName,
+            region: s3Region,
+            agoraRegionCode: agoraRegionCode,
+            serverResponse: startResponse.data.serverResponse
+        });
 
-//                 // Recording settings
-//                 recordConfig: {
-//                     maxIdleTime: 30,              // stop if no users for 30s
-//                     streamTypes: 0,               // 0: audio, 1: video, 2: both
-//                     channelType: 0,               // 0: communication, 1: live
-//                     // videoStreamType: 0,
-//                     audioProfile: 1,
-//                     // transcodingConfig: {
-//                     //     width: 1280,
-//                     //     height: 720,
-//                     //     fps: 15,
-//                     //     bitrate: 1200,
-//                     //     mixedVideoLayout: 1,        // 1 = best fit
-//                     //     backgroundColor: "#000000",
-//                     // },
-//                 },
+        res.json({
+            resourceId,
+            sid: startResponse.data.sid,
+            serverResponse: startResponse.data.serverResponse,
+            message: 'Recording started. Files will be uploaded to S3 when recording stops.',
+            s3Bucket: s3BucketName
+        });
+    } catch (error) {
+        console.error('❌ Error starting recording:', error.response?.data || error.message);
 
-//                 // File & storage settings
-//                 recordingFileConfig: {
-//                     avFileType: ["hls"],   // choose what you need
-//                 },
-//                 storageConfig: {
-//                     vendor: S3_VENDOR,
-//                     region: S3_REGION,
-//                     bucket: S3_BUCKET,
-//                     accessKey: S3_ACCESS_KEY,
-//                     secretKey: S3_SECRET_KEY,
-//                     fileNamePrefix: S3_FILE_PATH
-//                         ? S3_FILE_PATH.split("/").filter(Boolean)
-//                         : [],
-//                     // fileNamePrefix: "video/"
-//                 },
-//             },
-//         };
+        // Log detailed error information
+        if (error.response?.data) {
+            console.error('Error details:', JSON.stringify(error.response.data, null, 2));
 
+            // Check for S3 configuration errors
+            if (error.response.data.message && error.response.data.message.includes('storage')) {
+                console.error('⚠️ S3 Storage Configuration Error - Please check:');
+                console.error('  - S3_BUCKET_NAME:', s3BucketName ? 'Set ✓' : 'Missing ✗');
+                console.error('  - S3_ACCESS_KEY:', s3AccessKey ? 'Set ✓' : 'Missing ✗');
+                console.error('  - S3_SECRET_KEY:', s3SecretKey ? 'Set ✓' : 'Missing ✗');
+                console.error('  - S3_REGION:', s3Region, '(Agora code:', agoraRegionCode + ')');
+            }
+        }
 
-//         const startResp = await axios.post(
-//             `${baseUrl}/resourceid/${resourceId}/mode/mix/start`,
-//             startPayload,
-//             { auth }
-//         );
+        res.status(500).json({
+            error: 'Failed to start recording',
+            details: error.response?.data || error.message
+        });
+    }
+}
 
-//         const { sid } = startResp.data;
+async function recordingStop(req, res) {
+    try {
+        const { resourceId, sid, channelName, uid } = req.body;
 
-//         if (!sid) {
-//             return res.status(500).json({
-//                 error: "Failed to start recording",
-//                 detail: startResp.data,
-//             });
-//         }
+        // Check for null/undefined explicitly (uid can be 0 which is falsy but valid)
+        if (!resourceId || !sid || !channelName || uid == null) {
+            return res.status(400).json({
+                error: 'resourceId, sid, channelName, and uid are required',
+                received: { resourceId: !!resourceId, sid: !!sid, channelName, uid }
+            });
+        }
 
-//         // Return data to frontend
-//         return res.json({
-//             resourceId,
-//             sid,
-//             serverResponse: startResp.data,
-//         });
-//     } catch (err) {
-//         console.error("Error in /recording/start:", err?.response?.data || err.message);
-//         return res.status(500).json({
-//             error: "Internal error while starting recording",
-//             detail: err?.response?.data || err.message,
-//         });
-//     }
-// }
+        const appId = process.env.AGORA_APP_ID;
+        const customerKey = process.env.AGORA_CUSTOMER_KEY;
+        const customerSecret = process.env.AGORA_CUSTOMER_SECRET;
 
+        if (!appId || !customerKey || !customerSecret) {
+            return res.status(500).json({
+                error: 'Agora recording credentials not configured'
+            });
+        }
 
-// async function recordingStop(req, res) {
+        const stopResponse = await axios.post(
+            `https://api.agora.io/v1/apps/${appId}/cloud_recording/resourceid/${resourceId}/sid/${sid}/mode/mix/stop`,
+            {
+                cname: channelName,
+                uid: String(uid),
+                clientRequest: {}
+            },
+            {
+                auth: {
+                    username: customerKey,
+                    password: customerSecret
+                },
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            }
+        );
 
-//     try {
-//         const { resourceId, sid, channelName, uid } = req.body;
+        const serverResponse = stopResponse.data.serverResponse;
 
-//         if (!resourceId || !sid || !channelName || !uid) {
-//             return res.status(400).json({
-//                 error: "resourceId, sid, channelName and uid are required",
-//             });
-//         }
+        // Log file information if available
+        if (serverResponse?.fileList) {
+            console.log('📁 Recording files uploaded to S3:');
+            serverResponse.fileList.forEach((file, index) => {
+                console.log(`  File ${index + 1}:`, {
+                    fileName: file.fileName,
+                    fileType: file.fileType,
+                    fileSize: file.fileSize,
+                    trackType: file.trackType,
+                    uid: file.uid,
+                    mixType: file.mixType
+                });
+            });
+        } else if (serverResponse?.uploadingStatus) {
+            console.log('📤 Recording upload status:', serverResponse.uploadingStatus);
+        }
 
-//         const recordingUid = String(uid); // must be same UID used in /recording/start
+        console.log('✅ Recording stopped. Full response:', JSON.stringify(serverResponse, null, 2));
 
-//         const baseUrl = `https://api.agora.io/v1/apps/${APP_ID}/cloud_recording`;
+        res.json({
+            success: true,
+            serverResponse: serverResponse,
+            message: 'Recording stopped successfully. Files are being uploaded to S3.',
+            fileList: serverResponse?.fileList || []
+        });
+    } catch (error) {
+        console.error('❌ Error stopping recording:', error.response?.data || error.message);
 
-//         const auth = {
-//             username: AGORA_CUSTOMER_ID,
-//             password: AGORA_CUSTOMER_CERTIFICATE,
-//         };
+        if (error.response?.data) {
+            console.error('Stop recording error details:', JSON.stringify(error.response.data, null, 2));
+        }
 
-//         // STOP payload is simple
-//         const stopPayload = {
-//             cname: channelName,
-//             uid: recordingUid,
-//             clientRequest: {},
-//         };
+        res.status(500).json({
+            error: 'Failed to stop recording',
+            details: error.response?.data || error.message
+        });
+    }
+}
 
-//         const stopResp = await axios.post(
-//             `${baseUrl}/resourceid/${resourceId}/sid/${sid}/mode/mix/stop`,
-//             stopPayload,
-//             { auth }
-//         );
-
-//         // Agora returns file list (e.g., in your S3 bucket)
-//         return res.json({
-//             serverResponse: stopResp.data,
-//         });
-//     } catch (err) {
-//         console.error("Error in /recording/stop:", err?.response?.data || err.message);
-//         return res.status(500).json({
-//             error: "Internal error while stopping recording",
-//             detail: err?.response?.data || err.message,
-//         });
-//     }
-// }
-module.exports = { getRtcToken };
+module.exports = { getRtcToken, recordingStart, recordingStop };
