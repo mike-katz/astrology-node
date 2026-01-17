@@ -289,7 +289,7 @@ async function acceptOrder(req, res) {
         await db('orders').where({ id: order?.id }).update({ status: "continue", duration, deduction, start_time: startTime, end_time: endTime });
         await db('pandits').where({ id: order?.pandit_id }).update({ waiting_time: endTime });
 
-        if (order?.profile_id) {
+        if (order?.profile_id && order.type == 'chat') {
             const profile = await db('userprofiles').where({ id: order?.profile_id }).first();
 
             let message = `Hello ${order?.name},\n Below are my details:
@@ -373,11 +373,18 @@ async function acceptOrder(req, res) {
         //     toType: `user_${order?.userId}`,
         //     payload: order,
         // });
-
-        callEvent("emit_to_user_chat_end_time", {
-            key: `pandit_${order?.pandit_id}`,
-            payload: { startTime, endTime, orderId }
-        });
+        if (order.type == 'chat') {
+            callEvent("emit_to_user_chat_end_time", {
+                key: `pandit_${order?.pandit_id}`,
+                payload: { startTime, endTime, orderId }
+            });
+        }
+        if (order.type == 'call') {
+            callEvent("emit_to_user_call_end_time", {
+                key: `pandit_${order?.pandit_id}`,
+                payload: { startTime, endTime, orderId }
+            });
+        }
 
         callEvent("emit_to_pending_order", {
             key: `pandit_${order?.pandit_id}`,
