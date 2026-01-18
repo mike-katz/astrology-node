@@ -115,39 +115,50 @@ async function sendNotification(token, username, chat_call_rate, panditId, type)
                 token,
                 notification: {
                     title: messages,
-                    body: 'Incoming call'
-                },
-                // 🔔 Android
-                android: {
-                    notification: {
-                        sound: 'default'
-                    }
+                    body: `${username} is calling you`,
                 },
 
-                // 🔔 iOS
+                // 📦 Custom Data (MUST be strings)
+                data: {
+                    type: "incoming_call",
+                    channelName: "channelName",
+                    userName: username,
+                    userId: "userId",
+                    userAvatar: "userAvatar",
+                    agoraToken: "agoraToken",
+                },
+
+                // 🤖 Android
+                android: {
+                    priority: "high",
+                    notification: {
+                        sound: "default",
+                        channelId: "incoming_call",
+                    },
+                },
+
+                // 🍎 iOS
                 apns: {
+                    headers: {
+                        "apns-priority": "10",
+                    },
                     payload: {
                         aps: {
-                            sound: 'default'
-                        }
-                    }
+                            alert: {
+                                title: "Incoming Call",
+                                body: `${username} is calling you`,
+                            },
+                            sound: "default",
+                            contentAvailable: true,
+                        },
+                    },
                 },
 
-                // 🔔 Web Browser
+                // 🌐 Web
                 webpush: {
                     notification: {
-                        // icon: '/icon.png',
-                        requireInteraction: true
-                        // NOTE: Browsers play default sound automatically
-                    }
-                },
-                data: {
-                    "type": "incoming_call",
-                    "channelName": "unique-channel-id",
-                    "userName": username,
-                    "userAvatar": "avatar-url",
-                    "userId": "user-id",
-                    "token": "agora-token-if-needed"
+                        requireInteraction: true,
+                    },
                 },
             };
             const response = await admin.messaging().send(message);
