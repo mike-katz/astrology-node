@@ -115,16 +115,16 @@ async function sendNotification(token, username, chat_call_rate, panditId, type)
                 token,
                 notification: {
                     title: messages,
-                    data: {
-                        "type": "incoming_call",
-                        "channelName": "unique-channel-id",
-                        "userName": username,
-                        "userAvatar": "avatar-url",
-                        "userId": "user-id",
-                        "token": "agora-token-if-needed"
-                    }
+                    body: 'Incoming call'
                 },
-
+                data: {
+                    "type": "incoming_call",
+                    "channelName": "unique-channel-id",
+                    "userName": username,
+                    "userAvatar": "avatar-url",
+                    "userId": "user-id",
+                    "token": "agora-token-if-needed"
+                },
                 // 🔔 Android
                 android: {
                     notification: {
