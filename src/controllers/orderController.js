@@ -9,7 +9,7 @@ admin.initializeApp({
 });
 
 async function create(req, res) {
-    const { panditId, type = 'chat', profile_id } = req.body;
+    const { panditId, type, profile_id } = req.body;
     if (!panditId || !profile_id) {
         return res.status(400).json({ success: false, message: 'Missing params' });
     }
@@ -92,7 +92,7 @@ async function create(req, res) {
 
         const token = pandit?.token || false;
         if (token) {
-            sendNotification(token, user?.name, pandit?.final_chat_call_rate, panditId, type)
+            await sendNotification(token, user?.name, pandit?.final_chat_call_rate, panditId, type, orderId, user?.name, user?.profile)
         }
         // socket.emit("emit_to_user_for_register", {
         //     key: `user_${req?.userId}`,
@@ -105,62 +105,67 @@ async function create(req, res) {
     }
 }
 
-async function sendNotification(token, username, chat_call_rate, panditId, type) {
+async function sendNotification(token, username, chat_call_rate, panditId, type, orderId, panditName, profile) {
     try {
         if (token) {
             console.log("start push notification");
             const messages = `new ${type} request from ${username} (Rs ${chat_call_rate}/min).`
             const continueOrder = await db('panditnotifications').insert({ user_id: panditId, type: "order", message: messages })
-            const message = {
-                token,
-                notification: {
-                    title: messages,
-                    body: `${username} is calling you`,
-                },
-
-                // 📦 Custom Data (MUST be strings)
-                data: {
-                    type: "incoming_call",
-                    channelName: "channelName",
-                    userName: username,
-                    userId: "userId",
-                    userAvatar: "userAvatar",
-                    agoraToken: "agoraToken",
-                },
-
-                // 🤖 Android
-                android: {
-                    priority: "high",
+            let message = {}
+            if (type == 'chat') {
+                message = {
+                    token,
                     notification: {
-                        sound: "default",
-                        channelId: "incoming_call",
+                        title: messages,
                     },
-                },
 
-                // 🍎 iOS
-                apns: {
-                    headers: {
-                        "apns-priority": "10",
+                    // 🔔 Android
+                    android: {
+                        notification: {
+                            sound: 'default'
+                        }
                     },
-                    payload: {
-                        aps: {
-                            alert: {
-                                title: "Incoming Call",
-                                body: `${username} is calling you`,
-                            },
-                            sound: "default",
-                            contentAvailable: true,
-                        },
-                    },
-                },
 
-                // 🌐 Web
-                webpush: {
-                    notification: {
-                        requireInteraction: true,
+                    // 🔔 iOS
+                    apns: {
+                        payload: {
+                            aps: {
+                                sound: 'default'
+                            }
+                        }
                     },
-                },
-            };
+
+                    // 🔔 Web Browser
+                    webpush: {
+                        notification: {
+                            // icon: '/icon.png',
+                            requireInteraction: true
+                            // NOTE: Browsers play default sound automatically
+                        }
+                    },
+
+                };
+            } else {
+                message = {
+                    token,
+
+                    // 🔥 ANDROID ONLY – HIGH PRIORITY
+                    android: {
+                        priority: "high",
+                    },
+
+                    // 🔥 DATA ONLY (NO notification block)
+                    data: {
+                        type: "incoming_call",
+                        userName: String(username),
+                        userId: String("userId"),
+                        channelName: String(orderId),
+                        agoraToken: String("agoraToken"),
+                        panditName,
+                        profile
+                    },
+                };
+            }
             const response = await admin.messaging().send(message);
             console.log("push notification response", response);
             console.log("end push notification");
