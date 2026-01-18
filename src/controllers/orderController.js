@@ -162,7 +162,7 @@ async function sendNotification(token, username, chat_call_rate, panditId, type,
                         channelName: String(orderId),
                         agoraToken: String("agoraToken"),
                         panditName,
-                        profile
+                        profile: profile == null ? "" : profile
                     },
                 };
             }
