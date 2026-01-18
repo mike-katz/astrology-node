@@ -117,14 +117,6 @@ async function sendNotification(token, username, chat_call_rate, panditId, type)
                     title: messages,
                     body: 'Incoming call'
                 },
-                data: {
-                    "type": "incoming_call",
-                    "channelName": "unique-channel-id",
-                    "userName": username,
-                    "userAvatar": "avatar-url",
-                    "userId": "user-id",
-                    "token": "agora-token-if-needed"
-                },
                 // 🔔 Android
                 android: {
                     notification: {
@@ -149,8 +141,14 @@ async function sendNotification(token, username, chat_call_rate, panditId, type)
                         // NOTE: Browsers play default sound automatically
                     }
                 },
-                data: {},
-
+                data: {
+                    "type": "incoming_call",
+                    "channelName": "unique-channel-id",
+                    "userName": username,
+                    "userAvatar": "avatar-url",
+                    "userId": "user-id",
+                    "token": "agora-token-if-needed"
+                },
             };
             const response = await admin.messaging().send(message);
             console.log("push notification response", response);
