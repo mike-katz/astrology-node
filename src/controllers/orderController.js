@@ -9,11 +9,10 @@ admin.initializeApp({
 });
 
 async function create(req, res) {
-    const { panditId, profile_id } = req.body;
+    const { panditId, type, profile_id } = req.body;
     if (!panditId || !profile_id) {
         return res.status(400).json({ success: false, message: 'Missing params' });
     }
-    const type = 'call'
     console.log("create order req.body", req.body);
     try {
         const user = await db('users').where({ id: req.userId }).first()
