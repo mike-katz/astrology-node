@@ -3,6 +3,47 @@ const db = require('../db');
 require('dotenv').config();
 const { uploadImageTos3, deleteFileFroms3 } = require('./uploader');
 
+async function makeAvtarString(user, gender) {
+    if (!user || !gender) return null;
+
+    const firstChar = user.trim().charAt(0).toUpperCase();
+
+    const zodiacMap = {
+        aries: ['A', 'L', 'E', 'I', 'O'],
+        taurus: ['B', 'V', 'U', 'W'],
+        gemini: ['K', 'C', 'G'],
+        cancer: ['D', 'H'],
+        leo: ['M', 'T'],
+        virgo: ['P', 'N'],
+        libra: ['R', 'T'],
+        scorpio: ['N', 'Y'],
+        sagittarius: ['F', 'D', 'P'],
+        capricorn: ['K', 'J'],
+        aquarius: ['G', 'S'],
+        pisces: ['Z', 'C', 'L']
+    };
+
+    let zodiac = 'aries'; // default fallback
+
+    for (const [sign, letters] of Object.entries(zodiacMap)) {
+        if (letters.includes(firstChar)) {
+            zodiac = sign;
+            break;
+        }
+    }
+
+    const genderMap = {
+        male: 'm',
+        female: 'f',
+        other: 'o'
+    };
+
+    const genderKey = genderMap[gender.toLowerCase()] || 'o';
+
+    const random = Math.floor(Math.random() * 3) + 1;
+    return `${zodiac}_${genderKey}_${random}`;
+}
+
 async function getProfile(req, res) {
     const user = await db('users')
         .where('id', req?.userId)
@@ -31,9 +72,11 @@ async function updateProfile(req, res) {
         const update = {}
         if (name) {
             update.name = name
+            update.avatar = await makeAvtarString(name || user?.name, gender || user?.gender)
         }
         if (gender) {
             update.gender = gender
+            update.avatar = await makeAvtarString(name || user?.name, gender || user?.gender)
         }
         if (dob) {
             update.dob = dob
@@ -80,6 +123,7 @@ async function updateProfile(req, res) {
         delete update.current_address
         delete update.astromall_chat
         delete update.live_event
+        delete update.avatar
 
         if (isProfileExist) {
             await db('userprofiles')
