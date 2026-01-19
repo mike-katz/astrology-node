@@ -107,7 +107,7 @@ async function addPayment(req, res) {
         const order = await db('orders').where({ user_id: req.userId, status: "continue" }).first();
         if (order) {
             const minute = Math.floor(Number(Number(amount) / Number(order?.rate)));
-            const endTime = new Date(Date(order.end_time) + `${minute}` * 60 * 1000);
+            const endTime = new Date(new Date(order.end_time).getTime() + minute * 60 * 1000);
             const duration = Number(order?.duration) + Number(minute);
             const deduction = Number(duration) * Number(order.rate)
             await db('orders').where({ id: order?.id }).update({ duration, deduction, end_time: endTime });
