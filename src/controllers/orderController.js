@@ -112,60 +112,61 @@ async function sendNotification(token, username, chat_call_rate, panditId, type,
             const messages = `new ${type} request from ${username} (Rs ${chat_call_rate}/min).`
             const continueOrder = await db('panditnotifications').insert({ user_id: panditId, type: "order", message: messages })
             let message = {}
-            if (type == 'chat') {
-                message = {
-                    token,
-                    notification: {
-                        title: messages,
-                    },
+            // if (type == 'chat') {
 
-                    // 🔔 Android
-                    android: {
-                        notification: {
+            message = {
+                token,
+                notification: {
+                    title: messages,
+                },
+
+                // 🔔 Android
+                android: {
+                    notification: {
+                        sound: 'default'
+                    }
+                },
+
+                // 🔔 iOS
+                apns: {
+                    payload: {
+                        aps: {
                             sound: 'default'
                         }
-                    },
+                    }
+                },
 
-                    // 🔔 iOS
-                    apns: {
-                        payload: {
-                            aps: {
-                                sound: 'default'
-                            }
-                        }
-                    },
+                // 🔔 Web Browser
+                webpush: {
+                    notification: {
+                        // icon: '/icon.png',
+                        requireInteraction: true
+                        // NOTE: Browsers play default sound automatically
+                    }
+                },
 
-                    // 🔔 Web Browser
-                    webpush: {
-                        notification: {
-                            // icon: '/icon.png',
-                            requireInteraction: true
-                            // NOTE: Browsers play default sound automatically
-                        }
-                    },
+            };
+            // } else {
+            //     message = {
+            //         token,
 
-                };
-            } else {
-                message = {
-                    token,
+            //         // 🔥 ANDROID ONLY – HIGH PRIORITY
+            //         android: {
+            //             priority: "high",
+            //         },
 
-                    // 🔥 ANDROID ONLY – HIGH PRIORITY
-                    android: {
-                        priority: "high",
-                    },
-
-                    // 🔥 DATA ONLY (NO notification block)
-                    data: {
-                        type: "incoming_call",
-                        userName: String(username),
-                        userId: String("userId"),
-                        channelName: String(orderId),
-                        agoraToken: String("agoraToken"),
-                        panditName,
-                        profile: profile == null ? "" : profile
-                    },
-                };
-            }
+            //         // 🔥 DATA ONLY (NO notification block)
+            //         data: {
+            //             type: "incoming_call",
+            //             userName: String(username),
+            //             userId: String("userId"),
+            //             channelName: String(orderId),
+            //             agoraToken: String("agoraToken"),
+            //             panditName,
+            //             profile: profile == null ? "" : profile
+            //         },
+            //     };
+            // }
             const response = await admin.messaging().send(message);
             console.log("push notification response", response);
             console.log("end push notification");
