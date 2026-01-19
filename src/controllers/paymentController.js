@@ -117,11 +117,19 @@ async function addPayment(req, res) {
                     key: `pandit_${order?.pandit_id}`,
                     payload: { startTime: order?.start_time, endTime, orderId: order?.orderId }
                 });
+                callEvent("emit_to_user_chat_end_time", {
+                    key: `user_${order?.user_id}`,
+                    payload: { startTime: order?.start_time, endTime, orderId: order?.orderId }
+                });
             }
             if (order.type == 'call') {
                 console.log("emit_to_user_call_end_time call start",);
                 callEvent("emit_to_user_call_end_time", {
                     key: `pandit_${order?.pandit_id}`,
+                    payload: { startTime: order?.start_time, endTime, orderId: order?.orderId }
+                });
+                callEvent("emit_to_user_call_end_time", {
+                    key: `user_${order?.user_id}`,
                     payload: { startTime: order?.start_time, endTime, orderId: order?.orderId }
                 });
                 console.log("emit_to_user_call_end_time call end",);
