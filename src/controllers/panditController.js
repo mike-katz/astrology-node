@@ -36,11 +36,11 @@ async function getPandits(req, res) {
                 sort = 'experience'
                 orderBy = 'asc'
             }
-            if (sort_by == 'order_low_to_high') {
+            if (sort_by == 'orders_low_to_high') {
                 sort = 'total_orders'
                 orderBy = 'asc'
             }
-            if (sort_by == 'order_high_to_low') {
+            if (sort_by == 'orders_high_to_low') {
                 sort = 'experience'
                 orderBy = 'desc'
             }
