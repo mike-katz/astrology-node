@@ -1,4 +1,5 @@
 const db = require('../db');
+const { callEvent } = require('../socket');
 require('dotenv').config();
 const generateInvoicePDF = require('../utils/generatepdf');
 
@@ -103,6 +104,33 @@ async function addPayment(req, res) {
         await db('users').where({ id: user?.id }).increment({ balance: Number(amount) });
         await db('payments').insert({ user_id: req?.userId, transaction_id: orderId, utr, gst, amount, status: "success", invoice, type: "recharge" });
         const newBalance = Number(user.balance) + Number(amount)
+        const order = await db('orders').where({ user_id: req.userId, status: "continue" }).first();
+        if (order) {
+            const minute = Math.floor(Number(Number(amount) / Number(order?.rate)));
+            const endTime = new Date(Date(order.end_time) + `${minute}` * 60 * 1000);
+            await db('orders').where({ id: order?.id }).update({ duration, end_time: endTime });
+
+            if (order.type == 'chat') {
+                callEvent("emit_to_user_chat_end_time", {
+                    key: `pandit_${order?.pandit_id}`,
+                    payload: { startTime: order?.start_time, endTime, orderId: order?.orderId }
+                });
+            }
+            if (order.type == 'call') {
+                console.log("emit_to_user_call_end_time call start",);
+                callEvent("emit_to_user_call_end_time", {
+                    key: `pandit_${order?.pandit_id}`,
+                    payload: { startTime: order?.start_time, endTime, orderId: order?.orderId }
+                });
+                console.log("emit_to_user_call_end_time call end",);
+
+            }
+
+            callEvent("emit_to_pending_order", {
+                key: `pandit_${order?.pandit_id}`,
+                payload: { pandit_id: order?.pandit_id }
+            });
+        }
         await db('balancelogs').insert({
             user_old_balance: Number(user.balance), user_new_balance: Number(newBalance), user_id: req?.userId, message: "Purchase of ATG-Money via razorpay", amount, gst, invoice
         });
