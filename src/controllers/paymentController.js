@@ -108,7 +108,9 @@ async function addPayment(req, res) {
         if (order) {
             const minute = Math.floor(Number(Number(amount) / Number(order?.rate)));
             const endTime = new Date(Date(order.end_time) + `${minute}` * 60 * 1000);
-            await db('orders').where({ id: order?.id }).update({ duration, end_time: endTime });
+            const duration = Number(order?.duration) + Number(minute);
+            const deduction = Number(duration) * Number(order.rate)
+            await db('orders').where({ id: order?.id }).update({ duration, deduction, end_time: endTime });
 
             if (order.type == 'chat') {
                 callEvent("emit_to_user_chat_end_time", {
