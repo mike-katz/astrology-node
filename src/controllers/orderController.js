@@ -402,10 +402,13 @@ async function acceptOrder(req, res) {
             });
         }
         if (order.type == 'call') {
+            console.log("emit_to_user_call_end_time call start",);
             callEvent("emit_to_user_call_end_time", {
                 key: `pandit_${order?.pandit_id}`,
                 payload: { startTime, endTime, orderId }
             });
+            console.log("emit_to_user_call_end_time call end",);
+
         }
 
         callEvent("emit_to_pending_order", {
