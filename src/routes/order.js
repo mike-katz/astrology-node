@@ -10,5 +10,6 @@ router.get('/list', order.list);
 router.delete('/delete', order.deleteOrder);
 
 router.post('/sendGift', order.sendGift);
+router.post('/makeCall', order.generateCallToken);
 
 module.exports = router;

@@ -487,4 +487,16 @@ async function sendGift(req, res) {
     }
 }
 
-module.exports = { create, list, acceptOrder, cancelOrder, deleteOrder, sendGift };
+async function generateCallToken(req, res) {
+    const { order_id } = req.body;
+    if (!order_id) {
+        return res.status(400).json({ error: 'Channel name is required' });
+    }
+    callEvent("emit_to_call_request", {
+        key: `pandit_${pandit_id}`,
+        payload: [{ order_id }]
+    });
+    return res.status(200).json({ success: true, message: 'Call requested Successfully' });
+
+}
+module.exports = { create, list, acceptOrder, cancelOrder, deleteOrder, sendGift, generateCallToken };
