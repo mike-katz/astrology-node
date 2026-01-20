@@ -128,63 +128,107 @@ async function getPandits(req, res) {
         }
 
         if (Array.isArray(skill) && skill.length) {
-            query.andWhere(builder => {
-                skill.forEach((s, index) => {
-                    const condition = ['ilike', `%${s.trim()}%`];
-                    index === 0
-                        ? builder.where('p.primary_expertise', ...condition)
-                        : builder.orWhere('p.primary_expertise', ...condition);
-                });
-            });
+            // query.andWhere(builder => {
+            //     skill.forEach((s, index) => {
+            //         const condition = ['ilike', `%${s.trim()}%`];
+            //         index === 0
+            //             ? builder.where('p.primary_expertise', ...condition)
+            //             : builder.orWhere('p.primary_expertise', ...condition);
+            //     });
+            // });
 
-            countQuery.andWhere(builder => {
-                skill.forEach((s, index) => {
-                    const condition = ['ilike', `%${s.trim()}%`];
-                    index === 0
-                        ? builder.where('p.primary_expertise', ...condition)
-                        : builder.orWhere('p.primary_expertise', ...condition);
-                });
-            });
+            // countQuery.andWhere(builder => {
+            //     skill.forEach((s, index) => {
+            //         const condition = ['ilike', `%${s.trim()}%`];
+            //         index === 0
+            //             ? builder.where('p.primary_expertise', ...condition)
+            //             : builder.orWhere('p.primary_expertise', ...condition);
+            //     });
+            // });
+
+            const skills = skill
+                .map(s => s?.trim())
+                .filter(Boolean)
+                .map(s => `%${s}%`);
+
+            query.andWhereRaw(
+                `p.primary_expertise ILIKE ANY (ARRAY[${skills.map(() => '?').join(',')}])`,
+                skills
+            );
+
+            countQuery.andWhereRaw(
+                `p.primary_expertise ILIKE ANY (ARRAY[${skills.map(() => '?').join(',')}])`,
+                skills
+            );
         }
 
         if (Array.isArray(language) && language.length) {
-            query.andWhere(builder => {
-                language.forEach((s, index) => {
-                    const condition = ['ilike', `%${s.trim()}%`];
-                    index === 0
-                        ? builder.where('p.languages', ...condition)
-                        : builder.orWhere('p.languages', ...condition);
-                });
-            });
+            // query.andWhere(builder => {
+            //     language.forEach((s, index) => {
+            //         const condition = ['ilike', `%${s.trim()}%`];
+            //         index === 0
+            //             ? builder.where('p.languages', ...condition)
+            //             : builder.orWhere('p.languages', ...condition);
+            //     });
+            // });
 
-            countQuery.andWhere(builder => {
-                language.forEach((s, index) => {
-                    const condition = ['ilike', `%${s.trim()}%`];
-                    index === 0
-                        ? builder.where('p.languages', ...condition)
-                        : builder.orWhere('p.languages', ...condition);
-                });
-            });
+            // countQuery.andWhere(builder => {
+            //     language.forEach((s, index) => {
+            //         const condition = ['ilike', `%${s.trim()}%`];
+            //         index === 0
+            //             ? builder.where('p.languages', ...condition)
+            //             : builder.orWhere('p.languages', ...condition);
+            //     });
+            // });
+
+            const languages = language
+                .map(s => s?.trim())
+                .filter(Boolean)
+                .map(s => `%${s}%`);
+
+            query.andWhereRaw(
+                `p.languages ILIKE ANY (ARRAY[${languages.map(() => '?').join(',')}])`,
+                languages
+            );
+
+            countQuery.andWhereRaw(
+                `p.languages ILIKE ANY (ARRAY[${languages.map(() => '?').join(',')}])`,
+                languages
+            );
         }
 
         if (Array.isArray(gender) && gender.length) {
-            query.andWhere(builder => {
-                gender.forEach((s, index) => {
-                    const condition = ['ilike', `%${s.trim()}%`];
-                    index === 0
-                        ? builder.where('p.gender', ...condition)
-                        : builder.orWhere('p.gender', ...condition);
-                });
-            });
+            // query.andWhere(builder => {
+            //     gender.forEach((s, index) => {
+            //         const condition = ['ilike', `%${s.trim()}%`];
+            //         index === 0
+            //             ? builder.where('p.gender', ...condition)
+            //             : builder.orWhere('p.gender', ...condition);
+            //     });
+            // });
 
-            countQuery.andWhere(builder => {
-                gender.forEach((s, index) => {
-                    const condition = ['ilike', `%${s.trim()}%`];
-                    index === 0
-                        ? builder.where('p.gender', ...condition)
-                        : builder.orWhere('p.gender', ...condition);
-                });
-            });
+            // countQuery.andWhere(builder => {
+            //     gender.forEach((s, index) => {
+            //         const condition = ['ilike', `%${s.trim()}%`];
+            //         index === 0
+            //             ? builder.where('p.gender', ...condition)
+            //             : builder.orWhere('p.gender', ...condition);
+            //     });
+            // });
+            const genders = gender
+                .map(g => g?.trim())
+                .filter(Boolean)
+                .map(g => `%${g}%`);
+
+            query.andWhereRaw(
+                `p.gender ILIKE ANY (ARRAY[${genders.map(() => '?').join(',')}])`,
+                genders
+            );
+
+            countQuery.andWhereRaw(
+                `p.gender ILIKE ANY (ARRAY[${genders.map(() => '?').join(',')}])`,
+                genders
+            );
         }
 
         // if (Array.isArray(top_astrologer) && top_astrologer.length) {
@@ -229,6 +273,9 @@ async function getPandits(req, res) {
         if (sorting?.length > 0) {
             query.orderBy(sorting)
         }
+
+        console.log("query", query.toQuery()
+        );
         const user = await query;
         const [{ count }] = await countQuery
         const total = parseInt(count);
