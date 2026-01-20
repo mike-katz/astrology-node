@@ -475,10 +475,12 @@ async function sendGift(req, res) {
         if (user?.balance < Number(final)) return res.status(400).json({ success: false, message: 'Insufficient balance.' });
         if (!pandit) return res.status(400).json({ success: false, message: 'Pandit not found.' });
         if (isNaN(final)) return res.status(400).json({ success: false, message: 'Invalid amount.' });
-        await db('pandits').where({ id: pandit.id }).increment({ balance: Number(final) });
+
+        const panditAmount = (Number(final) * Number(pandit?.gift_share)) / 100
+        await db('pandits').where({ id: pandit.id }).increment({ balance: Number(panditAmount) });
         await db('users').where({ id: user?.id }).increment({ balance: -Number(final) });
         const newBalance = Number(user.balance) - Number(final)
-        const pandit_new_balance = Number(pandit.balance) + Number(final)
+        const pandit_new_balance = Number(pandit.balance) + Number(panditAmount)
         await db('balancelogs').insert({ pandit_old_balance: Number(pandit?.balance), pandit_new_balance, user_old_balance: Number(user.balance), user_new_balance: Number(newBalance), user_id: req.userId, message: `send gift to ${pandit?.name} (${name}) - ${qty}`, pandit_id: pandit?.id, pandit_message: `receive gift from ${user?.name} (${name}) - ${qty}`, amount: - final });
         return res.status(200).json({ success: true, message: 'Order cancel Successfully' });
     } catch (err) {
