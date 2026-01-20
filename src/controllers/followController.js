@@ -59,7 +59,12 @@ async function getFollow(req, res) {
             "p.languages",
             "p.primary_expertise",
             "p.experience",
-            "p.online",
+            'p.online',
+            'p.rating_1',
+            'p.rating_2',
+            'p.rating_3',
+            'p.rating_5',
+            'p.rating_4',
             "p.total_orders"
         )
         .where('f.user_id', Number(req?.userId)).limit(limit)
