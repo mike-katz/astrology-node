@@ -56,7 +56,7 @@ async function getProfile(req, res) {
 
 async function updateProfile(req, res) {
     try {
-        const { name, gender, dob, birthTime = '12:00:00', birth_place, current_address, city_state_country, pincode, language, astromall_chat, live_event, my_interest } = req.body;
+        const { name, gender, dob, dot = '12:00:00', birth_place, current_address, city_state_country, pincode, language, astromall_chat, live_event, my_interest, lat, lng } = req.body;
 
         if (!name) return res.status(400).json({ success: false, message: 'Please enter name.' });
         const user = await db('users')
@@ -81,8 +81,8 @@ async function updateProfile(req, res) {
         if (dob) {
             update.dob = dob
         }
-        if (birthTime) {
-            update.birth_time = birthTime
+        if (dot) {
+            update.birth_time = dot
         }
         if (birth_place) {
             update.birth_place = birth_place
@@ -95,6 +95,12 @@ async function updateProfile(req, res) {
         }
         if (pincode) {
             update.pincode = pincode
+        }
+        if (lat) {
+            update.lat = lat
+        }
+        if (lng) {
+            update.lng = lng
         }
         if (language?.length > 0) {
             update.language = language ? JSON.stringify(language) : {}
