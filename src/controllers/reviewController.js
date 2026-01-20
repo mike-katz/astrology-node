@@ -15,7 +15,8 @@ async function addReview(req, res) {
         // if (user) return res.status(400).json({ success: false, message: 'You already follow this pandit' });
         if (!user) {
             await db('pandits').where({ id: Number(panditId) }).increment(`rating_${rating}`, 1);
-            await db('reviews').insert({ user_id: req?.userId, pandit_id: panditId, order_id: orderId, message, rating, type: "user" });
+            const userDetail = await db('users').where('id', req?.userId).first();
+            await db('reviews').insert({ user_id: req?.userId, pandit_id: panditId, order_id: orderId, message, rating, type: "user", gender: userDetail?.gender, profile: userDetail?.profile, avatar: userDetail?.avatar, name: userDetail?.name });
         } else {
             await db('reviews').where({ id: user?.id }).update({ user_id: req?.userId, pandit_id: panditId, order_id: orderId, message, rating });
         }
