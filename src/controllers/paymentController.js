@@ -142,7 +142,7 @@ async function addPayment(req, res) {
             });
         }
         await db('balancelogs').insert({
-            user_old_balance: Number(user.balance), user_new_balance: Number(newBalance), user_id: req?.userId, message: "Purchase of ATG-Money via razorpay", amount, gst, invoice
+            user_old_balance: Number(user.balance), user_new_balance: Number(newBalance), user_id: req?.userId, message: "Purchase of AG-Money via razorpay", amount, gst, invoice
         });
 
         return res.status(200).json({ success: true, message: 'Payment added Successfully' });
