@@ -197,4 +197,4 @@ async function profileUpdate(req, res) {
 }
 
 
-module.exports = { updateProfile, getProfile, getBalance, updateToken, profileUpdate };
+module.exports = { updateProfile, getProfile, getBalance, updateToken, profileUpdate, makeAvtarString };

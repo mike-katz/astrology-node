@@ -1,6 +1,7 @@
 const db = require('../db');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const { makeAvtarString } = require('./userController');
 require('dotenv').config();
 
 const MARITAL_STATUS = ['single', 'married', 'divorced', 'separated', 'widowed'];
@@ -102,11 +103,14 @@ async function updateProfile(req, res) {
         //     birth_place,
         //     marital_status
         // }
+        let avatar;
         if (name) {
             upd.name = name
+            avatar = await makeAvtarString(name, gender)
         }
         if (gender) {
             upd.gender = gender
+            avatar = await makeAvtarString(name, gender)
         } if (dob) {
             upd.dob = dob
         } if (dot) {
@@ -145,8 +149,10 @@ async function updateProfile(req, res) {
 
         if (count.is_first) {
             delete upd.is_updated
-            delete upd.lat
-            delete upd.lng
+
+            if (avatar) {
+                upd.avatar = avatar
+            }
             await db('users').where({ id: req.userId }).update(upd);
         }
         return res.status(200).json({ success: true, message: 'Profile Successfully' });
