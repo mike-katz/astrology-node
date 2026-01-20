@@ -488,9 +488,9 @@ async function sendGift(req, res) {
 }
 
 async function generateCallToken(req, res) {
-    const { order_id } = req.body;
-    if (!order_id) {
-        return res.status(400).json({ error: 'Channel name is required' });
+    const { order_id, pandit_id } = req.body;
+    if (!order_id || !pandit_id) {
+        return res.status(400).json({ error: 'Missing params.' });
     }
     callEvent("emit_to_call_request", {
         key: `pandit_${pandit_id}`,
