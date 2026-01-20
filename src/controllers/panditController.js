@@ -619,7 +619,7 @@ async function onboard(req, res) {
         const { files } = req
         if (step == 1) {
             if (!name || !display_name || !dob || !email || !city || !country || !gender || !primary_expertise || !experience || !daily_horoscope) return res.status(400).json({ success: false, message: 'Missing params.' });
-            if (other_working == 'other' && !other_working_text) return res.status(400).json({ success: false, message: 'Missing params.' });
+            // if (other_working == 'other' && !other_working_text) return res.status(400).json({ success: false, message: 'Missing params.' });
             if (!is18OrAbove(dob)) return res.status(400).json({ success: false, message: 'Enter DOB above 18+ year.' });
         }
         if (step == 2) {
