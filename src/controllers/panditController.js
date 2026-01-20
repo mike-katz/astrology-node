@@ -468,9 +468,9 @@ async function verifyOtp(req, res) {
         // hide password
         const encryptToken = encrypt(token);
 
-        const { name, display_name, gender, profile, email, dob, city, country, experience, primary_expertise, secondary_expertise, other_working, other_working_text, daily_horoscope,
-            languages, consaltance_language, available_for, offer_live_session, live_start_time, live_end_time, dedicated_time, response_time,
-            chat_call_rate, is_first_chat_free, training_type, guru_name, certificate,
+        const { name, display_name, gender, profile, email, dob, city, country, experience, primary_expertise, secondary_expertise, other_working, other_working_text,
+            languages, consaltance_language, available_for, live_start_time, live_end_time, dedicated_time, response_time,
+            chat_call_rate, training_type, guru_name, certificate,
             govt_id, about, achievement_url, address, selfie, achievement_file,
             terms, no_false, consent_profile, step = 0, application_id
         } = user
@@ -485,16 +485,16 @@ async function verifyOtp(req, res) {
                 primary_expertise: primary_expertise ? JSON.parse(primary_expertise) : [],
                 secondary_expertise: secondary_expertise ? JSON.parse(secondary_expertise) : [],
                 other_working_text: other_working_text || "",
-                other_working: other_working ? JSON.parse(other_working) : [], daily_horoscope: daily_horoscope || ""
+                other_working: other_working ? JSON.parse(other_working) : []
             },
             "step2": {
                 languages: languages ? JSON.parse(languages) : [],
                 consaltance_language: consaltance_language ? JSON.parse(consaltance_language) : [],
                 available_for: available_for ? JSON.parse(available_for) : [],
-                offer_live_session: offer_live_session || "", live_start_time: live_start_time || "", live_end_time: live_end_time || "", dedicated_time: dedicated_time || "", response_time: response_time || ""
+                live_start_time: live_start_time || "", live_end_time: live_end_time || "", dedicated_time: dedicated_time || "", response_time: response_time || ""
             },
             "step3": {
-                chat_call_rate: chat_call_rate || "", is_first_chat_free: is_first_chat_free || "", training_type: training_type || "", guru_name: guru_name || "", certificate: certificate ? JSON.parse(certificate) : [],
+                chat_call_rate: chat_call_rate || "", training_type: training_type || "", guru_name: guru_name || "", certificate: certificate ? JSON.parse(certificate) : [],
             },
             "step4": {
                 govt_id: govt_id ? JSON.parse(govt_id) : [],
@@ -603,9 +603,9 @@ async function basicOnboard(req, res) {
 
 async function onboard(req, res) {
     try {
-        const { name, display_name, dob, country_code, mobile, email, city, country, gender, experience, primary_expertise, secondary_expertise, other_working, other_working_text, daily_horoscope, step = 1,
-            languages, consaltance_language, available_for, offer_live_session, live_start_time, live_end_time, dedicated_time, response_time,
-            chat_call_rate, is_first_chat_free, training_type, guru_name, certificate,
+        const { name, display_name, dob, country_code, mobile, email, city, country, gender, experience, primary_expertise, secondary_expertise, other_working, other_working_text, step = 1,
+            languages, consaltance_language, available_for, live_start_time, live_end_time, dedicated_time, response_time,
+            chat_call_rate, training_type, guru_name, certificate,
             govt_id, about, achievement_url, address, achievement_file,
             terms, no_false, consent_profile, token
         } = req.body;
@@ -618,12 +618,12 @@ async function onboard(req, res) {
         const language = ["english", "hindi", "tamil", "panjabi", "marathi", "gujarati", "bangali", "french", "odia", "telugu", "kannada", "malayalam", "sanskrit", "assamese", "german", "spanish", "marwari", "manipuri", "urdu", "sindhi", "kashmiri", "bodo", "nepali", "konkani", "maithili", "arabic", "bhojpuri", "dutch", "rajasthanii"]
         const { files } = req
         if (step == 1) {
-            if (!name || !display_name || !dob || !email || !city || !country || !gender || !primary_expertise || !experience || !daily_horoscope) return res.status(400).json({ success: false, message: 'Missing params.' });
+            if (!name || !display_name || !dob || !email || !city || !country || !gender || !primary_expertise || !experience) return res.status(400).json({ success: false, message: 'Missing params.' });
             // if (other_working == 'other' && !other_working_text) return res.status(400).json({ success: false, message: 'Missing params.' });
             if (!is18OrAbove(dob)) return res.status(400).json({ success: false, message: 'Enter DOB above 18+ year.' });
         }
         if (step == 2) {
-            if (!languages || !consaltance_language || !offer_live_session || !available_for || !live_start_time || !live_end_time || !response_time) return res.status(400).json({ success: false, message: 'Missing params.' });
+            if (!languages || !consaltance_language || !available_for || !live_start_time || !live_end_time || !response_time) return res.status(400).json({ success: false, message: 'Missing params.' });
         }
         if (step == 3) {
             if (!chat_call_rate || !training_type || !guru_name) return res.status(400).json({ success: false, message: 'Missing params.' });
@@ -693,9 +693,9 @@ async function onboard(req, res) {
         if (training_type) {
             ins.training_type = training_type
         }
-        if (is_first_chat_free != undefined) {
-            ins.is_first_chat_free = is_first_chat_free
-        }
+        // if (is_first_chat_free != undefined) {
+        //     ins.is_first_chat_free = is_first_chat_free
+        // }
         if (chat_call_rate) {
             ins.chat_call_rate = chat_call_rate
         }
@@ -708,9 +708,9 @@ async function onboard(req, res) {
         if (live_start_time) {
             ins.live_start_time = live_start_time
         }
-        if (offer_live_session != undefined) {
-            ins.offer_live_session = offer_live_session
-        }
+        // if (offer_live_session != undefined) {
+        //     ins.offer_live_session = offer_live_session
+        // }
         if (available_for) {
             ins.available_for = JSON.stringify(available_for)
         }
@@ -726,9 +726,9 @@ async function onboard(req, res) {
         if (step > user?.step) {
             ins.step = step
         }
-        if (daily_horoscope != undefined) {
-            ins.daily_horoscope = daily_horoscope
-        }
+        // if (daily_horoscope != undefined) {
+        //     ins.daily_horoscope = daily_horoscope
+        // }
         if (other_working) {
             ins.other_working = JSON.stringify(other_working)
         }
