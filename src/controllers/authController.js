@@ -5,6 +5,7 @@ require('dotenv').config();
 const { validationResult } = require('express-validator');
 const { encrypt } = require("../utils/crypto")
 const { checkOrders, isValidMobile } = require('../utils/decodeJWT');
+const axios = require('axios');
 
 const SALT_ROUNDS = parseInt(process.env.BCRYPT_SALT_ROUNDS || '12', 10);
 
@@ -43,8 +44,17 @@ async function login(req, res) {
         const isValid = isValidMobile(mobile);
         if (!isValid) return res.status(400).json({ success: false, message: 'Enter valid mobile number.' });
         const user = await db('users').where({ country_code, mobile }).first();
+        const url = `http://pro.trinityservices.co.in/generateOtp.jsp?userid=${process.env.OTP_USERNAME}&key=${process.env.OTP_KEY}&mobileno=${mobile}&timetoalive=60&sms=%7Botp%7D%20is%20the%20one%20time%20password%20for%20Astroguruji%20Application.%20AstrotalkGuruji`
+        let otpResponse;
+        try {
+            otpResponse = await axios.get(url);
+            otpResponse = otpResponse.data
+        } catch (error) {
+            console.error('Acquire API failed:', error.message);
+            otpResponse = null;
+        }
         if (!user) {
-            await db('users').insert({ mobile, country_code, otp: '1234' }).returning(['id', 'mobile', 'avatar', 'country_code', 'otp']);
+            await db('users').insert({ mobile, country_code, otp: otpResponse?.otpId }).returning(['id', 'mobile', 'avatar', 'country_code', 'otp']);
         }
         return res.status(200).json({ success: true, message: 'Otp Send Successfully' });
     } catch (err) {
@@ -60,7 +70,20 @@ async function verifyOtp(req, res) {
 
         const isValid = isValidMobile(mobile);
         if (!isValid) return res.status(400).json({ success: false, message: 'Enter valid mobile number.' });
-        const existing = await db('users').where({ mobile, country_code, otp }).first();
+        const url = `http://pro.trinityservices.co.in/validateOtpApi.jsp?mobileno=${mobile}&otp=${otp}`;
+        let otpResponse;
+        try {
+            otpResponse = await axios.get(url);
+            otpResponse = otpResponse.data
+            if (otpResponse?.result != "success") {
+                return res.status(400).json({ success: false, message: 'Wrong Otp' });
+            }
+        } catch (error) {
+            console.error('Acquire API failed:', error.message);
+            otpResponse = null;
+        }
+
+        const existing = await db('users').where({ mobile, country_code }).first();
         if (!existing) return res.status(400).json({ success: false, message: 'Wrong Otp' });
 
         const token = jwt.sign({ userId: existing.id, mobile: existing.mobile }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '1h' });
