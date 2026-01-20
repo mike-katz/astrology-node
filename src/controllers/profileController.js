@@ -155,7 +155,8 @@ async function updateProfile(req, res) {
             }
             await db('users').where({ id: req.userId }).update(upd);
         }
-        return res.status(200).json({ success: true, message: 'Profile Successfully' });
+        const newUser = await db('users').where({ id: req.userId }).first();
+        return res.status(200).json({ success: true, data: { profile: newUser?.profile, avatar: newUser?.avatar }, message: 'Profile Successfully' });
     } catch (err) {
         console.error(err);
         res.status(500).json({ success: false, message: 'Server error' });
