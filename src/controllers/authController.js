@@ -95,4 +95,20 @@ async function verifyOtp(req, res) {
         res.status(500).json({ success: false, message: 'Server error' });
     }
 }
-module.exports = { register, login, verifyOtp };
+
+async function socialUrl(req, res) {
+    try {
+        const banner = await db('banners');
+        const setting = await db('settings').first();
+        const data = {
+            banners: banner,
+            socialUrl: setting
+        }
+        return res.status(200).json({ success: true, data, message: 'get config Successfully' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
+module.exports = { register, login, verifyOtp, socialUrl };
