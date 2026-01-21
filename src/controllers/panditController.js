@@ -282,7 +282,6 @@ async function getPandits(req, res) {
         const totalPages = Math.ceil(total / limit);
 
         user.map(item => {
-            item.name = item?.display_name || "";
             item.govt_id = item?.govt_id ? JSON.parse(item?.govt_id) : [];
             item.available_for = item?.available_for ? JSON.parse(item?.available_for) : [];
             item.consaltance_language = item?.consaltance_language ? JSON.parse(item?.consaltance_language) : [];
