@@ -98,7 +98,9 @@ async function verifyOtp(req, res) {
 
 async function socialUrl(req, res) {
     try {
-        const banner = await db('banners');
+        const { platform } = req.query
+        if (!platform) return res.status(400).json({ success: false, message: 'Missing params' });
+        const banner = await db('banners').where({ platform });
         const setting = await db('settings').first();
         const data = {
             banners: banner,
