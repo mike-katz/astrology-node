@@ -79,7 +79,7 @@ async function getPandits(req, res) {
         let query = db('pandits as p')
             //.distinctOn('p.id')
             .select(
-                'p.name',
+                'p.display_name as name',
                 'p.id',
                 'p.knowledge',
                 'p.languages',
@@ -282,6 +282,7 @@ async function getPandits(req, res) {
         const totalPages = Math.ceil(total / limit);
 
         user.map(item => {
+            item.name = item?.display_name || "";
             item.govt_id = item?.govt_id ? JSON.parse(item?.govt_id) : [];
             item.available_for = item?.available_for ? JSON.parse(item?.available_for) : [];
             item.consaltance_language = item?.consaltance_language ? JSON.parse(item?.consaltance_language) : [];
@@ -314,16 +315,6 @@ async function getPanditDetail(req, res) {
     const user = await db('pandits').where('id', id).first();
     if (!user) return res.status(400).json({ success: false, message: 'pandit not available.' });
     const review = await db('reviews as r')
-        .leftJoin('users as u', 'u.id', 'r.user_id')
-        .select(
-            "r.id",
-            "r.message",
-            "r.rating",
-            "r.replay",
-            "r.created_at",
-            "u.name",
-            "u.profile",
-        )
         .where('r.pandit_id', id)
         .orderBy('r.created_at', 'desc')
         .limit(3);
@@ -331,7 +322,7 @@ async function getPanditDetail(req, res) {
     const gallery = await db('panditgallery').where({ pandit_id: id }).orderBy('order', 'asc');
     const response = {
         id: user?.id,
-        name: user?.name,
+        name: user?.display_name,
         knowledge: user?.knowledge,
         languages: user?.languages ? JSON.parse(user?.languages) : [],
         primary_expertise: user?.primary_expertise ? JSON.parse(user?.primary_expertise) : [],
@@ -893,15 +884,12 @@ async function getReviewList(req, res) {
         const pandit = await db('pandits').where({ id: Number(panditId) }).first()
 
         const user = await db('reviews as r')
-            .leftJoin('users as u', 'u.id', 'r.user_id')
             .select(
                 "r.id",
                 "r.message",
                 "r.rating",
                 "r.replay",
                 "r.created_at",
-                "u.name",
-                "u.profile",
             )
             .where('r.pandit_id', panditId).limit(limit)
             .offset(offset);

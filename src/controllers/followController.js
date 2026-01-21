@@ -53,7 +53,7 @@ async function getFollow(req, res) {
             "f.created_at",
             "p.id",
             "p.chat_call_rate",
-            "p.name",
+            "p.display_name as name",
             "p.profile",
             "p.knowledge",
             "p.languages",

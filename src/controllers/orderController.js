@@ -81,7 +81,7 @@ async function create(req, res) {
 
         callEvent("emit_to_user_for_register", {
             key: `user_${req?.userId}`,
-            payload: [{ ...saved, name: pandit?.name, profile: pandit?.profile }]
+            payload: [{ ...saved, name: pandit?.display_name, profile: pandit?.profile }]
         });
 
         callEvent("emit_to_pending_order", {
@@ -92,7 +92,7 @@ async function create(req, res) {
 
         const token = pandit?.token || false;
         if (token) {
-            await sendNotification(token, user?.name, pandit?.final_chat_call_rate, panditId, type, orderId, pandit?.name, pandit?.profile)
+            await sendNotification(token, user?.name, pandit?.final_chat_call_rate, panditId, type, orderId, pandit?.display_name, pandit?.profile)
         }
         // socket.emit("emit_to_user_for_register", {
         //     key: `user_${req?.userId}`,
@@ -226,7 +226,7 @@ async function list(req, res) {
             ])
             .select(
                 'o.*',
-                'p.name',
+                'p.display_name as name',
                 'p.profile',
                 'c.message'
             )
@@ -286,6 +286,7 @@ async function acceptOrder(req, res) {
             .select(
                 'o.*',
                 'p.name',
+                'p.display_name',
                 'p.final_chat_call_rate',
             )
             .first();
@@ -315,7 +316,7 @@ async function acceptOrder(req, res) {
         if (order?.profile_id && order.type == 'chat') {
             const profile = await db('userprofiles').where({ id: order?.profile_id }).first();
 
-            let message = `Hello ${order?.name},\n Below are my details:
+            let message = `Hello ${order?.display_name},\n Below are my details:
     Name: ${formatValue(profile?.name)} 
     Gender: ${formatValue(profile?.gender)} 
     DOB: ${formatDOB(profile?.dob)} 
