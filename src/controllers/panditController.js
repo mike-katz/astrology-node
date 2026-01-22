@@ -459,7 +459,7 @@ async function verifyOtp(req, res) {
         const encryptToken = encrypt(token);
 
         const { name, display_name, gender, profile, email, dob, city, country, experience, primary_expertise, secondary_expertise, other_working, other_working_text,
-            languages, consaltance_language, available_for, response_time,
+            languages, available_for, response_time,
             chat_call_rate, training_type, guru_name, certificate,
             govt_id, about, achievement_url, address, selfie, achievement_file,
             terms, no_false, consent_profile, step = 0, application_id
@@ -479,7 +479,6 @@ async function verifyOtp(req, res) {
             },
             "step2": {
                 languages: languages ? JSON.parse(languages) : [],
-                consaltance_language: consaltance_language ? JSON.parse(consaltance_language) : [],
                 available_for: available_for ? JSON.parse(available_for) : [],
                 response_time: response_time || ""
             },
@@ -594,7 +593,7 @@ async function basicOnboard(req, res) {
 async function onboard(req, res) {
     try {
         const { name, display_name, dob, country_code, mobile, email, city, country, gender, experience, primary_expertise, secondary_expertise, other_working, other_working_text, step = 1,
-            languages, consaltance_language, available_for, response_time,
+            languages, available_for, response_time,
             chat_call_rate, training_type, guru_name, certificate,
             govt_id, about, achievement_url, address, achievement_file,
             terms, no_false, consent_profile, token
@@ -613,7 +612,7 @@ async function onboard(req, res) {
             if (!is18OrAbove(dob)) return res.status(400).json({ success: false, message: 'Enter DOB above 18+ year.' });
         }
         if (step == 2) {
-            if (!languages || !consaltance_language || !available_for || !response_time) return res.status(400).json({ success: false, message: 'Missing params.' });
+            if (!languages || !available_for || !response_time) return res.status(400).json({ success: false, message: 'Missing params.' });
         }
         if (step == 3) {
             if (!chat_call_rate || !training_type || !guru_name) return res.status(400).json({ success: false, message: 'Missing params.' });
@@ -704,9 +703,9 @@ async function onboard(req, res) {
         if (available_for) {
             ins.available_for = JSON.stringify(available_for)
         }
-        if (consaltance_language) {
-            ins.consaltance_language = JSON.stringify(consaltance_language)
-        }
+        // if (consaltance_language) {
+        //     ins.consaltance_language = JSON.stringify(consaltance_language)
+        // }
         if (languages) {
             ins.languages = JSON.stringify(languages)
         }
