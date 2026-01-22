@@ -44,6 +44,9 @@ async function login(req, res) {
         const isValid = isValidMobile(mobile);
         if (!isValid) return res.status(400).json({ success: false, message: 'Enter valid mobile number.' });
         const user = await db('users').where({ country_code, mobile }).first();
+        if (user && user?.status == 'block') {
+            return res.status(400).json({ success: false, message: 'Your account is blocked.' });
+        }
         const url = `http://pro.trinityservices.co.in/generateOtp.jsp?userid=${process.env.OTP_USERNAME}&key=${process.env.OTP_KEY}&mobileno=${mobile}&timetoalive=600&sms=%7Botp%7D%20is%20the%20one%20time%20password%20for%20Astroguruji%20Application.%20AstrotalkGuruji`
         let otpResponse;
         try {
@@ -54,7 +57,7 @@ async function login(req, res) {
             otpResponse = null;
         }
         if (!user) {
-            await db('users').insert({ mobile, country_code, otp: otpResponse?.otpId }).returning(['id', 'mobile', 'avatar', 'country_code', 'otp']);
+            await db('users').insert({ mobile, country_code, otp: otpResponse?.otpId, status: "active" }).returning(['id', 'mobile', 'avatar', 'country_code', 'otp']);
         }
         return res.status(200).json({ success: true, message: 'Otp Send Successfully' });
     } catch (err) {
