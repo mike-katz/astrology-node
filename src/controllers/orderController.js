@@ -513,6 +513,17 @@ async function generateCallToken(req, res) {
         payload: [{ order_id }]
     });
     return res.status(200).json({ success: true, message: 'Call requested Successfully' });
-
 }
-module.exports = { create, list, acceptOrder, cancelOrder, deleteOrder, sendGift, generateCallToken };
+
+async function callReject(req, res) {
+    const { order_id, pandit_id } = req.body;
+    if (!order_id || !pandit_id) {
+        return res.status(400).json({ error: 'Missing params.' });
+    }
+    callEvent("emit_to_call_rejected", {
+        key: `pandit_${pandit_id}`,
+        order_id,
+    });
+    return res.status(200).json({ success: true, message: 'Call requested Successfully' });
+}
+module.exports = { create, list, acceptOrder, cancelOrder, deleteOrder, sendGift, generateCallToken, callReject };

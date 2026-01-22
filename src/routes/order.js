@@ -11,5 +11,6 @@ router.delete('/delete', order.deleteOrder);
 
 router.post('/sendGift', order.sendGift);
 router.post('/makeCall', order.generateCallToken);
+router.post('/rejectCall', order.callReject);
 
 module.exports = router;
