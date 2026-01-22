@@ -441,6 +441,17 @@ async function cancelOrder(req, res) {
             payload: { pandit_id: order?.pandit_id }
         });
 
+        if (order.type == 'chat') {
+            callEvent("emit_to_chat_rejected", {
+                key: `pandit_${order?.pandit_id}`,
+                order_id: order?.order_id,
+            });
+        } else {
+            callEvent("emit_to_call_rejected", {
+                key: `pandit_${order?.pandit_id}`,
+                order_id: order?.order_id,
+            });
+        }
         return res.status(200).json({ success: true, message: 'Order cancel Successfully' });
     } catch (err) {
         console.error(err);
