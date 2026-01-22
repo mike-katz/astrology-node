@@ -686,6 +686,10 @@ async function onboard(req, res) {
         //     ins.is_first_chat_free = is_first_chat_free
         // }
         if (chat_call_rate) {
+            const setting = await db('settings').first();
+            if (setting?.chat_call_base_rate > chat_call_rate) {
+                return res.status(400).json({ success: false, message: `Price minimum ${setting?.chat_call_base_rate} required.` });
+            }
             ins.chat_call_rate = chat_call_rate
         }
         // if (dedicated_time) {
