@@ -196,5 +196,14 @@ async function profileUpdate(req, res) {
     }
 }
 
-
-module.exports = { updateProfile, getProfile, getBalance, updateToken, profileUpdate, makeAvtarString };
+async function deleteMyAccount(req, res) {
+    try {
+        await db('users').where({ id: req.userId }).update({ deleted_at: new Date });
+        return res.status(200).json({ success: true, data: null, message: 'Update successfully' });
+    }
+    catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+module.exports = { updateProfile, getProfile, getBalance, updateToken, profileUpdate, makeAvtarString, deleteMyAccount };

@@ -31,6 +31,7 @@ router.get('/', user.getProfile);
 router.get('/balance', user.getBalance);
 router.post('/update', user.updateProfile);
 router.post('/updateToken', user.updateToken);
+router.delete('/', user.deleteMyAccount);
 
 router.post('/profileUpdate',
     upload.fields([
