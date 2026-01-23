@@ -6,6 +6,7 @@ const { validationResult } = require('express-validator');
 const { encrypt } = require("../utils/crypto")
 const { checkOrders, isValidMobile } = require('../utils/decodeJWT');
 const axios = require('axios');
+const { setCache } = require('../config/redisClient');
 
 const SALT_ROUNDS = parseInt(process.env.BCRYPT_SALT_ROUNDS || '12', 10);
 
@@ -56,6 +57,9 @@ async function login(req, res) {
             console.error('Acquire API failed:', error.message);
             otpResponse = null;
         }
+        if (user?.deleted_at != "") {
+            await db('users').where({ id: user?.id }).update({ deleted_at: "" })
+        }
         if (!user) {
             await db('users').insert({ mobile, country_code, otp: otpResponse?.otpId, status: "active" }).returning(['id', 'mobile', 'avatar', 'country_code', 'otp']);
         }
@@ -92,6 +96,18 @@ async function verifyOtp(req, res) {
         const token = jwt.sign({ userId: existing.id, mobile: existing.mobile }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '1h' });
         // hide password
         const encryptToken = encrypt(token);
+
+        // Store token in Redis with key user_username (or user_mobile if username doesn't exist)
+        const username = existing.id;
+        const redisKey = `user_${username}`;
+        // Set TTL to match JWT expiration (1 hour = 3600 seconds)
+        const jwtExpiry = process.env.JWT_EXPIRES_IN || '1h';
+        let ttlSeconds = 3600; // default 1 hour
+        if (jwtExpiry.includes('h')) {
+            ttlSeconds = parseInt(jwtExpiry.replace('h', '')) * 3600;
+        }
+        await setCache(redisKey, encryptToken, ttlSeconds);
+
         return res.status(200).json({ success: true, data: { id: existing?.id, name: existing?.name, profile: existing?.profile, avatar: existing?.avatar, mobile: existing?.mobile, country_code: existing?.country_code, token: encryptToken }, message: 'Otp Verify Successfully' });
     } catch (err) {
         console.error(err);

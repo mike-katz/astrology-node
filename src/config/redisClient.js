@@ -9,8 +9,11 @@ exports.initializeRedis = () => {
   client.on('error', (err) => console.log('Redis Client Error', err));
 };
 
-exports.setCache = (key, value) => {
-  client.set(key, value);
+exports.setCache = (key, value, ttlSeconds = null) => {
+  if (ttlSeconds) {
+    return client.set(key, value, 'EX', ttlSeconds);
+  }
+  return client.set(key, value);
 };
 
 exports.getCache = (key) => client.get(key);
