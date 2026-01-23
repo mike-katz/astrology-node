@@ -463,10 +463,11 @@ async function verifyOtp(req, res) {
             languages, available_for, response_time,
             chat_call_rate, training_type, guru_name, certificate,
             govt_id, about, achievement_url, address, selfie, achievement_file,
-            terms, no_false, consent_profile, step = 0, application_id
+            terms, no_false, consent_profile, step = 0, application_id, remark
         } = user
         const response = {
             "application_id": application_id,
+            "remark": remark,
             "step1": {
                 name: name || "", profile: profile || "",
                 display_name: display_name || "",
