@@ -57,12 +57,6 @@ async function login(req, res) {
             console.error('Acquire API failed:', error.message);
             otpResponse = null;
         }
-        if (user?.deleted_at != null) {
-            await db('users').where({ id: user?.id }).update({ deleted_at: null })
-        }
-        if (!user) {
-            await db('users').insert({ mobile, country_code, otp: otpResponse?.otpId, status: "active" }).returning(['id', 'mobile', 'avatar', 'country_code', 'otp']);
-        }
         return res.status(200).json({ success: true, message: 'Otp Send Successfully' });
     } catch (err) {
         console.error(err);
@@ -90,9 +84,15 @@ async function verifyOtp(req, res) {
             otpResponse = null;
         }
 
-        const existing = await db('users').where({ mobile, country_code }).first();
-        if (!existing) return res.status(400).json({ success: false, message: 'Wrong Otp' });
+        let existing = await db('users').where({ mobile, country_code }).first();
+        // if (!existing) return res.status(400).json({ success: false, message: 'Wrong Otp' });
 
+        if (existing?.deleted_at != null) {
+            await db('users').where({ id: existing?.id }).update({ deleted_at: null })
+        }
+        if (!existing) {
+            [existing] = await db('users').insert({ mobile, country_code, status: "active" }).returning(['id', 'mobile', 'avatar', 'country_code', 'otp']);
+        }
         const token = jwt.sign({ userId: existing.id, mobile: existing.mobile }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '1h' });
         // hide password
         const encryptToken = encrypt(token);
