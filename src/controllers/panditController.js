@@ -6,6 +6,7 @@ const { uploadImageTos3, deleteFileFroms3 } = require('./uploader');
 const jwt = require('jsonwebtoken');
 const { isValidMobile } = require('../utils/decodeJWT');
 const axios = require('axios');
+const sendMail = require('../utils/sendMail');
 
 async function getPandits(req, res) {
     try {
@@ -544,6 +545,30 @@ async function basicOnboard(req, res) {
         }
         const [result] = await db('onboardings').where({ id: user?.id }).update(ins).returning("*")
 
+        // Fetch settings for app name and support email
+        const settings = await db('settings').first();
+        const appName = settings?.app_name || "AstroGuruji";
+        const supportEmail = settings?.support_email || process.env.SUPPORT_EMAIL || "support@astroguruji.com";
+
+        // Send welcome email with dynamic values
+        if (email) {
+            try {
+                await sendMail(
+                    email,
+                    "Welcome to AstroGuruji - Registration Successful",
+                    "welcome",
+                    {
+                        panditName: name || "User",
+                        applicationNo: orderId,
+                        appName: appName,
+                        supportEmail: supportEmail
+                    }
+                );
+            } catch (emailError) {
+                console.error("Error sending welcome email:", emailError);
+                // Don't fail the request if email fails
+            }
+        }
         const response = {
             "step": 0,
             "application_id": orderId,

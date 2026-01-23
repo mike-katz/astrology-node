@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Astro Guruji Email</title>
+</head>
+
+<body style="margin:0;padding:0;background:#f5f5f5;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f5;">
+        <tr>
+            <td align="center" style="padding:40px 20px;">
+                <!-- MAIN WRAPPER -->
+                <table width="700" cellpadding="0" cellspacing="0"
+                    style="background:#ffffff;font-family:Arial,Helvetica,sans-serif;">
+                    <!-- HEADER -->
+                    <tr>
+                        <td style="padding:30px;">
+                            <table width="100%" cellpadding="0" cellspacing="0">
+                                <tr>
+                                    <td align="left" valign="middle">
+                                        <img src="https://astroguruji2026.s3.ap-south-1.amazonaws.com/avatars/logo.png"
+                                            width="156" style="display:block;">
+                                    </td>
+                                    <td align="right" valign="middle">
+                                        <table cellpadding="0" cellspacing="0">
+                                            <tr>
+                                                {{socialMediaIcons}}
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    <!-- CONTENT -->
+                    <tr>
+                        <td style="padding:0 30px 30px 30px;color:#000000;font-size:15px;line-height:1.7;">
+                            <p><strong>Dear {{panditName}},</strong></p>
+                            <p>Radhe Radhe,</p>
+                            <p>
+                                Thank you for submitting your details with AstroGuruji!
+                                Your Astroguruji registration number is <strong>{{applicationNo}}</strong>.
+                            </p>
+                            <p>
+                                Please note that our agents will connect you via WhatsApp and email for next steps.
+                            </p>
+                            <p>
+                                For further details, feel free to reach out to us via email at
+                                <strong>{{supportEmail}}</strong>.
+                                Looking forward to having you on board!
+                            </p>
+                            <p style="margin-top:30px;">
+                                Warm regards,<br>
+                                Admin Team<br>
+                                {{appName}}<br>
+                                {{supportEmail}}
+                            </p>
+                        </td>
+                    </tr>
+                    <!-- APP SECTION -->
+                    <tr>
+                        <td align="center" style="padding:40px 30px 20px 30px;">
+                            <h2 style="margin:0;font-size:26px;">Get the AstroGuruji app!</h2>
+                            <p style="color:#666666;max-width:520px;">
+                                Enhance your astrology experience with our mobile app.
+                                Access your account anytime using your registered mobile no.
+                            </p>
+                            <table cellpadding="0" cellspacing="0">
+                                <tr>
+                                    <td style="padding:10px;">
+                                        <img src="https://astroguruji2026.s3.ap-south-1.amazonaws.com/avatars/app-store.png"
+                                            width="150">
+                                    </td>
+                                    <td style="padding:10px;">
+                                        <img src="https://astroguruji2026.s3.ap-south-1.amazonaws.com/avatars/GooglePlay.png"
+                                            width="150">
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    <!-- FOOTER -->
+                    <tr>
+                        <td align="center" style="padding:30px;">
+                            <img src="https://astroguruji2026.s3.ap-south-1.amazonaws.com/avatars/footerlogo.png"
+                                width="50">
+                            <p style="font-size:12px;color:#888888;margin-top:10px;">
+                                Copyright © {{currentYear}} Astrotalkguruji Pvt. Ltd. – All Rights Reserved
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+                <!-- END WRAPPER -->
+            </td>
+        </tr>
+    </table>
+</body>
+
+</html>
