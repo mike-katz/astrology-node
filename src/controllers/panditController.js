@@ -686,6 +686,8 @@ async function onboard(req, res) {
         const oldStatus = await db('onboardlogs').where({ "onboard_id": Number(user?.id) }).orderBy('id', 'desc').first();
         if (oldStatus) {
             ins.status = oldStatus?.old_status
+            ins.reject_proof = ""
+            ins.remark = ""
         }
         if (gender) {
             ins.gender = gender
