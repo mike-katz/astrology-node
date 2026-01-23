@@ -57,7 +57,7 @@ async function login(req, res) {
             console.error('Acquire API failed:', error.message);
             otpResponse = null;
         }
-        if (user?.deleted_at != "") {
+        if (user?.deleted_at != null) {
             await db('users').where({ id: user?.id }).update({ deleted_at: null })
         }
         if (!user) {
