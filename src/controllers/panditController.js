@@ -534,15 +534,19 @@ function is18OrAbove(dobString) {
 
 async function basicOnboard(req, res) {
     try {
-        const { name, dob, email, gender, primary_expertise, languages, country_code, mobile } = req.body
+        const { name, dob, email, gender, primary_expertise, languages, country_code, mobile, country, city, experience, secondary_expertise } = req.body
         const { files } = req
+        if (!name || !dob || !email || !gender || !primary_expertise || !languages || !country_code || !mobile || !country || !city || !experience || !secondary_expertise) return res.status(400).json({ message: 'Missing params.' });
         const user = await db('onboardings').where({ mobile, country_code, deleted_at: null }).first();
         if (!user) return res.status(400).json({ message: 'Wrong mobile number.' });
         const orderId = Math.floor(1000000000000000 + Math.random() * 9000000000000000).toString();
         const ins = {
-            name, dob, email, gender, application_id: orderId, step: 0,
+            name, dob, email, gender, application_id: orderId, step: 0, country, city, experience
         }
 
+        if (secondary_expertise) {
+            ins.secondary_expertise = JSON.stringify(secondary_expertise)
+        }
         if (!is18OrAbove(dob)) return res.status(400).json({ success: false, message: 'Enter DOB above 18+ year.' });
 
         if (files?.profile?.length > 0) {
