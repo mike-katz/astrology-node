@@ -542,7 +542,7 @@ async function basicOnboard(req, res) {
         if (!user) return res.status(400).json({ message: 'Wrong mobile number.' });
         const orderId = Math.floor(1000000000000000 + Math.random() * 9000000000000000).toString();
         const ins = {
-            name, dob, email, gender, application_id: orderId, step: 0, country, city, experience, status: "inquiry"
+            name, dob, email, gender, application_id: orderId, step: 0, country, city, experience, status: "inquiry", step: 1
         }
 
         if (secondary_expertise) {
@@ -588,7 +588,7 @@ async function basicOnboard(req, res) {
             });
         }
         const response = {
-            "step": 0,
+            "step": 1,
             "application_id": orderId,
             "remark": user?.remark || "",
             "reject_proof": user?.reject_proof || "",
