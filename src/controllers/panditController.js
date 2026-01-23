@@ -465,8 +465,8 @@ async function verifyOtp(req, res) {
         // hide password
         const encryptToken = encrypt(token);
 
-        const { name, display_name, gender, profile, email, dob, city, country, experience, primary_expertise, secondary_expertise, other_working, other_working_text,
-            languages, available_for, response_time,
+        const { name, gender, profile, email, dob, city, country, experience, primary_expertise, secondary_expertise, other_working, other_working_text,
+            languages, available_for,
             chat_call_rate, training_type, guru_name, certificate,
             govt_id, about, achievement_url, address, selfie, achievement_file,
             terms, no_false, consent_profile, step = 0, application_id, remark, reject_proof, status
@@ -481,7 +481,7 @@ async function verifyOtp(req, res) {
             "status": status,
             "step1": {
                 name: name || "", profile: profile || "",
-                display_name: display_name || "",
+                // display_name: display_name || "",
                 gender: gender || "",
                 dob: dob || "",
                 country_code: country_code || "", email: email || "", city: city || "", country: country || "", experience: experience || "",
@@ -493,7 +493,7 @@ async function verifyOtp(req, res) {
             "step2": {
                 languages: languages ? JSON.parse(languages) : [],
                 available_for: available_for ? JSON.parse(available_for) : [],
-                response_time: response_time || ""
+                // response_time: response_time || ""
             },
             "step3": {
                 chat_call_rate: chat_call_rate || "", training_type: training_type || "", guru_name: guru_name || "", certificate: certificate ? JSON.parse(certificate) : [],
@@ -634,8 +634,8 @@ async function basicOnboard(req, res) {
 
 async function onboard(req, res) {
     try {
-        const { name, display_name, dob, country_code, mobile, email, city, country, gender, experience, primary_expertise, secondary_expertise, other_working, other_working_text, step = 1,
-            languages, available_for, response_time,
+        const { name, dob, country_code, mobile, email, city, country, gender, experience, primary_expertise, secondary_expertise, other_working, other_working_text, step = 1,
+            languages, available_for,
             chat_call_rate, training_type, guru_name, certificate,
             govt_id, about, achievement_url, address, achievement_file,
             terms, no_false, consent_profile, token
@@ -649,12 +649,12 @@ async function onboard(req, res) {
         const language = ["english", "hindi", "tamil", "panjabi", "marathi", "gujarati", "bangali", "french", "odia", "telugu", "kannada", "malayalam", "sanskrit", "assamese", "german", "spanish", "marwari", "manipuri", "urdu", "sindhi", "kashmiri", "bodo", "nepali", "konkani", "maithili", "arabic", "bhojpuri", "dutch", "rajasthanii"]
         const { files } = req
         if (step == 1) {
-            if (!name || !display_name || !dob || !email || !city || !country || !gender || !primary_expertise || !experience) return res.status(400).json({ success: false, message: 'Missing params.' });
+            if (!name || !dob || !email || !city || !country || !gender || !primary_expertise || !experience) return res.status(400).json({ success: false, message: 'Missing params.' });
             // if (other_working == 'other' && !other_working_text) return res.status(400).json({ success: false, message: 'Missing params.' });
             if (!is18OrAbove(dob)) return res.status(400).json({ success: false, message: 'Enter DOB above 18+ year.' });
         }
         if (step == 2) {
-            if (!languages || !available_for || !response_time) return res.status(400).json({ success: false, message: 'Missing params.' });
+            if (!languages || !available_for) return res.status(400).json({ success: false, message: 'Missing params.' });
         }
         if (step == 3) {
             if (!chat_call_rate || !training_type || !guru_name) return res.status(400).json({ success: false, message: 'Missing params.' });
@@ -670,12 +670,12 @@ async function onboard(req, res) {
         const user = await db('onboardings').where({ "mobile": tokenData?.data?.mobile, country_code: tokenData?.data?.country_code, deleted_at: null }).first();
         if (!user) return res.status(400).json({ message: 'Wrong mobile number.' });
 
-        if (display_name) {
-            if (display_name.length > 15) return res.status(400).json({ success: false, message: 'Max 15 character accept.' });
-            const onboard = await db('onboardings').where({ "display_name": display_name, deleted_at: null }).whereNot({ id: user?.id }).first();
-            const pandit = await db('pandits').where({ "display_name": display_name, deleted_at: null }).first();
-            if (onboard || pandit) return res.status(400).json({ success: false, message: 'Display name already exist.' });
-        }
+        // if (display_name) {
+        //     if (display_name.length > 15) return res.status(400).json({ success: false, message: 'Max 15 character accept.' });
+        //     const onboard = await db('onboardings').where({ "display_name": display_name, deleted_at: null }).whereNot({ id: user?.id }).first();
+        //     const pandit = await db('pandits').where({ "display_name": display_name, deleted_at: null }).first();
+        //     if (onboard || pandit) return res.status(400).json({ success: false, message: 'Display name already exist.' });
+        // }
 
         // const selectedskill = skills.split(",").map(l => l.trim());  // ["english", "hindi"]
 
@@ -795,12 +795,12 @@ async function onboard(req, res) {
         if (email) {
             ins.email = email
         }
-        if (display_name) {
-            ins.display_name = display_name
-        }
-        if (response_time) {
-            ins.response_time = response_time
-        }
+        // if (display_name) {
+        //     ins.display_name = display_name
+        // }
+        // if (response_time) {
+        //     ins.response_time = response_time
+        // }
         if (achievement_file) {
             ins.achievement_file = achievement_file
             ins.achievement_url = ""
