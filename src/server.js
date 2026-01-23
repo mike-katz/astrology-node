@@ -20,7 +20,7 @@ const kundliRoutes = require('./routes/kundli');
 
 // const cors = require('cors');
 const multer = require('multer');
-// const RedisCache = require('./config/redisClient');
+const RedisCache = require('./config/redisClient');
 const agoraRoutes = require('./routes/agora');
 const chatRoutes = require('./routes/chat');
 const { decryptRequest } = require('./middleware/decryptRequest.js');
@@ -30,7 +30,7 @@ app.use(express.json());
 
 app.use(decryptRequest);
 app.use(encryptResponse);
-// RedisCache.initializeRedis();
+RedisCache.initializeRedis();
 
 // app.use(cors());
 app.use('/auth', authRoutes);

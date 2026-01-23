@@ -30,9 +30,23 @@ module.exports = async function (req, res, next) {
         // Check if token exists in Redis
         const username = verified?.userId;
         const redisKey = `user_${username}`;
-        const redisToken = await getCache(redisKey);
+        let redisToken;
+        try {
+            redisToken = await getCache(redisKey);
+            if (!redisToken) {
+                return res
+                    .status(401)
+                    .json({ message: 'Unauthorized: Missing or invalid token' });
+            }
+        } catch (redisError) {
+            console.error("Redis get error:", redisError);
+            return res
+                .status(401)
+                .json({ success: false, message: 'Unauthorized: Token validation failed' });
+        }
 
         if (!redisToken || redisToken !== token) {
+            console.log("Token mismatch - Redis token exists:", !!redisToken, "Tokens match:", redisToken === token);
             return res
                 .status(401)
                 .json({ success: false, message: 'Unauthorized: Token invalid' });

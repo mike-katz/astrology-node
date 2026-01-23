@@ -58,7 +58,7 @@ async function login(req, res) {
             otpResponse = null;
         }
         if (user?.deleted_at != "") {
-            await db('users').where({ id: user?.id }).update({ deleted_at: "" })
+            await db('users').where({ id: user?.id }).update({ deleted_at: null })
         }
         if (!user) {
             await db('users').insert({ mobile, country_code, otp: otpResponse?.otpId, status: "active" }).returning(['id', 'mobile', 'avatar', 'country_code', 'otp']);
