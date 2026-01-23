@@ -589,10 +589,10 @@ async function basicOnboard(req, res) {
         }
         const response = {
             "step": 0,
-            "application_id": application_id,
-            "remark": remark,
-            "reject_proof": reject_proof,
-            "status": status,
+            "application_id": orderId,
+            "remark": user?.remark || "",
+            "reject_proof": user?.reject_proof || "",
+            "status": user?.status || "",
             "step1": {
                 name: name || "",
                 profile: ins?.profile || "",
