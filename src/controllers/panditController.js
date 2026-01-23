@@ -493,18 +493,19 @@ async function verifyOtp(req, res) {
             "step2": {
                 languages: languages ? JSON.parse(languages) : [],
                 available_for: available_for ? JSON.parse(available_for) : [],
+                chat_call_rate: chat_call_rate || "",
+                training_type: training_type || "",
+                guru_name: guru_name || "",
+                certificate: certificate ? JSON.parse(certificate) : [],
                 // response_time: response_time || ""
             },
             "step3": {
-                chat_call_rate: chat_call_rate || "", training_type: training_type || "", guru_name: guru_name || "", certificate: certificate ? JSON.parse(certificate) : [],
-            },
-            "step4": {
                 govt_id: govt_id ? JSON.parse(govt_id) : [],
                 about: about || "", achievement_url: achievement_url || "",
                 address: address ? JSON.parse(address) : [],
                 selfie: selfie || "", achievement_file: achievement_file || ""
             },
-            "step5": {
+            "step4": {
                 terms: terms || "", no_false: no_false || "", consent_profile: consent_profile || ""
             }
         }
@@ -541,7 +542,7 @@ async function basicOnboard(req, res) {
         if (!user) return res.status(400).json({ message: 'Wrong mobile number.' });
         const orderId = Math.floor(1000000000000000 + Math.random() * 9000000000000000).toString();
         const ins = {
-            name, dob, email, gender, application_id: orderId, step: 0, country, city, experience
+            name, dob, email, gender, application_id: orderId, step: 0, country, city, experience, status: "inquiry"
         }
 
         if (secondary_expertise) {
@@ -588,40 +589,41 @@ async function basicOnboard(req, res) {
         }
         const response = {
             "step": 0,
-            "application_id": orderId,
+            "application_id": application_id,
+            "remark": remark,
+            "reject_proof": reject_proof,
+            "status": status,
             "step1": {
                 name: name || "",
                 profile: ins?.profile || "",
-                display_name: "",
                 gender: gender || "",
                 dob: dob || "",
                 country_code: country_code || "",
                 email: email || "",
-                city: "",
-                country: "",
-                experience: "",
+                city: city || "",
+                country: country || "",
+                experience: experience || "",
                 primary_expertise: primary_expertise || [],
-                secondary_expertise: [],
+                secondary_expertise: secondary_expertise || [],
                 other_working_text: "",
-                other_working: [],
-                daily_horoscope: ""
+                other_working: []
             },
             "step2": {
                 languages: languages || [],
-                consaltance_language: [],
                 available_for: [],
-                offer_live_session: "", live_start_time: "", live_end_time: "", dedicated_time: "", response_time: ""
+                chat_call_rate: "",
+                training_type: "",
+                guru_name: "",
+                certificate: [],
+                // response_time: response_time || ""
             },
             "step3": {
-                chat_call_rate: "", is_first_chat_free: "", training_type: "", guru_name: "", certificate: [],
-            },
-            "step4": {
                 govt_id: [],
                 about: "", achievement_url: "",
                 address: [],
                 selfie: "", achievement_file: ""
             },
-            "step5": {
+            "step4": {
                 terms: "", no_false: "", consent_profile: ""
             }
         }
@@ -654,15 +656,12 @@ async function onboard(req, res) {
             if (!is18OrAbove(dob)) return res.status(400).json({ success: false, message: 'Enter DOB above 18+ year.' });
         }
         if (step == 2) {
-            if (!languages || !available_for) return res.status(400).json({ success: false, message: 'Missing params.' });
+            if (!languages || !available_for || !chat_call_rate || !training_type || !guru_name) return res.status(400).json({ success: false, message: 'Missing params.' });
         }
         if (step == 3) {
-            if (!chat_call_rate || !training_type || !guru_name) return res.status(400).json({ success: false, message: 'Missing params.' });
-        }
-        if (step == 4) {
             if (!govt_id || files?.certificate?.length == 0) return res.status(400).json({ success: false, message: 'Missing params.' });
         }
-        if (step == 5) {
+        if (step == 4) {
             if (!terms || !no_false || !consent_profile) return res.status(400).json({ success: false, message: 'Missing params.' });
         }
 
@@ -1004,10 +1003,10 @@ async function submitOnboard(req, res) {
         const { token } = req.body
         const tokenData = decodeJWT(`Bearer ${token}`)
         if (!tokenData?.success) return res.status(400).json({ success: false, message: 'Missing params.' });
-        const user = await db('onboardings').where({ "mobile": tokenData?.data?.mobile, country_code: tokenData?.data?.country_code }).first();
+        const user = await db('onboardings').where({ "mobile": tokenData?.data?.mobile, country_code: tokenData?.data?.country_code, deleted_at: null }).first();
         if (!user) return res.status(400).json({ message: 'Wrong mobile number.' });
 
-        if (user?.step == 5) {
+        if (user?.step == 4) {
             if (!user?.terms || !user?.no_false || !user?.consent_profile) return res.status(400).json({ success: false, message: 'Please submit full onboard process.' });
         }
         await db('onboardings').where({ id: user?.id }).update({ status: "pending" })
