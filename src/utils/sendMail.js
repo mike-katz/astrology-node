@@ -2,12 +2,17 @@ const Nodemailer = require("nodemailer");
 const fs = require("fs");
 const path = require("path");
 const db = require("../db");
+const { addEmailToQueue } = require("./emailQueue");
 
-async function sendMail(toEmail, subject, templateName, variables = {}) {
+/**
+ * Actual email sending function (used by worker)
+ * This function performs the actual email sending
+ */
+async function sendMailActual(toEmail, subject, templateName, variables = {}) {
 
     const sender = {
         address: process.env.SMTP_ADDRESS,
-        name: "Email Verification",
+        name: subject,
     };
     // const recipients = [
     //     toEmail
@@ -92,7 +97,6 @@ async function sendMail(toEmail, subject, templateName, variables = {}) {
     }
 
     try {
-        console.log("htmlTemplate", htmlTemplate);
         const info = await transporter.sendMail({
             from: sender,
             to: toEmail,
@@ -107,4 +111,27 @@ async function sendMail(toEmail, subject, templateName, variables = {}) {
     }
 }
 
+/**
+ * Queue wrapper function (default export)
+ * This function adds email to queue instead of sending immediately
+ * User doesn't have to wait for email to be sent
+ */
+async function sendMail(toEmail, subject, templateName, variables = {}) {
+    try {
+        console.log(`📨 sendMail called for: ${toEmail}, template: ${templateName}`);
+        // Add email to queue - returns immediately without waiting
+        const result = await addEmailToQueue(toEmail, subject, templateName, variables);
+        console.log(`✅ Email queued successfully: ${toEmail}`);
+        return { queued: true, message: 'Email added to queue', jobId: result.id };
+    } catch (error) {
+        console.error("❌ Error queuing email:", error);
+        console.error("Error details:", error.message, error.stack);
+        // If queue fails, you can optionally fall back to sending immediately
+        // For now, we'll just log the error
+        throw error;
+    }
+}
+
+// Export both functions
 module.exports = sendMail;
+module.exports.sendMailActual = sendMailActual;

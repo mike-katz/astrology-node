@@ -562,24 +562,25 @@ async function basicOnboard(req, res) {
         const appName = settings?.app_name || "AstroGuruji";
         const supportEmail = settings?.support_email || process.env.SUPPORT_EMAIL || "support@astroguruji.com";
 
-        // Send welcome email with dynamic values
+        // Send welcome email with dynamic values (queued - non-blocking)
         if (email) {
-            try {
-                await sendMail(
-                    email,
-                    "Welcome to AstroGuruji - Registration Successful",
-                    "welcome",
-                    {
-                        panditName: name || "User",
-                        applicationNo: orderId,
-                        appName: appName,
-                        supportEmail: supportEmail
-                    }
-                );
-            } catch (emailError) {
-                console.error("Error sending welcome email:", emailError);
-                // Don't fail the request if email fails
-            }
+            // Email is added to queue, doesn't block the request
+            // Worker will automatically process all jobs from database table
+            sendMail(
+                email,
+                "Welcome to AstroGuruji - Registration Successful",
+                "welcome",
+                {
+                    panditName: name || "User",
+                    applicationNo: orderId,
+                    appName: appName,
+                    supportEmail: supportEmail
+                }
+            ).catch(emailError => {
+                console.error("❌ Error queuing welcome email:", emailError);
+                console.error("Error details:", emailError.message, emailError.stack);
+                // Don't fail the request if email queue fails
+            });
         }
         const response = {
             "step": 0,
