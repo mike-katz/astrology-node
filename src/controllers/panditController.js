@@ -382,6 +382,12 @@ async function signup(req, res) {
         const user = await db('otpmanages').where(function () {
             this.where('mobile', mobile);
         }).first();
+
+        const onboardings = await db('onboardings').where({ mobile, country_code, deleted_at: null }).first();
+        if (onboardings && onboardings?.status == 'blocked') {
+            return res.status(400).json({ success: false, message: 'Your account is blocked.' });
+        }
+
         const url = `http://pro.trinityservices.co.in/generateOtp.jsp?userid=${process.env.OTP_USERNAME}&key=${process.env.OTP_KEY}&mobileno=${mobile}&timetoalive=600&sms=%7Botp%7D%20is%20the%20one%20time%20password%20for%20Astroguruji%20Application.%20AstrotalkGuruji`
         let otpResponse;
         try {
@@ -463,12 +469,16 @@ async function verifyOtp(req, res) {
             languages, available_for, response_time,
             chat_call_rate, training_type, guru_name, certificate,
             govt_id, about, achievement_url, address, selfie, achievement_file,
-            terms, no_false, consent_profile, step = 0, application_id, remark, reject_proof
+            terms, no_false, consent_profile, step = 0, application_id, remark, reject_proof, status
         } = user
+        if (status == 'blocked') {
+            return res.status(400).json({ success: false, message: 'Your account is blocked.' });
+        }
         const response = {
             "application_id": application_id,
             "remark": remark,
             "reject_proof": reject_proof,
+            "status": status,
             "step1": {
                 name: name || "", profile: profile || "",
                 display_name: display_name || "",
