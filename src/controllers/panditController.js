@@ -682,6 +682,11 @@ async function onboard(req, res) {
 
         // profile_image
         const ins = {}
+
+        const oldStatus = await db('onboardlogs').where({ "onboard_id": Number(user?.id) }).orderBy('id', 'desc').first();
+        if (oldStatus) {
+            ins.status = oldStatus?.old_status
+        }
         if (gender) {
             ins.gender = gender
         }
