@@ -8,13 +8,56 @@ require('dotenv').config();
 // const { PDFDocument, StandardFonts } = require('pdf-lib');
 // const wkhtmltopdf = require("wkhtmltopdf");
 // const pdf = require("html-pdf");
+const STATE_SHORT = {
+    "Andhra Pradesh": "AP",
+    "Arunachal Pradesh": "AR",
+    "Assam": "AS",
+    "Bihar": "BR",
+    "Chhattisgarh": "CG",
+    "Goa": "GA",
+    "Gujarat": "GJ",
+    "Haryana": "HR",
+    "Himachal Pradesh": "HP",
+    "Jharkhand": "JH",
+    "Karnataka": "KA",
+    "Kerala": "KL",
+    "Madhya Pradesh": "MP",
+    "Maharashtra": "MH",
+    "Manipur": "MN",
+    "Meghalaya": "ML",
+    "Mizoram": "MZ",
+    "Nagaland": "NL",
+    "Odisha": "OD",
+    "Punjab": "PB",
+    "Rajasthan": "RJ",
+    "Sikkim": "SK",
+    "Tamil Nadu": "TN",
+    "Telangana": "TS",
+    "Tripura": "TR",
+    "Uttar Pradesh": "UP",
+    "Uttarakhand": "UK",
+    "West Bengal": "WB",
+    "Delhi": "DL"
+};
+
+function getStateShortCode(address) {
+    if (!address) return null;
+
+    for (const state in STATE_SHORT) {
+        if (address.toLowerCase().includes(state.toLowerCase())) {
+            return STATE_SHORT[state];
+        }
+    }
+    return null;
+}
 
 async function generateInvoicePDF(data) {
     const { transaction_id, } = data;
     console.log("data", data);
     const templatePath = path.join(__dirname, 'invoice.html');
     let html = fs.readFileSync(templatePath, 'utf8');
-
+    const stateCode = getStateShortCode(data?.city);
+    data.place = stateCode
     const browser = await puppeteer.launch({
         headless: 'new',
         executablePath: '/snap/bin/chromium',
