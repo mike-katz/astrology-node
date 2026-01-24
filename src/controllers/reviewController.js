@@ -5,7 +5,7 @@ require('dotenv').config();
 
 async function addReview(req, res) {
     try {
-        const { panditId, message, orderId, rating } = req.body;
+        const { panditId, message, orderId, rating, hide } = req.body;
         if (!panditId || !rating) return res.status(400).json({ success: false, message: 'Missing params.' });
         const user = await db('reviews')
             .where('user_id', req?.userId)
@@ -16,9 +16,9 @@ async function addReview(req, res) {
         if (!user) {
             await db('pandits').where({ id: Number(panditId) }).increment(`rating_${rating}`, 1);
             const userDetail = await db('users').where('id', req?.userId).first();
-            await db('reviews').insert({ user_id: req?.userId, pandit_id: panditId, order_id: orderId, message, rating, type: "user", gender: userDetail?.gender, profile: userDetail?.profile, avatar: userDetail?.avatar, name: userDetail?.name });
+            await db('reviews').insert({ user_id: req?.userId, pandit_id: panditId, order_id: orderId, message, rating, type: "user", hide, gender: userDetail?.gender, profile: userDetail?.profile, avatar: userDetail?.avatar, name: userDetail?.name });
         } else {
-            await db('reviews').where({ id: user?.id }).update({ user_id: req?.userId, pandit_id: panditId, order_id: orderId, message, rating });
+            await db('reviews').where({ id: user?.id }).update({ user_id: req?.userId, pandit_id: panditId, order_id: orderId, hide, message, rating });
         }
         return res.status(200).json({ success: true, message: 'Review added Successfully' });
     } catch (err) {
