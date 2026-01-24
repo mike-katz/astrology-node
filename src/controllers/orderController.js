@@ -230,6 +230,8 @@ async function list(req, res) {
                 'o.*',
                 'p.display_name as name',
                 'p.profile',
+                'p.online',
+                'p.tag',
                 'c.message'
             )
             .limit(limit)
