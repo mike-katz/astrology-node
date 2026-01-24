@@ -60,23 +60,24 @@ async function getPandits(req, res) {
             })
             if (sort_by == 'rating_high_to_low') {
                 sorting = [
-                    { column: 'rating5', order: 'desc' },
-                    { column: 'rating4', order: 'desc' },
-                    { column: 'rating3', order: 'desc' },
-                    { column: 'rating2', order: 'desc' },
-                    { column: 'rating1', order: 'desc' }
+                    { column: 'rating_5', order: 'desc' },
+                    { column: 'rating_4', order: 'desc' },
+                    { column: 'rating_3', order: 'desc' },
+                    { column: 'rating_2', order: 'desc' },
+                    { column: 'rating_1', order: 'desc' }
                 ]
             }
             if (sort_by == 'rating_low_to_high') {
                 sorting = [
-                    { column: 'rating1', order: 'asc' },
-                    { column: 'rating2', order: 'asc' },
-                    { column: 'rating3', order: 'asc' },
-                    { column: 'rating4', order: 'asc' },
-                    { column: 'rating5', order: 'asc' }
+                    { column: 'rating_1', order: 'asc' },
+                    { column: 'rating_2', order: 'asc' },
+                    { column: 'rating_3', order: 'asc' },
+                    { column: 'rating_4', order: 'asc' },
+                    { column: 'rating_5', order: 'asc' }
                 ]
             }
         }
+        console.log("sort_by", sorting);
         let query = db('pandits as p')
             //.distinctOn('p.id')
             .select(
