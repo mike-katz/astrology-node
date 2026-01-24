@@ -94,7 +94,6 @@ async function addPayment(req, res) {
             amount,
             with_tax_amount,
             gst,
-            address: user?.current_address || "",
             city: user?.city_state_country || "",
             pincode: user?.pincode || "",
             total_in_word

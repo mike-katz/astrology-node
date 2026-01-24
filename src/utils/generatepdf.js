@@ -57,10 +57,10 @@ async function generateInvoicePDF(data) {
     const templatePath = path.join(__dirname, 'invoice.html');
     let html = fs.readFileSync(templatePath, 'utf8');
     const stateCode = getStateShortCode(data?.city);
-    data.place = stateCode
+    data.place = stateCode || ''
     const browser = await puppeteer.launch({
         headless: 'new',
-        executablePath: '/snap/bin/chromium',
+        // executablePath: '/snap/bin/chromium',
         args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
@@ -69,9 +69,33 @@ async function generateInvoicePDF(data) {
     });
     const page = await browser.newPage();
 
+    // Handle null/undefined values for address section - hide lines if null
+    // Check if address, city, or pincode exist
+    const hasCity = data.city && data.city.trim() !== '';
+    const hasPincode = data.pincode && data.pincode.trim() !== '';
+
+    if (!hasCity && !hasPincode) {
+        // Remove the entire address line if all are null/empty
+        html = html.replace(/<div id="address-line">[\s\S]*?<\/div>/g, '');
+    } else {
+        // Replace null values with empty string
+        if (!hasCity) data.city = '';
+        if (!hasPincode) data.pincode = '';
+    }
+
+    // Handle place of supply
+    if (!data.place || data.place.trim() === '') {
+        // Remove the place of supply line if null/empty
+        html = html.replace(/<div id="place-line">[\s\S]*?<\/div>/g, '');
+    }
+
+    // Explicitly remove {{address}} placeholder if it exists (safety check)
+    html = html.replace(/\{\{address\}\}/g, '');
+
     // 🔁 Replace placeholders
     for (const [key, value] of Object.entries(data)) {
-        html = html.replace(new RegExp(`{{${key}}}`, 'g'), value);
+        const replacementValue = value !== null && value !== undefined ? value : '';
+        html = html.replace(new RegExp(`{{${key}}}`, 'g'), replacementValue);
     }
 
     html = html.replace('{{date}}', new Date().toDateString())
