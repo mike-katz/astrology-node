@@ -60,22 +60,12 @@ async function getPandits(req, res) {
                 column: sort, order: orderBy
             })
             if (sort_by == 'rating_high_to_low') {
-                sorting = [
-                    { column: 'rating_5', order: 'desc' },
-                    { column: 'rating_4', order: 'desc' },
-                    { column: 'rating_3', order: 'desc' },
-                    { column: 'rating_2', order: 'desc' },
-                    { column: 'rating_1', order: 'desc' }
-                ]
+                // Clear the previous sorting and use rating ratio instead
+                sorting = []
             }
             if (sort_by == 'rating_low_to_high') {
-                sorting = [
-                    { column: 'rating_1', order: 'asc' },
-                    { column: 'rating_2', order: 'asc' },
-                    { column: 'rating_3', order: 'asc' },
-                    { column: 'rating_4', order: 'asc' },
-                    { column: 'rating_5', order: 'asc' }
-                ]
+                // Clear the previous sorting and use rating ratio instead
+                sorting = []
             }
         }
         console.log("sort_by", sorting);
@@ -286,12 +276,31 @@ async function getPandits(req, res) {
         //     countQuery.andWhere('p.tag', 'ilike', `%${offer.trim()}%`);
         // }
 
-        if (sorting?.length > 0) {
+        if (sort_by == 'rating_high_to_low') {
+            // Sort by rating ratio: (rating_5 + rating_4) / total_ratings
+            // Higher ratio means more high ratings, so sort desc
+            query.orderByRaw(`
+                CASE 
+                    WHEN (COALESCE(p.rating_1, 0) + COALESCE(p.rating_2, 0) + COALESCE(p.rating_3, 0) + COALESCE(p.rating_4, 0) + COALESCE(p.rating_5, 0)) > 0 
+                    THEN (COALESCE(p.rating_5, 0) + COALESCE(p.rating_4, 0))::float / 
+                         (COALESCE(p.rating_1, 0) + COALESCE(p.rating_2, 0) + COALESCE(p.rating_3, 0) + COALESCE(p.rating_4, 0) + COALESCE(p.rating_5, 0))::float
+                    ELSE 0 
+                END DESC
+            `)
+        } else if (sort_by == 'rating_low_to_high') {
+            // Sort by rating ratio ascending (lower ratio first)
+            query.orderByRaw(`
+                CASE 
+                    WHEN (COALESCE(p.rating_1, 0) + COALESCE(p.rating_2, 0) + COALESCE(p.rating_3, 0) + COALESCE(p.rating_4, 0) + COALESCE(p.rating_5, 0)) > 0 
+                    THEN (COALESCE(p.rating_5, 0) + COALESCE(p.rating_4, 0))::float / 
+                         (COALESCE(p.rating_1, 0) + COALESCE(p.rating_2, 0) + COALESCE(p.rating_3, 0) + COALESCE(p.rating_4, 0) + COALESCE(p.rating_5, 0))::float
+                    ELSE 0 
+                END ASC
+            `)
+        } else if (sorting?.length > 0) {
             query.orderBy(sorting)
         }
 
-        console.log("query", query.toQuery()
-        );
         const user = await query;
         const [{ count }] = await countQuery
         const total = parseInt(count);
