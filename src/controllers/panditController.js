@@ -17,7 +17,7 @@ async function getPandits(req, res) {
         if (page < 1) page = 1;
         if (limit < 1) limit = 100;
         const offset = (page - 1) * limit;
-        const { type = "chat", search, sort_by, skill, language, gender, country, offer, top_astrologer, secondary_expertise } = req.query
+        const { type = "chat", search, sort_by, skill, language, gender, country, offer, top_astrologers, secondary_expertise } = req.query
         const filter = {
             "p.status": "active",
             "p.deleted_at": null
@@ -191,73 +191,35 @@ async function getPandits(req, res) {
         }
 
         if (Array.isArray(gender) && gender.length) {
-            // query.andWhere(builder => {
-            //     gender.forEach((s, index) => {
-            //         const condition = ['ilike', `%${s.trim()}%`];
-            //         index === 0
-            //             ? builder.where('p.gender', ...condition)
-            //             : builder.orWhere('p.gender', ...condition);
-            //     });
-            // });
-
-            // countQuery.andWhere(builder => {
-            //     gender.forEach((s, index) => {
-            //         const condition = ['ilike', `%${s.trim()}%`];
-            //         index === 0
-            //             ? builder.where('p.gender', ...condition)
-            //             : builder.orWhere('p.gender', ...condition);
-            //     });
-            // });
+            console.log("gender.length", gender.length);
             const genders = gender
-                .map(g => g?.trim())
-                .filter(Boolean)
-                .map(g => `%${g}%`);
-
-            query.andWhereRaw(
-                `p.gender ILIKE ANY (ARRAY[${genders.map(() => '?').join(',')}])`,
+                .map(g => g?.trim().toLowerCase())
+                .filter(Boolean);
+            query.whereIn(
+                db.raw('LOWER(p.gender)'),
                 genders
             );
-
-            countQuery.andWhereRaw(
-                `p.gender ILIKE ANY (ARRAY[${genders.map(() => '?').join(',')}])`,
+            countQuery.whereIn(
+                db.raw('LOWER(p.gender)'),
                 genders
             );
         }
 
-        if (Array.isArray(top_astrologer) && top_astrologer.length && !top_astrologer.includes("All")) {
+        if (Array.isArray(top_astrologers) && top_astrologers.length && !top_astrologers.includes("All")) {
 
-            const genders = top_astrologer
-                .map(g => g?.trim())
-                .filter(Boolean)
-                .map(g => `%${g}%`);
+            const genders = top_astrologers
+                .map(g => g?.trim().toLowerCase())
+                .filter(Boolean);
 
-            query.andWhereRaw(
-                `p.tag ILIKE ANY (ARRAY[${genders.map(() => '?').join(',')}])`,
+            console.log("genders", genders);
+            query.whereIn(
+                db.raw('LOWER(p.tag)'),
                 genders
             );
-
-            countQuery.andWhereRaw(
-                `p.tag ILIKE ANY (ARRAY[${genders.map(() => '?').join(',')}])`,
+            countQuery.whereIn(
+                db.raw('LOWER(p.tag)'),
                 genders
             );
-
-            // query.andWhere(builder => {
-            //     top_astrologer.forEach((s, index) => {
-            //         const condition = ['ilike', `%${s.trim()}%`];
-            //         index === 0
-            //             ? builder.where('p.tag', ...condition)
-            //             : builder.orWhere('p.tag', ...condition);
-            //     });
-            // });
-
-            // countQuery.andWhere(builder => {
-            //     top_astrologer.forEach((s, index) => {
-            //         const condition = ['ilike', `%${s.trim()}%`];
-            //         index === 0
-            //             ? builder.where('p.tag', ...condition)
-            //             : builder.orWhere('p.tag', ...condition);
-            //     });
-            // });
         }
 
         if (Array.isArray(country) && country.length == 1) {
