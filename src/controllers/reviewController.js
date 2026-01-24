@@ -61,7 +61,7 @@ async function getList(req, res) {
 
         if (!panditId) return res.status(400).json({ success: false, message: 'Please enter pandit.' });
         const user = await db('reviews')
-            .where('pandit_id', panditId).select('id', 'message', 'rating').limit(limit)
+            .where('pandit_id', panditId).select('id', 'message', 'rating', 'tag').limit(limit)
             .offset(offset);
 
         const [{ count }] = await db('reviews')

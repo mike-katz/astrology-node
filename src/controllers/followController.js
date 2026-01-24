@@ -59,6 +59,7 @@ async function getFollow(req, res) {
             "p.languages",
             "p.primary_expertise",
             "p.experience",
+            "p.tag",
             'p.online',
             'p.rating_1',
             'p.rating_2',
