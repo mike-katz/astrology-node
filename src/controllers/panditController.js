@@ -47,11 +47,11 @@ async function getPandits(req, res) {
                 orderBy = 'desc'
             }
             if (sort_by == 'price_low_to_high') {
-                sort = 'chat_call_rate'
+                sort = 'final_chat_call_rate'
                 orderBy = 'asc'
             }
             if (sort_by == 'price_high_to_low') {
-                sort = 'chat_call_rate'
+                sort = 'final_chat_call_rate'
                 orderBy = 'desc'
             }
 
