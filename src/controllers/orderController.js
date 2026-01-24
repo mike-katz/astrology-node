@@ -201,8 +201,10 @@ async function list(req, res) {
             (
               SELECT DISTINCT ON (order_id)
                 order_id,
-                message
+                message,
+                created_at as message_created_at
               FROM chats
+              WHERE order_id IS NOT NULL AND deleted_at IS NULL
               ORDER BY order_id, id DESC
             ) c
           `),
@@ -232,7 +234,8 @@ async function list(req, res) {
                 'p.profile',
                 'p.online',
                 'p.tag',
-                'c.message'
+                'c.message as last_message',
+                'c.message_created_at as last_message_at'
             )
             .limit(limit)
             .offset(offset);
