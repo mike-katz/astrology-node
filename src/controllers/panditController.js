@@ -10,6 +10,7 @@ const sendMail = require('../utils/sendMail');
 
 async function getPandits(req, res) {
     try {
+        console.log("req.query", req.query);
         let page = parseInt(req.query.page) || 1;
         let limit = parseInt(req.query.limit) || 20;
 
@@ -233,28 +234,41 @@ async function getPandits(req, res) {
             );
         }
 
-        // if (Array.isArray(top_astrologer) && top_astrologer.length) {
+        if (Array.isArray(top_astrologer) && top_astrologer.length && !top_astrologer.includes("All")) {
 
-        //     top_astrologer.includes("All")
+            const genders = top_astrologer
+                .map(g => g?.trim())
+                .filter(Boolean)
+                .map(g => `%${g}%`);
 
-        //     query.andWhere(builder => {
-        //         top_astrologer.forEach((s, index) => {
-        //             const condition = ['ilike', `%${s.trim()}%`];
-        //             index === 0
-        //                 ? builder.where('p.tag', ...condition)
-        //                 : builder.orWhere('p.tag', ...condition);
-        //         });
-        //     });
+            query.andWhereRaw(
+                `p.tag ILIKE ANY (ARRAY[${genders.map(() => '?').join(',')}])`,
+                genders
+            );
 
-        //     countQuery.andWhere(builder => {
-        //         top_astrologer.forEach((s, index) => {
-        //             const condition = ['ilike', `%${s.trim()}%`];
-        //             index === 0
-        //                 ? builder.where('p.tag', ...condition)
-        //                 : builder.orWhere('p.tag', ...condition);
-        //         });
-        //     });
-        // }
+            countQuery.andWhereRaw(
+                `p.tag ILIKE ANY (ARRAY[${genders.map(() => '?').join(',')}])`,
+                genders
+            );
+
+            // query.andWhere(builder => {
+            //     top_astrologer.forEach((s, index) => {
+            //         const condition = ['ilike', `%${s.trim()}%`];
+            //         index === 0
+            //             ? builder.where('p.tag', ...condition)
+            //             : builder.orWhere('p.tag', ...condition);
+            //     });
+            // });
+
+            // countQuery.andWhere(builder => {
+            //     top_astrologer.forEach((s, index) => {
+            //         const condition = ['ilike', `%${s.trim()}%`];
+            //         index === 0
+            //             ? builder.where('p.tag', ...condition)
+            //             : builder.orWhere('p.tag', ...condition);
+            //     });
+            // });
+        }
 
         if (Array.isArray(country) && country.length == 1) {
             console.log("country", country[0]);
