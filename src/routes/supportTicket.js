@@ -34,5 +34,6 @@ router.get('/list', supportTicket.listTickets);
 
 // Get single ticket details
 router.get('/', supportTicket.getTicketDetail);
+router.post('/review', supportTicket.addReview);
 
 module.exports = router;

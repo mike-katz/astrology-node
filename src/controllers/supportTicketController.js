@@ -322,10 +322,86 @@ async function replyTicket(req, res) {
     }
 }
 
+async function addReview(req, res) {
+    try {
+        const { ticket_id, review, review_message } = req.body;
+
+        if (!ticket_id) {
+            return res.status(400).json({
+                success: false,
+                message: 'Ticket ID is required.'
+            });
+        }
+
+        if (!review) {
+            return res.status(400).json({
+                success: false,
+                message: 'Review rating is required.'
+            });
+        }
+
+        // Validate review rating (assuming 1-5 scale)
+        const reviewRating = parseInt(review);
+        if (isNaN(reviewRating) || reviewRating < 1 || reviewRating > 5) {
+            return res.status(400).json({
+                success: false,
+                message: 'Review rating must be between 1 and 5.'
+            });
+        }
+
+        // Verify ticket exists and belongs to this pandit
+        const ticket = await db('support_tickets')
+            .where({ id: ticket_id, user_id: req.userId })
+            .first();
+
+        if (!ticket) {
+            return res.status(400).json({
+                success: false,
+                message: 'Ticket not found or access denied.'
+            });
+        }
+
+        // Check if review already exists
+        const existingReview = await db('support_tickets')
+            .where({ id: ticket_id })
+            .whereNotNull('review')
+            .first();
+
+        if (existingReview && existingReview.review) {
+            return res.status(400).json({
+                success: false,
+                message: 'Review already exists for this ticket.'
+            });
+        }
+
+        // Update ticket with review
+        const [updatedTicket] = await db('support_tickets')
+            .where({ id: ticket_id })
+            .update({
+                review: reviewRating,
+                review_message: review_message || null
+            })
+            .returning('*');
+
+        return res.status(200).json({
+            success: true,
+            data: { ticket: updatedTicket },
+            message: 'Review added successfully'
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({
+            success: false,
+            message: 'Server error'
+        });
+    }
+}
+
 module.exports = {
     createTicket,
     listTickets,
     getTicketDetail,
     getSupportTypes,
-    replyTicket
+    replyTicket,
+    addReview
 };
