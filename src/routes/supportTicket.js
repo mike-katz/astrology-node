@@ -33,6 +33,6 @@ router.post('/reply', upload.array('file', 1), supportTicket.replyTicket);
 router.get('/list', supportTicket.listTickets);
 
 // Get single ticket details
-router.get('/:id', supportTicket.getTicketDetail);
+router.get('/', supportTicket.getTicketDetail);
 
 module.exports = router;

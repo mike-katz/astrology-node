@@ -160,7 +160,7 @@ async function listTickets(req, res) {
 // Get single ticket details
 async function getTicketDetail(req, res) {
     try {
-        const { id } = req.params;
+        const { id } = req.query;
         let page = parseInt(req.query.page) || 1;
         let limit = parseInt(req.query.limit) || 20;
 
