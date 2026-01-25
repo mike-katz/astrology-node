@@ -1,121 +1,6 @@
 const db = require('../db');
 require('dotenv').config();
-
-// Get payments list for support ticket (when type is payment)
-async function getPaymentsForTicket(req, res) {
-    try {
-        let page = parseInt(req.query.page) || 1;
-        let limit = parseInt(req.query.limit) || 100;
-
-        if (page < 1) page = 1;
-        if (limit < 1) limit = 100;
-        const offset = (page - 1) * limit;
-
-        const payments = await db('payments')
-            .whereNull('deleted_at')
-            .andWhere('user_id', req.userId)
-            .orderBy('id', 'desc')
-            .limit(limit)
-            .offset(offset);
-
-        // Get orders related to each payment (if any)
-        const paymentsWithOrders = await Promise.all(
-            payments.map(async (payment) => {
-                // Get orders that might be related to this payment
-                // Since payments and orders don't have direct foreign key, we'll get orders around the payment time
-                const orders = await db('orders')
-                    .where('user_id', req.userId)
-                    .whereNull('deleted_at')
-                    .whereBetween('created_at', [
-                        new Date(new Date(payment.created_at).getTime() - 24 * 60 * 60 * 1000), // 24 hours before
-                        new Date(new Date(payment.created_at).getTime() + 24 * 60 * 60 * 1000)  // 24 hours after
-                    ])
-                    .leftJoin('pandits as p', 'p.id', 'orders.pandit_id')
-                    .select(
-                        'orders.*',
-                        'p.display_name as pandit_name',
-                        'p.profile as pandit_profile'
-                    )
-                    .orderBy('orders.created_at', 'desc');
-
-                return {
-                    ...payment,
-                    related_orders: orders
-                };
-            })
-        );
-
-        const [{ count }] = await db('payments')
-            .count('* as count')
-            .whereNull('deleted_at')
-            .andWhere('user_id', req.userId);
-
-        const total = parseInt(count);
-        const totalPages = Math.ceil(total / limit);
-
-        const response = {
-            page,
-            limit,
-            total,
-            totalPages,
-            results: paymentsWithOrders
-        };
-
-        return res.status(200).json({
-            success: true,
-            data: response,
-            message: 'Payments list fetched successfully'
-        });
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ success: false, message: 'Server error' });
-    }
-}
-
-// Get orders for a specific payment
-async function getOrdersForPayment(req, res) {
-    try {
-        const { payment_id } = req.query;
-        if (!payment_id) {
-            return res.status(400).json({ success: false, message: 'Payment ID required' });
-        }
-
-        // Verify payment belongs to user
-        const payment = await db('payments')
-            .where({ id: payment_id, user_id: req.userId })
-            .whereNull('deleted_at')
-            .first();
-
-        if (!payment) {
-            return res.status(400).json({ success: false, message: 'Payment not found' });
-        }
-
-        // Get orders around the payment time
-        const orders = await db('orders')
-            .where('user_id', req.userId)
-            .whereNull('deleted_at')
-            .whereBetween('created_at', [
-                new Date(new Date(payment.created_at).getTime() - 24 * 60 * 60 * 1000),
-                new Date(new Date(payment.created_at).getTime() + 24 * 60 * 60 * 1000)
-            ])
-            .leftJoin('pandits as p', 'p.id', 'orders.pandit_id')
-            .select(
-                'orders.*',
-                'p.display_name as pandit_name',
-                'p.profile as pandit_profile'
-            )
-            .orderBy('orders.created_at', 'desc');
-
-        return res.status(200).json({
-            success: true,
-            data: { payment, orders },
-            message: 'Orders fetched successfully'
-        });
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ success: false, message: 'Server error' });
-    }
-}
+const { uploadImageTos3 } = require('./uploader');
 
 // Create support ticket
 async function createTicket(req, res) {
@@ -242,20 +127,6 @@ async function listTickets(req, res) {
 
         const tickets = await db('support_tickets as st')
             .where(filter)
-            .leftJoin('orders as o', 'o.id', 'st.order_id')
-            .leftJoin('payments as p', 'p.id', 'st.payment_id')
-            .leftJoin('pandits as pandit', 'pandit.id', 'o.pandit_id')
-            .select(
-                'st.*',
-                'o.order_id as order_order_id',
-                'o.status as order_status',
-                'o.type as order_type',
-                'p.transaction_id as payment_transaction_id',
-                'p.amount as payment_amount',
-                'p.status as payment_status',
-                'pandit.display_name as pandit_name',
-                'pandit.profile as pandit_profile'
-            )
             .orderBy('st.id', 'desc')
             .limit(limit)
             .offset(offset);
@@ -290,26 +161,16 @@ async function listTickets(req, res) {
 async function getTicketDetail(req, res) {
     try {
         const { id } = req.params;
+        let page = parseInt(req.query.page) || 1;
+        let limit = parseInt(req.query.limit) || 20;
+
+        if (page < 1) page = 1;
+        if (limit < 1) limit = 20;
+        const offset = (page - 1) * limit;
 
         const ticket = await db('support_tickets as st')
             .where({ 'st.id': id, 'st.user_id': req.userId })
             .whereNull('st.deleted_at')
-            .leftJoin('orders as o', 'o.id', 'st.order_id')
-            .leftJoin('payments as p', 'p.id', 'st.payment_id')
-            .leftJoin('pandits as pandit', 'pandit.id', 'o.pandit_id')
-            .select(
-                'st.*',
-                'o.order_id as order_order_id',
-                'o.status as order_status',
-                'o.type as order_type',
-                'o.created_at as order_created_at',
-                'p.transaction_id as payment_transaction_id',
-                'p.amount as payment_amount',
-                'p.status as payment_status',
-                'p.created_at as payment_created_at',
-                'pandit.display_name as pandit_name',
-                'pandit.profile as pandit_profile'
-            )
             .first();
 
         if (!ticket) {
@@ -319,9 +180,44 @@ async function getTicketDetail(req, res) {
             });
         }
 
+        // Get chat messages with pagination
+        const chatMessages = await db('support_tickets_chat as stc')
+            .where({ 'stc.support_tickets_id': id })
+            .whereNull('stc.deleted_at')
+            .select(
+                'stc.id',
+                'stc.message',
+                'stc.type',
+                'stc.sender_type',
+                'stc.receiver_type',
+                'stc.user_id',
+                'stc.admin_id',
+                'stc.created_at'
+            )
+            .orderBy('stc.id', 'asc')
+            .limit(limit)
+            .offset(offset);
+
+        // Get total count of chat messages
+        const [{ count }] = await db('support_tickets_chat as stc')
+            .where({ 'stc.support_tickets_id': id })
+            .whereNull('stc.deleted_at')
+            .count('* as count');
+
+        const total = parseInt(count);
+        const totalPages = Math.ceil(total / limit);
+
         return res.status(200).json({
             success: true,
-            data: ticket,
+            data: {
+                ticketDetail: ticket,
+                page,
+                limit,
+                total,
+                totalPages,
+                results: chatMessages
+
+            },
             message: 'Ticket details fetched successfully'
         });
     } catch (err) {
@@ -348,11 +244,89 @@ async function getSupportTypes(req, res) {
     }
 }
 
+// Reply to support ticket
+async function replyTicket(req, res) {
+    try {
+        const { id, message, type = 'text' } = req.body;
+        const { files } = req;
+
+        // Validation
+        if (!id) {
+            return res.status(400).json({
+                success: false,
+                message: 'Support ticket ID is required'
+            });
+        }
+
+        // Verify ticket belongs to user
+        const ticket = await db('support_tickets')
+            .where({ id: id, user_id: req.userId })
+            .whereNull('deleted_at')
+            .first();
+
+        if (!ticket) {
+            return res.status(400).json({
+                success: false,
+                message: 'Support ticket not found'
+            });
+        }
+
+        let messageText = message;
+        let messageType = type;
+
+        // Handle image upload
+        if (type === 'image') {
+            if (!files || !Array.isArray(files) || files.length === 0) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Image file is required for image type'
+                });
+            }
+            const file = files[0];
+            const image = await uploadImageTos3('message', file, 'support');
+            messageText = image.data.Location;
+            messageType = 'image';
+        } else if (type === 'text') {
+            if (!message || message.trim() === '') {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Message is required for text type'
+                });
+            }
+            messageText = message.trim();
+        } else {
+            return res.status(400).json({
+                success: false,
+                message: 'Type must be either "text" or "image"'
+            });
+        }
+
+        // Insert message into support_tickets_chat
+        const [chatMessage] = await db('support_tickets_chat').insert({
+            support_tickets_id: id,
+            message: messageText,
+            type: messageType,
+            user_id: req.userId,
+            admin_id: null,
+            sender_type: 'user',
+            receiver_type: 'admin'
+        }).returning('*');
+
+        return res.status(200).json({
+            success: true,
+            data: chatMessage,
+            message: 'Reply sent successfully'
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
 module.exports = {
-    getPaymentsForTicket,
-    getOrdersForPayment,
     createTicket,
     listTickets,
     getTicketDetail,
-    getSupportTypes
+    getSupportTypes,
+    replyTicket
 };
