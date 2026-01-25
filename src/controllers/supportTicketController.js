@@ -165,7 +165,7 @@ async function getTicketDetail(req, res) {
         let limit = parseInt(req.query.limit) || 20;
 
         if (page < 1) page = 1;
-        if (limit < 1) limit = 20;
+        if (limit < 1) limit = 100;
         const offset = (page - 1) * limit;
 
         const ticket = await db('support_tickets as st')
@@ -194,7 +194,7 @@ async function getTicketDetail(req, res) {
                 'stc.admin_id',
                 'stc.created_at'
             )
-            .orderBy('stc.id', 'asc')
+            .orderBy('stc.id', 'desc')
             .limit(limit)
             .offset(offset);
 
@@ -210,7 +210,6 @@ async function getTicketDetail(req, res) {
         return res.status(200).json({
             success: true,
             data: {
-                ticketDetail: ticket,
                 page,
                 limit,
                 total,
