@@ -920,12 +920,18 @@ async function getReviewList(req, res) {
         const pandit = await db('pandits').where({ id: Number(panditId) }).first()
 
         const user = await db('reviews as r')
+            .leftJoin('users as u', 'u.id', 'r.user_id')
             .select(
                 "r.id",
                 "r.message",
                 "r.rating",
                 "r.replay",
                 "r.created_at",
+                "r.hide",
+                "r.tag",
+                "u.name",
+                "u.avatar",
+                "u.profile"
             )
             .where('r.pandit_id', panditId).limit(limit)
             .offset(offset);
