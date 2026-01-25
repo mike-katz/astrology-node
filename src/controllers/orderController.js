@@ -204,7 +204,7 @@ async function list(req, res) {
                 message,
                 created_at as message_created_at
               FROM chats
-              WHERE order_id IS NOT NULL AND deleted_at IS NULL
+              WHERE order_id IS NOT NULL AND deleted_at IS NULL AND is_system_generate IS NULL
               ORDER BY order_id, id DESC
             ) c
           `),
