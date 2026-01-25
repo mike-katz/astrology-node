@@ -57,7 +57,7 @@ async function createTicket(req, res) {
         let orderDbId = null;
         if (order_id) {
             const order = await db('orders')
-                .where({ order_id: order_id, user_id: req.userId })
+                .where({ id: order_id, user_id: req.userId })
                 .whereNull('deleted_at')
                 .first();
 
