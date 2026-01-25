@@ -68,6 +68,14 @@ async function getPandits(req, res) {
                 sorting = []
             }
         }
+
+        if (Array.isArray(sorting)) {
+            // Filter out entries where column or order is undefined/null
+            sorting = sorting.filter(item => {
+                return item && item.column !== undefined && item.order !== undefined && item.column !== null && item.order !== null;
+            });
+        }
+
         console.log("sort_by", sorting);
         let query = db('pandits as p')
             //.distinctOn('p.id')
@@ -260,6 +268,7 @@ async function getPandits(req, res) {
                 END ASC
             `)
         } else if (sorting?.length > 0) {
+            sorting
             query.orderBy(sorting)
         }
 
