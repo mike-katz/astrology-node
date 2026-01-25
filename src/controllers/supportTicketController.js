@@ -195,6 +195,19 @@ async function createTicket(req, res) {
             status: 'open'
         }).returning('*');
 
+        // Create first message in support_tickets_chat
+        if (message && ticket?.id) {
+            await db('support_tickets_chat').insert({
+                support_tickets_id: ticket.id,
+                message: message,
+                type: 'text',
+                user_id: req.userId,
+                admin_id: null,
+                sender_type: 'user',
+                receiver_type: 'admin'
+            });
+        }
+
         return res.status(200).json({
             success: true,
             data: ticket,
