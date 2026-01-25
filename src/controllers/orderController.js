@@ -244,7 +244,10 @@ async function list(req, res) {
                                 'receiver_id', c.receiver_id,
                                 'type', c.type,
                                 'status', c.status,
-                                'created_at', c.created_at
+                                'created_at', c.created_at,
+                                'receiver_delete', c.receiver_delete,
+                                'sender_delete', c.sender_delete,
+                                'is_system_generate', c.is_system_generate
                             )
                         ELSE NULL
                     END as last_message
