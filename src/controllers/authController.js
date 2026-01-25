@@ -95,7 +95,7 @@ async function verifyOtp(req, res) {
         // if (!existing) return res.status(400).json({ success: false, message: 'Wrong Otp' });
 
         if (existing?.deleted_at != null) {
-            await db('users').where({ id: existing?.id }).update({ deleted_at: null })
+            // await db('users').where({ id: existing?.id }).update({ deleted_at: null })
         }
         if (!existing) {
             [existing] = await db('users').insert({ mobile, country_code, status: "active" }).returning(['id', 'mobile', 'avatar', 'country_code', 'otp']);
