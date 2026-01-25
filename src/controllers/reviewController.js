@@ -60,6 +60,7 @@ async function getList(req, res) {
         const offset = (page - 1) * limit;
 
         if (!panditId) return res.status(400).json({ success: false, message: 'Please enter pandit.' });
+        const userDetail = await db('user').where({ id: Number(req.userId) })
         const user = await db('reviews as r')
             .leftJoin('pandits as p', 'p.id', 'r.pandit_id')
             .where('r.pandit_id', panditId)
@@ -85,7 +86,12 @@ async function getList(req, res) {
             limit,
             total,
             totalPages,
-            results: user
+            results: user,
+            userDetail: {
+                name: userDetail?.name,
+                profile: userDetail?.profile,
+                avatar: userDetail?.avatar,
+            }
         }
         return res.status(200).json({ success: true, data: response, message: 'Review get Successfully' });
     } catch (err) {
