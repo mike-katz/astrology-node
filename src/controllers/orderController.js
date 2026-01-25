@@ -200,9 +200,7 @@ async function list(req, res) {
                 db.raw(`
             (
               SELECT DISTINCT ON (order_id)
-                order_id,
-                message,
-                created_at as message_created_at
+                *
               FROM chats
               WHERE order_id IS NOT NULL AND deleted_at IS NULL AND is_system_generate IS NULL
               ORDER BY order_id, id DESC
@@ -234,8 +232,23 @@ async function list(req, res) {
                 'p.profile',
                 'p.online',
                 'p.tag',
-                'c.message as last_message',
-                'c.message_created_at as last_message_at'
+                db.raw(`
+                    CASE 
+                        WHEN c.id IS NOT NULL THEN
+                            json_build_object(
+                                'id', c.id,
+                                'message', c.message,
+                                'sender_type', c.sender_type,
+                                'sender_id', c.sender_id,
+                                'receiver_type', c.receiver_type,
+                                'receiver_id', c.receiver_id,
+                                'type', c.type,
+                                'status', c.status,
+                                'created_at', c.created_at
+                            )
+                        ELSE NULL
+                    END as last_message
+                `)
             )
             .limit(limit)
             .offset(offset);
