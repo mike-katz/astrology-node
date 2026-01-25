@@ -195,6 +195,7 @@ async function list(req, res) {
         const order = await db('orders as o')
             .distinctOn('o.pandit_id')
             .where(filter)
+            .andWhereNot('o.status', 'cancel')
             .leftJoin('pandits as p', 'p.id', 'o.pandit_id')
             .leftJoin(
                 db.raw(`
