@@ -15,7 +15,7 @@ async function createTicket(req, res) {
             });
         }
 
-        if (!['payment', 'call', 'chat'].includes(type)) {
+        if (!['payment', 'order'].includes(type)) {
             return res.status(400).json({
                 success: false,
                 message: 'Type must be payment, call, or chat'
@@ -31,7 +31,7 @@ async function createTicket(req, res) {
         }
 
         // If type is call or chat, order_id should be provided
-        if ((type === 'call' || type === 'chat') && !order_id) {
+        if ((type === 'order') && !order_id) {
             return res.status(400).json({
                 success: false,
                 message: 'Order ID is required for call/chat type tickets'
