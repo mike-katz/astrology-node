@@ -309,7 +309,7 @@ async function acceptOrder(req, res) {
             })
             .select(
                 'o.*',
-                'p.name',
+                'p.display_name as name',
                 'p.display_name',
                 'p.final_chat_call_rate',
             )
@@ -517,7 +517,7 @@ async function sendGift(req, res) {
         await db('users').where({ id: user?.id }).increment({ balance: -Number(final) });
         const newBalance = Number(user.balance) - Number(final)
         const pandit_new_balance = Number(pandit.balance) + Number(panditAmount)
-        await db('balancelogs').insert({ pandit_old_balance: Number(pandit?.balance), pandit_new_balance, user_old_balance: Number(user.balance), user_new_balance: Number(newBalance), user_id: req.userId, message: `send gift to ${pandit?.name} (${name}) - ${qty}`, pandit_id: pandit?.id, pandit_message: `receive gift from ${user?.name} (${name}) - ${qty}`, pandit_amount: panditAmount, amount: - final });
+        await db('balancelogs').insert({ pandit_old_balance: Number(pandit?.balance), pandit_new_balance, user_old_balance: Number(user.balance), user_new_balance: Number(newBalance), user_id: req.userId, message: `send gift to ${pandit?.display_name} (${name}) - ${qty}`, pandit_id: pandit?.id, pandit_message: `receive gift from ${user?.name} (${name}) - ${qty}`, pandit_amount: panditAmount, amount: - final });
         return res.status(200).json({ success: true, message: 'Order cancel Successfully' });
     } catch (err) {
         console.error(err);

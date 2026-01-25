@@ -117,7 +117,7 @@ async function getReviewDetail(req, res) {
                 'r.message',
                 'r.rating',
                 'o.pandit_id',
-                'p.name',
+                'p.display_name as name',
                 'p.profile',
                 'o.order_id',
                 'o.type',

@@ -111,8 +111,8 @@ async function getPandits(req, res) {
         let countQuery = db('pandits as p')
             .count('* as count').where(filter);
         if (search && search.trim()) {
-            query.andWhere('p.name', 'ilike', `%${search.trim()}%`);
-            countQuery.andWhere('p.name', 'ilike', `%${search.trim()}%`);
+            query.andWhere('p.display_name', 'ilike', `%${search.trim()}%`);
+            countQuery.andWhere('p.display_name', 'ilike', `%${search.trim()}%`);
         }
 
         if (secondary_expertise && secondary_expertise != 'all') {
