@@ -928,7 +928,6 @@ async function getReviewList(req, res) {
                 "r.replay",
                 "r.created_at",
                 "r.hide",
-                "r.tag",
                 "u.name",
                 "u.avatar",
                 "u.profile"

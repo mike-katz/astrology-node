@@ -17,6 +17,7 @@ const orderRoutes = require('./routes/order');
 const profileRoutes = require('./routes/profile');
 const paymentRoutes = require('./routes/payment');
 const kundliRoutes = require('./routes/kundli');
+const faqRoutes = require('./routes/faq');
 
 // const cors = require('cors');
 const multer = require('multer');
@@ -37,6 +38,7 @@ app.use('/auth', authRoutes);
 app.use('/pandit', panditRoutes);
 app.use('/upload', panditRoutes);
 app.use('/kundli', kundliRoutes);
+app.use('/faq', faqRoutes);
 
 // app.use('/agora', agoraRoutes);
 
