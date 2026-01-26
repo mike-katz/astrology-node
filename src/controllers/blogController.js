@@ -68,4 +68,37 @@ async function getList(req, res) {
     }
 }
 
-module.exports = { getList };
+async function getDetail(req, res) {
+    try {
+        const { id } = req.query;
+        if (!id) {
+            return res.status(400).json({ success: false, data: null, message: 'Missing params' });
+        }
+        const query = db('blogs as b')
+            .where({ id }).first();
+        return res.status(200).json({
+            success: true,
+            data: query,
+            message: 'Blog detail fetched successfully'
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
+
+async function getCategory(req, res) {
+    try {
+        const query = db('blog_categories').whereNull('deleted_at')
+        return res.status(200).json({
+            success: true,
+            data: query,
+            message: 'List fetched successfully'
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+module.exports = { getList, getDetail, getCategory };
