@@ -37,7 +37,7 @@ async function createTicket(req, res) {
                 message: 'Order ID is required for call/chat type tickets'
             });
         }
-
+        let orderDbId = null;
         // Verify payment belongs to user (if payment_id provided)
         if (payment_id) {
             const payment = await db('payments')
@@ -51,10 +51,11 @@ async function createTicket(req, res) {
                     message: 'Payment not found'
                 });
             }
+            orderDbId = payment?.transaction_id;
         }
 
         // Verify order belongs to user (if order_id provided)
-        let orderDbId = null;
+
         if (order_id) {
             const order = await db('orders')
                 .where({ id: order_id, user_id: req.userId })
@@ -67,7 +68,7 @@ async function createTicket(req, res) {
                     message: 'Order not found'
                 });
             }
-            orderDbId = order.id;
+            orderDbId = order.order_id;
         }
 
         // Create ticket
@@ -75,8 +76,8 @@ async function createTicket(req, res) {
             user_id: req.userId,
             type,
             issue_type,
-            order_id: orderDbId,
-            payment_id: payment_id || null,
+            order_id: type == 'order' ? orderDbId : "",
+            payment_id: type == 'payment' ? orderDbId : "",
             status: 'open'
         }).returning('*');
 
