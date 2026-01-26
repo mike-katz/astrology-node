@@ -158,13 +158,16 @@ async function getBalance(req, res) {
 }
 
 async function updateToken(req, res) {
-    const { token } = req.body;
+    const { token, ios_token } = req.body;
     try {
         const order = await db('users').where({ id: req.userId }).first();
         if (!order) return res.status(400).json({ success: false, message: 'User not found.' });
         const update = {}
         if (token) {
             update.token = token
+        }
+        if (ios_token) {
+            update.ios_token = ios_token
         }
         await db('users').where({ id: req.userId }).update(update);
         return res.status(200).json({ success: true, data: null, message: 'Update successfully' });
