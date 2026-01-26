@@ -972,9 +972,24 @@ async function getReviewList(req, res) {
     }
 }
 
+function removeMatchedUrl(data, toFind) {
+    return data.map(doc => {
+        const updatedDoc = { ...doc };
+
+        Object.keys(updatedDoc).forEach(key => {
+            if (Array.isArray(updatedDoc[key])) {
+                updatedDoc[key] = updatedDoc[key].filter(url => url !== toFind);
+            }
+        });
+
+        return updatedDoc;
+    });
+}
+
+
 async function uploadImage(req, res) {
     try {
-        const { type = 'upload', token, file } = req.body
+        let { type = 'upload', token, file } = req.body
         const { files } = req
         let url = "";
         const tokenData = decodeJWT(`Bearer ${token}`)
@@ -988,8 +1003,58 @@ async function uploadImage(req, res) {
         }
         console.log("type", type);
         if (type == 'delete') {
-            const dd = await deleteFileFroms3(decodeURIComponent(file))
-            console.log("dd", dd);
+            if (!file) return res.status(400).json({ success: false, message: 'File URL is required.' });
+            const decodedUrl = decodeURIComponent(file);
+
+            // Get onboarding record for the user
+            const onboarding = await db('onboardings')
+                .where({
+                    'mobile': tokenData?.data?.mobile,
+                    'country_code': tokenData?.data?.country_code,
+                    'deleted_at': null
+                })
+                .first();
+
+            if (!onboarding) {
+                return res.status(400).json({ success: false, message: 'Onboarding record not found.' });
+            }
+
+            let updated = false;
+            const updateData = {};
+
+            // Check and remove from certificate array (stringified array of URLs)
+            if (onboarding.certificate) {
+                try {
+                    const certificateArray = JSON.parse(onboarding.certificate);
+                    const result = certificateArray.filter(item => item !== file);
+                    if (result?.length == 0) {
+                        updateData.certificate = null
+                    } else {
+                        updateData.certificate = JSON.stringify(result)
+                    }
+                } catch (e) {
+                    console.error('Error parsing certificate:', e);
+                }
+            }
+
+            // Check and remove from govt_id array (array of objects with URL)
+            if (onboarding.govt_id) {
+                const govt_id = JSON.parse(onboarding.govt_id);
+                const returns = removeMatchedUrl(govt_id, file)
+                updateData.govt_id = JSON.stringify(returns);
+
+            }
+            console.log("updateData", updateData);
+            // Update database if URL was found and removed
+            if (Object.keys(updateData).length > 0) {
+                await db('onboardings')
+                    .where({ id: onboarding.id })
+                    .update(updateData);
+            }
+
+            // Delete file from S3
+            const dd = await deleteFileFroms3(decodedUrl);
+            // console.log("dd", dd);
         }
         return res.status(200).json({ success: true, data: url, message: `Image ${type} Successfully` });
     } catch (err) {
@@ -1006,9 +1071,56 @@ async function submitOnboard(req, res) {
         const user = await db('onboardings').where({ "mobile": tokenData?.data?.mobile, country_code: tokenData?.data?.country_code, deleted_at: null }).first();
         if (!user) return res.status(400).json({ message: 'Wrong mobile number.' });
 
-        if (user?.step == 4) {
-            if (!user?.terms || !user?.no_false || !user?.consent_profile) return res.status(400).json({ success: false, message: 'Please submit full onboard process.' });
+        // Check if user is on step 4
+        if (user?.step != 4) {
+            return res.status(400).json({ success: false, message: 'Please complete all onboard steps before submission.' });
         }
+
+        // Step 1 required fields - parse JSON string for primary_expertise
+        let primary_expertise = [];
+        try {
+            primary_expertise = user?.primary_expertise ? JSON.parse(user.primary_expertise) : [];
+        } catch (e) {
+            console.error('Error parsing primary_expertise:', e);
+        }
+
+        if (!user?.name || !user?.dob || !user?.email || !user?.city || !user?.country || !user?.gender || !primary_expertise || primary_expertise.length === 0 || !user?.experience) {
+            return res.status(400).json({ success: false, message: 'Please complete step 1: name, dob, email, city, country, gender, primary_expertise, and experience are required.' });
+        }
+
+        // Step 2 required fields - parse JSON strings to check if they're empty
+        let languages = [];
+        let available_for = [];
+        let certificate = [];
+        try {
+            languages = user?.languages ? JSON.parse(user.languages) : [];
+            available_for = user?.available_for ? JSON.parse(user.available_for) : [];
+            certificate = user?.certificate ? JSON.parse(user.certificate) : [];
+        } catch (e) {
+            console.error('Error parsing JSON fields:', e);
+        }
+
+        if (!languages || languages.length === 0 || !available_for || available_for.length === 0 || !user?.chat_call_rate || !user?.training_type || !user?.guru_name || !certificate || certificate.length === 0) {
+            return res.status(400).json({ success: false, message: 'Please complete step 2: languages, available_for, chat_call_rate, training_type, guru_name, and certificate are required.' });
+        }
+
+        // Step 3 required fields - parse JSON string to check if it's empty
+        let govt_id = [];
+        try {
+            govt_id = user?.govt_id ? JSON.parse(user.govt_id) : [];
+        } catch (e) {
+            console.error('Error parsing govt_id:', e);
+        }
+
+        if (!govt_id || govt_id.length === 0) {
+            return res.status(400).json({ success: false, message: 'Please complete step 3: govt_id is required.' });
+        }
+
+        // Step 4 required fields
+        if (!user?.terms || !user?.no_false || !user?.consent_profile) {
+            return res.status(400).json({ success: false, message: 'Please complete step 4: terms, no_false, and consent_profile are required.' });
+        }
+
         await db('onboardings').where({ id: user?.id }).update({ status: "inquiry" })
         return res.status(200).json({ success: true, data: null, message: `Submit Successfully` });
     } catch (err) {
