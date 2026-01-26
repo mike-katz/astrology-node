@@ -1065,7 +1065,7 @@ async function uploadImage(req, res) {
 
 async function submitOnboard(req, res) {
     try {
-        const { token } = req.body
+        const { token, terms, no_false, consent_profile } = req.body
         const tokenData = decodeJWT(`Bearer ${token}`)
         if (!tokenData?.success) return res.status(400).json({ success: false, message: 'Missing params.' });
         const user = await db('onboardings').where({ "mobile": tokenData?.data?.mobile, country_code: tokenData?.data?.country_code, deleted_at: null }).first();
@@ -1151,11 +1151,11 @@ async function submitOnboard(req, res) {
         }
 
         // Step 4 required fields
-        if (!user?.terms || !user?.no_false || !user?.consent_profile) {
+        if (!terms || !no_false || !consent_profile) {
             return res.status(400).json({ success: false, message: 'Please complete step 4: terms, no_false, and consent_profile are required.' });
         }
 
-        await db('onboardings').where({ id: user?.id }).update({ status: "inquiry", step: 4 })
+        await db('onboardings').where({ id: user?.id }).update({ status: "inquiry", step: 4, terms: true, no_false: true, consent_profile: true })
         return res.status(200).json({ success: true, data: null, message: `Submit Successfully` });
     } catch (err) {
         console.error(err);
