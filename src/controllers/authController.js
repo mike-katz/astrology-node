@@ -91,13 +91,13 @@ async function verifyOtp(req, res) {
         if (mobile == '1999999999' && otp != '956019') {
             return res.status(400).json({ success: false, message: 'Wrong Otp' });
         }
-        let existing = await db('users').where({ mobile, country_code }).first();
+        let existing = await db('users').whereNull('deleted_at').where({ mobile, country_code }).first();
         // if (!existing) return res.status(400).json({ success: false, message: 'Wrong Otp' });
 
         if (existing?.deleted_at != null) {
             // await db('users').where({ id: existing?.id }).update({ deleted_at: null })
         }
-        if (!existing || (existing && existing?.deleted_at != null)) {
+        if (!existing) {
             [existing] = await db('users').insert({ mobile, country_code, status: "active" }).returning(['id', 'mobile', 'avatar', 'country_code', 'otp']);
         }
         const token = jwt.sign({ userId: existing.id, mobile: existing.mobile }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '1h' });
