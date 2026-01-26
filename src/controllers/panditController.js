@@ -1072,7 +1072,7 @@ async function submitOnboard(req, res) {
         if (!user) return res.status(400).json({ message: 'Wrong mobile number.' });
 
         // Check if user is on step 4
-        if (user?.step != 3) {
+        if (user?.step >= 3) {
             return res.status(400).json({ success: false, message: 'Please complete all onboard steps before submission.' });
         }
 
