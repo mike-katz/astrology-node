@@ -3,6 +3,8 @@ const db = require('../db');
 require('dotenv').config();
 const { uploadImageTos3, deleteFileFroms3 } = require('./uploader');
 
+const { deleteKey } = require('../config/redisClient');
+
 async function makeAvtarString(user, gender) {
     if (!user || !gender) return null;
 
@@ -203,8 +205,6 @@ async function deleteMyAccount(req, res) {
     try {
         await db('users').where({ id: req.userId }).update({ deleted_at: new Date });
         await deleteKey(`user_${req.userId}`)
-        const key = await getKey(`user_${req.userId}`)
-        console.log("key", key);
         return res.status(200).json({ success: true, data: null, message: 'Update successfully' });
     }
     catch (err) {
