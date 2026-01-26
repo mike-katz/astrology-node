@@ -1116,6 +1116,40 @@ async function submitOnboard(req, res) {
             return res.status(400).json({ success: false, message: 'Please complete step 3: govt_id is required.' });
         }
 
+        // Validate govt_id documents based on document type
+        for (const doc of govt_id) {
+            const label = doc?.label?.toLowerCase() || '';
+            
+            // Aadhaar Card requires both front and back images
+            if (label === 'aadhaar card' || label === 'aadhar card' || label === 'aadhar') {
+                const front_image = doc?.front_image || [];
+                const back_image = doc?.back_image || [];
+                
+                if (!Array.isArray(front_image) || front_image.length === 0) {
+                    return res.status(400).json({ success: false, message: 'Aadhaar Card front image is required.' });
+                }
+                if (!Array.isArray(back_image) || back_image.length === 0) {
+                    return res.status(400).json({ success: false, message: 'Aadhaar Card back image is required.' });
+                }
+            }
+            // PAN Card requires front image
+            else if (label === 'pan card' || label === 'pan') {
+                const front_image = doc?.front_image || [];
+                
+                if (!Array.isArray(front_image) || front_image.length === 0) {
+                    return res.status(400).json({ success: false, message: 'PAN Card front image is required.' });
+                }
+            }
+            // Passport requires front image
+            else if (label === 'passport') {
+                const front_image = doc?.front_image || [];
+                
+                if (!Array.isArray(front_image) || front_image.length === 0) {
+                    return res.status(400).json({ success: false, message: 'Passport front image is required.' });
+                }
+            }
+        }
+
         // Step 4 required fields
         if (!user?.terms || !user?.no_false || !user?.consent_profile) {
             return res.status(400).json({ success: false, message: 'Please complete step 4: terms, no_false, and consent_profile are required.' });
