@@ -94,7 +94,7 @@ async function create(req, res) {
 
         const token = pandit?.token || false;
         if (token) {
-            await sendNotification(token, user?.display_name, pandit?.final_chat_call_rate, panditId, type, orderId, pandit?.display_name, pandit?.profile)
+            await sendNotification(token, pandit?.display_name, pandit?.final_chat_call_rate, panditId, type, orderId, pandit?.display_name, pandit?.profile)
         }
         // socket.emit("emit_to_user_for_register", {
         //     key: `user_${req?.userId}`,
