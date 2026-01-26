@@ -1072,7 +1072,7 @@ async function submitOnboard(req, res) {
         if (!user) return res.status(400).json({ message: 'Wrong mobile number.' });
 
         // Check if user is on step 4
-        if (user?.step != 4) {
+        if (user?.step != 3) {
             return res.status(400).json({ success: false, message: 'Please complete all onboard steps before submission.' });
         }
 
@@ -1119,12 +1119,12 @@ async function submitOnboard(req, res) {
         // Validate govt_id documents based on document type
         for (const doc of govt_id) {
             const label = doc?.label?.toLowerCase() || '';
-            
+
             // Aadhaar Card requires both front and back images
             if (label === 'aadhaar card' || label === 'aadhar card' || label === 'aadhar') {
                 const front_image = doc?.front_image || [];
                 const back_image = doc?.back_image || [];
-                
+
                 if (!Array.isArray(front_image) || front_image.length === 0) {
                     return res.status(400).json({ success: false, message: 'Aadhaar Card front image is required.' });
                 }
@@ -1135,7 +1135,7 @@ async function submitOnboard(req, res) {
             // PAN Card requires front image
             else if (label === 'pan card' || label === 'pan') {
                 const front_image = doc?.front_image || [];
-                
+
                 if (!Array.isArray(front_image) || front_image.length === 0) {
                     return res.status(400).json({ success: false, message: 'PAN Card front image is required.' });
                 }
@@ -1143,7 +1143,7 @@ async function submitOnboard(req, res) {
             // Passport requires front image
             else if (label === 'passport') {
                 const front_image = doc?.front_image || [];
-                
+
                 if (!Array.isArray(front_image) || front_image.length === 0) {
                     return res.status(400).json({ success: false, message: 'Passport front image is required.' });
                 }
@@ -1155,7 +1155,7 @@ async function submitOnboard(req, res) {
             return res.status(400).json({ success: false, message: 'Please complete step 4: terms, no_false, and consent_profile are required.' });
         }
 
-        await db('onboardings').where({ id: user?.id }).update({ status: "inquiry" })
+        await db('onboardings').where({ id: user?.id }).update({ status: "inquiry", step: 4 })
         return res.status(200).json({ success: true, data: null, message: `Submit Successfully` });
     } catch (err) {
         console.error(err);
