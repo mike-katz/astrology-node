@@ -163,10 +163,10 @@ async function updateToken(req, res) {
         const order = await db('users').where({ id: req.userId }).first();
         if (!order) return res.status(400).json({ success: false, message: 'User not found.' });
         const update = {}
-        if (token) {
+        if (token != undefined) {
             update.token = token
         }
-        if (ios_token) {
+        if (ios_token != undefined) {
             update.ios_token = ios_token
         }
         await db('users').where({ id: req.userId }).update(update);
