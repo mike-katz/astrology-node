@@ -74,11 +74,14 @@ async function getDetail(req, res) {
         if (!id) {
             return res.status(400).json({ success: false, data: null, message: 'Missing params' });
         }
-        const query = db('blogs as b')
-            .where({ id }).first();
+        const blog = await db('blogs as b')
+            .where({ 'b.id': id, 'b.deleted_at': null }).first();
+        if (!blog) {
+            return res.status(404).json({ success: false, data: null, message: 'Blog not found' });
+        }
         return res.status(200).json({
             success: true,
-            data: query,
+            data: blog,
             message: 'Blog detail fetched successfully'
         });
     } catch (err) {
@@ -90,10 +93,10 @@ async function getDetail(req, res) {
 
 async function getCategory(req, res) {
     try {
-        const query = db('blog_categories').whereNull('deleted_at')
+        const categories = await db('blog_categories').whereNull('deleted_at');
         return res.status(200).json({
             success: true,
-            data: query,
+            data: categories,
             message: 'List fetched successfully'
         });
     } catch (err) {
