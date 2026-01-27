@@ -884,33 +884,45 @@ async function getPersonalHororscope(req, res) {
 async function ashtakootMilanApiCall(p1Data, p2Data, language = 'en') {
     const formData = new FormData();
 
+    // Parse Person 1 DOB and birth time
+    const p1Lat = p1Data?.lat ?? '22.82';
+    const p1Lon = p1Data?.lon ?? '70.84';
+    const [p1Year, p1Month, p1Day] = p1Data?.dob.split('-');
+    const [p1Hour, p1Min, p1Sec] = p1Data?.birth_time.split(':');
+
+    // Parse Person 2 DOB and birth time
+    const p2Lat = p2Data?.lat ?? '22.82';
+    const p2Lon = p2Data?.lon ?? '70.84';
+    const [p2Year, p2Month, p2Day] = p2Data?.dob.split('-');
+    const [p2Hour, p2Min, p2Sec] = p2Data?.birth_time.split(':');
+
     // Person 1 data
     formData.append('api_key', process.env.KUNDLI_API_KEY);
     formData.append('p1_full_name', p1Data.full_name);
-    formData.append('p1_day', p1Data.day);
-    formData.append('p1_month', p1Data.month);
-    formData.append('p1_year', p1Data.year);
-    formData.append('p1_hour', p1Data.hour);
-    formData.append('p1_min', p1Data.min);
-    formData.append('p1_sec', p1Data.sec || 0);
+    formData.append('p1_day', p1Day);
+    formData.append('p1_month', p1Month);
+    formData.append('p1_year', p1Year);
+    formData.append('p1_hour', p1Hour);
+    formData.append('p1_min', p1Min);
+    formData.append('p1_sec', p1Sec || 0);
     formData.append('p1_gender', p1Data.gender);
     formData.append('p1_place', p1Data.place);
-    formData.append('p1_lat', p1Data.lat);
-    formData.append('p1_lon', p1Data.lon);
+    formData.append('p1_lat', p1Lat);
+    formData.append('p1_lon', p1Lon);
     formData.append('p1_tzone', p1Data.tzone || '5.5');
 
     // Person 2 data
     formData.append('p2_full_name', p2Data.full_name);
-    formData.append('p2_day', p2Data.day);
-    formData.append('p2_month', p2Data.month);
-    formData.append('p2_year', p2Data.year);
-    formData.append('p2_hour', p2Data.hour);
-    formData.append('p2_min', p2Data.min);
-    formData.append('p2_sec', p2Data.sec || 0);
+    formData.append('p2_day', p2Day);
+    formData.append('p2_month', p2Month);
+    formData.append('p2_year', p2Year);
+    formData.append('p2_hour', p2Hour);
+    formData.append('p2_min', p2Min);
+    formData.append('p2_sec', p2Sec || 0);
     formData.append('p2_gender', p2Data.gender);
     formData.append('p2_place', p2Data.place);
-    formData.append('p2_lat', p2Data.lat);
-    formData.append('p2_lon', p2Data.lon);
+    formData.append('p2_lat', p2Lat);
+    formData.append('p2_lon', p2Lon);
     formData.append('p2_tzone', p2Data.tzone || '5.5');
 
     // Language
@@ -935,44 +947,53 @@ async function ashtakootMilanApiCall(p1Data, p2Data, language = 'en') {
 async function ashtakootMilan(req, res) {
     try {
         const {
-            // Person 1 details
-            p1_full_name, p1_day, p1_month, p1_year, p1_hour, p1_min, p1_sec,
+            // Person 1 details - simplified input
+            p1_name, p1_dob, p1_birth_time,
             p1_gender, p1_place, p1_lat, p1_lon, p1_tzone = '5.5',
-            // Person 2 details
-            p2_full_name, p2_day, p2_month, p2_year, p2_hour, p2_min, p2_sec,
+            // Person 2 details - simplified input
+            p2_name, p2_dob, p2_birth_time,
             p2_gender, p2_place, p2_lat, p2_lon, p2_tzone = '5.5',
             // Optional
             language = 'en'
         } = req.body;
 
         // Validate required fields
-        if (!p1_full_name || !p1_day || !p1_month || !p1_year || !p1_hour || !p1_min ||
-            !p1_gender || !p1_place || !p1_lat || !p1_lon) {
-            return res.status(400).json({ success: false, message: 'Missing Person 1 required fields.' });
+        if (!p1_name || !p1_dob || !p1_birth_time || !p1_gender || !p1_place || !p1_lat || !p1_lon) {
+            return res.status(400).json({ success: false, message: 'Missing Person 1 required fields (p1_name, p1_dob, p1_birth_time, p1_gender, p1_place, p1_lat, p1_lon).' });
         }
 
-        if (!p2_full_name || !p2_day || !p2_month || !p2_year || !p2_hour || !p2_min ||
-            !p2_gender || !p2_place || !p2_lat || !p2_lon) {
-            return res.status(400).json({ success: false, message: 'Missing Person 2 required fields.' });
+        if (!p2_name || !p2_dob || !p2_birth_time || !p2_gender || !p2_place || !p2_lat || !p2_lon) {
+            return res.status(400).json({ success: false, message: 'Missing Person 2 required fields (p2_name, p2_dob, p2_birth_time, p2_gender, p2_place, p2_lat, p2_lon).' });
         }
 
-        // Check if matching already exists in database
+        // Parse Person 1 DOB and birth time
+        const [p1Year, p1Month, p1Day] = p1_dob.split('-');
+        const [p1Hour, p1Min, p1Sec] = p1_birth_time.split(':');
+        const p1SecInt = parseInt(p1Sec) || 0;
+
+        // Parse Person 2 DOB and birth time
+        const [p2Year, p2Month, p2Day] = p2_dob.split('-');
+        const [p2Hour, p2Min, p2Sec] = p2_birth_time.split(':');
+        const p2SecInt = parseInt(p2Sec) || 0;
+
+        // Optimized query - only select needed columns using composite unique index
         const existingMatch = await db('kundlimatches')
+            .select('ashtakoot_milan_data', 'ashtakoot_milan_result', 'manglik_dosha', 'nadi_dosha', 'bhakoot_dosha')
             .where({
-                p1_full_name,
-                p1_day,
-                p1_month,
-                p1_year,
-                p1_hour,
-                p1_min,
-                p1_sec: p1_sec || 0,
-                p2_full_name,
-                p2_day,
-                p2_month,
-                p2_year,
-                p2_hour,
-                p2_min,
-                p2_sec: p2_sec || 0,
+                p1_full_name: p1_name,
+                p1_day: parseInt(p1Day),
+                p1_month: parseInt(p1Month),
+                p1_year: parseInt(p1Year),
+                p1_hour: parseInt(p1Hour),
+                p1_min: parseInt(p1Min),
+                p1_sec: p1SecInt,
+                p2_full_name: p2_name,
+                p2_day: parseInt(p2Day),
+                p2_month: parseInt(p2Month),
+                p2_year: parseInt(p2Year),
+                p2_hour: parseInt(p2Hour),
+                p2_min: parseInt(p2Min),
+                p2_sec: p2SecInt,
                 language
             })
             .first();
@@ -994,14 +1015,10 @@ async function ashtakootMilan(req, res) {
 
         // Prepare data for API call
         const p1Data = {
-            full_name: p1_full_name,
-            day: p1_day,
-            month: p1_month,
-            year: p1_year,
-            hour: p1_hour,
-            min: p1_min,
-            sec: p1_sec || 0,
+            full_name: p1_name,
             gender: p1_gender,
+            dob: p1_dob,
+            birth_time: p1_birth_time,
             place: p1_place,
             lat: p1_lat,
             lon: p1_lon,
@@ -1009,13 +1026,9 @@ async function ashtakootMilan(req, res) {
         };
 
         const p2Data = {
-            full_name: p2_full_name,
-            day: p2_day,
-            month: p2_month,
-            year: p2_year,
-            hour: p2_hour,
-            min: p2_min,
-            sec: p2_sec || 0,
+            full_name: p2_name,
+            dob: p2_dob,
+            birth_time: p2_birth_time,
             gender: p2_gender,
             place: p2_place,
             lat: p2_lat,
@@ -1024,10 +1037,10 @@ async function ashtakootMilan(req, res) {
         };
 
         // Call the API
-        const apiResponse = await ashtakootMilanApiCall(p1Data, p2Data, lan);
+        const apiResponse = await ashtakootMilanApiCall(p1Data, p2Data, language);
 
         if (!apiResponse || !apiResponse.success) {
-            return res.status(400).json({ success: false, data: response, message: 'Failed to get matching results' });
+            return res.status(400).json({ success: false, message: 'Failed to get matching results from API' });
         }
 
         // Extract data from API response
@@ -1035,25 +1048,25 @@ async function ashtakootMilan(req, res) {
 
         // Prepare data for database
         const matchData = {
-            p1_full_name,
-            p1_day,
-            p1_month,
-            p1_year,
-            p1_hour,
-            p1_min,
-            p1_sec: p1_sec || 0,
+            p1_full_name: p1_name,
+            p1_day: parseInt(p1Day),
+            p1_month: parseInt(p1Month),
+            p1_year: parseInt(p1Year),
+            p1_hour: parseInt(p1Hour),
+            p1_min: parseInt(p1Min),
+            p1_sec: p1SecInt,
             p1_gender,
             p1_place,
             p1_lat: parseFloat(p1_lat),
             p1_lon: parseFloat(p1_lon),
             p1_tzone: parseFloat(p1_tzone),
-            p2_full_name,
-            p2_day,
-            p2_month,
-            p2_year,
-            p2_hour,
-            p2_min,
-            p2_sec: p2_sec || 0,
+            p2_full_name: p2_name,
+            p2_day: parseInt(p2Day),
+            p2_month: parseInt(p2Month),
+            p2_year: parseInt(p2Year),
+            p2_hour: parseInt(p2Hour),
+            p2_min: parseInt(p2Min),
+            p2_sec: p2SecInt,
             p2_gender,
             p2_place,
             p2_lat: parseFloat(p2_lat),
