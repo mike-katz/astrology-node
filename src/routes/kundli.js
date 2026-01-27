@@ -11,6 +11,7 @@ router.get('/dasha', kundli.findDashaTab);
 router.get('/report', kundli.findReportTab);
 router.get('/horoscope', kundli.getHororscope);
 router.get('/horoscope/overview', kundli.getPersonalHororscope);
+router.post('/kundli-match', kundli.ashtakootMilan);
 
 
 module.exports = router;
