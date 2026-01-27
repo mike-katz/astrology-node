@@ -733,7 +733,7 @@ async function onboard(req, res) {
             if (setting?.chat_call_min_base_rate > chat_call_rate) {
                 return res.status(400).json({ success: false, message: `Price minimum ${setting?.chat_call_min_base_rate} required.` });
             }
-            if (setting?.chat_call_max_base_rate && base_rate > setting?.chat_call_max_base_rate) {
+            if (setting?.chat_call_max_base_rate && chat_call_rate > setting?.chat_call_max_base_rate) {
                 return sendError(res, `Rate maximum ${setting?.chat_call_max_base_rate} allowed.`);
             }
             ins.chat_call_rate = chat_call_rate
