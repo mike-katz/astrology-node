@@ -11,7 +11,7 @@ async function getList(req, res) {
         if (limit < 1) limit = 20;
         const offset = (page - 1) * limit;
 
-        const filter = { 'b.deleted_at': null };
+        const filter = { 'b.deleted_at': null, is_publish: true };
 
         // Filter by category if provided
         if (category_id) {
@@ -31,15 +31,6 @@ async function getList(req, res) {
         }
 
         const blogs = await query
-            .select(
-                'b.id',
-                'b.title',
-                'b.short_desc',
-                'b.desc',
-                'b.image',
-                'b.blog_category_id',
-                'b.created_at',
-            )
             .orderBy('b.id', 'desc')
             .limit(limit)
             .offset(offset);
@@ -48,7 +39,9 @@ async function getList(req, res) {
 
         const total = parseInt(count);
         const totalPages = Math.ceil(total / limit);
-
+        blogs.map(item => {
+            item.hase_tag = JSON.parse(item?.hase_tag)
+        })
         const response = {
             page,
             limit,
@@ -79,6 +72,7 @@ async function getDetail(req, res) {
         if (!blog) {
             return res.status(404).json({ success: false, data: null, message: 'Blog not found' });
         }
+        blog.hase_tag = JSON.parse(blog?.hase_tag)
         return res.status(200).json({
             success: true,
             data: blog,
