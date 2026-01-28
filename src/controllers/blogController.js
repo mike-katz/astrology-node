@@ -40,7 +40,7 @@ async function getList(req, res) {
         const total = parseInt(count);
         const totalPages = Math.ceil(total / limit);
         blogs.map(item => {
-            item.hase_tag = JSON.parse(item?.hase_tag)
+            item.hash_tag = JSON.parse(item?.hash_tag)
         })
         const response = {
             page,
@@ -72,7 +72,7 @@ async function getDetail(req, res) {
         if (!blog) {
             return res.status(404).json({ success: false, data: null, message: 'Blog not found' });
         }
-        blog.hase_tag = JSON.parse(blog?.hase_tag)
+        blog.hash_tag = JSON.parse(blog?.hash_tag)
         return res.status(200).json({
             success: true,
             data: blog,
