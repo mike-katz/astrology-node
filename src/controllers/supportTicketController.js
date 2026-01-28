@@ -127,7 +127,9 @@ async function listTickets(req, res) {
         }
 
         const tickets = await db('support_tickets as st')
+            .leftJoin('support_types as s', 's.id', 'st.issue_type')
             .where(filter)
+            .select('st.*', 's.name as issue_type')
             .orderBy('st.id', 'desc')
             .limit(limit)
             .offset(offset);
@@ -170,6 +172,8 @@ async function getTicketDetail(req, res) {
         const offset = (page - 1) * limit;
 
         const ticket = await db('support_tickets as st')
+            .leftJoin('support_types as s', 's.id', 'st.issue_type')
+            .select('st.*', 's.name as issue_type')
             .where({ 'st.id': id, 'st.user_id': req.userId })
             .whereNull('st.deleted_at')
             .first();
@@ -271,7 +275,10 @@ async function replyTicket(req, res) {
                 message: 'Support ticket not found'
             });
         }
-
+        if (ticket.review != null) return res.status(400).json({
+            success: false,
+            message: 'You already reviewed this ticket.'
+        });
         let messageText = message;
         let messageType = type;
 
@@ -312,6 +319,8 @@ async function replyTicket(req, res) {
             sender_type: 'user',
             receiver_type: 'admin'
         }).returning('*');
+
+        await db('support_tickets').where({ id: id, user_id: req.userId }).update({ status: "open" })
 
         return res.status(200).json({
             success: true,

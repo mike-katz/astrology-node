@@ -68,6 +68,8 @@ async function getDetail(req, res) {
             return res.status(400).json({ success: false, data: null, message: 'Missing params' });
         }
         const blog = await db('blogs as b')
+            .leftJoin('blog_categories as c', 'c.id', 'b.blog_category_id')
+            .select('b.*', 'c.name as category')
             .where({ 'b.id': id, 'b.deleted_at': null }).first();
         if (!blog) {
             return res.status(404).json({ success: false, data: null, message: 'Blog not found' });
