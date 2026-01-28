@@ -320,8 +320,9 @@ async function replyTicket(req, res) {
             receiver_type: 'admin'
         }).returning('*');
 
-        await db('support_tickets').where({ id: id, user_id: req.userId }).update({ status: "open" })
-
+        if (ticket.status == "closed") {
+            await db('support_tickets').where({ id: id, user_id: req.userId }).update({ status: "in progress" })
+        }
         return res.status(200).json({
             success: true,
             data: chatMessage,
