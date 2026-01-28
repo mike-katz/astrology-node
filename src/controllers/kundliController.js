@@ -1001,16 +1001,15 @@ async function ashtakootMilan(req, res) {
         if (existingMatch) {
             // Return existing match
             const response = {
-                success: 1,
-                data: {
-                    ashtakoot_milan: existingMatch.ashtakoot_milan_data,
-                    ashtakoot_milan_result: existingMatch.ashtakoot_milan_result,
-                    manglik_dosha: existingMatch.manglik_dosha,
-                    nadi_dosha: existingMatch.nadi_dosha,
-                    bhakoot_dosha: existingMatch.bhakoot_dosha
-                }
-            };
-            return res.status(200).json({ success: true, data: response, message: 'Kundli match Successfully' });
+                ashtakoot_milan: existingMatch.ashtakoot_milan_data,
+                ashtakoot_milan_result: existingMatch.ashtakoot_milan_result,
+                manglik_dosha: existingMatch.manglik_dosha,
+                nadi_dosha: existingMatch.nadi_dosha,
+                bhakoot_dosha: existingMatch.bhakoot_dosha
+            }
+            return res.status(200).json({
+                success: true, data: response, message: 'Kundli match Successfully'
+            });
         }
 
         // Prepare data for API call
