@@ -856,7 +856,7 @@ async function getHororscope(req, res) {
 
 async function getPersonalHororscope(req, res) {
     try {
-        let { type, language } = req.query;
+        let { type, language = 'en' } = req.query;
         if (!type) return res.status(400).json({ success: false, message: 'Missing params.' });
         if (type == 'monthly') {
             type = 'month'
