@@ -2,6 +2,41 @@ const db = require('../db');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 require('dotenv').config();
+const admin = require('../config/firebase');
+
+async function sendBulkPush(tokens, title, body, data = {}) {
+    // Normalize: allow single token string or array, filter invalid
+    const list = Array.isArray(tokens) ? tokens : (tokens ? [tokens] : []);
+    const validTokens = [...new Set(list)]
+        .map((t) => (typeof t === 'string' ? t.trim() : t))
+        .filter((t) => t && t.length > 0);
+    if (validTokens.length === 0) {
+        console.log('sendBulkPush: no valid tokens');
+        return;
+    }
+    const bodyStr = typeof body === 'string' ? body : '';
+    const dataStr = typeof data === 'object' && data !== null
+        ? Object.fromEntries(Object.entries(data).map(([k, v]) => [String(k), String(v)]))
+        : {};
+    const messages = validTokens.map((token) => ({
+        token,
+        notification: { title, body: bodyStr },
+        data: dataStr,
+    }));
+    try {
+        const response = await admin.messaging().sendEach(messages);
+        console.log('FCM Success:', response.successCount, 'Failed:', response.failureCount);
+        if (response.failureCount > 0 && response.responses) {
+            response.responses.forEach((r, i) => {
+                if (r.error) {
+                    console.log(`FCM fail[${i}] token: ${validTokens[i]?.slice(0, 20)}... code: ${r.error.code} message: ${r.error.message}`);
+                }
+            });
+        }
+    } catch (err) {
+        console.error('sendBulkPush error:', err.code || err.message, err);
+    }
+}
 
 async function addReview(req, res) {
     try {
@@ -14,9 +49,14 @@ async function addReview(req, res) {
         console.log("user", user);
         // if (user) return res.status(400).json({ success: false, message: 'You already follow this pandit' });
         if (!user) {
-            await db('pandits').where({ id: Number(panditId) }).increment(`rating_${rating}`, 1);
+            const [saved] = await db('pandits').where({ id: Number(panditId) }).increment(`rating_${rating}`, 1).returning("*");
             const userDetail = await db('users').where('id', req?.userId).first();
             await db('reviews').insert({ user_id: req?.userId, pandit_id: panditId, order_id: orderId, message, rating, type: "user", hide, gender: userDetail?.gender, profile: userDetail?.profile, avatar: userDetail?.avatar, name: userDetail?.name });
+            if (saved?.token && rating == 5) {
+                const title = '⭐ You’re a Star!';
+                const body = `${userDetail?.name} gave you a 5-star rating! "Amazing guidance," they said. This will boost your profile visibility.`
+                sendBulkPush([saved?.token], title, body, data = {})
+            }
         } else {
             await db('reviews').where({ id: user?.id }).update({ user_id: req?.userId, pandit_id: panditId, order_id: orderId, hide, message, rating });
         }

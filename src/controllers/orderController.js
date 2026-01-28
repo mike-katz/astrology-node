@@ -1,12 +1,8 @@
 const db = require('../db');
 require('dotenv').config();
-const serviceAccount = require('../config/astro-1e9f7-firebase-adminsdk-fbsvc-4f429f67a7.json');
-const admin = require("firebase-admin");
-const { callEvent } = require("../socket");
+const admin = require('../config/firebase');
 
-admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount),
-});
+const { callEvent } = require("../socket");
 
 async function create(req, res) {
     const { panditId, type, profile_id } = req.body;
