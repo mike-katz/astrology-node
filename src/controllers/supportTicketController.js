@@ -231,6 +231,7 @@ async function getSupportTypes(req, res) {
     try {
         const supportTypes = await db('support_types')
             .whereNull('deleted_at')
+            .where({ status: true })
             .orderBy('id', 'asc');
 
         return res.status(200).json({
