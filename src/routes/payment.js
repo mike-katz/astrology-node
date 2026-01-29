@@ -3,6 +3,8 @@ const router = express.Router();
 const payment = require('../controllers/paymentController');
 
 router.post('/', payment.addPayment);
+router.post('/create-order', payment.createRazorpayOrder);
+router.post('/verify', payment.verifyRazorpayPayment);
 router.get('/', payment.getPayment);
 router.get('/transactions', payment.getTransactions);
 
