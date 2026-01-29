@@ -135,11 +135,11 @@ async function verifyRazorpayPayment(req, res) {
             return res.status(500).json({ success: false, message: 'Razorpay is not configured.' });
         }
 
-        // const body = `${razorpay_order_id}|${razorpay_payment_id}`;
-        // const expectedSignature = crypto.createHmac('sha256', keySecret).update(body).digest('hex');
-        // if (expectedSignature !== razorpay_signature) {
-        //     return res.status(400).json({ success: false, message: 'Invalid payment signature.' });
-        // }
+        const body = `${razorpay_order_id}|${razorpay_payment_id}`;
+        const expectedSignature = crypto.createHmac('sha256', keySecret).update(body).digest('hex');
+        if (expectedSignature !== razorpay_signature) {
+            return res.status(400).json({ success: false, message: 'Invalid payment signature.' });
+        }
 
         const existing = await db('payments')
             .where({ user_id: req.userId, transaction_id: razorpay_order_id })
