@@ -279,6 +279,12 @@ async function replyTicket(req, res) {
             success: false,
             message: 'You already reviewed this ticket.'
         });
+        if (ticket.status == "reopen") {
+            return res.status(400).json({
+                success: false,
+                message: 'Please wait for admin replay.'
+            });
+        }
         let messageText = message;
         let messageType = type;
 
@@ -321,7 +327,7 @@ async function replyTicket(req, res) {
         }).returning('*');
 
         if (ticket.status == "closed") {
-            await db('support_tickets').where({ id: id, user_id: req.userId }).update({ status: "in progress" })
+            await db('support_tickets').where({ id: id, user_id: req.userId }).update({ status: "reopen" })
         }
         return res.status(200).json({
             success: true,
