@@ -152,7 +152,7 @@ async function razorpay(req, res) {
             user_new_balance: Number(newBalance),
             user_id: user.id,
             message: 'Purchase of AG-Money via Razorpay',
-            amount: amountInr,
+            amount: paymentRow?.amount,
             gst,
             invoice,
         });
