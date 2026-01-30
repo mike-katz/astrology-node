@@ -129,6 +129,7 @@ async function createRazorpayOrder(req, res) {
 /** Verify Razorpay payment signature and credit balance (no SMS) */
 async function verifyRazorpayPayment(req, res) {
     try {
+        console.log("verifyRazorpayPayment req.body", req.body);
         const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
         if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
             return res.status(400).json({ success: false, message: 'Missing razorpay_order_id, razorpay_payment_id or razorpay_signature.' });
@@ -160,17 +161,17 @@ async function verifyRazorpayPayment(req, res) {
         const user = await db('users').where('id', req.userId).first();
         if (!user) return res.status(400).json({ success: false, message: 'User not found.' });
 
-        const amountInr = Number((req.body.amount_inr != null ? req.body.amount_inr : 0)) || 0;
-        let amount = amountInr;
-        if (amount <= 0) {
-            const instance = new Razorpay({
-                key_id: keyId,
-                key_secret: keySecret
-            });
-            const orderRes = await instance.orders.fetch(razorpay_order_id);
-            console.log("orderRes", orderRes);
-            amount = Number(orderRes.amount) / 100;
-        }
+        // const amountInr = Number((req.body.amount_inr != null ? req.body.amount_inr : 0)) || 0;
+        let amount = 0;
+        // if (amount <= 0) {
+        const instance = new Razorpay({
+            key_id: keyId,
+            key_secret: keySecret
+        });
+        const orderRes = await instance.orders.fetch(razorpay_order_id);
+        console.log("instance orderRes", orderRes);
+        amount = Number(orderRes.amount) / 100;
+        // }
 
         if (amount < 0.01) {
             return res.status(400).json({ success: false, message: 'Invalid amount.' });
