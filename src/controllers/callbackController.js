@@ -124,7 +124,6 @@ async function razorpay(req, res) {
         const with_tax_amount = Number(Number(gst) + Number(paymentRow?.amount)).toFixed(2);
         const total_in_word = numberToIndianWords(with_tax_amount);
 
-        await db('users').where({ id: user.id }).increment({ balance: Number(paymentRow?.amount) });
         const newBalance = Number(user.balance) + Number(paymentRow?.amount);
 
         const data = {
@@ -145,6 +144,8 @@ async function razorpay(req, res) {
             status: 'success',
             invoice,
         });
+
+        await db('users').where({ id: user.id }).increment({ balance: Number(paymentRow?.amount) });
 
         await db('balancelogs').insert({
             user_old_balance: Number(user.balance),
