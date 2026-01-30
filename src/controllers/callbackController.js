@@ -63,36 +63,52 @@ async function razorpay(req, res) {
         } catch (e) {
             return res.status(400).send('Invalid JSON');
         }
-        // Razorpay body: { entity: 'event', event: 'order.paid', payload: { payment: { entity }, order: { entity } } }
+        // Razorpay events: payment.failed | payment.authorized | payment.captured | order.paid
         const event = payload.event;
+
+        // 1. payment.authorized – only acknowledged, no DB update (wait for captured/order.paid)
+        if (event === 'payment.authorized') {
+            return res.status(200).json({ success: true, message: 'payment.authorized acknowledged' });
+        }
+
+        // 2. payment.failed | 3. payment.captured | 4. order.paid
         const status = (event === 'payment.captured' || event === 'order.paid') ? 'success' : (event === 'payment.failed') ? 'failed' : null;
         if (!status) {
             return res.status(200).json({ success: true, message: 'Event ignored' });
         }
 
+        console.log("status", status);
+
         const pay = payload.payload?.payment?.entity;
         const orderEntity = payload.payload?.order?.entity;
-        let orderId, razorpayPaymentId, amountPaise;
+        let orderId, razorpayPaymentId, amountPaise, utr;
         if (pay) {
             orderId = pay.order_id;
             razorpayPaymentId = pay.id;
             amountPaise = Number(pay.amount || 0);
+            utr = pay.acquirer_data?.rrn || pay.id;
         } else if (orderEntity) {
             orderId = orderEntity.id;
             amountPaise = Number(orderEntity.amount || 0);
-            razorpayPaymentId = payload.payload?.payment?.entity?.id || null;
+            const p = payload.payload?.payment?.entity;
+            razorpayPaymentId = p?.id || null;
+            utr = p?.acquirer_data?.rrn || razorpayPaymentId;
         } else {
             return res.status(200).json({ success: true, message: 'No payment or order entity' });
         }
         const amountInr = amountPaise / 100;
 
+        // Same order: find row by Razorpay order_id (transaction_id). Failed path = only pending. Success path = pending or failed (retry pachi success)
+        console.log("orderId", orderId);
         const paymentRow = await db('payments')
-            .where({ transaction_id: orderId, status: 'pending' })
+            .where({ order_id: orderId })
+            .whereIn('status', status === 'failed' ? ['pending'] : ['pending', 'failed'])
             .first();
         if (!paymentRow) {
             return res.status(200).json({ success: true, message: 'No pending payment or already processed' });
         }
 
+        // 2. payment.failed – mark payment as failed
         if (status === 'failed') {
             await db('payments').where({ id: paymentRow.id }).update({ status: 'failed' });
             return res.status(200).json({ success: true, message: 'Payment marked failed' });
@@ -104,13 +120,13 @@ async function razorpay(req, res) {
             return res.status(200).json({ success: true, message: 'User not found' });
         }
 
-        const gst = (Number(amountInr) * 18) / 100;
-        const with_tax_amount = Number(Number(gst) + Number(amountInr)).toFixed(2);
+        const gst = Number(paymentRow?.gst);
+        const with_tax_amount = Number(Number(gst) + Number(paymentRow?.amount)).toFixed(2);
         const total_in_word = numberToIndianWords(with_tax_amount);
         const data = {
             transaction_id: orderId,
-            utr: razorpayPaymentId,
-            amount: amountInr,
+            utr,
+            amount: paymentRow?.amount,
             with_tax_amount,
             gst,
             city: user?.city_state_country || '',
@@ -120,18 +136,17 @@ async function razorpay(req, res) {
         const invoice = await generateInvoicePDF(data);
 
         await db('payments').where({ id: paymentRow.id }).update({
-            utr: razorpayPaymentId,
-            amount: amountInr,
-            gst,
+            utr,
+            transaction_id: razorpayPaymentId,
             status: 'success',
             invoice,
         });
-        await db('users').where({ id: user.id }).increment({ balance: Number(amountInr) });
-        const newBalance = Number(user.balance) + Number(amountInr);
+        await db('users').where({ id: user.id }).increment({ balance: Number(paymentRow?.amount) });
+        const newBalance = Number(user.balance) + Number(paymentRow?.amount);
 
         const order = await db('orders').where({ user_id: user.id, status: 'continue' }).first();
         if (order) {
-            const minute = Math.floor(Number(amountInr) / Number(order?.rate || order?.final_chat_call_rate || 1));
+            const minute = Math.floor(Number(paymentRow?.amount) / Number(order?.rate || order?.final_chat_call_rate || 1));
             const endTime = new Date(new Date(order.end_time).getTime() + minute * 60 * 1000);
             const duration = Number(order?.duration) + Number(minute);
             const rate = order?.rate || order?.final_chat_call_rate;

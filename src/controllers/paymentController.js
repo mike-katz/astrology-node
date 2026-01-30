@@ -108,7 +108,7 @@ async function createRazorpayOrder(req, res) {
         });
         console.log("order", order);
 
-        await db('payments').insert({ user_id: req?.userId, transaction_id: order.id, gst, amount, status: "pending", type: "recharge" });
+        await db('payments').insert({ user_id: req?.userId, order_id: order.id, gst, amount, status: "pending", type: "recharge" });
         return res.status(200).json({
             success: true,
             data: {
@@ -149,7 +149,7 @@ async function verifyRazorpayPayment(req, res) {
         }
 
         const existing = await db('payments')
-            .where({ user_id: req.userId, transaction_id: razorpay_order_id })
+            .where({ user_id: req.userId, order_id: razorpay_order_id })
             .orWhere({ utr: razorpay_payment_id })
             .first();
         if (existing) {
@@ -181,7 +181,7 @@ async function verifyRazorpayPayment(req, res) {
         const with_tax_amount = Number(Number(gst) + Number(amount)).toFixed(2);
         const total_in_word = numberToIndianWords(with_tax_amount);
         const data = {
-            transaction_id: orderId,
+            transaction_id: razorpay_payment_id,
             utr,
             amount,
             with_tax_amount,
