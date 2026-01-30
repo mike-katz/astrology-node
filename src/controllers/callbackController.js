@@ -110,7 +110,7 @@ async function razorpay(req, res) {
 
         // 2. payment.failed – mark payment as failed
         if (status === 'failed') {
-            await db('payments').where({ id: paymentRow.id }).update({ status: 'failed', transaction_id: orderId });
+            await db('payments').where({ id: paymentRow.id }).update({ status: 'failed', transaction_id: razorpayPaymentId });
             return res.status(200).json({ success: true, message: 'Payment marked failed' });
         }
 
