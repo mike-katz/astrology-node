@@ -101,12 +101,12 @@ async function createRazorpayOrder(req, res) {
             receipt,
             notes: { user_id: String(req.userId) },
         });
-
+        console.log("order", order);
         return res.status(200).json({
             success: true,
             data: {
                 orderId: order.id,
-                key_id: keyId,
+                // key_id: keyId,
                 amount: order.amount,
                 currency: order.currency,
             },
