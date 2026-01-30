@@ -3,8 +3,8 @@ require('dotenv').config();
 
 async function razorpay(req, res) {
     try {
-        console.log("req body", req.body);
-        console.log("req qiery", req.query);
+        console.log("razorpay req body", req.body);
+        console.log("razorpay req qiery", req.query);
         // const faqs = await db('faqs')
         //     .whereNull('deleted_at')
         //     .orderBy('id', 'asc')
