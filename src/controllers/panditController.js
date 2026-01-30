@@ -654,7 +654,7 @@ async function onboard(req, res) {
             if (!languages || !available_for || !chat_call_rate || !training_type || !guru_name) return res.status(400).json({ success: false, message: 'Missing params.' });
         }
         if (step == 3) {
-            if (!govt_id || files?.certificate?.length == 0) return res.status(400).json({ success: false, message: 'Missing params.' });
+            if (!govt_id) return res.status(400).json({ success: false, message: 'Missing params.' });
         }
         if (step == 4) {
             if (!terms || !no_false || !consent_profile) return res.status(400).json({ success: false, message: 'Missing params.' });
