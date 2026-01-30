@@ -93,10 +93,11 @@ async function createRazorpayOrder(req, res) {
         if (!user) return res.status(400).json({ success: false, message: 'User not found.' });
 
         const instance = new Razorpay({ key_id: keyId, key_secret: keySecret });
-        const gst = (Number(amount) * 18) / 100
 
-        const with_tax_amount = Number(Number(gst) + Number(amount)).toFixed(2);
+        const base = (Number(amount) * 100) / Number(amount)
 
+        const gst = Number(amount) - Number(base)
+        const with_tax_amount = Number(amount).toFixed(2);
 
         const amountPaise = Math.round(Number(with_tax_amount) * 100);
         const receipt = `rcpt_${req.userId}_${Date.now()}`;
@@ -108,12 +109,12 @@ async function createRazorpayOrder(req, res) {
         });
         console.log("order", order);
 
-        await db('payments').insert({ user_id: req?.userId, order_id: order.id, gst, amount, status: "pending", type: "recharge" });
+        await db('payments').insert({ user_id: req?.userId, order_id: order.id, gst, amount: base, status: "pending", type: "recharge" });
         return res.status(200).json({
             success: true,
             data: {
                 orderId: order.id,
-                // key_id: keyId,
+                key: keyId,
                 amount: order.amount,
                 currency: order.currency,
             },
