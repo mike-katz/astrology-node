@@ -2,6 +2,6 @@ const express = require('express');
 const router = express.Router();
 const callback = require('../controllers/callbackController');
 
-router.get('/razorpay', callback.razorpay);
+router.post('/razorpay', callback.razorpay);
 
 module.exports = router;
