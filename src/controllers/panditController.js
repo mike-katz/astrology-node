@@ -1104,7 +1104,7 @@ async function submitOnboard(req, res) {
             console.error('Error parsing JSON fields:', e);
         }
 
-        if (!languages || languages.length === 0 || !available_for || available_for.length === 0 || !user?.chat_call_rate || !user?.training_type || !user?.guru_name || !certificate || certificate.length === 0) {
+        if (!languages || languages.length === 0 || !available_for || available_for.length === 0 || !user?.chat_call_rate || !user?.training_type || !user?.guru_name) {
             return res.status(400).json({ success: false, message: 'Please complete step 2: languages, available_for, chat_call_rate, training_type, guru_name, and certificate are required.' });
         }
 
