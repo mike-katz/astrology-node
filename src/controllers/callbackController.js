@@ -123,6 +123,20 @@ async function razorpay(req, res) {
         const gst = Number(paymentRow?.gst);
         const with_tax_amount = Number(Number(gst) + Number(paymentRow?.amount)).toFixed(2);
         const total_in_word = numberToIndianWords(with_tax_amount);
+
+        await db('users').where({ id: user.id }).increment({ balance: Number(paymentRow?.amount) });
+        const newBalance = Number(user.balance) + Number(paymentRow?.amount);
+
+        await db('balancelogs').insert({
+            user_old_balance: Number(user.balance),
+            user_new_balance: Number(newBalance),
+            user_id: user.id,
+            message: 'Purchase of AG-Money via Razorpay',
+            amount: amountInr,
+            gst,
+            invoice,
+        });
+
         const data = {
             transaction_id: orderId,
             utr,
@@ -141,8 +155,6 @@ async function razorpay(req, res) {
             status: 'success',
             invoice,
         });
-        await db('users').where({ id: user.id }).increment({ balance: Number(paymentRow?.amount) });
-        const newBalance = Number(user.balance) + Number(paymentRow?.amount);
 
         const order = await db('orders').where({ user_id: user.id, status: 'continue' }).first();
         if (order) {
@@ -162,16 +174,6 @@ async function razorpay(req, res) {
             }
             callEvent('emit_to_pending_order', { key: `pandit_${order.pandit_id}`, payload: { pandit_id: order.pandit_id } });
         }
-
-        await db('balancelogs').insert({
-            user_old_balance: Number(user.balance),
-            user_new_balance: Number(newBalance),
-            user_id: user.id,
-            message: 'Purchase of AG-Money via Razorpay',
-            amount: amountInr,
-            gst,
-            invoice,
-        });
 
         return res.status(200).json({ success: true, message: 'Payment success updated' });
     } catch (err) {
