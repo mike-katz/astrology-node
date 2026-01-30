@@ -127,16 +127,6 @@ async function razorpay(req, res) {
         await db('users').where({ id: user.id }).increment({ balance: Number(paymentRow?.amount) });
         const newBalance = Number(user.balance) + Number(paymentRow?.amount);
 
-        await db('balancelogs').insert({
-            user_old_balance: Number(user.balance),
-            user_new_balance: Number(newBalance),
-            user_id: user.id,
-            message: 'Purchase of AG-Money via Razorpay',
-            amount: amountInr,
-            gst,
-            invoice,
-        });
-
         const data = {
             transaction_id: orderId,
             utr,
@@ -153,6 +143,16 @@ async function razorpay(req, res) {
             utr,
             transaction_id: razorpayPaymentId,
             status: 'success',
+            invoice,
+        });
+
+        await db('balancelogs').insert({
+            user_old_balance: Number(user.balance),
+            user_new_balance: Number(newBalance),
+            user_id: user.id,
+            message: 'Purchase of AG-Money via Razorpay',
+            amount: amountInr,
+            gst,
             invoice,
         });
 
