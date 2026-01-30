@@ -94,7 +94,7 @@ async function createRazorpayOrder(req, res) {
 
         const instance = new Razorpay({ key_id: keyId, key_secret: keySecret });
 
-        const base = (Number(amount) * 100) / Number(amount)
+        const base = (Number(amount) * 100) / (Number(118)) //add gst 18 +100
 
         const gst = Number(amount) - Number(base)
         const with_tax_amount = Number(amount).toFixed(2);
