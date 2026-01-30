@@ -32,6 +32,8 @@ const { encryptResponse } = require('./middleware/encryptResponse.js')
 
 app.use(express.json());
 
+app.use('/callback', callBackRoutes);
+
 app.use(decryptRequest);
 app.use(encryptResponse);
 RedisCache.initializeRedis();
@@ -43,7 +45,6 @@ app.use('/upload', panditRoutes);
 app.use('/kundli', kundliRoutes);
 app.use('/faq', faqRoutes);
 app.use('/blog', blogRoutes);
-app.use('/callback', callBackRoutes);
 
 // app.use('/agora', agoraRoutes);
 
