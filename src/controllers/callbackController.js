@@ -124,10 +124,18 @@ async function razorpay(req, res) {
         const with_tax_amount = Number(Number(gst) + Number(paymentRow?.amount)).toFixed(2);
         const total_in_word = numberToIndianWords(with_tax_amount);
 
+        let extra = 0;
+        if (paymentRow.recharge_id) {
+            const recharge = await db('recharges').where('id', paymentRow.recharge_id).first();
+            if (recharge) {
+                extra = Number(recharge?.extra_amount)
+            }
+        }
+
         const newBalance = Number(user.balance) + Number(paymentRow?.amount);
 
         const data = {
-            transaction_id: orderId,
+            transaction_id: razorpayPaymentId,
             utr,
             amount: paymentRow?.amount,
             with_tax_amount,
@@ -145,7 +153,7 @@ async function razorpay(req, res) {
             invoice,
         });
 
-        await db('users').where({ id: user.id }).increment({ balance: Number(paymentRow?.amount) });
+        await db('users').where({ id: user.id }).increment({ balance: Number(Number(paymentRow?.amount) + Number(extra)) });
 
         await db('balancelogs').insert({
             user_old_balance: Number(user.balance),
@@ -156,6 +164,18 @@ async function razorpay(req, res) {
             gst,
             invoice,
         });
+
+        if (extra > 0) {
+            await db('balancelogs').insert({
+                user_old_balance: Number(newBalance),
+                user_new_balance: Number(newBalance) + Number(extra),
+                user_id: user.id,
+                message: `Cashback Order(${orderId})`,
+                amount: extra,
+                gst: 0,
+                invoice: "",
+            });
+        }
 
         const order = await db('orders').where({ user_id: user.id, status: 'continue' }).first();
         if (order) {

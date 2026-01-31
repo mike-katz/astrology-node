@@ -77,9 +77,15 @@ function numberToIndianWords(amount) {
 /** Create Razorpay order (no SMS/OTP – use Razorpay Checkout on frontend) */
 async function createRazorpayOrder(req, res) {
     try {
-        const { amount } = req.body;
-        if (!amount || Number(amount) < 1) {
-            return res.status(400).json({ success: false, message: 'Amount is required and must be at least ₹1.' });
+        let { amount, recharge_id, manual_recharge } = req.body;
+        if (!amount) {
+            return res.status(400).json({ success: false, message: 'Missing params.' });
+        }
+        if (manual_recharge && recharge_id) {
+            const recharge = await db('recharges').whereNull('deleted_at').where({ 'id': recharge_id, status: true }).first();
+            if (!recharge) return res.status(400).json({ success: false, message: 'Recharge not active.' });
+            const gst = (Number(recharge?.amount) * 18) / 100
+            amount = Number(recharge?.amount) + Number(gst)
         }
         const gateway = await db('payment_gateways').where('status', true).first();
         // { "key_id": "rzp_test_S9nToUfWEFILCz", "key_secret": "HTbBCXlFb7xEa2rVltcKIvNy", "merchant_id": "S5qAOpGWOEM7L9" }
@@ -109,7 +115,7 @@ async function createRazorpayOrder(req, res) {
         });
         console.log("order", order);
 
-        await db('payments').insert({ user_id: req?.userId, order_id: order.id, gst, amount: base, status: "pending", type: "recharge" });
+        await db('payments').insert({ user_id: req?.userId, order_id: order.id, gst, amount: base, status: "pending", type: "recharge", recharge_id });
         return res.status(200).json({
             success: true,
             data: {
@@ -364,5 +370,5 @@ module.exports = {
     deleteAllPayment,
     deleteAllTransaction,
     createRazorpayOrder,
-    verifyRazorpayPayment,
+    verifyRazorpayPayment
 };
