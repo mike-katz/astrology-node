@@ -149,82 +149,84 @@ async function verifyRazorpayPayment(req, res) {
 }
 
 async function addPayment(req, res) {
-    try {
-        const { amount } = req.body;
-        if (!amount) return res.status(400).json({ success: false, message: 'Missing params.' });
-        const user = await db('users')
-            .where('id', req?.userId)
-            .first();
-        if (!user) return res.status(400).json({ success: false, message: 'User not found.' });
+    return res.status(400).json({ success: false, message: 'API in maintenance.' });
+    // try {
 
-        const orderId = Math.floor(100000000000000 + Math.random() * 900000000000000).toString();
-        const utr = Math.floor(100000000 + Math.random() * 900000000).toString();
-        const gst = (Number(amount) * 18) / 100
+    //     const { amount } = req.body;
+    //     if (!amount) return res.status(400).json({ success: false, message: 'Missing params.' });
+    //     const user = await db('users')
+    //         .where('id', req?.userId)
+    //         .first();
+    //     if (!user) return res.status(400).json({ success: false, message: 'User not found.' });
 
-        const with_tax_amount = Number(Number(gst) + Number(amount)).toFixed(2);
-        const total_in_word = numberToIndianWords(with_tax_amount)
+    //     const orderId = Math.floor(100000000000000 + Math.random() * 900000000000000).toString();
+    //     const utr = Math.floor(100000000 + Math.random() * 900000000).toString();
+    //     const gst = (Number(amount) * 18) / 100
 
-        const data = {
-            transaction_id: orderId,
-            utr,
-            amount,
-            with_tax_amount,
-            gst,
-            city: user?.city_state_country || "",
-            pincode: user?.pincode || "",
-            total_in_word
-        };
-        const invoice = await generateInvoicePDF(data)
-        console.log("invoice", invoice);
-        await db('users').where({ id: user?.id }).increment({ balance: Number(amount) });
-        await db('payments').insert({ user_id: req?.userId, transaction_id: orderId, utr, gst, amount, status: "success", invoice, type: "recharge" });
-        const newBalance = Number(user.balance) + Number(amount)
-        const order = await db('orders').where({ user_id: req.userId, status: "continue" }).first();
-        if (order) {
-            const minute = Math.floor(Number(Number(amount) / Number(order?.rate)));
-            const endTime = new Date(new Date(order.end_time).getTime() + minute * 60 * 1000);
-            const duration = Number(order?.duration) + Number(minute);
-            const deduction = Number(duration) * Number(order.rate)
-            await db('orders').where({ id: order?.id }).update({ duration, deduction, end_time: endTime });
+    //     const with_tax_amount = Number(Number(gst) + Number(amount)).toFixed(2);
+    //     const total_in_word = numberToIndianWords(with_tax_amount)
 
-            if (order.type == 'chat') {
-                callEvent("emit_to_user_chat_end_time", {
-                    key: `pandit_${order?.pandit_id}`,
-                    payload: { startTime: order?.start_time, endTime, orderId: order?.orderId }
-                });
-                callEvent("emit_to_user_chat_end_time", {
-                    key: `user_${order?.user_id}`,
-                    payload: { startTime: order?.start_time, endTime, orderId: order?.orderId }
-                });
-            }
-            if (order.type == 'call') {
-                console.log("emit_to_user_call_end_time call start",);
-                callEvent("emit_to_user_call_end_time", {
-                    key: `pandit_${order?.pandit_id}`,
-                    payload: { startTime: order?.start_time, endTime, orderId: order?.orderId }
-                });
-                callEvent("emit_to_user_call_end_time", {
-                    key: `user_${order?.user_id}`,
-                    payload: { startTime: order?.start_time, endTime, orderId: order?.orderId }
-                });
-                console.log("emit_to_user_call_end_time call end",);
+    //     const data = {
+    //         transaction_id: orderId,
+    //         utr,
+    //         amount,
+    //         with_tax_amount,
+    //         gst,
+    //         city: user?.city_state_country || "",
+    //         pincode: user?.pincode || "",
+    //         total_in_word
+    //     };
+    //     const invoice = await generateInvoicePDF(data)
+    //     console.log("invoice", invoice);
+    //     await db('users').where({ id: user?.id }).increment({ balance: Number(amount) });
+    //     await db('payments').insert({ user_id: req?.userId, transaction_id: orderId, utr, gst, amount, status: "success", invoice, type: "recharge" });
+    //     const newBalance = Number(user.balance) + Number(amount)
+    //     const order = await db('orders').where({ user_id: req.userId, status: "continue" }).first();
+    //     if (order) {
+    //         const minute = Math.floor(Number(Number(amount) / Number(order?.rate)));
+    //         const endTime = new Date(new Date(order.end_time).getTime() + minute * 60 * 1000);
+    //         const duration = Number(order?.duration) + Number(minute);
+    //         const deduction = Number(duration) * Number(order.rate)
+    //         await db('orders').where({ id: order?.id }).update({ duration, deduction, end_time: endTime });
 
-            }
+    //         if (order.type == 'chat') {
+    //             callEvent("emit_to_user_chat_end_time", {
+    //                 key: `pandit_${order?.pandit_id}`,
+    //                 payload: { startTime: order?.start_time, endTime, orderId: order?.orderId }
+    //             });
+    //             callEvent("emit_to_user_chat_end_time", {
+    //                 key: `user_${order?.user_id}`,
+    //                 payload: { startTime: order?.start_time, endTime, orderId: order?.orderId }
+    //             });
+    //         }
+    //         if (order.type == 'call') {
+    //             console.log("emit_to_user_call_end_time call start",);
+    //             callEvent("emit_to_user_call_end_time", {
+    //                 key: `pandit_${order?.pandit_id}`,
+    //                 payload: { startTime: order?.start_time, endTime, orderId: order?.orderId }
+    //             });
+    //             callEvent("emit_to_user_call_end_time", {
+    //                 key: `user_${order?.user_id}`,
+    //                 payload: { startTime: order?.start_time, endTime, orderId: order?.orderId }
+    //             });
+    //             console.log("emit_to_user_call_end_time call end",);
 
-            callEvent("emit_to_pending_order", {
-                key: `pandit_${order?.pandit_id}`,
-                payload: { pandit_id: order?.pandit_id }
-            });
-        }
-        await db('balancelogs').insert({
-            user_old_balance: Number(user.balance), user_new_balance: Number(newBalance), user_id: req?.userId, message: "Purchase of AG-Money via razorpay", amount, gst, invoice
-        });
+    //         }
 
-        return res.status(200).json({ success: true, message: 'Payment added Successfully' });
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ success: false, message: 'Server error' });
-    }
+    //         callEvent("emit_to_pending_order", {
+    //             key: `pandit_${order?.pandit_id}`,
+    //             payload: { pandit_id: order?.pandit_id }
+    //         });
+    //     }
+    //     await db('balancelogs').insert({
+    //         user_old_balance: Number(user.balance), user_new_balance: Number(newBalance), user_id: req?.userId, message: "Purchase of AG-Money via razorpay", amount, gst, invoice
+    //     });
+
+    //     return res.status(200).json({ success: true, message: 'Payment added Successfully' });
+    // } catch (err) {
+    //     console.error(err);
+    //     res.status(500).json({ success: false, message: 'Server error' });
+    // }
 }
 
 async function getPayment(req, res) {
