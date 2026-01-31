@@ -79,11 +79,14 @@ async function createRazorpayOrder(req, res) {
     try {
         let { amount, recharge_id, manual_recharge } = req.body;
 
-        if (manual_recharge && recharge_id) {
+        if (manual_recharge == false && recharge_id) {
             const recharge = await db('recharges').whereNull('deleted_at').where({ 'id': recharge_id, status: true }).first();
             if (!recharge) return res.status(400).json({ success: false, message: 'Recharge not active.' });
             const gst = (Number(recharge?.amount) * 18) / 100
-            amount = Number(recharge?.amount) + Number(gst)
+            amount = Number(Number(recharge?.amount) + Number(gst))
+        }
+        if (!Number.isFinite(amount) || amount < 0) {
+            return res.status(400).json({ success: false, message: 'Invalid amount.' });
         }
         const gateway = await db('payment_gateways').where('status', true).first();
         // { "key_id": "rzp_test_S9nToUfWEFILCz", "key_secret": "HTbBCXlFb7xEa2rVltcKIvNy", "merchant_id": "S5qAOpGWOEM7L9" }
