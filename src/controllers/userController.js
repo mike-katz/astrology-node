@@ -219,10 +219,11 @@ async function getRecharge(req, res) {
             .where("status", true)
             .whereNull('deleted_at')
             .orderBy([{ column: 'amount', order: 'asc' }]);
-        return sendSuccess(res, result, 'Recharge list success');
+        return res.status(200).json({ success: true, data: result, message: 'Recharge list success' });
     }
     catch (err) {
-        return sendServerError(res, err);
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
     }
 }
 module.exports = { updateProfile, getProfile, getBalance, updateToken, profileUpdate, makeAvtarString, deleteMyAccount, getRecharge };
