@@ -212,4 +212,17 @@ async function deleteMyAccount(req, res) {
         res.status(500).json({ success: false, message: 'Server error' });
     }
 }
-module.exports = { updateProfile, getProfile, getBalance, updateToken, profileUpdate, makeAvtarString, deleteMyAccount };
+
+async function getRecharge(req, res) {
+    try {
+        const result = await db('recharges')
+            .where("status", true)
+            .whereNull('deleted_at')
+            .orderBy([{ column: 'amount', order: 'asc' }]);
+        return sendSuccess(res, result, 'Recharge list success');
+    }
+    catch (err) {
+        return sendServerError(res, err);
+    }
+}
+module.exports = { updateProfile, getProfile, getBalance, updateToken, profileUpdate, makeAvtarString, deleteMyAccount, getRecharge };
