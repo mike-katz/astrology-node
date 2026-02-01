@@ -4,6 +4,7 @@ const RedisCache = require('../config/redisClient');
 
 require('dotenv').config();
 const { RtcTokenBuilder, RtcRole } = require('agora-access-token');
+const { callEvent } = require('../socket');
 
 /* ================= ENV ================= */
 const APP_ID = process.env.AGORA_APP_ID;
@@ -25,11 +26,47 @@ const RECORDING_MODE = 'mix';
 const MIN_USERS_TO_START_RECORDING = 2;
 const CHANNEL_COUNT_KEY = (cname) => `agora:channel:${cname}:count`;
 const CHANNEL_RECORDING_KEY = (cname) => `agora:channel:${cname}:recording`;
+// Max call time: default 5 min (fallback when order has no duration)
+const DEFAULT_MAX_CALL_SECONDS = parseInt(process.env.AGORA_DEFAULT_MAX_CALL_SECONDS, 10) || 60;
+
+/* =====================================================
+   Get token expire & max call seconds for order (order_id = channelName)
+   When token expires, Agora AUTO-REMOVES user from channel (no API call needed)
+   - order.end_time (if future) → absolute expire (both user+pandit same time)
+   - order.call_minutes / max_minutes / minutes → now + minutes
+   - default 5 min
+   Returns: { expireTs, maxCallSeconds }
+   ===================================================== */
+async function getTokenExpireForOrder(channelName) {
+    const nowSec = Math.floor(Date.now() / 1000);
+    const order = await db('orders').where({ order_id: channelName }).first();
+    if (!order) {
+        return { expireTs: nowSec + DEFAULT_MAX_CALL_SECONDS, maxCallSeconds: DEFAULT_MAX_CALL_SECONDS };
+    }
+
+    // end_time = absolute max call end (use same expire for both user & pandit)
+    if (order.end_time) {
+        const endSec = Math.floor(new Date(order.end_time).getTime() / 1000);
+        if (endSec > nowSec) {
+            return { expireTs: endSec, maxCallSeconds: endSec - nowSec };
+        }
+    }
+
+    // call_minutes, max_minutes, minutes = purchased minutes
+    const minutes = order.call_minutes ?? order.max_minutes ?? order.minutes;
+    if (minutes != null && Number(minutes) > 0) {
+        const sec = Math.min(Number(minutes) * 60, 3600);
+        return { expireTs: nowSec + sec, maxCallSeconds: sec };
+    }
+
+    return { expireTs: nowSec + DEFAULT_MAX_CALL_SECONDS, maxCallSeconds: DEFAULT_MAX_CALL_SECONDS };
+}
 
 /* =====================================================
    1️⃣ getRtcToken
-   input  : channelName
-   output : token + uid (+ join done: if 2nd user → recording starts)
+   input  : channelName (order_id)
+   output : token + uid + maxCallSeconds (+ join done: if 2nd user → recording starts)
+   Each order can have different max call time (e.g. 2 min, 5 min)
    Token create thay tyare join thay; 2 users thay to recording auto-start
    ===================================================== */
 async function getRtcToken(req, res) {
@@ -41,8 +78,15 @@ async function getRtcToken(req, res) {
 
         // 👤 frontend user UID (random)
         const uid = Math.floor(Math.random() * 900000) + 100000;
-        const expire = Math.floor(Date.now() / 1000) + 3600;
 
+        // Order-wise max call time - when token expires, Agora auto-disconnects user (no API needed)
+        const { expireTs, maxCallSeconds } = await getTokenExpireForOrder(channelName);
+        console.log("maxCallSeconds", maxCallSeconds);
+        const nowSec = Math.floor(Date.now() / 1000);
+        const expire = maxCallSeconds < 60 ? nowSec + 60 : expireTs; // min 1 min validity
+        const actualMaxCallSeconds = expire - nowSec;
+        console.log("expire", expire);
+        console.log("actualMaxCallSeconds", actualMaxCallSeconds);
         const token = RtcTokenBuilder.buildTokenWithUid(
             APP_ID,
             APP_CERT,
@@ -77,7 +121,8 @@ async function getRtcToken(req, res) {
                 uid,
                 token,
                 userCount: newCount,
-                recordingStarted
+                recordingStarted,
+                maxCallSeconds: actualMaxCallSeconds  // frontend: show timer; Agora auto-ends call when token expires
             }
         });
 
@@ -146,6 +191,8 @@ async function startRecordingForChannel(channelName) {
 }
 
 async function stopRecordingForChannel(channelName, resourceId, sid) {
+
+    console.log("channelName, resourceId, sid", channelName, resourceId, sid);
     await axios.post(
         `https://api.agora.io/v1/apps/${APP_ID}/cloud_recording/resourceid/${resourceId}/sid/${sid}/mode/${RECORDING_MODE}/stop`,
         {
@@ -173,6 +220,7 @@ async function channelLeave(channelName) {
         let recordingStopped = false;
         if (newCount === 1) {
             const recJson = await RedisCache.getCache(recordingKey);
+            console.log("recJson", recJson);
             if (recJson) {
                 try {
                     const { resourceId, sid } = JSON.parse(recJson);
@@ -371,6 +419,22 @@ async function recordingWebhook(req, res) {
                     type: "call_recording"
                 }).returning('*');
                 console.log("saved", saved);
+
+                console.log("socket start");
+                callEvent("emit_to_user", {
+                    toType: "user",
+                    toId: order?.user_id,
+                    orderId: order?.order_id,
+                    payload: saved,
+                });
+                callEvent("emit_to_user", {
+                    toType: "pandit",
+                    toId: order?.pandit_id,
+                    orderId: order?.order_id,
+                    payload: saved,
+                });
+                console.log("socket end");
+
             }
             // TODO: e.g. save recording URLs to DB, notify user, etc.
         }
