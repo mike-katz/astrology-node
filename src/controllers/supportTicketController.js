@@ -279,11 +279,17 @@ async function replyTicket(req, res) {
             success: false,
             message: 'You already reviewed this ticket.'
         });
+
         if (ticket.status == "reopen") {
-            return res.status(400).json({
-                success: false,
-                message: 'Please wait for admin replay.'
-            });
+            const chat = await db('support_tickets_chat')
+                .count('* as count').where({ admin_id: null, support_tickets_id: id })
+                .whereNull('deleted_at');
+            if (chat == 2) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Please wait for admin replay.'
+                });
+            }
         }
         let messageText = message;
         let messageType = type;
