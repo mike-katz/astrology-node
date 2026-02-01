@@ -16,6 +16,10 @@ exports.setCache = (key, value, ttlSeconds = null) => {
   return client.set(key, value);
 };
 
+exports.incr = (key) => client.incr(key);
+
+exports.decr = (key) => client.decr(key);
+
 exports.getCache = (key) => client.get(key);
 
 exports.deleteKey = (key) => client.del(key);
