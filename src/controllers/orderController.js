@@ -3,6 +3,7 @@ require('dotenv').config();
 const admin = require('../config/firebase');
 
 const { callEvent } = require("../socket");
+const { channelLeave } = require('./agoraController');
 
 async function create(req, res) {
     const { panditId, type, profile_id } = req.body;
@@ -549,4 +550,25 @@ async function callReject(req, res) {
     });
     return res.status(200).json({ success: true, message: 'Call requested Successfully' });
 }
-module.exports = { create, list, acceptOrder, cancelOrder, deleteOrder, sendGift, generateCallToken, callReject };
+
+
+async function callEnd(req, res) {
+    try {
+        const { order_id } = req.body;
+
+        if (!order_id) return res.status(400).json({ success: false, message: 'Order id required.' });
+        const order = await db('orders').where({ order_id, pandit_id: req.userId }).first();
+        if (!order) return res.status(400).json({ success: false, message: 'Order not found.' });
+
+        const dd = await channelLeave(order_id)
+        console.log("order end resposne", dd);
+        return res.status(200).json({
+            success: true, data: null, message: 'Call ended Successfully'
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
+module.exports = { create, list, acceptOrder, cancelOrder, deleteOrder, sendGift, generateCallToken, callReject, callEnd };
