@@ -122,7 +122,7 @@ async function razorpay(req, res) {
 
         const gst = Number(paymentRow?.gst);
         const with_tax_amount = Number(Number(gst) + Number(paymentRow?.amount)).toFixed(2);
-        const total_in_word = numberToIndianWords(with_tax_amount);
+        const total_in_word = numberToIndianWords(Number(with_tax_amount).toFixed(2),);
 
         let extra = 0;
         if (paymentRow.recharge_id) {
@@ -137,9 +137,9 @@ async function razorpay(req, res) {
         const data = {
             transaction_id: razorpayPaymentId,
             utr,
-            amount: paymentRow?.amount,
-            with_tax_amount,
-            gst,
+            amount: Number(paymentRow?.amount).toFixed(2),
+            with_tax_amount: Number(with_tax_amount).toFixed(2),
+            gst: Number(gst).toFixed(2),
             city: user?.city_state_country || '',
             pincode: user?.pincode || '',
             total_in_word,
