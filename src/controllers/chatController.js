@@ -1,6 +1,7 @@
 const db = require('../db');
 require('dotenv').config();
 const { callEvent } = require("../socket");
+const { channelLeave } = require('./agoraController');
 const { uploadImageTos3 } = require('./uploader');
 
 async function getRoom(req, res) {
