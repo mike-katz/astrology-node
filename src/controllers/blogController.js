@@ -37,7 +37,7 @@ async function getList(req, res) {
 
         const blogs = await query
             .leftJoin('blog_categories as c', 'c.id', 'b.blog_category_id')
-            .select('b.*', 'c.name as category')
+            .select('b.id', 'b.title', 'b.short_desc', 'b.image', 'b.created_at', 'b.hash_tag', 'b.meta_data', 'b.slug', 'b.is_publish', 'b.publish_date', 'c.slug as category_slug', 'c.name as category')
             .orderBy('b.id', 'desc')
             .limit(limit)
             .offset(offset);
