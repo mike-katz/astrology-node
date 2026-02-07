@@ -10,7 +10,7 @@ async function create(req, res) {
     if (!panditId || !profile_id) {
         return res.status(400).json({ success: false, message: 'Missing params' });
     }
-    console.log("create order req.body", req.body);
+    // console.log("create order req.body", req.body);
     try {
         const user = await db('users').where({ id: req.userId }).first()
         if (user?.balance < 1) return res.status(400).json({ success: false, message: 'Please recharge your wallet.' });
@@ -36,7 +36,7 @@ async function create(req, res) {
         // const order = await db('orders').where({ user_id: req.userId, pandit_id: panditId }).first()
         const orderId = `${new Date().getTime().toString()}${Math.floor(100000 + Math.random() * 900000).toString()}`;
         let duration = Math.floor(Number(Number(user?.balance)) / Number(pandit?.final_chat_call_rate));
-        console.log("duration", duration);
+        // console.log("duration", duration);
         if (!Number.isFinite(duration)) {
             return res.status(400).json({ success: false, message: 'Min. 5 min balance required.' });
         }
@@ -72,9 +72,9 @@ async function create(req, res) {
             type,
             profile_id
         }).returning('*');
-        console.log("order inserted", saved);
+        // console.log("order inserted", saved);
 
-        console.log("start socket call");
+        // console.log("start socket call");
 
         const profile = await db('userprofiles').where({ id: Number(profile_id) }).first();
 
@@ -87,7 +87,7 @@ async function create(req, res) {
             key: `pandit_${pandit?.id}`,
             payload: { pandit_id: pandit?.id }
         });
-        console.log(" socket end call");
+        // console.log(" socket end call");
 
         const token = pandit?.token || false;
         if (token) {
@@ -107,7 +107,7 @@ async function create(req, res) {
 async function sendNotification(token, username, chat_call_rate, panditId, type, orderId, panditName, profile) {
     try {
         if (token) {
-            console.log("start push notification");
+            // console.log("start push notification");
             const messages = `new ${type} request from ${username} (Rs ${chat_call_rate}/min).`
             const continueOrder = await db('panditnotifications').insert({ user_id: panditId, type: "order", message: messages })
             let message = {}
@@ -167,8 +167,8 @@ async function sendNotification(token, username, chat_call_rate, panditId, type,
             //     };
             // }
             const response = await admin.messaging().send(message);
-            console.log("push notification response", response);
-            console.log("end push notification");
+            // console.log("push notification response", response);
+            // console.log("end push notification");
             return true;
         }
     } catch (e) {
@@ -316,7 +316,7 @@ async function acceptOrder(req, res) {
         const userDetail = await db('users').where({ id: req.userId }).first();
 
         let duration = Math.floor(Number(Number(userDetail?.balance)) / Number(order?.final_chat_call_rate));
-        console.log("duration", duration);
+        // console.log("duration", duration);
         if (!Number.isFinite(duration)) {
             return res.status(400).json({ success: false, message: 'Min. 5 min balance required.' });
         }
@@ -425,12 +425,12 @@ async function acceptOrder(req, res) {
             });
         }
         if (order.type == 'call') {
-            console.log("emit_to_user_call_end_time call start",);
+            // console.log("emit_to_user_call_end_time call start",);
             callEvent("emit_to_user_call_end_time", {
                 key: `pandit_${order?.pandit_id}`,
                 payload: { startTime, endTime, orderId }
             });
-            console.log("emit_to_user_call_end_time call end",);
+            // console.log("emit_to_user_call_end_time call end",);
 
         }
 
@@ -561,7 +561,7 @@ async function callEnd(req, res) {
         if (!order) return res.status(400).json({ success: false, message: 'Order not found.' });
 
         const dd = await channelLeave(order_id)
-        console.log("order end resposne", dd);
+        // console.log("order end resposne", dd);
         return res.status(200).json({
             success: true, data: null, message: 'Call ended Successfully'
         });

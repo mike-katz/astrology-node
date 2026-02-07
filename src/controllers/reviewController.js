@@ -11,7 +11,7 @@ async function sendBulkPush(tokens, title, body, data = {}) {
         .map((t) => (typeof t === 'string' ? t.trim() : t))
         .filter((t) => t && t.length > 0);
     if (validTokens.length === 0) {
-        console.log('sendBulkPush: no valid tokens');
+        // console.log('sendBulkPush: no valid tokens');
         return;
     }
     const bodyStr = typeof body === 'string' ? body : '';
@@ -25,7 +25,7 @@ async function sendBulkPush(tokens, title, body, data = {}) {
     }));
     try {
         const response = await admin.messaging().sendEach(messages);
-        console.log('FCM Success:', response.successCount, 'Failed:', response.failureCount);
+        // console.log('FCM Success:', response.successCount, 'Failed:', response.failureCount);
         if (response.failureCount > 0 && response.responses) {
             response.responses.forEach((r, i) => {
                 if (r.error) {
@@ -46,7 +46,7 @@ async function addReview(req, res) {
             .where('user_id', req?.userId)
             .where('order_id', orderId)
             .first();
-        console.log("user", user);
+        // console.log("user", user);
         // if (user) return res.status(400).json({ success: false, message: 'You already follow this pandit' });
         if (!user) {
             const [saved] = await db('pandits').where({ id: Number(panditId) }).increment(`rating_${rating}`, 1).returning("*");
@@ -75,7 +75,7 @@ async function addReplay(req, res) {
             .where('pandit_id', req?.userId)
             .where('id', ratingId)
             .first();
-        console.log("user", user);
+        // console.log("user", user);
         if (!user) return res.status(400).json({ success: false, message: 'You already follow this pandit' });
         if (user) {
             await db('reviews')

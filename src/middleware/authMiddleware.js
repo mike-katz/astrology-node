@@ -39,14 +39,14 @@ module.exports = async function (req, res, next) {
                     .json({ message: 'Unauthorized: Missing or invalid token' });
             }
         } catch (redisError) {
-            console.error("Redis get error:", redisError);
+            // console.error("Redis get error:", redisError);
             return res
                 .status(401)
                 .json({ success: false, message: 'Unauthorized: Token validation failed' });
         }
 
         if (!redisToken || redisToken !== token) {
-            console.log("Token mismatch - Redis token exists:", !!redisToken, "Tokens match:", redisToken === token);
+            // console.log("Token mismatch - Redis token exists:", !!redisToken, "Tokens match:", redisToken === token);
             return res
                 .status(401)
                 .json({ success: false, message: 'Unauthorized: Token invalid' });

@@ -4,7 +4,7 @@ require('dotenv').config();
 const decryptRequest = (req, res, next) => {
 
   if (req.path == '/chat/sendMessage') {
-    console.log("req.path", req.path);
+    // console.log("req.path", req.path);
     return next();
   }
   if (req.file) {

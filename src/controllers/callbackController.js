@@ -37,12 +37,9 @@ function numberToIndianWords(amount) {
  */
 async function razorpay(req, res) {
     try {
-        console.log("razorpay req body", JSON.stringify(req.body));
-        console.log("razorpay req query", JSON.stringify(req.query));
         const rawBody = req.body instanceof Buffer ? req.body : (typeof req.body === 'string' ? Buffer.from(req.body) : Buffer.from(JSON.stringify(req.body)));
         const bodyStr = rawBody.toString('utf8');
         const signature = req.headers['x-razorpay-signature'];
-        console.log("signature", signature);
         // if (!signature) {
         //     return res.status(400).send('Missing signature');
         // }
@@ -77,7 +74,6 @@ async function razorpay(req, res) {
             return res.status(200).json({ success: true, message: 'Event ignored' });
         }
 
-        console.log("status", status);
 
         const pay = payload.payload?.payment?.entity;
         const orderEntity = payload.payload?.order?.entity;
@@ -99,7 +95,6 @@ async function razorpay(req, res) {
         const amountInr = amountPaise / 100;
 
         // Same order: find row by Razorpay order_id (transaction_id). Failed path = only pending. Success path = pending or failed (retry pachi success)
-        console.log("orderId", orderId);
         const paymentRow = await db('payments')
             .where({ order_id: orderId })
             .whereIn('status', status === 'failed' ? ['pending'] : ['pending', 'failed'])

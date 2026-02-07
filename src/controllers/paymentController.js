@@ -114,7 +114,7 @@ async function createRazorpayOrder(req, res) {
             receipt,
             notes: { user_id: String(req.userId) },
         });
-        console.log("order", order);
+        // console.log("order", order);
 
         await db('payments').insert({ user_id: req?.userId, order_id: order.id, gst, amount: base, status: "pending", type: "recharge", recharge_id });
         return res.status(200).json({
@@ -136,7 +136,7 @@ async function createRazorpayOrder(req, res) {
 /** Verify Razorpay payment signature and credit balance (no SMS) */
 async function verifyRazorpayPayment(req, res) {
     try {
-        console.log("verifyRazorpayPayment req.body", req.body);
+        // console.log("verifyRazorpayPayment req.body", req.body);
         const { razorpay_order_id } = req.body;
         if (!razorpay_order_id) {
             return res.status(400).json({ success: false, message: 'Missing params.' });

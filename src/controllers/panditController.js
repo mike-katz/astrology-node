@@ -10,7 +10,7 @@ const sendMail = require('../utils/sendMail');
 
 async function getPandits(req, res) {
     try {
-        console.log("req.query", req.query);
+        // console.log("req.query", req.query);
         let page = parseInt(req.query.page) || 1;
         let limit = parseInt(req.query.limit) || 20;
 
@@ -76,7 +76,7 @@ async function getPandits(req, res) {
             });
         }
 
-        console.log("sort_by", sorting);
+        // console.log("sort_by", sorting);
         let query = db('pandits as p')
             //.distinctOn('p.id')
             .select(
@@ -199,7 +199,7 @@ async function getPandits(req, res) {
         }
 
         if (Array.isArray(gender) && gender.length) {
-            console.log("gender.length", gender.length);
+            // console.log("gender.length", gender.length);
             const genders = gender
                 .map(g => g?.trim().toLowerCase())
                 .filter(Boolean);
@@ -219,7 +219,7 @@ async function getPandits(req, res) {
                 .map(g => g?.trim().toLowerCase())
                 .filter(Boolean);
 
-            console.log("genders", genders);
+            // console.log("genders", genders);
             query.whereIn(
                 db.raw('LOWER(p.tag)'),
                 genders
@@ -231,7 +231,7 @@ async function getPandits(req, res) {
         }
 
         if (Array.isArray(country) && country.length == 1) {
-            console.log("country", country[0]);
+            // console.log("country", country[0]);
             if (country[0] == 'India') {
                 query.andWhere('p.country', "India");
                 countQuery.andWhere('p.country', "India");
@@ -305,8 +305,8 @@ async function getPandits(req, res) {
 
 async function getPanditDetail(req, res) {
     const { id } = req.query;
-    console.log("authHeader", req.headers);
-    console.log("getPanditDetail id", id);
+    // console.log("authHeader", req.headers);
+    // console.log("getPanditDetail id", id);
     const user = await db('pandits').where('id', id).first();
     if (!user) return res.status(400).json({ success: false, message: 'pandit not available.' });
     const review = await db('reviews as r')
@@ -347,15 +347,15 @@ async function getPanditDetail(req, res) {
         gallery
     }
     const authHeader = req.headers.authorization;
-    console.log("authHeader", authHeader);
+    // console.log("authHeader", authHeader);
     if (authHeader && authHeader.startsWith('Bearer ')) {
         const token = authHeader.split(' ')[1];
         const decryptToken = decrypt(token);
         const verified = jwt.verify(decryptToken, process.env.JWT_SECRET);
-        console.log("verified", verified);
+        // console.log("verified", verified);
         if (verified?.userId) {
             const user = await db('follows').where({ 'pandit_id': id, 'user_id': verified?.userId }).first();
-            console.log("user", user);
+            // console.log("user", user);
             if (user) {
                 response.isFollow = true
             }
@@ -409,7 +409,7 @@ async function verifyOtp(req, res) {
         const isValid = isValidMobile(mobile);
         if (!isValid) return res.status(400).json({ success: false, message: 'Enter valid mobile number.' });
         const latestRecord = await db('otpmanages').where('mobile', mobile).first();
-        console.log("latestRecord", latestRecord);
+        // console.log("latestRecord", latestRecord);
         if (!latestRecord) return res.status(400).json({ success: false, message: 'Wrong Otp' });
 
         const currentDate = new Date();
@@ -455,7 +455,7 @@ async function verifyOtp(req, res) {
         if (!user) {
             [user] = await db('onboardings').insert({ mobile, country_code, step: 0, status: "number" }).returning(['id', 'mobile', 'country_code', 'step']);
         }
-        console.log("user", user);
+        // console.log("user", user);
         const token = jwt.sign({ userId: user.id, mobile: user.mobile, country_code: user.country_code }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '1h' });
         // hide password
         const encryptToken = encrypt(token);
@@ -660,7 +660,7 @@ async function onboard(req, res) {
             if (!terms || !no_false || !consent_profile) return res.status(400).json({ success: false, message: 'Missing params.' });
         }
 
-        console.log("tokenData", JSON.stringify(tokenData));
+        // console.log("tokenData", JSON.stringify(tokenData));
         const user = await db('onboardings').where({ "mobile": tokenData?.data?.mobile, country_code: tokenData?.data?.country_code, deleted_at: null }).first();
         if (!user) return res.status(400).json({ message: 'Wrong mobile number.' });
 
@@ -851,7 +851,7 @@ async function onboard(req, res) {
         //     ins.address = JSON.stringify(addresss);
         // }
 
-        console.log("ins", ins);
+        // console.log("ins", ins);
         await db('onboardings').where({ id: user?.id }).update(ins);
 
         return res.status(200).json({
@@ -1004,7 +1004,7 @@ async function uploadImage(req, res) {
                 url = image.data.Location;
             }
         }
-        console.log("type", type);
+        // console.log("type", type);
         if (type == 'delete') {
             if (!file) return res.status(400).json({ success: false, message: 'File URL is required.' });
             const decodedUrl = decodeURIComponent(file);
@@ -1047,7 +1047,7 @@ async function uploadImage(req, res) {
                 updateData.govt_id = JSON.stringify(returns);
 
             }
-            console.log("updateData", updateData);
+            // console.log("updateData", updateData);
             // Update database if URL was found and removed
             if (Object.keys(updateData).length > 0) {
                 await db('onboardings')
@@ -1069,7 +1069,7 @@ async function uploadImage(req, res) {
 async function submitOnboard(req, res) {
     try {
         const { token, terms, no_false, consent_profile } = req.body
-        console.log("submitOnboard req.body", req.body);
+        // console.log("submitOnboard req.body", req.body);
         const tokenData = decodeJWT(`Bearer ${token}`)
         if (!tokenData?.success) return res.status(400).json({ success: false, message: 'Missing params.' });
         const user = await db('onboardings').where({ "mobile": tokenData?.data?.mobile, country_code: tokenData?.data?.country_code, deleted_at: null }).first();

@@ -43,7 +43,7 @@ async function basicKundliApiCall(language = 'en', lat, lng, dob, birth_time, na
     };
     // console.log("config", config);
     const response = await axios(config);
-    console.log("response", response.data);
+    // console.log("response", response.data);
     return response?.data
 }
 
@@ -51,17 +51,17 @@ async function findBasicKundli(req, res) {
     try {
         let { profile_id, name, dob, type, birth_time, gender, birth_place, lat = '22.82', lng = '70.84', language = 'en' } = req.query;
 
-        console.log("req.query", req.query);
+        // console.log("req.query", req.query);
         if (!type) return res.status(400).json({ success: false, message: 'Missing params.' });
 
         const authHeader = req.headers.authorization;
-        console.log("authHeader", authHeader);
+        // console.log("authHeader", authHeader);
         const url = 'https://astroapi-3.divineapi.com/indian-api/v3/basic-astro-details'
         if (type == 'profile' && !authHeader?.startsWith('Bearer ')) {
             return res.status(400).json({ success: false, message: 'Missing params.' });
         }
         if (authHeader && type == 'profile' && authHeader.startsWith('Bearer ')) {
-            console.log("authHeader", authHeader);
+            // console.log("authHeader", authHeader);
             const tokenData = decodeJWT(authHeader)
             if (!tokenData?.success) return res.status(400).json({ success: false, message: 'Your session expired.' });
             const user = await db('userprofiles')
@@ -83,11 +83,11 @@ async function findBasicKundli(req, res) {
                 .first();
 
             if (user?.is_updated || !kundli) {
-                console.log("dob, birth_time, name, gender, birth_place, url", dob, birth_time, name, gender, birth_place, url);
+                // console.log("dob, birth_time, name, gender, birth_place, url", dob, birth_time, name, gender, birth_place, url);
                 const response = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, url)
                 kundli = { ...kundli, name, gender, dob, birth_place, birth_time, lng, lat, language, profile_id: Number(profile_id) }
                 kundli.basic = JSON.stringify(response?.data)
-                console.log("kundli", kundli);
+                // console.log("kundli", kundli);
                 if (kundli.id) {
                     await db('kundlis')
                         .where({ id: kundli.id }).update(kundli)
@@ -107,9 +107,9 @@ async function findBasicKundli(req, res) {
             .first();
 
         if (!user) {
-            console.log("inside api");
+            // console.log("inside api");
             const response = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, url)
-            console.log(response.data);
+            // console.log(response.data);
 
             user = { name, gender, dob, birth_place, birth_time, lat, lng, language }
             if (profile_id) {
@@ -120,7 +120,7 @@ async function findBasicKundli(req, res) {
             // await db('follows').insert({ user_id: req?.userId, pandit_id: panditId, type: "user" });
             user.id = saved.id
         }
-        console.log("user", user);
+        // console.log("user", user);
         user.basic = JSON.parse(user.basic)
         return res.status(200).json({ success: true, data: user, message: 'Kundli get Successfully' });
     } catch (err) {
@@ -940,7 +940,7 @@ async function ashtakootMilanApiCall(p1Data, p2Data, language = 'en') {
     };
 
     const response = await axios(config);
-    console.log("ashtakoot milan response", response.data);
+    // console.log("ashtakoot milan response", response.data);
     return response?.data;
 }
 

@@ -191,7 +191,7 @@ async function profileUpdate(req, res) {
         }
         if (order?.profile?.length > 0) {
             const dd = await deleteFileFroms3(decodeURIComponent(order?.profile))
-            console.log("dd", dd);
+            // console.log("dd", dd);
         }
         await db('users').where({ id: req.userId }).update(update);
         return res.status(200).json({ success: true, data: { url: update?.profile }, message: 'Update successfully' });
