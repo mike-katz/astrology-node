@@ -65,16 +65,27 @@ async function getList(req, res) {
 
 async function getDetail(req, res) {
     try {
-        const { id } = req.query;
-        if (!id) {
-            return res.status(400).json({ success: false, data: null, message: 'Missing params' });
+        const { id, slug } = req.query;
+        // if (!id) {
+        //     return res.status(400).json({ success: false, data: null, message: 'Missing params' });
+        // }
+        const filter = { 'b.deleted_at': null }
+        if (id) {
+            filter['b.id'] = Number(id)
         }
-        const blog = await db('blogs as b')
+        let query = db('blogs as b')
+            .where(filter);
+        if (slug) {
+            query = query.where('b.slug', 'ilike', `%${slug.trim()}%`);
+        }
+
+
+
+        const blog = await query
             .leftJoin('blog_categories as c', 'c.id', 'b.blog_category_id')
-            .select('b.*', 'c.name as category')
-            .where({ 'b.id': id, 'b.deleted_at': null }).first();
+            .select('b.*', 'c.name as category').first();
         if (!blog) {
-            return res.status(404).json({ success: false, data: null, message: 'Blog not found' });
+            return res.status(400).json({ success: false, data: null, message: 'Blog not found' });
         }
         blog.hash_tag = JSON.parse(blog?.hash_tag)
         return res.status(200).json({
