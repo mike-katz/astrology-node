@@ -372,35 +372,36 @@ async function balanceCut(user_id, order, end_time) {
         } else {
             upd.total_chat_minutes = Number(diffMinutes)
         }
-
-        const [saved] = await db('chats').insert({
-            sender_type: "user",
-            sender_id: Number(user_id),
-            receiver_type: "pandit",
-            order_id: order?.order_id,
-            receiver_id: Number(order?.pandit_id),
-            message: `${user?.name} ended the chat`,
-            status: "send",
-            type: "text",
-            is_system_generate: true
-        }).returning('*');
-        callEvent("emit_to_user", {
-            toType: "pandit",
-            toId: order?.pandit_id,
-            orderId: order?.order_id,
-            payload: saved,
-        });
-        callEvent("emit_to_user", {
-            toType: "user",
-            toId: order?.user_id,
-            orderId: order?.order_id,
-            payload: saved,
-        });
-        callEvent("emit_to_chat_end", {
-            toType: "pandit",
-            toId: order?.pandit_id,
-            orderId: order?.order_id,
-        });
+        if (order.type == 'chat') {
+            const [saved] = await db('chats').insert({
+                sender_type: "user",
+                sender_id: Number(user_id),
+                receiver_type: "pandit",
+                order_id: order?.order_id,
+                receiver_id: Number(order?.pandit_id),
+                message: `${user?.name} ended the chat`,
+                status: "send",
+                type: "text",
+                is_system_generate: true
+            }).returning('*');
+            callEvent("emit_to_user", {
+                toType: "pandit",
+                toId: order?.pandit_id,
+                orderId: order?.order_id,
+                payload: saved,
+            });
+            callEvent("emit_to_user", {
+                toType: "user",
+                toId: order?.user_id,
+                orderId: order?.order_id,
+                payload: saved,
+            });
+            callEvent("emit_to_chat_end", {
+                toType: "pandit",
+                toId: order?.pandit_id,
+                orderId: order?.order_id,
+            });
+        }
         const panditDetail = await db('pandits').where({ id: order.pandit_id }).first();
 
         const panditAmount = (Number(deduction) * Number(panditDetail?.chat_call_share)) / 100
