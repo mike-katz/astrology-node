@@ -5,7 +5,7 @@ async function getList(req, res) {
     try {
         let page = parseInt(req.query.page) || 1;
         let limit = parseInt(req.query.limit) || 20;
-        const { category_id, title } = req.query;
+        const { category_id, title, category } = req.query;
 
         if (page < 1) page = 1;
         if (limit < 1) limit = 20;
@@ -18,10 +18,15 @@ async function getList(req, res) {
             filter['b.blog_category_id'] = category_id;
         }
 
+        if (category) {
+            filter['c.slug'] = category;
+        }
+
         let query = db('blogs as b')
             .where(filter);
 
         let countQuery = db('blogs as b')
+            .leftJoin('blog_categories as c', 'c.id', 'b.blog_category_id')
             .where(filter);
 
         // Filter by title if provided
@@ -78,8 +83,6 @@ async function getDetail(req, res) {
         if (slug) {
             query = query.where('b.slug', 'ilike', `%${slug.trim()}%`);
         }
-
-
 
         const blog = await query
             .leftJoin('blog_categories as c', 'c.id', 'b.blog_category_id')
