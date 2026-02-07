@@ -160,6 +160,27 @@ const recordingStartBody = (channelName, recordingToken) => ({
     }
 });
 
+/* ================= CHANNEL USER QUERY ================= */
+async function getChannelUsers(channelName) {
+    try {
+        const res = await axios.get(
+            `https://api.sd-rtn.com/dev/v1/channel/user/${APP_ID}/${channelName}`,
+            { auth: { username: CUSTOMER_KEY, password: CUSTOMER_SECRET } }
+        );
+        if (!res.data?.success || !res.data?.data?.channel_exist) return [];
+        const d = res.data.data;
+        if (d.mode === 1) return (d.users || []).map(String);
+        if (d.mode === 2) {
+            const uids = [...(d.broadcasters || []), ...(d.audience || [])];
+            return uids.map(String);
+        }
+        return [];
+    } catch (err) {
+        console.error('[Agora] getChannelUsers failed', err.response?.data || err.message);
+        return [];
+    }
+}
+
 /* ================= INTERNAL HELPERS (dynamic recording) ================= */
 async function startRecordingForChannel(channelName) {
     const expire = Math.floor(Date.now() / 1000) + 3600;
@@ -189,14 +210,14 @@ async function startRecordingForChannel(channelName) {
     return { resourceId, sid: startRes.data.sid };
 }
 
-async function stopRecordingForChannel(channelName, resourceId, sid) {
-
-    console.log("channelName, resourceId, sid", channelName, resourceId, sid);
+async function stopRecordingForChannel(channelName, resourceId, sid, userUids = []) {
+    // userUids from channel query - used for logging; stop API only accepts cname, uid (999999), clientRequest
+    if (userUids?.length) console.log('[Agora] stop recording, channel users:', userUids);
     await axios.post(
         `https://api.agora.io/v1/apps/${APP_ID}/cloud_recording/resourceid/${resourceId}/sid/${sid}/mode/${RECORDING_MODE}/stop`,
         {
             cname: channelName,
-            uid: String(RECORDING_UID),
+            uid: String(userUids[0]),
             clientRequest: {}
         },
         { auth: { username: CUSTOMER_KEY, password: CUSTOMER_SECRET } }
@@ -211,7 +232,7 @@ async function stopRecordingForChannel(channelName, resourceId, sid) {
 async function channelLeave(channelName) {
     try {
         if (!channelName) {
-            return { status: false, message: 'channelName and uid required' };
+            return { success: false, message: 'channelName required' };
         }
         const countKey = CHANNEL_COUNT_KEY(channelName);
         const recordingKey = CHANNEL_RECORDING_KEY(channelName);
@@ -219,11 +240,12 @@ async function channelLeave(channelName) {
         let recordingStopped = false;
         if (newCount === 1) {
             const recJson = await RedisCache.getCache(recordingKey);
-            console.log("recJson", recJson);
             if (recJson) {
                 try {
                     const { resourceId, sid } = JSON.parse(recJson);
-                    await stopRecordingForChannel(channelName, resourceId, sid);
+                    const userUids = await getChannelUsers(channelName);
+                    console.log("userUids", userUids);
+                    await stopRecordingForChannel(channelName, resourceId, sid, userUids);
                     recordingStopped = true;
                     console.log(`[Agora] recording auto-stopped for channel ${channelName} (1 user left)`);
                 } catch (err) {
