@@ -440,6 +440,9 @@ async function endChat(req, res) {
         if (order.status != 'continue') {
             return res.status(400).json({ success: false, message: 'order is pending or completed.' });
         }
+        if (order.type == 'call') {
+            const dd = await channelLeave(orderId)
+        }
         const result = await balanceCut(req.userId, order, new Date());
         if (!result) {
             return res.status(400).json({ success: false, message: 'Something went wrong.' });
