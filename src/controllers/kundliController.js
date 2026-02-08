@@ -116,7 +116,6 @@ async function findBasicKundli(req, res) {
             const response = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, url)
             // console.log(response.data);
             const ghataChakra = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, 'https://astroapi-3.divineapi.com/indian-api/v1/ghata-chakra',)
-            kundli.ghata_chakra = JSON.stringify(ghataChakra?.data)
 
             user = { name, gender, dob, birth_place, birth_time, lat, lng, language }
             if (profile_id) {
