@@ -79,7 +79,7 @@ async function findBasicKundli(req, res) {
             lng = user?.lng || lng
 
             let kundli = await db('kundlis')
-                .where({ profile_id, language }).select('dob', 'birth_time', 'name', 'gender', 'birth_place', 'basic', 'id')
+                .where({ profile_id, language }).select('dob', 'birth_time', 'name', 'gender', 'birth_place', 'basic', 'ghata_chakra', 'id')
                 .first();
 
             if (user?.is_updated || !kundli) {
@@ -108,7 +108,7 @@ async function findBasicKundli(req, res) {
         }
         let user = await db('kundlis')
             .where({ name, gender, dob, birth_place, birth_time, language })
-            .select('dob', 'birth_time', 'name', 'gender', 'birth_place', 'basic', 'language', 'id')
+            .select('dob', 'birth_time', 'name', 'gender', 'birth_place', 'basic', 'ghata_chakra', 'language', 'id')
             .first();
 
         if (!user) {
