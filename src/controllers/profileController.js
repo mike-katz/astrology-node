@@ -57,6 +57,8 @@ async function addProfile(req, res) {
             delete ins.user_id
             delete ins.lat
             delete ins.lng
+            const avatar = await makeAvtarString(name, gender)
+            ins.avatar = avatar
             await db('users').where({ id: req.userId }).update(ins);
         }
         return res.status(200).json({ success: true, data: response, message: 'Profile Successfully' });
