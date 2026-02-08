@@ -85,8 +85,11 @@ async function findBasicKundli(req, res) {
             if (user?.is_updated || !kundli) {
                 // console.log("dob, birth_time, name, gender, birth_place, url", dob, birth_time, name, gender, birth_place, url);
                 const response = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, url)
+                const ghataChakra = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, 'https://astroapi-3.divineapi.com/indian-api/v1/ghata-chakra',)
                 kundli = { ...kundli, name, gender, dob, birth_place, birth_time, lng, lat, language, profile_id: Number(profile_id) }
                 kundli.basic = JSON.stringify(response?.data)
+                kundli.ghata_chakra = JSON.stringify(ghataChakra?.data)
+
                 // console.log("kundli", kundli);
                 if (kundli.id) {
                     await db('kundlis')
@@ -99,6 +102,8 @@ async function findBasicKundli(req, res) {
                 await db('userprofiles').where({ 'id': Number(profile_id) }).update({ is_updated: false })
             }
             kundli.basic = JSON.parse(kundli.basic)
+            kundli.ghata_chakra = JSON.parse(kundli?.ghata_chakra)
+
             return res.status(200).json({ success: true, data: kundli, message: 'Kundli get Successfully' });
         }
         let user = await db('kundlis')
@@ -110,18 +115,22 @@ async function findBasicKundli(req, res) {
             // console.log("inside api");
             const response = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, url)
             // console.log(response.data);
+            const ghataChakra = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, 'https://astroapi-3.divineapi.com/indian-api/v1/ghata-chakra',)
+            kundli.ghata_chakra = JSON.stringify(ghataChakra?.data)
 
             user = { name, gender, dob, birth_place, birth_time, lat, lng, language }
             if (profile_id) {
                 user.profile_id = profile_id
             }
             user.basic = JSON.stringify(response?.data)
+            user.ghata_chakra = JSON.stringify(ghataChakra?.data)
             const [saved] = await db('kundlis').insert(user).returning("*");
             // await db('follows').insert({ user_id: req?.userId, pandit_id: panditId, type: "user" });
             user.id = saved.id
         }
         // console.log("user", user);
         user.basic = JSON.parse(user.basic)
+        user.ghata_chakra = JSON.parse(user.ghata_chakra)
         return res.status(200).json({ success: true, data: user, message: 'Kundli get Successfully' });
     } catch (err) {
         console.error(err);
