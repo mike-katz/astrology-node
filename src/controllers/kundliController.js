@@ -615,7 +615,7 @@ async function findDashaTab(req, res) {
             .where({ id: kundli_id })
             .first();
         if (!kundli) return res.status(400).json({ success: false, message: 'Kundli not found.' });
-        const { lat, lng, dob, language, birth_time, name, gender, birth_place, sun_dasha, south_chalit_chart, moon_dasha, mars_dasha, mercury_dasha, venus_dasha, saturn_dasha, jupiter_dasha, ketu_dasha, rahu_dasha, yogini_dasha, birth_chart, south_birth_chart } = kundli
+        const { lat, lng, dob, language, birth_time, name, gender, birth_place, sun_dasha, south_chalit_chart, moon_dasha, mars_dasha, mercury_dasha, venus_dasha, saturn_dasha, jupiter_dasha, ketu_dasha, rahu_dasha, yogini_dasha, birth_chart, south_birth_chart, sookshma_dasha } = kundli
         const upd = {}
         const ChartUrl = 'https://astroapi-3.divineapi.com/indian-api/v1/maha-dasha-analysis'
         if (sun_dasha == null) {
@@ -678,6 +678,11 @@ async function findDashaTab(req, res) {
             const birthChartresponse = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, birthChartUrl, [{ key: "chart_type", value: "south" }])
             upd.south_birth_chart = JSON.stringify(birthChartresponse?.data);
         }
+        if (sookshma_dasha == null) {
+            const Vimshottari = 'https://astroapi-3.divineapi.com/indian-api/v1/vimshottari-dasha'
+            const sookshmadasharesponse = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, Vimshottari, [{ key: "dasha_type", value: "sookshma-dasha" }])
+            upd.sookshma_dasha = JSON.stringify(sookshmadasharesponse?.data);
+        }
 
         if (Object.keys(upd).length > 0) {
             [kundli] = await db('kundlis')
@@ -700,7 +705,8 @@ async function findDashaTab(req, res) {
             south_chalit_chart: JSON.parse(kundli.south_chalit_chart),
             yogini_dasha: JSON.parse(kundli.yogini_dasha),
             birth_chart: JSON.parse(kundli.birth_chart),
-            south_birth_chart: JSON.parse(kundli.south_birth_chart)
+            south_birth_chart: JSON.parse(kundli.south_birth_chart),
+            sookshma_dasha: JSON.parse(kundli.sookshma_dasha)
         }
         return res.status(200).json({ success: true, data: response, message: 'Kundli get Successfully' });
     } catch (err) {
