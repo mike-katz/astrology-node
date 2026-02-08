@@ -306,10 +306,42 @@ async function findChartTab(req, res) {
         if (!kundli) return res.status(400).json({ success: false, message: 'Kundli not found.' });
         const { lat, lng, dob, language, birth_time, name, gender, birth_place, chalit_chart, south_chalit_chart, sun_chart, south_sun_chart, moon_chart, south_moon_chart, birth_chart, south_birth_chart,
             hora_chart, south_hora_chart, drekkana_chart, south_drekkana_chart, chaturthamsha_chart, south_chaturthamsha_chart, saptamsa_chart, south_saptamsa_chart, navamsa_chart, south_navamsa_chart,
-            dasamsa_chart, south_dasamsa_chart, dwadasamsa_chart, south_dwadasamsa_chart, shodasamsa_chart, south_shodasamsa_chart, vimsamsa_chart, south_vimsamsa_chart, chaturvimsamsa_chart, south_chaturvimsamsa_chart,
+            dasamsa_chart, south_dasamsa_chart, dwadasamsa_chart, south_dwadasamsa_chart, shodasamsa_chart, south_shodasamsa_chart, vimsamsa_chart, south_vimsamsa_chart, chaturvimsamsa_chart, south_chaturvimsamsa_chart, transit_ascendant_south, transit_moon_south, transit_ascendant_north, transit_moon_north,
             saptavimsamsa_chart, south_saptavimsamsa_chart, trimsamsa_chart, south_trimsamsa_chart, khavedamsa_chart, south_khavedamsa_chart, akshavedamsa_chart, south_akshavedamsa_chart, shastiamsa_chart, south_shastiamsa_chart, planets } = kundli
         const upd = {}
         let extraparam = [{ key: "chart_type", value: "north" }]
+        const [year, month, day] = dob.split('-');
+        const transit = [
+            { key: "transit_year", value: year },
+            { key: "transit_month", value: month },
+            { key: "transit_day", value: day }
+        ]
+        if (transit_ascendant_north == null) {
+            transit.push({ key: "chart_type", value: "north" })
+            const url = 'https://astroapi-3.divineapi.com/indian-api/v1/kundli-transit/ascendant'
+            const data = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, url, transit)
+            upd.transit_ascendant_north = JSON.stringify(data?.data);
+        }
+        if (transit_moon_north == null) {
+            transit.push({ key: "chart_type", value: "north" })
+            const url = 'https://astroapi-3.divineapi.com/indian-api/v1/kundli-transit/moon'
+            const data = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, url, transit)
+            upd.transit_moon_north = JSON.stringify(data?.data);
+        }
+
+        if (transit_ascendant_south == null) {
+            transit.push({ key: "chart_type", value: "south" })
+            const url = 'https://astroapi-3.divineapi.com/indian-api/v1/kundli-transit/ascendant'
+            const data = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, url, transit)
+            upd.transit_ascendant_south = JSON.stringify(data?.data);
+        }
+        if (transit_moon_south == null) {
+            transit.push({ key: "chart_type", value: "south" })
+            const url = 'https://astroapi-3.divineapi.com/indian-api/v1/kundli-transit/moon'
+            const data = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, url, transit)
+            upd.transit_moon_south = JSON.stringify(data?.data);
+        }
+
         if (chalit_chart == null) {
             console.log("here");
             const url = 'https://astroapi-3.divineapi.com/indian-api/v1/horoscope-chart/chalit'
@@ -560,6 +592,12 @@ async function findChartTab(req, res) {
             south_khavedamsa_chart: JSON.parse(kundli.south_khavedamsa_chart),
             south_akshavedamsa_chart: JSON.parse(kundli.south_akshavedamsa_chart),
             south_shastiamsa_chart: JSON.parse(kundli.south_shastiamsa_chart),
+
+            planets: JSON.parse(kundli.planets),
+            transit_ascendant_south: JSON.parse(kundli.transit_ascendant_south),
+            transit_moon_south: JSON.parse(kundli.transit_moon_south),
+            transit_ascendant_north: JSON.parse(kundli.transit_ascendant_north),
+            transit_moon_north: JSON.parse(kundli.transit_moon_north),
         }
         return res.status(200).json({ success: true, data: response, message: 'Kundli get Successfully' });
     } catch (err) {
