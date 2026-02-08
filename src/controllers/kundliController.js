@@ -720,7 +720,7 @@ async function findReportTab(req, res) {
         if (!kundli) return res.status(400).json({ success: false, message: 'Kundli not found.' });
         const { lat, lng, dob, language, birth_time, name, gender, birth_place, general_report, kalsarpa_dosha, manglik_dosha, sadesati_dosha, general_yoga_tab,
             gemstones, planetary_sun, planetary_moon, planetary_mercury, planetary_venus, planetary_mars, planetary_jupiter, planetary_saturn, planetary_rahu, planetary_ketu,
-            sun_dasha, moon_dasha, mars_dasha, mercury_dasha, venus_dasha, saturn_dasha, jupiter_dasha, ketu_dasha, rahu_dasha
+            sun_dasha, moon_dasha, mars_dasha, mercury_dasha, venus_dasha, saturn_dasha, jupiter_dasha, ketu_dasha, rahu_dasha, pitra_dosha
         } = kundli
         const upd = {}
         if (general_report == null) {
@@ -840,6 +840,11 @@ async function findReportTab(req, res) {
             const chalitChartresponse = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, ChartUrl, [{ key: "maha_dasha", value: "rahu" }])
             upd.rahu_dasha = JSON.stringify(chalitChartresponse?.data);
         }
+        if (pitra_dosha == null) {
+            const ChartUrl = 'https://astroapi-3.divineapi.com/indian-api/v1/pitra-dosha'
+            const chalitChartresponse = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, ChartUrl)
+            upd.pitra_dosha = JSON.stringify(chalitChartresponse?.data);
+        }
 
         if (Object.keys(upd).length > 0) {
             [kundli] = await db('kundlis')
@@ -874,6 +879,7 @@ async function findReportTab(req, res) {
             jupiter_dasha: JSON.parse(kundli.jupiter_dasha),
             ketu_dasha: JSON.parse(kundli.ketu_dasha),
             rahu_dasha: JSON.parse(kundli.rahu_dasha),
+            pitra_dosha: JSON.parse(kundli.pitra_dosha),
         }
         return res.status(200).json({ success: true, data: response, message: 'Kundli get Successfully' });
     } catch (err) {
