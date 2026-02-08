@@ -307,7 +307,7 @@ async function findChartTab(req, res) {
         const { lat, lng, dob, language, birth_time, name, gender, birth_place, chalit_chart, south_chalit_chart, sun_chart, south_sun_chart, moon_chart, south_moon_chart, birth_chart, south_birth_chart,
             hora_chart, south_hora_chart, drekkana_chart, south_drekkana_chart, chaturthamsha_chart, south_chaturthamsha_chart, saptamsa_chart, south_saptamsa_chart, navamsa_chart, south_navamsa_chart,
             dasamsa_chart, south_dasamsa_chart, dwadasamsa_chart, south_dwadasamsa_chart, shodasamsa_chart, south_shodasamsa_chart, vimsamsa_chart, south_vimsamsa_chart, chaturvimsamsa_chart, south_chaturvimsamsa_chart,
-            saptavimsamsa_chart, south_saptavimsamsa_chart, trimsamsa_chart, south_trimsamsa_chart, khavedamsa_chart, south_khavedamsa_chart, akshavedamsa_chart, south_akshavedamsa_chart, shastiamsa_chart, south_shastiamsa_chart } = kundli
+            saptavimsamsa_chart, south_saptavimsamsa_chart, trimsamsa_chart, south_trimsamsa_chart, khavedamsa_chart, south_khavedamsa_chart, akshavedamsa_chart, south_akshavedamsa_chart, shastiamsa_chart, south_shastiamsa_chart, planets } = kundli
         const upd = {}
         let extraparam = [{ key: "chart_type", value: "north" }]
         if (chalit_chart == null) {
@@ -505,6 +505,11 @@ async function findChartTab(req, res) {
             upd.south_shastiamsa_chart = JSON.stringify(data?.data);
         }
 
+        if (planets == null) {
+            const Planets = 'https://astroapi-3.divineapi.com/indian-api/v2/planetary-positions'
+            const Planetsresponse = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, Planets)
+            upd.planets = JSON.stringify(Planetsresponse?.data);
+        }
         if (Object.keys(upd).length > 0) {
             [kundli] = await db('kundlis')
                 .where('id', kundli?.id)
