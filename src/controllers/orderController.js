@@ -289,7 +289,7 @@ async function createFreeChat(req, res) {
         const panditRecords = await db('pandits').whereIn('id', requestedPanditIds).select('id', 'token', 'display_name', 'profile', 'final_chat_call_rate');
         for (const pandit of panditRecords || []) {
             if (pandit?.token) {
-                await sendNotification(pandit.token, user?.name, 0, pandit.id, type, orderId, pandit?.display_name, pandit?.profile);
+                await sendNotification(pandit.token, user?.name, settings?.free_chat_amount_per_minute, pandit.id, type, orderId, pandit?.display_name, pandit?.profile);
             }
         }
         sendAutoMessage(profile, req.userId, orderId);
