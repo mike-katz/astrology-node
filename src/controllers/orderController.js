@@ -7,8 +7,8 @@ const { channelLeave } = require('./agoraController');
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-async function sendAutoMessage(pandit, profile, userId, orderId) {
-    let message = `Hello ${pandit?.display_name},\n Below are my details:
+async function sendAutoMessage(profile, userId, orderId) {
+    let message = `Hi,\n Below are my details:
     Name: ${formatValue(profile?.name)} 
     Gender: ${formatValue(profile?.gender)} 
     DOB: ${formatDOB(profile?.dob)} 
@@ -42,17 +42,17 @@ async function sendAutoMessage(pandit, profile, userId, orderId) {
         sender_id: Number(userId),
         receiver_type: "pandit",
         order_id: orderId,
-        receiver_id: Number(pandit?.id),
+        // receiver_id: Number(pandit?.id),
         message: message,
         status: "send",
         type: "text"
     }).returning('*');
-    callEvent("emit_to_user", {
-        toType: "pandit",
-        toId: pandit.id,
-        orderId: orderId,
-        payload: saved,
-    });
+    // callEvent("emit_to_user", {
+    //     toType: "pandit",
+    //     toId: pandit.id,
+    //     orderId: orderId,
+    //     payload: saved,
+    // });
     callEvent("emit_to_user", {
         toType: "user",
         toId: userId,
@@ -63,7 +63,7 @@ async function sendAutoMessage(pandit, profile, userId, orderId) {
 
     [saved] = await db('chats').insert({
         sender_type: "pandit",
-        sender_id: Number(pandit.id),
+        // sender_id: Number(pandit.id),
         receiver_type: "user",
         order_id: orderId,
         receiver_id: Number(userId),
@@ -72,13 +72,13 @@ async function sendAutoMessage(pandit, profile, userId, orderId) {
         is_system_generate: true,
         type: "text"
     }).returning('*');
-    callEvent("emit_to_user", { toType: "pandit", toId: pandit.id, orderId, payload: saved });
+    // callEvent("emit_to_user", { toType: "pandit", toId: pandit.id, orderId, payload: saved });
     callEvent("emit_to_user", { toType: "user", toId: userId, orderId, payload: saved });
     await sleep(1000);
 
     [saved] = await db('chats').insert({
         sender_type: "pandit",
-        sender_id: Number(pandit.id),
+        // sender_id: Number(pandit.id),
         receiver_type: "user",
         order_id: orderId,
         receiver_id: Number(userId),
@@ -87,13 +87,13 @@ async function sendAutoMessage(pandit, profile, userId, orderId) {
         is_system_generate: true,
         type: "text"
     }).returning('*');
-    callEvent("emit_to_user", { toType: "pandit", toId: pandit.id, orderId, payload: saved });
+    // callEvent("emit_to_user", { toType: "pandit", toId: pandit.id, orderId, payload: saved });
     callEvent("emit_to_user", { toType: "user", toId: userId, orderId, payload: saved });
     await sleep(1000);
 
     [saved] = await db('chats').insert({
         sender_type: "pandit",
-        sender_id: Number(pandit.id),
+        // sender_id: Number(pandit.id),
         receiver_type: "user",
         order_id: orderId,
         receiver_id: Number(userId),
@@ -102,89 +102,71 @@ async function sendAutoMessage(pandit, profile, userId, orderId) {
         is_system_generate: true,
         type: "text"
     }).returning('*');
-    callEvent("emit_to_user", { toType: "pandit", toId: pandit.id, orderId, payload: saved });
+    // callEvent("emit_to_user", { toType: "pandit", toId: pandit.id, orderId, payload: saved });
     callEvent("emit_to_user", { toType: "user", toId: userId, orderId, payload: saved });
 }
 
+
 async function create(req, res) {
     const { panditId, type, profile_id } = req.body;
-    if (!profile_id) {
+    if (!panditId || !profile_id) {
         return res.status(400).json({ success: false, message: 'Missing params' });
     }
     // console.log("create order req.body", req.body);
     try {
-        const user = await db('users').where({ id: req.userId }).first();
-        const [{ count }] = await db('orders')
-            .count('* as count')
-            .where({ user_id: req.userId })
-            .whereIn('status', ['continue', 'pending', 'completed'])
-        if (count > 0 && !panditId) return res.status(400).json({ success: false, message: 'Missing params' });
-        let pandit = null;
-        if (panditId) {
-            pandit = await db('pandits').where({ id: panditId }).first();
-            if (!pandit) return res.status(400).json({ success: false, message: 'Pandit not found.' });
-        }
-        if (!pandit) {
-            pandit = await db('pandits')
-                .whereNull('waiting_time')
-                .where({ unlimited_free_calls_chats: true, chat: true })
-                .orderByRaw('RANDOM()')
-                .first();
-        }
-        if (!pandit) {
-            pandit = await db('pandits')
-                .whereNull('waiting_time')
-                .where({ chat: true })
-                .orderByRaw('RANDOM()')
-                .first();
-        }
+        const user = await db('users').where({ id: req.userId }).first()
+        if (user?.balance < 1) return res.status(400).json({ success: false, message: 'Please recharge your wallet.' });
 
-        const isRandomPandit = !panditId;
+        const pandit = await db('pandits').where({ id: panditId }).first()
+        if (!pandit) return res.status(400).json({ success: false, message: 'Pandit not found.' });
 
-        if (!isRandomPandit && user?.balance < 1) return res.status(400).json({ success: false, message: 'Please recharge your wallet.' });
-
-        const effectivePanditId = pandit.id;
-
-        const continueOrder = await db('orders').where({ user_id: req.userId, pandit_id: effectivePanditId }).whereIn('status', ['continue', 'pending']).first()
+        const continueOrder = await db('orders').where({ user_id: req.userId, pandit_id: panditId }).whereIn('status', ['continue', 'pending']).first()
         if (continueOrder) return res.status(400).json({ success: false, message: 'Please complete your ongoing order.' });
 
+        // const order = await db('orders').where({ user_id: req.userId, pandit_id: panditId }).first()
         const orderId = `${new Date().getTime().toString()}${Math.floor(100000 + Math.random() * 900000).toString()}`;
-        let duration;
-        let deduction;
-
-        if (isRandomPandit) {
-            const settings = await db('settings').first();
-            duration = Number(settings?.free_chat_minutes) || 0;
-            if (!duration || duration < 1) return res.status(400).json({ success: false, message: 'Free chat minutes not configured.' });
-            deduction = 0;
-        } else {
-            duration = Math.floor(Number(Number(user?.balance)) / Number(pandit?.final_chat_call_rate));
-            if (!Number.isFinite(duration)) {
-                return res.status(400).json({ success: false, message: 'Min. 5 min balance required.' });
-            }
-            if (duration < 5) {
-                return res.status(400).json({ success: false, message: 'Min. 5 min balance required.' });
-            }
-            deduction = Number(duration) * Number(pandit?.final_chat_call_rate);
-            if (isNaN(deduction)) {
-                return res.status(400).json({ success: false, message: 'Balance could not be NaN.' });
-            }
-            if (Number(user?.balance) < deduction) return res.status(400).json({ success: false, message: 'Min. 5 min balance required.' });
+        let duration = Math.floor(Number(Number(user?.balance)) / Number(pandit?.final_chat_call_rate));
+        // console.log("duration", duration);
+        if (!Number.isFinite(duration)) {
+            return res.status(400).json({ success: false, message: 'Min. 5 min balance required.' });
         }
 
+        if (duration < 5) {
+            return res.status(400).json({ success: false, message: 'Min. 5 min balance required.' });
+        }
+        const deduction = Number(duration) * Number(pandit?.final_chat_call_rate)
+        if (isNaN(deduction)) {
+            return res.status(400).json({ success: false, message: 'Balance could not be NaN.' });
+        }
+        // console.log("last order", order);
+        // if (!order) {
+        //     //create 5 minute order
+        //     deduction = (5 * pandit?.chat_call_rate || 1);
+
+        // } else {
+        //     deduction = (5 * pandit?.chat_call_rate || 1);
+        if (Number(user?.balance) < deduction) return res.status(400).json({ success: false, message: 'Min. 5 min balance required.' });
+        // deduction = (user?.balance - 50) / (pandit?.chat_call_rate || 1)
+        // }
+        // if (user?.balance < deduction) return res.status(400).json({ success: false, message: 'Insufficient fund.' });
+
+
         const [saved] = await db('orders').insert({
-            pandit_id: effectivePanditId,
+            pandit_id: panditId,
             user_id: req.userId,
             order_id: orderId,
             status: "pending",
-            rate: isRandomPandit ? 0 : pandit?.final_chat_call_rate,
+            rate: pandit?.final_chat_call_rate || 1,
             duration,
             deduction,
             type,
-            profile_id,
-            is_free: isRandomPandit
+            profile_id
+
         }).returning('*');
         // console.log("order inserted", saved);
+
+        // console.log("start socket call");
+
         const profile = await db('userprofiles').where({ id: Number(profile_id) }).first();
 
         callEvent("emit_to_user_for_register", {
@@ -193,23 +175,120 @@ async function create(req, res) {
         });
 
         callEvent("emit_to_pending_order", {
-            key: `pandit_${effectivePanditId}`,
-            payload: { pandit_id: effectivePanditId }
+            key: `pandit_${pandit?.id}`,
+            payload: { pandit_id: pandit?.id }
         });
         // console.log(" socket end call");
 
         const token = pandit?.token || false;
         if (token) {
-            await sendNotification(token, user?.name, pandit?.final_chat_call_rate, effectivePanditId, type, orderId, pandit?.display_name, pandit?.profile)
-        }
-        if (isRandomPandit) {
-            sendAutoMessage(pandit, profile, req.userId, orderId)
+            await sendNotification(token, user?.name, pandit?.final_chat_call_rate, panditId, type, orderId, pandit?.display_name, pandit?.profile)
         }
         // socket.emit("emit_to_user_for_register", {
         //     key: `user_${req?.userId}`,
         //     payload: [{ ...saved, name: pandit?.name, profile: pandit?.profile }],
         // });
-        return res.status(200).json({ success: true, data: { orderId, is_free: isRandomPandit }, message: 'Order create Successfully' });
+        return res.status(200).json({ success: true, data: { orderId }, message: 'Order create Successfully' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
+async function createFreeChat(req, res) {
+    const { profile_id, type } = req.body;
+    if (!profile_id || !type) {
+        return res.status(400).json({ success: false, message: 'Missing params' });
+    }
+    try {
+        const user = await db('users').where({ id: req.userId }).first();
+        const [{ count }] = await db('orders')
+            .count('* as count')
+            .where({ user_id: req.userId, is_free: true })
+            .whereIn('status', ['continue', 'pending']);
+        if (count > 0) return res.status(400).json({ success: false, message: 'Please complete your ongoing free chat request.' });
+
+        const settings = await db('settings').first();
+        const limit = Number(settings?.free_chat_max_pandit_request) || 30;
+
+        let pandits = await db('pandits')
+            .whereNull('waiting_time')
+            .where({ unlimited_free_calls_chats: true, chat: true })
+            .orderByRaw('RANDOM()')
+            .limit(limit);
+
+        if (pandits.length < limit) {
+            const excludeIds = pandits.map((p) => p.id);
+            const more1 = await db('pandits')
+                .where({ unlimited_free_calls_chats: true, chat: true })
+                .whereNotIn('id', excludeIds.length ? excludeIds : [0])
+                .orderByRaw('RANDOM()')
+                .limit(limit - pandits.length);
+            pandits = [...pandits, ...more1];
+        }
+        if (pandits.length < limit) {
+            const excludeIds = pandits.map((p) => p.id);
+            const more2 = await db('pandits')
+                .whereNull('waiting_time')
+                .where({ chat: true })
+                .whereNotIn('id', excludeIds.length ? excludeIds : [0])
+                .orderByRaw('RANDOM()')
+                .limit(limit - pandits.length);
+            pandits = [...pandits, ...more2];
+        }
+        if (pandits.length < limit) {
+            const excludeIds = pandits.map((p) => p.id);
+            const more3 = await db('pandits')
+                .where({ chat: true })
+                .whereNotIn('id', excludeIds.length ? excludeIds : [0])
+                .orderByRaw('RANDOM()')
+                .limit(limit - pandits.length);
+            pandits = [...pandits, ...more3];
+        }
+
+        const requestedPanditIds = [...new Set((pandits || []).map((p) => p.id))];
+        if (requestedPanditIds.length === 0) return res.status(400).json({ success: false, message: 'No pandit available.' });
+
+
+        const duration = Number(settings?.free_chat_minutes) || 0;
+        if (!duration || duration < 1) return res.status(400).json({ success: false, message: 'Free chat minutes not configured.' });
+
+        const orderId = `${new Date().getTime().toString()}${Math.floor(100000 + Math.random() * 900000).toString()}`;
+        const [saved] = await db('orders').insert({
+            user_id: req.userId,
+            order_id: orderId,
+            status: 'pending',
+            rate: 0,
+            duration,
+            deduction: 0,
+            type,
+            profile_id,
+            is_free: true,
+            requested_pandits: JSON.stringify(requestedPanditIds),
+        }).returning('*');
+
+        const profile = await db('userprofiles').where({ id: Number(profile_id) }).first();
+
+        callEvent('emit_to_user_for_register', {
+            key: `user_${req.userId}`,
+            payload: [{ ...saved, profile_name: profile?.name, requested_pandits: requestedPanditIds }],
+        });
+
+        for (const panditId of requestedPanditIds) {
+            callEvent('emit_to_pending_order', {
+                key: `pandit_${panditId}`,
+                payload: { pandit_id: panditId, order_id: orderId, requested_pandits: requestedPanditIds },
+            });
+        }
+
+        const panditRecords = await db('pandits').whereIn('id', requestedPanditIds).select('id', 'token', 'display_name', 'profile', 'final_chat_call_rate');
+        for (const pandit of panditRecords || []) {
+            if (pandit?.token) {
+                await sendNotification(pandit.token, user?.name, 0, pandit.id, type, orderId, pandit?.display_name, pandit?.profile);
+            }
+        }
+        await sendAutoMessage(profile, req.userId, orderId);
+        return res.status(200).json({ success: true, data: { orderId, requested_pandits: requestedPanditIds }, message: 'Free chat order created successfully.' });
     } catch (err) {
         console.error(err);
         res.status(500).json({ success: false, message: 'Server error' });
@@ -683,4 +762,4 @@ async function callEnd(req, res) {
     }
 }
 
-module.exports = { create, list, acceptOrder, cancelOrder, deleteOrder, sendGift, generateCallToken, callReject, callEnd };
+module.exports = { create, createFreeChat, list, acceptOrder, cancelOrder, deleteOrder, sendGift, generateCallToken, callReject, callEnd };

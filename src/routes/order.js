@@ -4,6 +4,7 @@ const order = require('../controllers/orderController');
 
 
 router.post('/create', order.create);
+router.post('/createFreeChat', order.createFreeChat);
 router.post('/acceptOrder', order.acceptOrder);
 router.post('/cancelOrder', order.cancelOrder);
 router.get('/list', order.list);
