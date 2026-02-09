@@ -214,9 +214,6 @@ async function create(req, res) {
         //     key: `user_${req?.userId}`,
         //     payload: [{ ...saved, name: pandit?.name, profile: pandit?.profile }],
         // });
-        if (count == 0 && type == 'chat') {
-            sendAutoMessage(profile, req.userId, orderId, panditId);
-        }
         return res.status(200).json({ success: true, data: { orderId }, message: 'Order create Successfully' });
     } catch (err) {
         console.error(err);
@@ -540,18 +537,26 @@ async function acceptOrder(req, res) {
 
         const userDetail = await db('users').where({ id: req.userId }).first();
 
-        let duration = Math.floor(Number(Number(userDetail?.balance)) / Number(order?.final_chat_call_rate));
-        // console.log("duration", duration);
-        if (!Number.isFinite(duration)) {
-            return res.status(400).json({ success: false, message: 'Min. 5 min balance required.' });
-        }
+        let duration;
+        let deduction;
+        if (order.is_free) {
+            const settings = await db('settings').first();
+            duration = Number(settings?.free_chat_minutes) || 0;
+            deduction = 0;
+        } else {
+            duration = Math.floor(Number(Number(userDetail?.balance)) / Number(order?.final_chat_call_rate));
+            // console.log("duration", duration);
+            if (!Number.isFinite(duration)) {
+                return res.status(400).json({ success: false, message: 'Min. 5 min balance required.' });
+            }
 
-        if (duration < 5) {
-            return res.status(400).json({ success: false, message: 'Min. 5 min balance required.' });
-        }
-        const deduction = Number(duration) * Number(order?.final_chat_call_rate)
-        if (isNaN(deduction)) {
-            return res.status(400).json({ success: false, message: 'Balance could not be NaN.' });
+            if (duration < 5) {
+                return res.status(400).json({ success: false, message: 'Min. 5 min balance required.' });
+            }
+            deduction = Number(duration) * Number(order?.final_chat_call_rate)
+            if (isNaN(deduction)) {
+                return res.status(400).json({ success: false, message: 'Balance could not be NaN.' });
+            }
         }
 
         const startTime = new Date()
@@ -559,7 +564,7 @@ async function acceptOrder(req, res) {
         await db('orders').where({ id: order?.id }).update({ status: "continue", duration, deduction, start_time: startTime, end_time: endTime });
         await db('pandits').where({ id: order?.pandit_id }).update({ waiting_time: endTime });
 
-        if (order?.profile_id && order.type == 'chat') {
+        if (order?.profile_id && order.type == 'chat' && !order.is_free) {
             const profile = await db('userprofiles').where({ id: order?.profile_id }).first();
 
             let message = `Hello ${order?.display_name},\n Below are my details:
