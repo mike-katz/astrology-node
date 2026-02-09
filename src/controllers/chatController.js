@@ -279,16 +279,24 @@ async function sendMessage(req, res) {
 async function getDetail(req, res) {
     const { panditId, orderId } = req.query;
     try {
-        const order = await db('pandits').where({ id: panditId }).first();
-        if (!order) return res.status(400).json({ success: false, message: 'Pandit not found.' });
-        let orderDetail
-        let isFirstOrder = true
-        const [{ total }] = await db('orders').where({ pandit_id: panditId, user_id: req.userId }).count('id as total');
-        if (total > 1) {
-            isFirstOrder = false
+        if (!orderId) return res.status(400).json({ success: false, message: 'Missing param.' });
+        let order
+        if (panditId) {
+            order = await db('pandits').where({ id: panditId }).first();
+            if (!order) return res.status(400).json({ success: false, message: 'Pandit not found.' });
         }
+        let orderDetail
+        // let isFirstOrder = true
+        // const [{ total }] = await db('orders').where({ pandit_id: panditId, user_id: req.userId }).count('id as total');
+        // if (total > 1) {
+        //     isFirstOrder = false
+        // }
         if (orderId) {
             orderDetail = await db('orders').where({ order_id: orderId }).first();
+        }
+
+        if (!order) {
+            order = await db('pandits').where({ id: orderDetail?.pandit_id }).first();
         }
         const response = { id: panditId, name: order?.display_name, status: order?.status, profile: order?.profile, isOnline: order?.chat, isFirstOrder }
         if (orderDetail) {
