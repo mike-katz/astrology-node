@@ -78,7 +78,6 @@ function numberToIndianWords(amount) {
 async function createRazorpayOrder(req, res) {
     try {
         let { amount, recharge_id, manual_recharge } = req.body;
-        console.log("req.body", req.body);
         if (manual_recharge == false && recharge_id) {
             const recharge = await db('recharges').whereNull('deleted_at').where({ 'id': recharge_id, status: true }).first();
             if (!recharge) return res.status(400).json({ success: false, message: 'Recharge not active.' });

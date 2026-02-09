@@ -7,7 +7,10 @@ const { channelLeave } = require('./agoraController');
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-async function sendAutoMessage(profile, userId, orderId) {
+async function sendAutoMessage(profile, userId, orderId, panditId) {
+    await sleep(2500);
+
+    const panditIdNum = panditId != null && panditId !== '' ? Number(panditId) : null;
     let message = `Hi,\n Below are my details:
     Name: ${formatValue(profile?.name)} 
     Gender: ${formatValue(profile?.gender)} 
@@ -42,17 +45,20 @@ async function sendAutoMessage(profile, userId, orderId) {
         sender_id: Number(userId),
         receiver_type: "pandit",
         order_id: orderId,
-        // receiver_id: Number(pandit?.id),
+        receiver_id: panditIdNum,
         message: message,
         status: "send",
         type: "text"
     }).returning('*');
-    // callEvent("emit_to_user", {
-    //     toType: "pandit",
-    //     toId: pandit.id,
-    //     orderId: orderId,
-    //     payload: saved,
-    // });
+    if (panditIdNum != null) {
+        callEvent("emit_to_user", {
+            toType: "pandit",
+            toId: panditIdNum,
+            orderId: orderId,
+            payload: saved,
+        });
+    }
+
     callEvent("emit_to_user", {
         toType: "user",
         toId: userId,
@@ -63,7 +69,7 @@ async function sendAutoMessage(profile, userId, orderId) {
 
     [saved] = await db('chats').insert({
         sender_type: "pandit",
-        // sender_id: Number(pandit.id),
+        sender_id: panditIdNum,
         receiver_type: "user",
         order_id: orderId,
         receiver_id: Number(userId),
@@ -72,13 +78,15 @@ async function sendAutoMessage(profile, userId, orderId) {
         is_system_generate: true,
         type: "text"
     }).returning('*');
-    // callEvent("emit_to_user", { toType: "pandit", toId: pandit.id, orderId, payload: saved });
+    if (panditIdNum != null) {
+        callEvent("emit_to_user", { toType: "pandit", toId: panditIdNum, orderId, payload: saved });
+    }
     callEvent("emit_to_user", { toType: "user", toId: userId, orderId, payload: saved });
     await sleep(500);
 
     [saved] = await db('chats').insert({
         sender_type: "pandit",
-        // sender_id: Number(pandit.id),
+        sender_id: panditIdNum,
         receiver_type: "user",
         order_id: orderId,
         receiver_id: Number(userId),
@@ -87,13 +95,15 @@ async function sendAutoMessage(profile, userId, orderId) {
         is_system_generate: true,
         type: "text"
     }).returning('*');
-    // callEvent("emit_to_user", { toType: "pandit", toId: pandit.id, orderId, payload: saved });
+    if (panditIdNum != null) {
+        callEvent("emit_to_user", { toType: "pandit", toId: panditIdNum, orderId, payload: saved });
+    }
     callEvent("emit_to_user", { toType: "user", toId: userId, orderId, payload: saved });
     await sleep(500);
 
     [saved] = await db('chats').insert({
         sender_type: "pandit",
-        // sender_id: Number(pandit.id),
+        sender_id: panditIdNum,
         receiver_type: "user",
         order_id: orderId,
         receiver_id: Number(userId),
@@ -102,7 +112,9 @@ async function sendAutoMessage(profile, userId, orderId) {
         is_system_generate: true,
         type: "text"
     }).returning('*');
-    // callEvent("emit_to_user", { toType: "pandit", toId: pandit.id, orderId, payload: saved });
+    if (panditIdNum != null) {
+        callEvent("emit_to_user", { toType: "pandit", toId: panditIdNum, orderId, payload: saved });
+    }
     callEvent("emit_to_user", { toType: "user", toId: userId, orderId, payload: saved });
 }
 
@@ -122,18 +134,31 @@ async function create(req, res) {
         const continueOrder = await db('orders').where({ user_id: req.userId, pandit_id: panditId }).whereIn('status', ['continue', 'pending']).first()
         if (continueOrder) return res.status(400).json({ success: false, message: 'Please complete your ongoing order.' });
 
+        const [{ count }] = await db('orders')
+            .count('* as count')
+            .where({ user_id: req.userId, is_free: true })
+            .whereIn('status', ['continue', 'completed', 'pending']);
+        let duration = Math.floor(Number(Number(user?.balance)) / Number(pandit?.final_chat_call_rate));
+        let deduction = Number(duration) * Number(pandit?.final_chat_call_rate)
+        let rate = pandit?.final_chat_call_rate;
+        if (count == 0 && type == 'chat') {
+            const settings = await db('settings').first();
+            duration = Number(settings?.free_chat_minutes) || 0;
+            deduction = 0;
+            rate = settings?.free_chat_amount_per_minute || 1;
+        } else {
+            if (duration < 5) {
+                return res.status(400).json({ success: false, message: 'Min. 5 min balance required.' });
+            }
+            if (Number(user?.balance) < deduction) return res.status(400).json({ success: false, message: 'Min. 5 min balance required.' });
+        }
         // const order = await db('orders').where({ user_id: req.userId, pandit_id: panditId }).first()
         const orderId = `${new Date().getTime().toString()}${Math.floor(100000 + Math.random() * 900000).toString()}`;
-        let duration = Math.floor(Number(Number(user?.balance)) / Number(pandit?.final_chat_call_rate));
         // console.log("duration", duration);
         if (!Number.isFinite(duration)) {
             return res.status(400).json({ success: false, message: 'Min. 5 min balance required.' });
         }
 
-        if (duration < 5) {
-            return res.status(400).json({ success: false, message: 'Min. 5 min balance required.' });
-        }
-        const deduction = Number(duration) * Number(pandit?.final_chat_call_rate)
         if (isNaN(deduction)) {
             return res.status(400).json({ success: false, message: 'Balance could not be NaN.' });
         }
@@ -144,24 +169,27 @@ async function create(req, res) {
 
         // } else {
         //     deduction = (5 * pandit?.chat_call_rate || 1);
-        if (Number(user?.balance) < deduction) return res.status(400).json({ success: false, message: 'Min. 5 min balance required.' });
         // deduction = (user?.balance - 50) / (pandit?.chat_call_rate || 1)
         // }
         // if (user?.balance < deduction) return res.status(400).json({ success: false, message: 'Insufficient fund.' });
-
-
-        const [saved] = await db('orders').insert({
+        const ins = {
             pandit_id: panditId,
             user_id: req.userId,
             order_id: orderId,
             status: "pending",
-            rate: pandit?.final_chat_call_rate || 1,
+            rate,
             duration,
             deduction,
             type,
             profile_id
+        }
+        if (count == 0 && type == 'chat') {
+            ins.start_time = new Date()
+            ins.end_time = new Date(Date.now() + `${duration}` * 60 * 1000);
+            ins.is_free
+        }
 
-        }).returning('*');
+        const [saved] = await db('orders').insert(ins).returning('*');
         // console.log("order inserted", saved);
 
         // console.log("start socket call");
@@ -187,6 +215,9 @@ async function create(req, res) {
         //     key: `user_${req?.userId}`,
         //     payload: [{ ...saved, name: pandit?.name, profile: pandit?.profile }],
         // });
+        if (count == 0 && type == 'chat') {
+            sendAutoMessage(profile, req.userId, orderId, panditId);
+        }
         return res.status(200).json({ success: true, data: { orderId }, message: 'Order create Successfully' });
     } catch (err) {
         console.error(err);
