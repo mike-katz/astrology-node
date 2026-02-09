@@ -269,10 +269,10 @@ async function createFreeChat(req, res) {
 
         const profile = await db('userprofiles').where({ id: Number(profile_id) }).first();
 
-        callEvent('emit_to_user_for_register', {
-            key: `user_${req.userId}`,
-            payload: [{ ...saved, profile_name: profile?.name, requested_pandits: requestedPanditIds }],
-        });
+        // callEvent('emit_to_user_for_register', {
+        //     key: `user_${req.userId}`,
+        //     payload: [{ ...saved, profile_name: profile?.name, requested_pandits: requestedPanditIds }],
+        // });
 
         for (const panditId of requestedPanditIds) {
             callEvent('emit_to_pending_order', {
@@ -287,7 +287,7 @@ async function createFreeChat(req, res) {
                 await sendNotification(pandit.token, user?.name, 0, pandit.id, type, orderId, pandit?.display_name, pandit?.profile);
             }
         }
-        await sendAutoMessage(profile, req.userId, orderId);
+        sendAutoMessage(profile, req.userId, orderId);
         return res.status(200).json({ success: true, data: { orderId, requested_pandits: requestedPanditIds }, message: 'Free chat order created successfully.' });
     } catch (err) {
         console.error(err);
