@@ -592,4 +592,43 @@ async function deleteChat(req, res) {
     }
 }
 
-module.exports = { getRoom, getMessage, sendMessage, getDetail, getOrderDetail, endChat, forceEndChat, readMessage, deleteChat };
+async function getOrderChat(req, res) {
+    const { order_id } = req.query;
+    if (!order_id) {
+        return res.status(400).json({ success: false, message: 'Missing params.' });
+    }
+    try {
+        let page = parseInt(req.query.page) || 1;
+        let limit = parseInt(req.query.limit) || 100;
+
+        if (page < 1) page = 1;
+        if (limit < 1) limit = 100;
+        const offset = (page - 1) * limit;
+        const messages = await db('chats')
+            .where({ order_id })
+            .whereNull('deleted_at')
+            .orderBy('id', 'desc')
+            .limit(limit)
+            .offset(offset);
+
+        const [{ count }] = await db('chats')
+            .count('* as count')
+            .whereNull('deleted_at')
+            .where({ order_id });
+        const total = parseInt(count);
+        const totalPages = Math.ceil(total / limit);
+        const response = {
+            page,
+            limit,
+            total,
+            totalPages,
+            results: messages
+        }
+        return res.status(200).json({ success: true, data: response, message: 'Chat get Successfully' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
+module.exports = { getRoom, getMessage, sendMessage, getDetail, getOrderDetail, endChat, forceEndChat, readMessage, deleteChat, getOrderChat };

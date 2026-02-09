@@ -28,6 +28,7 @@ const upload = multer({
 router.post('/sendMessage', upload.array('message', 5), chat.sendMessage);
 router.get('/rooms', chat.getRoom);
 router.get('/messages', chat.getMessage);
+router.get('/orderChat', chat.getOrderChat);
 router.get('/getDetail', chat.getDetail);
 router.get('/getOrderDetail', chat.getOrderDetail);
 router.post('/endChat', chat.endChat);
