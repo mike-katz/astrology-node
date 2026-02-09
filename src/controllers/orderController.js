@@ -126,7 +126,6 @@ async function create(req, res) {
     // console.log("create order req.body", req.body);
     try {
         const user = await db('users').where({ id: req.userId }).first()
-        if (user?.balance < 1) return res.status(400).json({ success: false, message: 'Please recharge your wallet.' });
 
         const pandit = await db('pandits').where({ id: panditId }).first()
         if (!pandit) return res.status(400).json({ success: false, message: 'Pandit not found.' });
@@ -147,6 +146,7 @@ async function create(req, res) {
             deduction = 0;
             rate = settings?.free_chat_amount_per_minute || 1;
         } else {
+            if (user?.balance < 1) return res.status(400).json({ success: false, message: 'Please recharge your wallet.' });
             if (duration < 5) {
                 return res.status(400).json({ success: false, message: 'Min. 5 min balance required.' });
             }
