@@ -309,10 +309,10 @@ async function getPanditDetail(req, res) {
     // console.log("getPanditDetail id", id);
     const user = await db('pandits').where('id', id).first();
     if (!user) return res.status(400).json({ success: false, message: 'pandit not available.' });
-    const review = await db('reviews as r')
-        .where('r.pandit_id', id)
-        .orderBy('r.created_at', 'desc')
-        .limit(3);
+    // const review = await db('reviews as r')
+    //     .where('r.pandit_id', id)
+    //     .orderBy('r.created_at', 'desc')
+    //     .limit(3);
 
     const gallery = await db('panditgallery').where({ pandit_id: id }).orderBy('order', 'asc');
     const response = {
