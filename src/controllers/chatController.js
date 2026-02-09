@@ -295,7 +295,7 @@ async function getDetail(req, res) {
             orderDetail = await db('orders').where({ order_id: orderId }).first();
         }
 
-        if (!order) {
+        if (!order && orderDetail?.pandit_id != null) {
             order = await db('pandits').where({ id: orderDetail?.pandit_id }).first();
         }
         const response = { id: panditId, name: order?.display_name, status: order?.status, profile: order?.profile, isOnline: order?.chat, is_free: orderDetail?.is_free }
