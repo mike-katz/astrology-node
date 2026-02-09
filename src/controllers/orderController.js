@@ -117,6 +117,7 @@ async function create(req, res) {
         const [{ count }] = await db('orders')
             .count('* as count')
             .where({ user_id: req.userId })
+            .whereIn('status', ['continue', 'pending', 'completed'])
         if (count > 0 && !panditId) return res.status(400).json({ success: false, message: 'Missing params' });
         let pandit = null;
         if (panditId) {
