@@ -342,7 +342,9 @@ async function getPanditDetail(req, res) {
         total_orders: user?.total_orders,
         tag: user?.tag,
         isverified: user?.isverified,
-        reviews: review,
+        audio_intro: user?.audio_intro,
+        video_intro: user?.video_intro,
+        // reviews: review,
         isFollow: false,
         gallery
     }
