@@ -204,8 +204,8 @@ async function createFreeChat(req, res) {
         const [{ count }] = await db('orders')
             .count('* as count')
             .where({ user_id: req.userId, is_free: true })
-            .whereIn('status', ['continue', 'pending']);
-        if (count > 0) return res.status(400).json({ success: false, message: 'Please complete your ongoing free chat request.' });
+            .whereIn('status', ['continue', 'completed', 'pending']);
+        if (count > 0) return res.status(400).json({ success: false, message: 'Your free chat already completed.' });
 
         const settings = await db('settings').first();
         const limit = Number(settings?.free_chat_max_pandit_request) || 30;
@@ -265,7 +265,7 @@ async function createFreeChat(req, res) {
             end_time,
             duration,
             deduction: 0,
-            type,
+            type: "chat",
             profile_id,
             is_free: true,
             requested_pandits: JSON.stringify(requestedPanditIds),
