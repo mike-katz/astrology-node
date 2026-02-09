@@ -185,8 +185,6 @@ async function create(req, res) {
             is_free: false
         }
         if (count == 0 && type == 'chat') {
-            ins.start_time = new Date()
-            ins.end_time = new Date(Date.now() + `${duration}` * 60 * 1000);
             ins.is_free = true
         }
 
