@@ -181,12 +181,13 @@ async function create(req, res) {
             duration,
             deduction,
             type,
-            profile_id
+            profile_id,
+            is_free: false
         }
         if (count == 0 && type == 'chat') {
             ins.start_time = new Date()
             ins.end_time = new Date(Date.now() + `${duration}` * 60 * 1000);
-            ins.is_free
+            ins.is_free = true
         }
 
         const [saved] = await db('orders').insert(ins).returning('*');
