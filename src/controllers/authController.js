@@ -115,7 +115,12 @@ async function verifyOtp(req, res) {
         }
         await setCache(redisKey, encryptToken, ttlSeconds);
 
-        return res.status(200).json({ success: true, data: { id: existing?.id, name: existing?.name, profile: existing?.profile, avatar: existing?.avatar, mobile: existing?.mobile, country_code: existing?.country_code, token: encryptToken }, message: 'Otp Verify Successfully' });
+        const [{ count }] = await db('orders')
+            .count('* as count')
+            .where({ user_id: existing.id })
+            .whereIn('status', ['continue', 'completed', 'pending']);
+        const is_free = count == 0 ? true : false
+        return res.status(200).json({ success: true, data: { id: existing?.id, name: existing?.name, profile: existing?.profile, avatar: existing?.avatar, mobile: existing?.mobile, country_code: existing?.country_code, token: encryptToken, is_free }, message: 'Otp Verify Successfully' });
     } catch (err) {
         console.error(err);
         res.status(500).json({ success: false, message: 'Server error' });

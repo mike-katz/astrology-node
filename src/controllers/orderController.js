@@ -128,7 +128,7 @@ async function create(req, res) {
 
         const [{ count }] = await db('orders')
             .count('* as count')
-            .where({ user_id: req.userId, is_free: true })
+            .where({ user_id: req.userId })
             .whereIn('status', ['continue', 'completed', 'pending']);
         let duration = Math.floor(Number(Number(user?.balance)) / Number(pandit?.final_chat_call_rate));
         let deduction = Number(duration) * Number(pandit?.final_chat_call_rate)
@@ -223,7 +223,7 @@ async function createFreeChat(req, res) {
         const user = await db('users').where({ id: req.userId }).first();
         const [{ count }] = await db('orders')
             .count('* as count')
-            .where({ user_id: req.userId, is_free: true })
+            .where({ user_id: req.userId })
             .whereIn('status', ['continue', 'completed', 'pending']);
         if (count > 0) return res.status(400).json({ success: false, message: 'Your free chat already completed.' });
 
