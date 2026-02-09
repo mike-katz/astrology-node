@@ -7,70 +7,81 @@ const { channelLeave } = require('./agoraController');
 
 async function create(req, res) {
     const { panditId, type, profile_id } = req.body;
-    if (!panditId || !profile_id) {
+    if (!profile_id) {
         return res.status(400).json({ success: false, message: 'Missing params' });
     }
     // console.log("create order req.body", req.body);
     try {
-        const user = await db('users').where({ id: req.userId }).first()
-        if (user?.balance < 1) return res.status(400).json({ success: false, message: 'Please recharge your wallet.' });
+        const user = await db('users').where({ id: req.userId }).first();
+        const [{ count }] = await db('orders')
+            .count('* as count')
+            .where({ user_id: req.userId })
+        if (count > 0 && !panditId) return res.status(400).json({ success: false, message: 'Missing params' });
+        let pandit = null;
+        if (panditId) {
+            pandit = await db('pandits').where({ id: panditId }).first();
+            if (!pandit) return res.status(400).json({ success: false, message: 'Pandit not found.' });
+        }
+        if (!pandit) {
+            pandit = await db('pandits')
+                .whereNull('waiting_time')
+                .where({ unlimited_free_calls_chats: true, chat: true })
+                .orderByRaw('RANDOM()')
+                .first();
+        }
+        if (!pandit) {
+            pandit = await db('pandits')
+                .whereNull('waiting_time')
+                .where({ chat: true })
+                .orderByRaw('RANDOM()')
+                .first();
+        }
 
-        const pandit = await db('pandits').where({ id: panditId }).first()
-        if (!pandit) return res.status(400).json({ success: false, message: 'Pandit not found.' });
+        const isRandomPandit = !panditId;
 
-        const continueOrder = await db('orders').where({ user_id: req.userId, pandit_id: panditId }).whereIn('status', ['continue', 'pending']).first()
+        if (!isRandomPandit && user?.balance < 1) return res.status(400).json({ success: false, message: 'Please recharge your wallet.' });
+
+        const effectivePanditId = pandit.id;
+
+        const continueOrder = await db('orders').where({ user_id: req.userId, pandit_id: effectivePanditId }).whereIn('status', ['continue', 'pending']).first()
         if (continueOrder) return res.status(400).json({ success: false, message: 'Please complete your ongoing order.' });
 
-        //check order deduction
-
-        // const pandingOrder = await db('orders').where({ user_id: req.userId }).whereIn('status', ['continue', 'pending'])
-        // let pendingDeduction = 0
-        // if (pandingOrder?.length > 0) {
-        //     pandingOrder.map(item => {
-        //         pendingDeduction += Number(item.deduction)
-        //     })
-        // }
-
-        // pendingDeduction = Number(user?.balance) - pendingDeduction
-
-        // const order = await db('orders').where({ user_id: req.userId, pandit_id: panditId }).first()
         const orderId = `${new Date().getTime().toString()}${Math.floor(100000 + Math.random() * 900000).toString()}`;
-        let duration = Math.floor(Number(Number(user?.balance)) / Number(pandit?.final_chat_call_rate));
-        // console.log("duration", duration);
-        if (!Number.isFinite(duration)) {
-            return res.status(400).json({ success: false, message: 'Min. 5 min balance required.' });
-        }
+        let duration;
+        let deduction;
 
-        if (duration < 5) {
-            return res.status(400).json({ success: false, message: 'Min. 5 min balance required.' });
+        if (isRandomPandit) {
+            const settings = await db('settings').first();
+            duration = Number(settings?.free_chat_minutes) || 0;
+            if (!duration || duration < 1) return res.status(400).json({ success: false, message: 'Free chat minutes not configured.' });
+            deduction = 0;
+        } else {
+            duration = Math.floor(Number(Number(user?.balance)) / Number(pandit?.final_chat_call_rate));
+            if (!Number.isFinite(duration)) {
+                return res.status(400).json({ success: false, message: 'Min. 5 min balance required.' });
+            }
+            if (duration < 5) {
+                return res.status(400).json({ success: false, message: 'Min. 5 min balance required.' });
+            }
+            deduction = Number(duration) * Number(pandit?.final_chat_call_rate);
+            if (isNaN(deduction)) {
+                return res.status(400).json({ success: false, message: 'Balance could not be NaN.' });
+            }
+            if (Number(user?.balance) < deduction) return res.status(400).json({ success: false, message: 'Min. 5 min balance required.' });
         }
-        const deduction = Number(duration) * Number(pandit?.final_chat_call_rate)
-        if (isNaN(deduction)) {
-            return res.status(400).json({ success: false, message: 'Balance could not be NaN.' });
-        }
-        // console.log("last order", order);
-        // if (!order) {
-        //     //create 5 minute order
-        //     deduction = (5 * pandit?.chat_call_rate || 1);
-
-        // } else {
-        //     deduction = (5 * pandit?.chat_call_rate || 1);
-        if (Number(user?.balance) < deduction) return res.status(400).json({ success: false, message: 'Min. 5 min balance required.' });
-        // deduction = (user?.balance - 50) / (pandit?.chat_call_rate || 1)
-        // }
-        // if (user?.balance < deduction) return res.status(400).json({ success: false, message: 'Insufficient fund.' });
 
 
         const [saved] = await db('orders').insert({
-            pandit_id: panditId,
+            pandit_id: effectivePanditId,
             user_id: req.userId,
             order_id: orderId,
             status: "pending",
-            rate: pandit?.final_chat_call_rate || 1,
+            rate: isRandomPandit ? 0 : pandit?.final_chat_call_rate,
             duration,
             deduction,
             type,
-            profile_id
+            profile_id,
+            is_free: isRandomPandit
         }).returning('*');
         // console.log("order inserted", saved);
 
@@ -84,14 +95,14 @@ async function create(req, res) {
         });
 
         callEvent("emit_to_pending_order", {
-            key: `pandit_${pandit?.id}`,
-            payload: { pandit_id: pandit?.id }
+            key: `pandit_${effectivePanditId}`,
+            payload: { pandit_id: effectivePanditId }
         });
         // console.log(" socket end call");
 
         const token = pandit?.token || false;
         if (token) {
-            await sendNotification(token, user?.name, pandit?.final_chat_call_rate, panditId, type, orderId, pandit?.display_name, pandit?.profile)
+            await sendNotification(token, user?.name, pandit?.final_chat_call_rate, effectivePanditId, type, orderId, pandit?.display_name, pandit?.profile)
         }
         // socket.emit("emit_to_user_for_register", {
         //     key: `user_${req?.userId}`,

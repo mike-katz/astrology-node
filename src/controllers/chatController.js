@@ -361,11 +361,26 @@ async function balanceCut(user_id, order, end_time) {
         const user = await db('users').where({ id: user_id }).first();
         const diffMinutes = getDuration(order.start_time, end_time)
         // console.log("diffMinutes", diffMinutes);
-        const perMinute = Number(order?.rate);
-        // console.log("perMinute", perMinute);
-        const deduction = Number(diffMinutes) * Number(perMinute);
+        const isFree = order.is_free === true;
+        let deduction;
+        let newBalance;
+        let panditAmount;
+        const panditDetail = await db('pandits').where({ id: order.pandit_id }).first();
+
+        if (isFree) {
+            const settings = await db('settings').first();
+            const freeChatPerMinute = Number(settings?.free_chat_amount_per_minute) || 0;
+            panditAmount = Number(diffMinutes) * freeChatPerMinute;
+            deduction = 0;
+            newBalance = Number(user.balance);
+        } else {
+            const perMinute = Number(order?.rate);
+            deduction = Number(diffMinutes) * Number(perMinute);
+            newBalance = user.balance - deduction;
+            panditAmount = (Number(deduction) * Number(panditDetail?.chat_call_share)) / 100;
+        }
+
         // console.log("deduction", deduction);
-        const newBalance = user.balance - deduction
         // console.log("newBalance", newBalance, "username", user?.name);
         const upd = { total_orders: 1, }
         if (order.type == 'call') {
@@ -403,16 +418,16 @@ async function balanceCut(user_id, order, end_time) {
                 orderId: order?.order_id,
             });
         }
-        const panditDetail = await db('pandits').where({ id: order.pandit_id }).first();
 
-        const panditAmount = (Number(deduction) * Number(panditDetail?.chat_call_share)) / 100
-        const dd = await db('users').where({ id: user_id }).update({ balance: newBalance });
-        const dds = await db('orders').where({ id: order.id }).update({ status: "completed", deduction, duration: diffMinutes, end_time: new Date(end_time) });
+        if (!isFree) {
+            await db('users').where({ id: user_id }).update({ balance: newBalance });
+        }
+        await db('orders').where({ id: order.id }).update({ status: "completed", deduction, duration: diffMinutes, end_time: new Date(end_time) });
         upd.balance = panditAmount
         await db('pandits').where({ id: order.pandit_id }).increment(upd).update({ waiting_time: null });
         const pandit_new_balance = Number(panditDetail?.balance) + Number(panditAmount)
         const type = order.type.charAt(0).toUpperCase() + order.type.slice(1);
-        await db('balancelogs').insert({ user_id, pandit_old_balance: Number(panditDetail?.balance), pandit_new_balance, user_old_balance: Number(user.balance), user_new_balance: Number(newBalance), message: `${type} with ${panditDetail?.display_name} for ${diffMinutes} minutes`, pandit_id: panditDetail?.id, pandit_message: `${type} with ${user?.name} for ${diffMinutes} minutes`, pandit_amount: panditAmount, amount: - deduction });
+        await db('balancelogs').insert({ user_id, pandit_old_balance: Number(panditDetail?.balance), pandit_new_balance, user_old_balance: Number(user.balance), user_new_balance: Number(newBalance), message: `${type} with ${panditDetail?.display_name} for ${diffMinutes} minutes`, pandit_id: panditDetail?.id, pandit_message: `${type} with ${user?.name} for ${diffMinutes} minutes`, pandit_amount: panditAmount, amount: isFree ? 0 : -deduction });
         // console.log("user", dd);
         // console.log("order", dds);
         return true
