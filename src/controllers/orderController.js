@@ -184,12 +184,13 @@ async function create(req, res) {
             is_free: isRandomPandit
         }).returning('*');
         // console.log("order inserted", saved);
+        const profile = await db('userprofiles').where({ id: Number(profile_id) }).first();
+
         callEvent("emit_to_user_for_register", {
             key: `user_${req?.userId}`,
             payload: [{ ...saved, name: pandit?.display_name, profile: pandit?.profile, profile_name: profile?.name }]
         });
 
-        const profile = await db('userprofiles').where({ id: Number(profile_id) }).first();
         callEvent("emit_to_pending_order", {
             key: `pandit_${effectivePanditId}`,
             payload: { pandit_id: effectivePanditId }
