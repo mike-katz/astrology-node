@@ -207,7 +207,7 @@ async function create(req, res) {
         //     key: `user_${req?.userId}`,
         //     payload: [{ ...saved, name: pandit?.name, profile: pandit?.profile }],
         // });
-        return res.status(200).json({ success: true, data: { orderId }, message: 'Order create Successfully' });
+        return res.status(200).json({ success: true, data: { orderId, is_free: isRandomPandit }, message: 'Order create Successfully' });
     } catch (err) {
         console.error(err);
         res.status(500).json({ success: false, message: 'Server error' });
