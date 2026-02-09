@@ -559,7 +559,7 @@ async function acceptOrder(req, res) {
         await db('orders').where({ id: order?.id }).update({ status: "continue", duration, deduction, start_time: startTime, end_time: endTime });
         await db('pandits').where({ id: order?.pandit_id }).update({ waiting_time: endTime });
 
-        if (order?.profile_id && order.type == 'chat' && !order.is_free) {
+        if (order?.profile_id && order.type == 'chat') {
             const profile = await db('userprofiles').where({ id: order?.profile_id }).first();
 
             let message = `Hello ${order?.display_name},\n Below are my details:
