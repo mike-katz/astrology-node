@@ -106,7 +106,6 @@ async function sendAutoMessage(profile, userId, orderId) {
     callEvent("emit_to_user", { toType: "user", toId: userId, orderId, payload: saved });
 }
 
-
 async function create(req, res) {
     const { panditId, type, profile_id } = req.body;
     if (!panditId || !profile_id) {
@@ -261,7 +260,7 @@ async function createFreeChat(req, res) {
             user_id: req.userId,
             order_id: orderId,
             status: 'pending',
-            rate: 0,
+            rate: settings?.free_chat_amount_per_minute,
             start_time,
             end_time,
             duration,
