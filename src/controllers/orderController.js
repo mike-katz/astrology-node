@@ -5,6 +5,107 @@ const admin = require('../config/firebase');
 const { callEvent } = require("../socket");
 const { channelLeave } = require('./agoraController');
 
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function sendAutoMessage(pandit, profile, userId, orderId) {
+    let message = `Hello ${pandit?.display_name},\n Below are my details:
+    Name: ${formatValue(profile?.name)} 
+    Gender: ${formatValue(profile?.gender)} 
+    DOB: ${formatDOB(profile?.dob)} 
+    Birth Time: ${profile?.birth_time} 
+    Birth Place: ${formatValue(profile?.birth_place)} 
+    Marital Status: ${formatValue(profile?.marital_status)} \n`;
+    if (profile?.occupation) {
+        message += `    Occupation: ${formatValue(profile?.occupation)}\n`
+    }
+    if (profile?.topic_of_concern) {
+        message += `    Concern Topic: ${formatValue(profile?.topic_of_concern)}\n`
+    }
+    if (profile?.topic_of_concern_other) {
+        message += `    Other Concern: ${formatValue(profile?.topic_of_concern_other)}\n`
+    }
+    if (profile?.partner_name) {
+        message += `    Partner Name: ${formatValue(profile?.partner_name)}`
+    }
+    if (profile?.partner_dob) {
+        message += `    Partner DOB: ${formatDOB(profile?.partner_dob)}`
+    }
+    if (profile?.partner_dot) {
+        message += `    Partner Birth Time: ${formatValue(profile?.partner_dot)}`
+    }
+    if (profile?.partner_place) {
+        message += `    Partner Birth Place: ${formatValue(profile?.partner_place)} \n`
+    }
+
+    let [saved] = await db('chats').insert({
+        sender_type: "user",
+        sender_id: Number(userId),
+        receiver_type: "pandit",
+        order_id: orderId,
+        receiver_id: Number(pandit?.id),
+        message: message,
+        status: "send",
+        type: "text"
+    }).returning('*');
+    callEvent("emit_to_user", {
+        toType: "pandit",
+        toId: pandit.id,
+        orderId: orderId,
+        payload: saved,
+    });
+    callEvent("emit_to_user", {
+        toType: "user",
+        toId: userId,
+        orderId: orderId,
+        payload: saved,
+    });
+    await sleep(1000);
+
+    [saved] = await db('chats').insert({
+        sender_type: "pandit",
+        sender_id: Number(pandit.id),
+        receiver_type: "user",
+        order_id: orderId,
+        receiver_id: Number(userId),
+        message: "Welcome to AstroGuruji!",
+        status: "send",
+        is_system_generate: true,
+        type: "text"
+    }).returning('*');
+    callEvent("emit_to_user", { toType: "pandit", toId: pandit.id, orderId, payload: saved });
+    callEvent("emit_to_user", { toType: "user", toId: userId, orderId, payload: saved });
+    await sleep(1000);
+
+    [saved] = await db('chats').insert({
+        sender_type: "pandit",
+        sender_id: Number(pandit.id),
+        receiver_type: "user",
+        order_id: orderId,
+        receiver_id: Number(userId),
+        message: "Astrologer will join within 10 seconds",
+        status: "send",
+        is_system_generate: true,
+        type: "text"
+    }).returning('*');
+    callEvent("emit_to_user", { toType: "pandit", toId: pandit.id, orderId, payload: saved });
+    callEvent("emit_to_user", { toType: "user", toId: userId, orderId, payload: saved });
+    await sleep(1000);
+
+    [saved] = await db('chats').insert({
+        sender_type: "pandit",
+        sender_id: Number(pandit.id),
+        receiver_type: "user",
+        order_id: orderId,
+        receiver_id: Number(userId),
+        message: "Please share your question in the meanwhile",
+        status: "send",
+        is_system_generate: true,
+        type: "text"
+    }).returning('*');
+    callEvent("emit_to_user", { toType: "pandit", toId: pandit.id, orderId, payload: saved });
+    callEvent("emit_to_user", { toType: "user", toId: userId, orderId, payload: saved });
+}
+
 async function create(req, res) {
     const { panditId, type, profile_id } = req.body;
     if (!profile_id) {
@@ -70,7 +171,6 @@ async function create(req, res) {
             if (Number(user?.balance) < deduction) return res.status(400).json({ success: false, message: 'Min. 5 min balance required.' });
         }
 
-
         const [saved] = await db('orders').insert({
             pandit_id: effectivePanditId,
             user_id: req.userId,
@@ -84,16 +184,12 @@ async function create(req, res) {
             is_free: isRandomPandit
         }).returning('*');
         // console.log("order inserted", saved);
-
-        // console.log("start socket call");
-
-        const profile = await db('userprofiles').where({ id: Number(profile_id) }).first();
-
         callEvent("emit_to_user_for_register", {
             key: `user_${req?.userId}`,
             payload: [{ ...saved, name: pandit?.display_name, profile: pandit?.profile, profile_name: profile?.name }]
         });
 
+        const profile = await db('userprofiles').where({ id: Number(profile_id) }).first();
         callEvent("emit_to_pending_order", {
             key: `pandit_${effectivePanditId}`,
             payload: { pandit_id: effectivePanditId }
@@ -103,6 +199,9 @@ async function create(req, res) {
         const token = pandit?.token || false;
         if (token) {
             await sendNotification(token, user?.name, pandit?.final_chat_call_rate, effectivePanditId, type, orderId, pandit?.display_name, pandit?.profile)
+        }
+        if (isRandomPandit) {
+            sendAutoMessage(pandit, profile, req.userId, orderId)
         }
         // socket.emit("emit_to_user_for_register", {
         //     key: `user_${req?.userId}`,
