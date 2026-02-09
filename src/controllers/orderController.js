@@ -59,7 +59,7 @@ async function sendAutoMessage(profile, userId, orderId) {
         orderId: orderId,
         payload: saved,
     });
-    await sleep(10000);
+    await sleep(1000);
 
     [saved] = await db('chats').insert({
         sender_type: "pandit",
@@ -74,7 +74,7 @@ async function sendAutoMessage(profile, userId, orderId) {
     }).returning('*');
     // callEvent("emit_to_user", { toType: "pandit", toId: pandit.id, orderId, payload: saved });
     callEvent("emit_to_user", { toType: "user", toId: userId, orderId, payload: saved });
-    await sleep(10000);
+    await sleep(1000);
 
     [saved] = await db('chats').insert({
         sender_type: "pandit",
@@ -89,7 +89,7 @@ async function sendAutoMessage(profile, userId, orderId) {
     }).returning('*');
     // callEvent("emit_to_user", { toType: "pandit", toId: pandit.id, orderId, payload: saved });
     callEvent("emit_to_user", { toType: "user", toId: userId, orderId, payload: saved });
-    await sleep(10000);
+    await sleep(1000);
 
     [saved] = await db('chats').insert({
         sender_type: "pandit",
