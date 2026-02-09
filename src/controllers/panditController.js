@@ -124,8 +124,8 @@ async function getPandits(req, res) {
         }
 
         if (secondary_expertise && secondary_expertise != 'all') {
-            query.andWhereRaw('p.secondary_expertise::text ILIKE ?', [secondary_expertise]);
-            countQuery.andWhereRaw('p.secondary_expertise::text ILIKE ?', [secondary_expertise]);
+            query.andWhere('p.secondary_expertise', 'ILIKE', `%${secondary_expertise.trim()}%`);
+            countQuery.andWhere('p.secondary_expertise', 'ILIKE', `%${secondary_expertise.trim()}%`);
         }
 
         if (Array.isArray(skill) && skill.length) {
