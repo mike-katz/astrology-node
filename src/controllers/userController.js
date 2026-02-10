@@ -221,7 +221,7 @@ async function getRecharge(req, res) {
             .whereIn('status', ['pending', 'success']);
         const rechargeNo = Number(count + 1)
         const recharges = await db('recharges')
-            .whereIn('id', [1111, rechargeNo])
+            .whereIn('recharge_number', [1111, rechargeNo])
             .whereNull('deleted_at');
 
         const matchedRecharge =
@@ -236,6 +236,7 @@ async function getRecharge(req, res) {
             });
         }
         const amounts = JSON.parse(matchedObject?.amounts || '[]')
+        console.log("amounts", amounts);
         return res.status(200).json({ success: true, data: amounts, message: 'Recharge list success' });
     }
     catch (err) {
