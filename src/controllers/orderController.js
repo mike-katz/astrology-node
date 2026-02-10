@@ -314,7 +314,7 @@ async function createFreeChat(req, res) {
             }
         }
         sendAutoMessage(profile, req.userId, orderId);
-        return res.status(200).json({ success: true, data: { orderId, end_time, requested_pandits: requestedPanditIds }, message: 'Free chat order created successfully.' });
+        return res.status(200).json({ success: true, data: { orderId, ...saved }, message: 'Free chat order created successfully.' });
     } catch (err) {
         console.error(err);
         res.status(500).json({ success: false, message: 'Server error' });
