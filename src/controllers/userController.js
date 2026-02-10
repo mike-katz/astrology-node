@@ -223,7 +223,6 @@ async function getRecharge(req, res) {
         const recharges = await db('recharges')
             .whereIn('recharge_number', [1111, rechargeNo])
             .whereNull('deleted_at');
-
         const matchedRecharge =
             recharges.find(r => r.recharge_number === rechargeNo) ||
             recharges.find(r => r.recharge_number === 1111);
@@ -235,8 +234,7 @@ async function getRecharge(req, res) {
                 message: 'Recharge list success'
             });
         }
-        const amounts = JSON.parse(matchedObject?.amounts || '[]')
-        console.log("amounts", amounts);
+        const amounts = matchedRecharge?.amounts || [];
         return res.status(200).json({ success: true, data: amounts, message: 'Recharge list success' });
     }
     catch (err) {
