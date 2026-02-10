@@ -215,7 +215,7 @@ async function deleteMyAccount(req, res) {
 
 async function getRecharge(req, res) {
     try {
-        const result = await db('recharges')
+        const result = await db('oldrecharges')
             .where("status", true)
             .whereNull('deleted_at')
             .orderBy([{ column: 'amount', order: 'asc' }]);

@@ -121,7 +121,7 @@ async function razorpay(req, res) {
 
         let extra = 0;
         if (paymentRow.recharge_id) {
-            const recharge = await db('recharges').where('id', paymentRow.recharge_id).first();
+            const recharge = await db('oldrecharges').where('id', paymentRow.recharge_id).first();
             if (recharge) {
                 extra = Number(recharge?.extra_amount)
             }
