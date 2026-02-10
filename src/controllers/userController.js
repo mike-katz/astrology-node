@@ -217,10 +217,10 @@ async function getRecharge(req, res) {
     try {
         const [{ count }] = await db('payments')
             .count('* as count')
-            .where({ user_id: existing.id })
+            .where({ user_id: req.userId })
             .whereIn('status', ['pending', 'success']);
         const newNumber = Number(count + 1)
-        const result = await db('recharges')
+        const recharges = await db('recharges')
             .whereIn('id', [1111, newNumber])
             .whereNull('deleted_at');
 
