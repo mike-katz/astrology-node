@@ -215,11 +215,28 @@ async function deleteMyAccount(req, res) {
 
 async function getRecharge(req, res) {
     try {
-        const result = await db('oldrecharges')
-            .where("status", true)
-            .whereNull('deleted_at')
-            .orderBy([{ column: 'amount', order: 'asc' }]);
-        return res.status(200).json({ success: true, data: result, message: 'Recharge list success' });
+        const [{ count }] = await db('payments')
+            .count('* as count')
+            .where({ user_id: existing.id })
+            .whereIn('status', ['pending', 'success']);
+        const newNumber = Number(count + 1)
+        const result = await db('recharges')
+            .whereIn('id', [1111, newNumber])
+            .whereNull('deleted_at');
+
+        const matchedRecharge =
+            recharges.find(r => r.recharge_number === rechargeNo) ||
+            recharges.find(r => r.recharge_number === 1111);
+
+        if (!matchedRecharge) {
+            return res.status(200).json({
+                success: true,
+                data: [],
+                message: 'Recharge list success'
+            });
+        }
+        const amounts = JSON.parse(matchedObject?.amounts || '[]')
+        return res.status(200).json({ success: true, data: amounts, message: 'Recharge list success' });
     }
     catch (err) {
         console.error(err);
