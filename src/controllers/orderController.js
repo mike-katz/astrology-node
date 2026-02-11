@@ -764,7 +764,7 @@ async function callReject(req, res) {
     if (!order_id || !pandit_id) {
         return res.status(400).json({ error: 'Missing params.' });
     }
-    const order = await db('orders').where({ order_id, user_id: req.userId, status: "continue" }).first();
+    const order = await db('orders').where({ order_id, user_id: req.userId, status: "pending" }).first();
     if (!order) return res.status(400).json({ success: false, message: 'You can not cancel this order.' });
 
     await db('orders').where({ id: order?.id }).update({ status: "cancel" });
