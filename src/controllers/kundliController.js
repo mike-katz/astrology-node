@@ -83,9 +83,10 @@ async function findBasicKundli(req, res) {
                 .first();
 
             if (user?.is_updated || !kundli) {
-                // console.log("dob, birth_time, name, gender, birth_place, url", dob, birth_time, name, gender, birth_place, url);
-                const response = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, url)
-                const ghataChakra = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, 'https://astroapi-3.divineapi.com/indian-api/v1/ghata-chakra',)
+                const [response, ghataChakra] = await Promise.all([
+                    basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, url),
+                    basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, 'https://astroapi-3.divineapi.com/indian-api/v1/ghata-chakra')
+                ]);
                 kundli = { ...kundli, name, gender, dob, birth_place, birth_time, lng, lat, language, profile_id: Number(profile_id) }
                 kundli.basic = JSON.stringify(response?.data)
                 kundli.ghata_chakra = JSON.stringify(ghataChakra?.data)
@@ -112,11 +113,10 @@ async function findBasicKundli(req, res) {
             .first();
 
         if (!user) {
-            // console.log("inside api");
-            const response = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, url)
-            // console.log(response.data);
-            const ghataChakra = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, 'https://astroapi-3.divineapi.com/indian-api/v1/ghata-chakra',)
-
+            const [response, ghataChakra] = await Promise.all([
+                basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, url),
+                basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, 'https://astroapi-3.divineapi.com/indian-api/v1/ghata-chakra')
+            ]);
             user = { name, gender, dob, birth_place, birth_time, lat, lng, language }
             if (profile_id) {
                 user.profile_id = profile_id
@@ -147,41 +147,23 @@ async function findkundliTab(req, res) {
             .first();
         if (!kundli) return res.status(400).json({ success: false, message: 'Kundli not found.' });
         const { dob, birth_time, name, gender, language, birth_place, birth_chart, lat, lng, south_birth_chart, navamsa_chart, south_navamsa_chart, planets, sookshma_dasha } = kundli
-        const upd = {}
-        if (birth_chart == null) {
-            console.log("here");
-            const birthChartUrl = 'https://astroapi-3.divineapi.com/indian-api/v1/horoscope-chart/D1'
-            const birthChartresponse = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, birthChartUrl, [{ key: "chart_type", value: "north" }])
-            upd.birth_chart = JSON.stringify(birthChartresponse?.data);
-        }
-        if (navamsa_chart == null) {
-            const Navamsha = 'https://astroapi-3.divineapi.com/indian-api/v1/horoscope-chart/D9'
-            const Navamsharesponse = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, Navamsha, [{ key: "chart_type", value: "north" }])
-            upd.navamsa_chart = JSON.stringify(Navamsharesponse?.data);
-        }
-
-        if (south_birth_chart == null) {
-            const birthChartUrl = 'https://astroapi-3.divineapi.com/indian-api/v1/horoscope-chart/D1'
-            const birthChartresponse = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, birthChartUrl, [{ key: "chart_type", value: "south" }])
-            upd.south_birth_chart = JSON.stringify(birthChartresponse?.data);
-        }
-        if (south_navamsa_chart == null) {
-            const Navamsha = 'https://astroapi-3.divineapi.com/indian-api/v1/horoscope-chart/D9'
-            const Navamsharesponse = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, Navamsha, [{ key: "chart_type", value: "south" }])
-            upd.south_navamsa_chart = JSON.stringify(Navamsharesponse?.data);
-        }
-
-        if (planets == null) {
-            const Planets = 'https://astroapi-3.divineapi.com/indian-api/v2/planetary-positions'
-            const Planetsresponse = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, Planets)
-            upd.planets = JSON.stringify(Planetsresponse?.data);
-        }
-        const Vimshottari = 'https://astroapi-3.divineapi.com/indian-api/v1/vimshottari-dasha'
-        if (sookshma_dasha == null) {
-            const sookshmadasharesponse = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, Vimshottari, [{ key: "dasha_type", value: "sookshma-dasha" }])
-            upd.sookshma_dasha = JSON.stringify(sookshmadasharesponse?.data);
-        }
-
+        const base = 'https://astroapi-3.divineapi.com/indian-api';
+        const allTasks = [
+            { key: 'birth_chart', url: base + '/v1/horoscope-chart/D1', extraparam: [{ key: 'chart_type', value: 'north' }] },
+            { key: 'navamsa_chart', url: base + '/v1/horoscope-chart/D9', extraparam: [{ key: 'chart_type', value: 'north' }] },
+            { key: 'south_birth_chart', url: base + '/v1/horoscope-chart/D1', extraparam: [{ key: 'chart_type', value: 'south' }] },
+            { key: 'south_navamsa_chart', url: base + '/v1/horoscope-chart/D9', extraparam: [{ key: 'chart_type', value: 'south' }] },
+            { key: 'planets', url: base + '/v2/planetary-positions', extraparam: [] },
+            { key: 'sookshma_dasha', url: base + '/v1/vimshottari-dasha', extraparam: [{ key: 'dasha_type', value: 'sookshma-dasha' }] },
+        ];
+        const tasks = allTasks.filter(t => kundli[t.key] == null);
+        const apiArgs = [language, lat, lng, dob, birth_time, name, gender, birth_place];
+        const results = tasks.length > 0 ? await Promise.all(tasks.map(async (t) => {
+            const data = await basicKundliApiCall(...apiArgs, t.url, t.extraparam);
+            return { key: t.key, value: JSON.stringify(data?.data) };
+        })) : [];
+        const upd = {};
+        results.forEach(r => { upd[r.key] = r.value; });
         if (Object.keys(upd).length > 0) {
             [kundli] = await db('kundlis')
                 .where('id', kundli?.id)
@@ -215,41 +197,31 @@ async function findkpTab(req, res) {
             .first();
         if (!kundli) return res.status(400).json({ success: false, message: 'Kundli not found.' });
         const { lat, lng, dob, language, birth_time, name, gender, birth_place, chalit_chart, ruling_planet, kp_planet, kp_cusps } = kundli
-        const upd = {}
-        if (chalit_chart == null) {
-            console.log("here");
-            const ChartUrl = 'https://astroapi-3.divineapi.com/indian-api/v1/horoscope-chart/chalit'
-            const chalitChartresponse = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, ChartUrl)
-            upd.chalit_chart = JSON.stringify(chalitChartresponse?.data);
-        }
-        if (ruling_planet == null) {
-            const Navamsha = 'https://astroapi-3.divineapi.com/indian-api/v2/kp/planetary-positions'
-            const Navamsharesponse = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, Navamsha)
-            upd.ruling_planet = JSON.stringify(Navamsharesponse?.data);
-        }
-        if (kp_planet == null) {
-            const Planets = 'https://astroapi-3.divineapi.com/indian-api/v2/kp/planetary-positions'
-            const Planetsresponse = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, Planets)
-            upd.kp_planet = JSON.stringify(Planetsresponse?.data);
-        }
-        // const Vimshottari = 'https://astroapi-3.divineapi.com/indian-api/v1/vimshottari-dasha'
-        if (kp_cusps == null) {
-            const Vimshottari = 'https://astroapi-3.divineapi.com/indian-api/v2/kp/cuspal'
-            const mahaDasharesponse = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, Vimshottari)
-            upd.kp_cusps = JSON.stringify(mahaDasharesponse?.data);
-        }
-
+        const base = 'https://astroapi-3.divineapi.com/indian-api';
+        const allTasks = [
+            { key: 'chalit_chart', url: base + '/v1/horoscope-chart/chalit', extraparam: [] },
+            { key: 'ruling_planet', url: base + '/v2/kp/planetary-positions', extraparam: [] },
+            { key: 'kp_planet', url: base + '/v2/kp/planetary-positions', extraparam: [] },
+            { key: 'kp_cusps', url: base + '/v2/kp/cuspal', extraparam: [] },
+        ];
+        const tasks = allTasks.filter(t => kundli[t.key] == null);
+        const apiArgs = [language, lat, lng, dob, birth_time, name, gender, birth_place];
+        const results = tasks.length > 0 ? await Promise.all(tasks.map(async (t) => {
+            const data = await basicKundliApiCall(...apiArgs, t.url, t.extraparam);
+            return { key: t.key, value: JSON.stringify(data?.data) };
+        })) : [];
+        const upd = {};
+        results.forEach(r => { upd[r.key] = r.value; });
         if (Object.keys(upd).length > 0) {
             [kundli] = await db('kundlis')
                 .where('id', kundli?.id)
                 .update(upd)
                 .returning('*');
         }
-
         const response = {
             id: kundli_id,
             chalit_chart: JSON.parse(kundli.chalit_chart),
-            ruling_planet: JSON.parse(kundli.chalit_chart),
+            ruling_planet: JSON.parse(kundli.ruling_planet),
             kp_planet: JSON.parse(kundli.kp_planet),
             kp_cusps: JSON.parse(kundli.kp_cusps),
         }
@@ -307,246 +279,90 @@ async function findChartTab(req, res) {
         const { lat, lng, dob, language, birth_time, name, gender, birth_place, chalit_chart, south_chalit_chart, sun_chart, south_sun_chart, moon_chart, south_moon_chart, birth_chart, south_birth_chart,
             hora_chart, south_hora_chart, drekkana_chart, south_drekkana_chart, chaturthamsha_chart, south_chaturthamsha_chart, saptamsa_chart, south_saptamsa_chart, navamsa_chart, south_navamsa_chart,
             dasamsa_chart, south_dasamsa_chart, dwadasamsa_chart, south_dwadasamsa_chart, shodasamsa_chart, south_shodasamsa_chart, vimsamsa_chart, south_vimsamsa_chart, chaturvimsamsa_chart, south_chaturvimsamsa_chart, south_transit_ascendant, south_transit_moon, transit_ascendant, transit_moon,
-            saptavimsamsa_chart, south_saptavimsamsa_chart, trimsamsa_chart, south_trimsamsa_chart, khavedamsa_chart, south_khavedamsa_chart, akshavedamsa_chart, south_akshavedamsa_chart, shastiamsa_chart, south_shastiamsa_chart, planets, sookshma_dasha } = kundli
-        const upd = {}
-        let extraparam = [{ key: "chart_type", value: "north" }]
+            saptavimsamsa_chart, south_saptavimsamsa_chart, trimsamsa_chart, south_trimsamsa_chart, khavedamsa_chart, south_khavedamsa_chart, akshavedamsa_chart, south_akshavedamsa_chart, shastiamsa_chart, south_shastiamsa_chart, planets, sookshma_dasha } = kundli;
+
         const [year, month, day] = dob.split('-');
-        const transit = [
-            { key: "transit_year", value: year },
-            { key: "transit_month", value: month },
-            { key: "transit_day", value: day }
-        ]
-        if (transit_ascendant == null) {
-            transit.push({ key: "chart_type", value: "north" })
-            const url = 'https://astroapi-3.divineapi.com/indian-api/v1/kundli-transit/ascendant'
-            const data = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, url, transit)
-            upd.transit_ascendant = JSON.stringify({ svg: data?.data?.svg });
-        }
-        if (transit_moon == null) {
-            transit.push({ key: "chart_type", value: "north" })
-            const url = 'https://astroapi-3.divineapi.com/indian-api/v1/kundli-transit/moon'
-            const data = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, url, transit)
-            upd.transit_moon = JSON.stringify({ svg: data?.data?.svg });
-        }
+        const transitNorth = [
+            { key: 'transit_year', value: year },
+            { key: 'transit_month', value: month },
+            { key: 'transit_day', value: day },
+            { key: 'chart_type', value: 'north' }
+        ];
+        const transitSouth = [
+            { key: 'transit_year', value: year },
+            { key: 'transit_month', value: month },
+            { key: 'transit_day', value: day },
+            { key: 'chart_type', value: 'south' }
+        ];
+        const northParam = [{ key: 'chart_type', value: 'north' }];
+        const southParam = [{ key: 'chart_type', value: 'south' }];
+        const base = 'https://astroapi-3.divineapi.com/indian-api/v1';
+        const baseChart = base + '/horoscope-chart';
 
-        if (south_transit_ascendant == null) {
-            transit.push({ key: "chart_type", value: "south" })
-            const url = 'https://astroapi-3.divineapi.com/indian-api/v1/kundli-transit/ascendant'
-            const data = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, url, transit)
-            upd.south_transit_ascendant = JSON.stringify({ svg: data?.data?.svg });
-        }
-        if (south_transit_moon == null) {
-            transit.push({ key: "chart_type", value: "south" })
-            const url = 'https://astroapi-3.divineapi.com/indian-api/v1/kundli-transit/moon'
-            const data = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, url, transit)
-            upd.south_transit_moon = JSON.stringify({ svg: data?.data?.svg });
-        }
+        const allTasks = [
+            { key: 'transit_ascendant', url: base + '/kundli-transit/ascendant', extraparam: transitNorth, type: 'svg' },
+            { key: 'transit_moon', url: base + '/kundli-transit/moon', extraparam: transitNorth, type: 'svg' },
+            { key: 'south_transit_ascendant', url: base + '/kundli-transit/ascendant', extraparam: transitSouth, type: 'svg' },
+            { key: 'south_transit_moon', url: base + '/kundli-transit/moon', extraparam: transitSouth, type: 'svg' },
+            { key: 'chalit_chart', url: baseChart + '/chalit', extraparam: northParam, type: 'svg' },
+            { key: 'sun_chart', url: baseChart + '/SUN', extraparam: northParam, type: 'svg' },
+            { key: 'moon_chart', url: baseChart + '/MOON', extraparam: northParam, type: 'svg' },
+            { key: 'birth_chart', url: baseChart + '/D1', extraparam: northParam, type: 'svg' },
+            { key: 'hora_chart', url: baseChart + '/D2', extraparam: northParam, type: 'svg' },
+            { key: 'drekkana_chart', url: baseChart + '/D3', extraparam: northParam, type: 'svg' },
+            { key: 'chaturthamsha_chart', url: baseChart + '/D4', extraparam: northParam, type: 'svg' },
+            { key: 'saptamsa_chart', url: baseChart + '/D7', extraparam: northParam, type: 'svg' },
+            { key: 'navamsa_chart', url: baseChart + '/D9', extraparam: northParam, type: 'svg' },
+            { key: 'dasamsa_chart', url: baseChart + '/D10', extraparam: northParam, type: 'svg' },
+            { key: 'dwadasamsa_chart', url: baseChart + '/D12', extraparam: northParam, type: 'svg' },
+            { key: 'shodasamsa_chart', url: baseChart + '/D16', extraparam: northParam, type: 'svg' },
+            { key: 'vimsamsa_chart', url: baseChart + '/D20', extraparam: northParam, type: 'svg' },
+            { key: 'chaturvimsamsa_chart', url: baseChart + '/D24', extraparam: northParam, type: 'svg' },
+            { key: 'saptavimsamsa_chart', url: baseChart + '/D27', extraparam: northParam, type: 'svg' },
+            { key: 'trimsamsa_chart', url: baseChart + '/D30', extraparam: northParam, type: 'svg' },
+            { key: 'khavedamsa_chart', url: baseChart + '/D40', extraparam: northParam, type: 'svg' },
+            { key: 'akshavedamsa_chart', url: baseChart + '/D45', extraparam: northParam, type: 'svg' },
+            { key: 'shastiamsa_chart', url: baseChart + '/D60', extraparam: northParam, type: 'svg' },
+            { key: 'south_chalit_chart', url: baseChart + '/chalit', extraparam: southParam, type: 'svg' },
+            { key: 'south_sun_chart', url: baseChart + '/SUN', extraparam: southParam, type: 'svg' },
+            { key: 'south_moon_chart', url: baseChart + '/MOON', extraparam: southParam, type: 'svg' },
+            { key: 'south_birth_chart', url: baseChart + '/D1', extraparam: southParam, type: 'svg' },
+            { key: 'south_hora_chart', url: baseChart + '/D2', extraparam: southParam, type: 'svg' },
+            { key: 'south_drekkana_chart', url: baseChart + '/D3', extraparam: southParam, type: 'svg' },
+            { key: 'south_chaturthamsha_chart', url: baseChart + '/D4', extraparam: southParam, type: 'svg' },
+            { key: 'south_saptamsa_chart', url: baseChart + '/D7', extraparam: southParam, type: 'svg' },
+            { key: 'south_navamsa_chart', url: baseChart + '/D9', extraparam: southParam, type: 'svg' },
+            { key: 'south_dasamsa_chart', url: baseChart + '/D10', extraparam: southParam, type: 'svg' },
+            { key: 'south_dwadasamsa_chart', url: baseChart + '/D12', extraparam: southParam, type: 'svg' },
+            { key: 'south_shodasamsa_chart', url: baseChart + '/D16', extraparam: southParam, type: 'svg' },
+            { key: 'south_vimsamsa_chart', url: baseChart + '/D20', extraparam: southParam, type: 'svg' },
+            { key: 'south_chaturvimsamsa_chart', url: baseChart + '/D24', extraparam: southParam, type: 'svg' },
+            { key: 'south_saptavimsamsa_chart', url: baseChart + '/D27', extraparam: southParam, type: 'svg' },
+            { key: 'south_trimsamsa_chart', url: baseChart + '/D30', extraparam: southParam, type: 'svg' },
+            { key: 'south_khavedamsa_chart', url: baseChart + '/D40', extraparam: southParam, type: 'svg' },
+            { key: 'south_akshavedamsa_chart', url: baseChart + '/D45', extraparam: southParam, type: 'svg' },
+            { key: 'south_shastiamsa_chart', url: baseChart + '/D60', extraparam: southParam, type: 'svg' },
+            { key: 'planets', url: base.replace('/v1', '/v2') + '/planetary-positions', extraparam: [], type: 'data' },
+            { key: 'sookshma_dasha', url: base + '/vimshottari-dasha', extraparam: [{ key: 'dasha_type', value: 'sookshma-dasha' }], type: 'data' },
+        ];
 
-        if (chalit_chart == null) {
-            console.log("here");
-            const url = 'https://astroapi-3.divineapi.com/indian-api/v1/horoscope-chart/chalit'
-            const data = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, url, extraparam)
-            upd.chalit_chart = JSON.stringify({ svg: data?.data?.svg });
-        }
-        if (sun_chart == null) {
-            const url = 'https://astroapi-3.divineapi.com/indian-api/v1/horoscope-chart/SUN'
-            const data = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, url, extraparam)
-            upd.sun_chart = JSON.stringify({ svg: data?.data?.svg });
-        }
-        if (moon_chart == null) {
-            const url = 'https://astroapi-3.divineapi.com/indian-api/v1/horoscope-chart/MOON'
-            const data = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, url, extraparam)
-            upd.moon_chart = JSON.stringify({ svg: data?.data?.svg });
-        }
-        if (birth_chart == null) {
-            const url = 'https://astroapi-3.divineapi.com/indian-api/v1/horoscope-chart/D1'
-            const data = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, url, extraparam)
-            upd.birth_chart = JSON.stringify({ svg: data?.data?.svg });
-        }
-        if (hora_chart == null) {
-            const url = 'https://astroapi-3.divineapi.com/indian-api/v1/horoscope-chart/D2'
-            const data = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, url, extraparam)
-            upd.hora_chart = JSON.stringify({ svg: data?.data?.svg });
-        }
-        if (drekkana_chart == null) {
-            const url = 'https://astroapi-3.divineapi.com/indian-api/v1/horoscope-chart/D3'
-            const data = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, url, extraparam)
-            upd.drekkana_chart = JSON.stringify({ svg: data?.data?.svg });
-        }
-        if (chaturthamsha_chart == null) {
-            const url = 'https://astroapi-3.divineapi.com/indian-api/v1/horoscope-chart/D4'
-            const data = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, url, extraparam)
-            upd.chaturthamsha_chart = JSON.stringify({ svg: data?.data?.svg });
-        }
-        if (saptamsa_chart == null) {
-            const url = 'https://astroapi-3.divineapi.com/indian-api/v1/horoscope-chart/D7'
-            const data = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, url, extraparam)
-            upd.saptamsa_chart = JSON.stringify({ svg: data?.data?.svg });
-        }
-        if (navamsa_chart == null) {
-            const url = 'https://astroapi-3.divineapi.com/indian-api/v1/horoscope-chart/D9'
-            const data = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, url, extraparam)
-            upd.navamsa_chart = JSON.stringify({ svg: data?.data?.svg });
-        }
-        if (dasamsa_chart == null) {
-            const url = 'https://astroapi-3.divineapi.com/indian-api/v1/horoscope-chart/D10'
-            const data = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, url, extraparam)
-            upd.dasamsa_chart = JSON.stringify({ svg: data?.data?.svg });
-        }
-        if (dwadasamsa_chart == null) {
-            const url = 'https://astroapi-3.divineapi.com/indian-api/v1/horoscope-chart/D12'
-            const data = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, url, extraparam)
-            upd.dwadasamsa_chart = JSON.stringify({ svg: data?.data?.svg });
-        }
-        if (shodasamsa_chart == null) {
-            const url = 'https://astroapi-3.divineapi.com/indian-api/v1/horoscope-chart/D16'
-            const data = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, url, extraparam)
-            upd.shodasamsa_chart = JSON.stringify({ svg: data?.data?.svg });
-        }
-        if (vimsamsa_chart == null) {
-            const url = 'https://astroapi-3.divineapi.com/indian-api/v1/horoscope-chart/D20'
-            const data = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, url, extraparam)
-            upd.vimsamsa_chart = JSON.stringify({ svg: data?.data?.svg });
-        }
-        if (chaturvimsamsa_chart == null) {
-            const url = 'https://astroapi-3.divineapi.com/indian-api/v1/horoscope-chart/D24'
-            const data = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, url, extraparam)
-            upd.chaturvimsamsa_chart = JSON.stringify({ svg: data?.data?.svg });
-        }
-        if (saptavimsamsa_chart == null) {
-            const url = 'https://astroapi-3.divineapi.com/indian-api/v1/horoscope-chart/D27'
-            const data = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, url, extraparam)
-            upd.saptavimsamsa_chart = JSON.stringify({ svg: data?.data?.svg });
-        }
-        if (trimsamsa_chart == null) {
-            const url = 'https://astroapi-3.divineapi.com/indian-api/v1/horoscope-chart/D30'
-            const data = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, url, extraparam)
-            upd.trimsamsa_chart = JSON.stringify({ svg: data?.data?.svg });
-        }
-        if (khavedamsa_chart == null) {
-            const url = 'https://astroapi-3.divineapi.com/indian-api/v1/horoscope-chart/D40'
-            const data = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, url, extraparam)
-            upd.khavedamsa_chart = JSON.stringify({ svg: data?.data?.svg });
-        }
-        if (akshavedamsa_chart == null) {
-            const url = 'https://astroapi-3.divineapi.com/indian-api/v1/horoscope-chart/D45'
-            const data = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, url, extraparam)
-            upd.akshavedamsa_chart = JSON.stringify({ svg: data?.data?.svg });
-        }
-        if (shastiamsa_chart == null) {
-            const url = 'https://astroapi-3.divineapi.com/indian-api/v1/horoscope-chart/D60'
-            const data = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, url, extraparam)
-            upd.shastiamsa_chart = JSON.stringify({ svg: data?.data?.svg });
-        }
-        extraparam = [{ key: "chart_type", value: "south" }]
+        const tasks = allTasks.filter(t => kundli[t.key] == null);
+        const apiArgs = [language, lat, lng, dob, birth_time, name, gender, birth_place];
 
-        if (south_chalit_chart == null) {
-            console.log("here");
-            const url = 'https://astroapi-3.divineapi.com/indian-api/v1/horoscope-chart/chalit'
-            const data = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, url, extraparam)
-            upd.south_chalit_chart = JSON.stringify({ svg: data?.data?.svg });
-        }
-        if (south_sun_chart == null) {
-            const url = 'https://astroapi-3.divineapi.com/indian-api/v1/horoscope-chart/SUN'
-            const data = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, url, extraparam)
-            upd.south_sun_chart = JSON.stringify({ svg: data?.data?.svg });
-        }
-        if (south_moon_chart == null) {
-            const url = 'https://astroapi-3.divineapi.com/indian-api/v1/horoscope-chart/MOON'
-            const data = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, url, extraparam)
-            upd.south_moon_chart = JSON.stringify({ svg: data?.data?.svg });
-        }
-        if (south_birth_chart == null) {
-            const url = 'https://astroapi-3.divineapi.com/indian-api/v1/horoscope-chart/D1'
-            const data = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, url, extraparam)
-            upd.south_birth_chart = JSON.stringify({ svg: data?.data?.svg });
-        }
-        if (south_hora_chart == null) {
-            const url = 'https://astroapi-3.divineapi.com/indian-api/v1/horoscope-chart/D2'
-            const data = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, url, extraparam)
-            upd.south_hora_chart = JSON.stringify({ svg: data?.data?.svg });
-        }
-        if (south_drekkana_chart == null) {
-            const url = 'https://astroapi-3.divineapi.com/indian-api/v1/horoscope-chart/D3'
-            const data = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, url, extraparam)
-            upd.south_drekkana_chart = JSON.stringify({ svg: data?.data?.svg });
-        }
-        if (south_chaturthamsha_chart == null) {
-            const url = 'https://astroapi-3.divineapi.com/indian-api/v1/horoscope-chart/D4'
-            const data = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, url, extraparam)
-            upd.south_chaturthamsha_chart = JSON.stringify({ svg: data?.data?.svg });
-        }
-        if (south_saptamsa_chart == null) {
-            const url = 'https://astroapi-3.divineapi.com/indian-api/v1/horoscope-chart/D7'
-            const data = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, url, extraparam)
-            upd.south_saptamsa_chart = JSON.stringify({ svg: data?.data?.svg });
-        }
-        if (south_navamsa_chart == null) {
-            const url = 'https://astroapi-3.divineapi.com/indian-api/v1/horoscope-chart/D9'
-            const data = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, url, extraparam)
-            upd.south_navamsa_chart = JSON.stringify({ svg: data?.data?.svg });
-        }
-        if (south_dasamsa_chart == null) {
-            const url = 'https://astroapi-3.divineapi.com/indian-api/v1/horoscope-chart/D10'
-            const data = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, url, extraparam)
-            upd.south_dasamsa_chart = JSON.stringify({ svg: data?.data?.svg });
-        }
-        if (south_dwadasamsa_chart == null) {
-            const url = 'https://astroapi-3.divineapi.com/indian-api/v1/horoscope-chart/D12'
-            const data = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, url, extraparam)
-            upd.south_dwadasamsa_chart = JSON.stringify({ svg: data?.data?.svg });
-        }
-        if (south_shodasamsa_chart == null) {
-            const url = 'https://astroapi-3.divineapi.com/indian-api/v1/horoscope-chart/D16'
-            const data = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, url, extraparam)
-            upd.south_shodasamsa_chart = JSON.stringify({ svg: data?.data?.svg });
-        }
-        if (south_vimsamsa_chart == null) {
-            const url = 'https://astroapi-3.divineapi.com/indian-api/v1/horoscope-chart/D20'
-            const data = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, url, extraparam)
-            upd.south_vimsamsa_chart = JSON.stringify({ svg: data?.data?.svg });
-        }
-        if (south_chaturvimsamsa_chart == null) {
-            const url = 'https://astroapi-3.divineapi.com/indian-api/v1/horoscope-chart/D24'
-            const data = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, url, extraparam)
-            upd.south_chaturvimsamsa_chart = JSON.stringify({ svg: data?.data?.svg });
-        }
-        if (south_saptavimsamsa_chart == null) {
-            const url = 'https://astroapi-3.divineapi.com/indian-api/v1/horoscope-chart/D27'
-            const data = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, url, extraparam)
-            upd.south_saptavimsamsa_chart = JSON.stringify({ svg: data?.data?.svg });
-        }
-        if (south_trimsamsa_chart == null) {
-            const url = 'https://astroapi-3.divineapi.com/indian-api/v1/horoscope-chart/D30'
-            const data = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, url, extraparam)
-            upd.south_trimsamsa_chart = JSON.stringify({ svg: data?.data?.svg });
-        }
-        if (south_khavedamsa_chart == null) {
-            const url = 'https://astroapi-3.divineapi.com/indian-api/v1/horoscope-chart/D40'
-            const data = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, url, extraparam)
-            upd.south_khavedamsa_chart = JSON.stringify({ svg: data?.data?.svg });
-        }
-        if (south_akshavedamsa_chart == null) {
-            const url = 'https://astroapi-3.divineapi.com/indian-api/v1/horoscope-chart/D45'
-            const data = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, url, extraparam)
-            upd.south_akshavedamsa_chart = JSON.stringify({ svg: data?.data?.svg });
-        }
-        if (south_shastiamsa_chart == null) {
-            const url = 'https://astroapi-3.divineapi.com/indian-api/v1/horoscope-chart/D60'
-            const data = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, url, extraparam)
-            upd.south_shastiamsa_chart = JSON.stringify({ svg: data?.data?.svg });
-        }
+        console.log("api call start ", new Date());
+        const results = tasks.length > 0
+            ? await Promise.all(tasks.map(async (t) => {
+                const data = await basicKundliApiCall(...apiArgs, t.url, t.extraparam);
+                const value = t.type === 'svg'
+                    ? JSON.stringify({ svg: data?.data?.svg })
+                    : JSON.stringify(data?.data);
+                return { key: t.key, value };
+            }))
+            : [];
+        console.log("api call end ", new Date());
+        const upd = {};
+        results.forEach(r => { upd[r.key] = r.value; });
 
-        if (planets == null) {
-            const Planets = 'https://astroapi-3.divineapi.com/indian-api/v2/planetary-positions'
-            const Planetsresponse = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, Planets)
-            upd.planets = JSON.stringify(Planetsresponse?.data);
-        }
-        if (sookshma_dasha == null) {
-            const Vimshottari = 'https://astroapi-3.divineapi.com/indian-api/v1/vimshottari-dasha'
-            const sookshmadasharesponse = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, Vimshottari, [{ key: "dasha_type", value: "sookshma-dasha" }])
-            upd.sookshma_dasha = JSON.stringify(sookshmadasharesponse?.data);
-        }
         if (Object.keys(upd).length > 0) {
             [kundli] = await db('kundlis')
                 .where('id', kundli?.id)
@@ -622,81 +438,38 @@ async function findDashaTab(req, res) {
             .first();
         if (!kundli) return res.status(400).json({ success: false, message: 'Kundli not found.' });
         const { lat, lng, dob, language, birth_time, name, gender, birth_place, sun_dasha, south_chalit_chart, moon_dasha, mars_dasha, mercury_dasha, venus_dasha, saturn_dasha, jupiter_dasha, ketu_dasha, rahu_dasha, yogini_dasha, birth_chart, south_birth_chart, sookshma_dasha } = kundli
-        const upd = {}
-        const ChartUrl = 'https://astroapi-3.divineapi.com/indian-api/v1/maha-dasha-analysis'
-        if (sun_dasha == null) {
-            const chalitChartresponse = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, ChartUrl, [{ key: "maha_dasha", value: "sun" }])
-            upd.sun_dasha = JSON.stringify(chalitChartresponse?.data);
-        }
-        if (moon_dasha == null) {
-            const chalitChartresponse = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, ChartUrl, [{ key: "maha_dasha", value: "moon" }])
-            upd.moon_dasha = JSON.stringify(chalitChartresponse?.data);
-        }
-        if (mars_dasha == null) {
-            const chalitChartresponse = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, ChartUrl, [{ key: "maha_dasha", value: "mars" }])
-            upd.mars_dasha = JSON.stringify(chalitChartresponse?.data);
-        }
-        if (mercury_dasha == null) {
-            const chalitChartresponse = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, ChartUrl, [{ key: "maha_dasha", value: "mercury" }])
-            upd.mercury_dasha = JSON.stringify(chalitChartresponse?.data);
-        }
-        if (venus_dasha == null) {
-            const chalitChartresponse = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, ChartUrl, [{ key: "maha_dasha", value: "venus" }])
-            upd.venus_dasha = JSON.stringify(chalitChartresponse?.data);
-        }
-        if (saturn_dasha == null) {
-            const chalitChartresponse = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, ChartUrl, [{ key: "maha_dasha", value: "saturn" }])
-            upd.saturn_dasha = JSON.stringify(chalitChartresponse?.data);
-        }
-        if (jupiter_dasha == null) {
-            const chalitChartresponse = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, ChartUrl, [{ key: "maha_dasha", value: "jupiter" }])
-            upd.jupiter_dasha = JSON.stringify(chalitChartresponse?.data);
-        }
-        if (ketu_dasha == null) {
-            const chalitChartresponse = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, ChartUrl, [{ key: "maha_dasha", value: "ketu" }])
-            upd.ketu_dasha = JSON.stringify(chalitChartresponse?.data);
-        }
-        if (rahu_dasha == null) {
-            const chalitChartresponse = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, ChartUrl, [{ key: "maha_dasha", value: "rahu" }])
-            upd.rahu_dasha = JSON.stringify(chalitChartresponse?.data);
-        }
-        if (yogini_dasha == null) {
-            const url = 'https://astroapi-3.divineapi.com/indian-api/v2/yogini-dasha'
-            const chalitChartresponse = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, url)
-            upd.yogini_dasha = JSON.stringify(chalitChartresponse?.data);
-        }
-
-        if (south_chalit_chart == null) {
-            console.log("here");
-            const url = 'https://astroapi-3.divineapi.com/indian-api/v1/horoscope-chart/chalit'
-            const data = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, url, [{ key: "chart_type", value: "south" }])
-            upd.south_chalit_chart = JSON.stringify(data?.data);
-        }
-
-        if (birth_chart == null) {
-            const birthChartUrl = 'https://astroapi-3.divineapi.com/indian-api/v1/horoscope-chart/D1'
-            const birthChartresponse = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, birthChartUrl, [{ key: "chart_type", value: "north" }])
-            upd.birth_chart = JSON.stringify(birthChartresponse?.data);
-        }
-
-        if (south_birth_chart == null) {
-            const birthChartUrl = 'https://astroapi-3.divineapi.com/indian-api/v1/horoscope-chart/D1'
-            const birthChartresponse = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, birthChartUrl, [{ key: "chart_type", value: "south" }])
-            upd.south_birth_chart = JSON.stringify(birthChartresponse?.data);
-        }
-        if (sookshma_dasha == null) {
-            const Vimshottari = 'https://astroapi-3.divineapi.com/indian-api/v1/vimshottari-dasha'
-            const sookshmadasharesponse = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, Vimshottari, [{ key: "dasha_type", value: "sookshma-dasha" }])
-            upd.sookshma_dasha = JSON.stringify(sookshmadasharesponse?.data);
-        }
-
+        const base = 'https://astroapi-3.divineapi.com/indian-api';
+        const mahaUrl = base + '/v1/maha-dasha-analysis';
+        const allTasks = [
+            { key: 'sun_dasha', url: mahaUrl, extraparam: [{ key: 'maha_dasha', value: 'sun' }] },
+            { key: 'moon_dasha', url: mahaUrl, extraparam: [{ key: 'maha_dasha', value: 'moon' }] },
+            { key: 'mars_dasha', url: mahaUrl, extraparam: [{ key: 'maha_dasha', value: 'mars' }] },
+            { key: 'mercury_dasha', url: mahaUrl, extraparam: [{ key: 'maha_dasha', value: 'mercury' }] },
+            { key: 'venus_dasha', url: mahaUrl, extraparam: [{ key: 'maha_dasha', value: 'venus' }] },
+            { key: 'saturn_dasha', url: mahaUrl, extraparam: [{ key: 'maha_dasha', value: 'saturn' }] },
+            { key: 'jupiter_dasha', url: mahaUrl, extraparam: [{ key: 'maha_dasha', value: 'jupiter' }] },
+            { key: 'ketu_dasha', url: mahaUrl, extraparam: [{ key: 'maha_dasha', value: 'ketu' }] },
+            { key: 'rahu_dasha', url: mahaUrl, extraparam: [{ key: 'maha_dasha', value: 'rahu' }] },
+            { key: 'yogini_dasha', url: base + '/v2/yogini-dasha', extraparam: [] },
+            { key: 'south_chalit_chart', url: base + '/v1/horoscope-chart/chalit', extraparam: [{ key: 'chart_type', value: 'south' }] },
+            { key: 'birth_chart', url: base + '/v1/horoscope-chart/D1', extraparam: [{ key: 'chart_type', value: 'north' }] },
+            { key: 'south_birth_chart', url: base + '/v1/horoscope-chart/D1', extraparam: [{ key: 'chart_type', value: 'south' }] },
+            { key: 'sookshma_dasha', url: base + '/v1/vimshottari-dasha', extraparam: [{ key: 'dasha_type', value: 'sookshma-dasha' }] },
+        ];
+        const tasks = allTasks.filter(t => kundli[t.key] == null);
+        const apiArgs = [language, lat, lng, dob, birth_time, name, gender, birth_place];
+        const results = tasks.length > 0 ? await Promise.all(tasks.map(async (t) => {
+            const data = await basicKundliApiCall(...apiArgs, t.url, t.extraparam);
+            return { key: t.key, value: JSON.stringify(data?.data) };
+        })) : [];
+        const upd = {};
+        results.forEach(r => { upd[r.key] = r.value; });
         if (Object.keys(upd).length > 0) {
             [kundli] = await db('kundlis')
                 .where('id', kundli?.id)
                 .update(upd)
                 .returning('*');
         }
-
         const response = {
             id: kundli_id,
             sun_dasha: JSON.parse(kundli.sun_dasha),
@@ -734,137 +507,50 @@ async function findReportTab(req, res) {
             gemstones, planetary_sun, planetary_moon, planetary_mercury, planetary_venus, planetary_mars, planetary_jupiter, planetary_saturn, planetary_rahu, planetary_ketu,
             sun_dasha, moon_dasha, mars_dasha, mercury_dasha, venus_dasha, saturn_dasha, jupiter_dasha, ketu_dasha, rahu_dasha, pitra_dosha
         } = kundli
-        const upd = {}
-        if (general_report == null) {
-            const ChartUrl = 'https://astroapi-3.divineapi.com/indian-api/v2/ascendant-report'
-            const chalitChartresponse = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, ChartUrl)
-            upd.general_report = JSON.stringify(chalitChartresponse?.data);
-        }
-        const planetUrl = 'https://astroapi-3.divineapi.com/indian-api/v2/planet-analysis'
-        if (planetary_sun == null) {
-            const sookshmadasharesponse = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, planetUrl, [{ key: "analysis_planet", value: "sun" }])
-            upd.planetary_sun = JSON.stringify(sookshmadasharesponse?.data);
-        }
-
-        if (planetary_moon == null) {
-            const sookshmadasharesponse = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, planetUrl, [{ key: "analysis_planet", value: "moon" }])
-            upd.planetary_moon = JSON.stringify(sookshmadasharesponse?.data);
-        }
-
-        if (planetary_mercury == null) {
-            const sookshmadasharesponse = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, planetUrl, [{ key: "analysis_planet", value: "mercury" }])
-            upd.planetary_mercury = JSON.stringify(sookshmadasharesponse?.data);
-        }
-
-        if (planetary_venus == null) {
-            const sookshmadasharesponse = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, planetUrl, [{ key: "analysis_planet", value: "venus" }])
-            upd.planetary_venus = JSON.stringify(sookshmadasharesponse?.data);
-        }
-
-        if (planetary_mars == null) {
-            const sookshmadasharesponse = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, planetUrl, [{ key: "analysis_planet", value: "mars" }])
-            upd.planetary_mars = JSON.stringify(sookshmadasharesponse?.data);
-        }
-
-        if (planetary_jupiter == null) {
-            const sookshmadasharesponse = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, planetUrl, [{ key: "analysis_planet", value: "jupiter" }])
-            upd.planetary_jupiter = JSON.stringify(sookshmadasharesponse?.data);
-        }
-        if (planetary_saturn == null) {
-            const sookshmadasharesponse = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, planetUrl, [{ key: "analysis_planet", value: "saturn" }])
-            upd.planetary_saturn = JSON.stringify(sookshmadasharesponse?.data);
-        }
-
-        if (planetary_rahu == null) {
-            const sookshmadasharesponse = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, planetUrl, [{ key: "analysis_planet", value: "rahu" }])
-            upd.planetary_rahu = JSON.stringify(sookshmadasharesponse?.data);
-        }
-
-        if (planetary_ketu == null) {
-            const sookshmadasharesponse = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, planetUrl, [{ key: "analysis_planet", value: "ketu" }])
-            upd.planetary_ketu = JSON.stringify(sookshmadasharesponse?.data);
-        }
-
-        if (general_yoga_tab == null) {
-            const url = 'https://astroapi-3.divineapi.com/indian-api/v2/yogas'
-            const sookshmadasharesponse = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, url)
-            upd.general_yoga_tab = JSON.stringify(sookshmadasharesponse?.data);
-        }
-
-        if (gemstones == null) {
-            const url = 'https://astroapi-3.divineapi.com/indian-api/v2/gemstone-suggestion'
-            const sookshmadasharesponse = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, url)
-            upd.gemstones = JSON.stringify(sookshmadasharesponse?.data);
-        }
-
-        if (kalsarpa_dosha == null) {
-            const Vimshottari = 'https://astroapi-3.divineapi.com/indian-api/v1/kaal-sarpa-yoga'
-            const sookshmadasharesponse = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, Vimshottari, [{ key: "dasha_type", value: "sookshma-dasha" }])
-            upd.kalsarpa_dosha = JSON.stringify(sookshmadasharesponse?.data);
-        }
-
-        if (manglik_dosha == null) {
-            const Vimshottari = 'https://astroapi-3.divineapi.com/indian-api/v2/manglik-dosha'
-            const sookshmadasharesponse = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, Vimshottari)
-            upd.manglik_dosha = JSON.stringify(sookshmadasharesponse?.data);
-        }
-
-        if (sadesati_dosha == null) {
-            const Vimshottari = 'https://astroapi-3.divineapi.com/indian-api/v2/sadhe-sati'
-            const sookshmadasharesponse = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, Vimshottari)
-            upd.sadesati_dosha = JSON.stringify(sookshmadasharesponse?.data);
-        }
-
-        const ChartUrl = 'https://astroapi-3.divineapi.com/indian-api/v1/maha-dasha-analysis'
-        if (sun_dasha == null) {
-            const chalitChartresponse = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, ChartUrl, [{ key: "maha_dasha", value: "sun" }])
-            upd.sun_dasha = JSON.stringify(chalitChartresponse?.data);
-        }
-        if (moon_dasha == null) {
-            const chalitChartresponse = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, ChartUrl, [{ key: "maha_dasha", value: "moon" }])
-            upd.moon_dasha = JSON.stringify(chalitChartresponse?.data);
-        }
-        if (mars_dasha == null) {
-            const chalitChartresponse = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, ChartUrl, [{ key: "maha_dasha", value: "mars" }])
-            upd.mars_dasha = JSON.stringify(chalitChartresponse?.data);
-        }
-        if (mercury_dasha == null) {
-            const chalitChartresponse = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, ChartUrl, [{ key: "maha_dasha", value: "mercury" }])
-            upd.mercury_dasha = JSON.stringify(chalitChartresponse?.data);
-        }
-        if (venus_dasha == null) {
-            const chalitChartresponse = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, ChartUrl, [{ key: "maha_dasha", value: "venus" }])
-            upd.venus_dasha = JSON.stringify(chalitChartresponse?.data);
-        }
-        if (saturn_dasha == null) {
-            const chalitChartresponse = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, ChartUrl, [{ key: "maha_dasha", value: "saturn" }])
-            upd.saturn_dasha = JSON.stringify(chalitChartresponse?.data);
-        }
-        if (jupiter_dasha == null) {
-            const chalitChartresponse = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, ChartUrl, [{ key: "maha_dasha", value: "jupiter" }])
-            upd.jupiter_dasha = JSON.stringify(chalitChartresponse?.data);
-        }
-        if (ketu_dasha == null) {
-            const chalitChartresponse = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, ChartUrl, [{ key: "maha_dasha", value: "ketu" }])
-            upd.ketu_dasha = JSON.stringify(chalitChartresponse?.data);
-        }
-        if (rahu_dasha == null) {
-            const chalitChartresponse = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, ChartUrl, [{ key: "maha_dasha", value: "rahu" }])
-            upd.rahu_dasha = JSON.stringify(chalitChartresponse?.data);
-        }
-        if (pitra_dosha == null) {
-            const ChartUrl = 'https://astroapi-3.divineapi.com/indian-api/v1/pitra-dosha'
-            const chalitChartresponse = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, ChartUrl)
-            upd.pitra_dosha = JSON.stringify(chalitChartresponse?.data);
-        }
-
+        const base = 'https://astroapi-3.divineapi.com/indian-api';
+        const planetUrl = base + '/v2/planet-analysis';
+        const mahaUrl = base + '/v1/maha-dasha-analysis';
+        const allTasks = [
+            { key: 'general_report', url: base + '/v2/ascendant-report', extraparam: [] },
+            { key: 'planetary_sun', url: planetUrl, extraparam: [{ key: 'analysis_planet', value: 'sun' }] },
+            { key: 'planetary_moon', url: planetUrl, extraparam: [{ key: 'analysis_planet', value: 'moon' }] },
+            { key: 'planetary_mercury', url: planetUrl, extraparam: [{ key: 'analysis_planet', value: 'mercury' }] },
+            { key: 'planetary_venus', url: planetUrl, extraparam: [{ key: 'analysis_planet', value: 'venus' }] },
+            { key: 'planetary_mars', url: planetUrl, extraparam: [{ key: 'analysis_planet', value: 'mars' }] },
+            { key: 'planetary_jupiter', url: planetUrl, extraparam: [{ key: 'analysis_planet', value: 'jupiter' }] },
+            { key: 'planetary_saturn', url: planetUrl, extraparam: [{ key: 'analysis_planet', value: 'saturn' }] },
+            { key: 'planetary_rahu', url: planetUrl, extraparam: [{ key: 'analysis_planet', value: 'rahu' }] },
+            { key: 'planetary_ketu', url: planetUrl, extraparam: [{ key: 'analysis_planet', value: 'ketu' }] },
+            { key: 'general_yoga_tab', url: base + '/v2/yogas', extraparam: [] },
+            { key: 'gemstones', url: base + '/v2/gemstone-suggestion', extraparam: [] },
+            { key: 'kalsarpa_dosha', url: base + '/v1/kaal-sarpa-yoga', extraparam: [{ key: 'dasha_type', value: 'sookshma-dasha' }] },
+            { key: 'manglik_dosha', url: base + '/v2/manglik-dosha', extraparam: [] },
+            { key: 'sadesati_dosha', url: base + '/v2/sadhe-sati', extraparam: [] },
+            { key: 'sun_dasha', url: mahaUrl, extraparam: [{ key: 'maha_dasha', value: 'sun' }] },
+            { key: 'moon_dasha', url: mahaUrl, extraparam: [{ key: 'maha_dasha', value: 'moon' }] },
+            { key: 'mars_dasha', url: mahaUrl, extraparam: [{ key: 'maha_dasha', value: 'mars' }] },
+            { key: 'mercury_dasha', url: mahaUrl, extraparam: [{ key: 'maha_dasha', value: 'mercury' }] },
+            { key: 'venus_dasha', url: mahaUrl, extraparam: [{ key: 'maha_dasha', value: 'venus' }] },
+            { key: 'saturn_dasha', url: mahaUrl, extraparam: [{ key: 'maha_dasha', value: 'saturn' }] },
+            { key: 'jupiter_dasha', url: mahaUrl, extraparam: [{ key: 'maha_dasha', value: 'jupiter' }] },
+            { key: 'ketu_dasha', url: mahaUrl, extraparam: [{ key: 'maha_dasha', value: 'ketu' }] },
+            { key: 'rahu_dasha', url: mahaUrl, extraparam: [{ key: 'maha_dasha', value: 'rahu' }] },
+            { key: 'pitra_dosha', url: base + '/v1/pitra-dosha', extraparam: [] },
+        ];
+        const tasks = allTasks.filter(t => kundli[t.key] == null);
+        const apiArgs = [language, lat, lng, dob, birth_time, name, gender, birth_place];
+        const results = tasks.length > 0 ? await Promise.all(tasks.map(async (t) => {
+            const data = await basicKundliApiCall(...apiArgs, t.url, t.extraparam);
+            return { key: t.key, value: JSON.stringify(data?.data) };
+        })) : [];
+        const upd = {};
+        results.forEach(r => { upd[r.key] = r.value; });
         if (Object.keys(upd).length > 0) {
             [kundli] = await db('kundlis')
                 .where('id', kundli?.id)
                 .update(upd)
                 .returning('*');
         }
-
         const response = {
             id: kundli_id,
             general_report: JSON.parse(kundli.general_report),
