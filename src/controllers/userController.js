@@ -242,4 +242,81 @@ async function getRecharge(req, res) {
         res.status(500).json({ success: false, message: 'Server error' });
     }
 }
-module.exports = { updateProfile, getProfile, getBalance, updateToken, profileUpdate, makeAvtarString, deleteMyAccount, getRecharge };
+
+async function getRechargeBanner(req, res) {
+    try {
+        const userId = req.userId;
+        const [{ count }] = await db('payments')
+            .count('* as count')
+            .where({ user_id: userId })
+            .whereIn('status', ['pending', 'success']);
+        const rechargeNo = Number(count) + 1;
+        const recharges = await db('recharges')
+            .whereIn('recharge_number', [1111, rechargeNo])
+            .whereNull('deleted_at');
+        const matchedRecharge =
+            recharges.find(r => r.recharge_number === rechargeNo) ||
+            recharges.find(r => r.recharge_number === 1111);
+
+        // Last 5 unique pandits from orders (one row per pandit_id, most recent order first)
+
+
+        if (!matchedRecharge) {
+
+            const uniqueOrderRows = await db.raw(
+                `SELECT pandit_id FROM (
+                    SELECT pandit_id, id, ROW_NUMBER() OVER (PARTITION BY pandit_id ORDER BY id DESC) as rn
+                    FROM orders
+                    WHERE user_id = ? AND deleted_at IS NULL
+                ) t WHERE rn = 1 ORDER BY id DESC LIMIT 5`,
+                [userId]
+            );
+            const rows = uniqueOrderRows?.rows ?? uniqueOrderRows?.[0] ?? [];
+            const panditIds = rows.map(r => r.pandit_id).filter(Boolean);
+
+            let lastPandits = [];
+            if (panditIds.length > 0) {
+                const pandits = await db('pandits').whereIn('id', panditIds).select('id', 'display_name', 'profile');
+                const panditMap = Object.fromEntries((pandits || []).map(p => [p.id, p]));
+                lastPandits = await Promise.all(panditIds.map(async (panditId) => {
+                    const lastMsg = await db('chats')
+                        .whereNull('deleted_at')
+                        .andWhere(function () {
+                            this.where({ sender_type: 'user', sender_id: userId, receiver_type: 'pandit', receiver_id: panditId })
+                                .orWhere({ sender_type: 'pandit', sender_id: panditId, receiver_type: 'user', receiver_id: userId });
+                        })
+                        .orderBy('id', 'desc')
+                        .first('message', 'created_at');
+                    const p = panditMap[panditId] || {};
+                    return {
+                        pandit_id: panditId,
+                        display_name: p.display_name || null,
+                        profile: p.profile || null,
+                        last_message: lastMsg?.message || null,
+                        last_message_at: lastMsg?.created_at || null,
+                    };
+                }));
+            }
+
+            return res.status(200).json({
+                success: true,
+                data: [],
+                last_pandits: lastPandits,
+                message: 'Recharge list success'
+            });
+        }
+        const amounts = matchedRecharge?.amounts || [];
+        return res.status(200).json({
+            success: true,
+            data: amounts,
+            last_pandits: lastPandits,
+            message: 'Recharge list success'
+        });
+    }
+    catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
+module.exports = { updateProfile, getProfile, getBalance, updateToken, profileUpdate, makeAvtarString, deleteMyAccount, getRecharge, getRechargeBanner };

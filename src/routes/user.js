@@ -33,6 +33,7 @@ router.post('/update', user.updateProfile);
 router.post('/updateToken', user.updateToken);
 router.delete('/', user.deleteMyAccount);
 router.get('/recharge', user.getRecharge);
+router.get('/rechargeBanner', user.getRechargeBanner);
 
 router.post('/profileUpdate',
     upload.fields([
