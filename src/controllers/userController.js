@@ -219,7 +219,7 @@ async function getRecharge(req, res) {
             .count('* as count')
             .where({ user_id: req.userId })
             .whereIn('status', ['pending', 'success']);
-        const rechargeNo = Number(count + 1)
+        const rechargeNo = Number(count) + 1
         const recharges = await db('recharges')
             .whereIn('recharge_number', [1111, rechargeNo])
             .whereNull('deleted_at');
