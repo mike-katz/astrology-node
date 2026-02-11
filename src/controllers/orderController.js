@@ -765,10 +765,10 @@ async function callReject(req, res) {
     if (!order_id || !pandit_id) {
         return res.status(400).json({ error: 'Missing params.' });
     }
-    const order = await db('orders').where({ order_id, user_id: req.userId, status: "pending" }).first();
+    const order = await db('orders').where({ order_id, user_id: req.userId, }).first();
     console.log("order", order);
     if (!order) return res.status(400).json({ success: false, message: 'You can not cancel this order.' });
-    if (order?.type == "call") {
+    if (order?.type == "call" && order?.status == "pending") {
         await db('orders').where({ id: order?.id }).update({ status: "cancel" });
     }
     callEvent("emit_to_call_rejected", {
