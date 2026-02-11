@@ -10,7 +10,7 @@ module.exports = async function (req, res, next) {
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
         return res
             .status(401)
-            .json({ message: '1Unauthorized: Missing or invalid token' });
+            .json({ message: 'Unauthorized: Missing or invalid token' });
     }
 
     const token = authHeader.split(' ')[1];
@@ -23,7 +23,7 @@ module.exports = async function (req, res, next) {
         if (!verified) {
             return res
                 .status(401)
-                .json({ message: '2Unauthorized: Missing or invalid token' });
+                .json({ message: 'Unauthorized: Missing or invalid token' });
         }
 
         // Get user from database to get username
@@ -36,20 +36,20 @@ module.exports = async function (req, res, next) {
             if (!redisToken) {
                 return res
                     .status(401)
-                    .json({ message: '3Unauthorized: Missing or invalid token' });
+                    .json({ message: 'Unauthorized: Missing or invalid token' });
             }
         } catch (redisError) {
             // console.error("Redis get error:", redisError);
             return res
                 .status(401)
-                .json({ success: false, message: '4Unauthorized: Token validation failed' });
+                .json({ success: false, message: 'Unauthorized: Token validation failed' });
         }
 
         if (!redisToken || redisToken !== token) {
             // console.log("Token mismatch - Redis token exists:", !!redisToken, "Tokens match:", redisToken === token);
             return res
                 .status(401)
-                .json({ success: false, message: '5Unauthorized: Token invalid' });
+                .json({ success: false, message: 'Unauthorized: Token invalid' });
         }
 
         req.user = verified?.username
@@ -59,6 +59,6 @@ module.exports = async function (req, res, next) {
         console.error('Error in authenticateJWT:', error);
         return res
             .status(401)
-            .json({ message: '6Unauthorized: Missing or invalid token' });
+            .json({ message: 'Unauthorized: Missing or invalid token' });
     }
 };
