@@ -77,14 +77,9 @@ function numberToIndianWords(amount) {
 /** Create Razorpay order (no SMS/OTP – use Razorpay Checkout on frontend) */
 async function createRazorpayOrder(req, res) {
     try {
-        let { amount, recharge_id, manual_recharge } = req.body;
-        if (manual_recharge == false && recharge_id) {
-            const recharge = await db('oldrecharges').whereNull('deleted_at').where({ 'id': recharge_id, status: true }).first();
-            if (!recharge) return res.status(400).json({ success: false, message: 'Recharge not active.' });
-            const gst = (Number(recharge?.amount) * 18) / 100
-            amount = Number(Number(recharge?.amount) + Number(gst))
-        }
-        if (!Number.isFinite(amount) || amount < 0) {
+        const { amount } = req.body;
+        // amount frontend par thi aave (user/recharge API no amounts array mathi select)
+        if (!Number.isFinite(Number(amount)) || Number(amount) < 0) {
             return res.status(400).json({ success: false, message: 'Invalid amount.' });
         }
         const gateway = await db('payment_gateways').where('status', true).first();
@@ -115,7 +110,7 @@ async function createRazorpayOrder(req, res) {
         });
         // console.log("order", order);
 
-        await db('payments').insert({ user_id: req?.userId, order_id: order.id, gst, amount: base, status: "pending", type: "recharge", recharge_id });
+        await db('payments').insert({ user_id: req?.userId, order_id: order.id, gst, amount: base, status: "pending", type: "recharge" });
         return res.status(200).json({
             success: true,
             data: {

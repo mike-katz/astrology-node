@@ -119,11 +119,35 @@ async function razorpay(req, res) {
         const with_tax_amount = Number(Number(gst) + Number(paymentRow?.amount)).toFixed(2);
         const total_in_word = numberToIndianWords(Number(with_tax_amount).toFixed(2),);
 
+        // user/recharge logic: amounts array ma amount match kari ne discount apply
         let extra = 0;
-        if (paymentRow.recharge_id) {
-            const recharge = await db('oldrecharges').where('id', paymentRow.recharge_id).first();
-            if (recharge) {
-                extra = Number(recharge?.extra_amount)
+        const [{ count }] = await db('payments')
+            .count('* as count')
+            .where({ user_id: paymentRow.user_id })
+            .whereIn('status', ['pending', 'success']);
+        const rechargeNo = Number(count);
+        const recharges = await db('recharges')
+            .whereIn('recharge_number', [1111, rechargeNo])
+            .whereNull('deleted_at');
+        const matchedRecharge =
+            recharges.find(r => r.recharge_number === rechargeNo) ||
+            recharges.find(r => r.recharge_number === 1111);
+        if (matchedRecharge) {
+            const amounts = matchedRecharge.amounts || [];
+            const amountsList = Array.isArray(amounts) ? amounts : (typeof amounts === 'string' ? JSON.parse(amounts || '[]') : []);
+            const matched = amountsList.find(a => Number(a.amount) === Number(paymentRow.amount));
+            if (matched) {
+                const d = matched.discount;
+                const dt = matched.discount_type;
+                if (d == null || d === '' || dt == null || dt === '') {
+                    extra = 0;
+                } else if (String(dt).toLowerCase() === 'amount') {
+                    extra = Number(d) || 0;
+                } else if (String(dt).toLowerCase() === 'percentage') {
+                    extra = (Number(paymentRow.amount) * Number(d)) / 100;
+                } else {
+                    extra = 0;
+                }
             }
         }
 
