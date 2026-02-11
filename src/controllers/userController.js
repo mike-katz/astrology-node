@@ -251,20 +251,20 @@ async function getRechargeBanner(req, res) {
             .where({ user_id: userId })
             .whereIn('status', ['pending', 'success']);
         const rechargeNo = Number(count) + 1;
+        console.log("rechargeNo", rechargeNo);
         const recharges = await db('recharges')
-            .whereIn('recharge_number', [1111, rechargeNo])
+            .whereIn('recharge_number', [rechargeNo])
             .whereNull('deleted_at');
-        const matchedRecharge =
-            recharges.find(r => r.recharge_number === rechargeNo) ||
-            recharges.find(r => r.recharge_number === 1111);
+        const matchedRecharge = recharges.find(r => r.recharge_number === rechargeNo);
 
-        // Last 5 unique pandits from orders (one row per pandit_id, most recent order first)
+        console.log("matchedRecharge", matchedRecharge);
+        // Last 5 unique orders (one per pandit, most recent first) – full order list for Flutter model
 
 
         if (!matchedRecharge) {
 
             const uniqueOrderRows = await db.raw(
-                `SELECT pandit_id FROM (
+                `SELECT id, pandit_id FROM (
                     SELECT pandit_id, id, ROW_NUMBER() OVER (PARTITION BY pandit_id ORDER BY id DESC) as rn
                     FROM orders
                     WHERE user_id = ? AND deleted_at IS NULL
@@ -272,44 +272,55 @@ async function getRechargeBanner(req, res) {
                 [userId]
             );
             const rows = uniqueOrderRows?.rows ?? uniqueOrderRows?.[0] ?? [];
-            const panditIds = rows.map(r => r.pandit_id).filter(Boolean);
+            const orderIds = rows.map(r => r.id).filter(Boolean);
+            const panditIds = [...new Set(rows.map(r => r.pandit_id).filter(Boolean))];
 
-            let lastPandits = [];
-            if (panditIds.length > 0) {
-                const pandits = await db('pandits').whereIn('id', panditIds).select('id', 'display_name', 'profile');
+            let last_orders = [];
+            if (orderIds.length > 0) {
+                const orders = await db('orders').whereIn('id', orderIds).orderBy('id', 'desc');
+                const orderMap = Object.fromEntries((orders || []).map(o => [o.id, o]));
+                const pandits = await db('pandits').whereIn('id', panditIds).select('id', 'display_name', 'profile', 'waiting_time');
                 const panditMap = Object.fromEntries((pandits || []).map(p => [p.id, p]));
-                lastPandits = await Promise.all(panditIds.map(async (panditId) => {
-                    const lastMsg = await db('chats')
-                        .whereNull('deleted_at')
-                        .andWhere(function () {
-                            this.where({ sender_type: 'user', sender_id: userId, receiver_type: 'pandit', receiver_id: panditId })
-                                .orWhere({ sender_type: 'pandit', sender_id: panditId, receiver_type: 'user', receiver_id: userId });
-                        })
-                        .orderBy('id', 'desc')
-                        .first('message', 'created_at');
+
+                last_orders = await Promise.all(orderIds.map(async (orderId) => {
+                    const order = orderMap[orderId] || {};
+                    const panditId = order.pandit_id;
                     const p = panditMap[panditId] || {};
+
                     return {
-                        pandit_id: panditId,
-                        name: p.display_name || null,
-                        profile: p.profile || null,
-                        last_message: lastMsg?.message || null,
-                        last_message_at: lastMsg?.created_at || null,
+                        id: order.id ?? null,
+                        panditId: order.pandit_id ?? null,
+                        userId: order.user_id ?? null,
+                        orderId: order.order_id ?? null,
+                        status: order.status ?? null,
+                        type: order.type ?? null,
+                        isAccept: order.is_accept ?? null,
+                        rate: order.rate ?? null,
+                        endTime: order.end_time ? new Date(order.end_time).toISOString() : null,
+                        startTime: order.start_time ? new Date(order.start_time).toISOString() : null,
+                        duration: order.duration ?? null,
+                        deduction: order.deduction ?? null,
+                        deletedAt: order.deleted_at ? new Date(order.deleted_at).toISOString() : null,
+                        createdAt: order.created_at ? new Date(order.created_at).toISOString() : null,
+                        profileId: order.profile_id ?? null,
+                        updatedAt: order.updated_at ? new Date(order.updated_at).toISOString() : null,
+                        name: p.display_name ?? null,
+                        profile: p.profile ?? null,
+                        online: p.waiting_time == null,
+
                     };
                 }));
             }
-
             return res.status(200).json({
                 success: true,
-                data: [],
-                last_pandits: lastPandits,
+                data: { last_orders },
                 message: 'Recharge list success'
             });
         }
-        const amounts = matchedRecharge?.amounts || [];
+        const banner = matchedRecharge?.banner ?? '';
         return res.status(200).json({
             success: true,
-            data: amounts,
-            last_pandits: lastPandits,
+            data: { banner },
             message: 'Recharge list success'
         });
     }
