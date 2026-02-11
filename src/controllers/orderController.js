@@ -760,11 +760,13 @@ async function generateCallToken(req, res) {
 }
 
 async function callReject(req, res) {
+    console.log("req.body callReject", req.body);
     const { order_id, pandit_id } = req.body;
     if (!order_id || !pandit_id) {
         return res.status(400).json({ error: 'Missing params.' });
     }
     const order = await db('orders').where({ order_id, user_id: req.userId, status: "pending" }).first();
+    console.log("order", order);
     if (!order) return res.status(400).json({ success: false, message: 'You can not cancel this order.' });
 
     await db('orders').where({ id: order?.id }).update({ status: "cancel" });
