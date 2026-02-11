@@ -290,7 +290,7 @@ async function getRechargeBanner(req, res) {
                     const p = panditMap[panditId] || {};
                     return {
                         pandit_id: panditId,
-                        display_name: p.display_name || null,
+                        name: p.display_name || null,
                         profile: p.profile || null,
                         last_message: lastMsg?.message || null,
                         last_message_at: lastMsg?.created_at || null,
