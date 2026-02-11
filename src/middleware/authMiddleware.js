@@ -10,7 +10,7 @@ module.exports = async function (req, res, next) {
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
         return res
             .status(401)
-            .json({ message: 'Unauthorized: Missing or invalid token' });
+            .json({ message: 'u1 Unauthorized: Missing or invalid token' });
     }
 
     const token = authHeader.split(' ')[1];
