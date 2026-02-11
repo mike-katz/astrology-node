@@ -7,6 +7,7 @@ const { encrypt } = require("../utils/crypto")
 const { checkOrders, isValidMobile } = require('../utils/decodeJWT');
 const axios = require('axios');
 const { setCache } = require('../config/redisClient');
+const sendMail = require('../utils/sendMail');
 
 const SALT_ROUNDS = parseInt(process.env.BCRYPT_SALT_ROUNDS || '12', 10);
 
@@ -144,4 +145,14 @@ async function socialUrl(req, res) {
     }
 }
 
-module.exports = { register, login, verifyOtp, socialUrl };
+async function getSettings(req, res) {
+    try {
+        const setting = await db('settings').select('facebook', 'x', 'instagram', 'youtube', 'linkedin').first();
+        return res.status(200).json({ success: true, data: setting, message: 'get config Successfully' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
+module.exports = { register, login, verifyOtp, socialUrl, getSettings };
