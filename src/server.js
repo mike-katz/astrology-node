@@ -20,6 +20,7 @@ const kundliRoutes = require('./routes/kundli');
 const supportTicketRoutes = require('./routes/supportTicket');
 const faqRoutes = require('./routes/faq');
 const blogRoutes = require('./routes/blog');
+const bannerRoutes = require('./routes/banners');
 const callBackRoutes = require('./routes/callback');
 
 // const cors = require('cors');
@@ -45,6 +46,7 @@ app.use('/upload', panditRoutes);
 app.use('/kundli', kundliRoutes);
 app.use('/faq', faqRoutes);
 app.use('/blog', blogRoutes);
+app.use('/banners', bannerRoutes);
 
 // app.use('/agora', agoraRoutes);
 
