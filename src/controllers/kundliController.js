@@ -43,7 +43,7 @@ async function basicKundliApiCall(language = 'en', lat, lng, dob, birth_time, na
     };
     // console.log("config", config);
     const response = await axios(config);
-    console.log("response", response.data);
+    // console.log("response", response.data);
     return response?.data
 }
 
@@ -547,7 +547,6 @@ async function findChartTab(req, res) {
             const sookshmadasharesponse = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, Vimshottari, [{ key: "dasha_type", value: "sookshma-dasha" }])
             upd.sookshma_dasha = JSON.stringify(sookshmadasharesponse?.data);
         }
-        console.log("upd", upd, "language", language);
         if (Object.keys(upd).length > 0) {
             [kundli] = await db('kundlis')
                 .where('id', kundli?.id)
