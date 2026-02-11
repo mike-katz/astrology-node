@@ -279,7 +279,7 @@ async function getRechargeBanner(req, res) {
             if (orderIds.length > 0) {
                 const orders = await db('orders').whereIn('id', orderIds).orderBy('id', 'desc');
                 const orderMap = Object.fromEntries((orders || []).map(o => [o.id, o]));
-                const pandits = await db('pandits').whereIn('id', panditIds).select('id', 'display_name', 'profile', 'waiting_time');
+                const pandits = await db('pandits').whereIn('id', panditIds).select('id', 'display_name', 'profile', 'waiting_time', 'online');
                 const panditMap = Object.fromEntries((pandits || []).map(p => [p.id, p]));
 
                 last_orders = await Promise.all(orderIds.map(async (orderId) => {
@@ -306,7 +306,7 @@ async function getRechargeBanner(req, res) {
                         updatedAt: order.updated_at ? new Date(order.updated_at).toISOString() : null,
                         name: p.display_name ?? null,
                         profile: p.profile ?? null,
-                        online: p.waiting_time == null,
+                        online: p.online,
 
                     };
                 }));
