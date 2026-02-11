@@ -768,9 +768,9 @@ async function callReject(req, res) {
     const order = await db('orders').where({ order_id, user_id: req.userId, status: "pending" }).first();
     console.log("order", order);
     if (!order) return res.status(400).json({ success: false, message: 'You can not cancel this order.' });
-
-    await db('orders').where({ id: order?.id }).update({ status: "cancel" });
-
+    if (order?.type == "call") {
+        await db('orders').where({ id: order?.id }).update({ status: "cancel" });
+    }
     callEvent("emit_to_call_rejected", {
         key: `pandit_${pandit_id}`,
         order_id,
