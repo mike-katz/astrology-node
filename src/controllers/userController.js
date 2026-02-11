@@ -246,11 +246,14 @@ async function getRecharge(req, res) {
 async function getRechargeBanner(req, res) {
     try {
         const userId = req.userId;
+        console.log("userId", userId);
         const [{ count }] = await db('payments')
             .count('* as count')
             .where({ user_id: userId })
             .whereIn('status', ['pending', 'success']);
+        // log
         const rechargeNo = Number(count) + 1;
+
         console.log("rechargeNo", rechargeNo);
         const recharges = await db('recharges')
             .whereIn('recharge_number', [rechargeNo])
@@ -313,14 +316,14 @@ async function getRechargeBanner(req, res) {
             }
             return res.status(200).json({
                 success: true,
-                data: { last_orders },
+                data: { last_orders, banner: "" },
                 message: 'Recharge list success'
             });
         }
         const banner = matchedRecharge?.banner ?? '';
         return res.status(200).json({
             success: true,
-            data: { banner },
+            data: { banner, last_orders: [] },
             message: 'Recharge list success'
         });
     }
