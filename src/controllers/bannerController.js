@@ -6,7 +6,7 @@ async function getList(req, res) {
         let platform = req.query.platform;
         if (!platform) return res.status(400).json({ success: false, message: 'Missing params.' });
 
-        let query = db('banners').whereNull('deleted_at').orderBy('id', 'asc');
+        let query = db.live('banners').orderBy('id', 'asc');
 
         if (platform !== undefined && platform !== null && platform !== '') {
             const platforms = Array.isArray(platform) ? platform : [platform];

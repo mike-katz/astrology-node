@@ -220,9 +220,8 @@ async function getRecharge(req, res) {
             .where({ user_id: req.userId })
             .whereIn('status', ['pending', 'success']);
         const rechargeNo = Number(count) + 1
-        const recharges = await db('recharges')
-            .whereIn('recharge_number', [1111, rechargeNo])
-            .whereNull('deleted_at');
+        const recharges = await db.live('recharges')
+            .whereIn('recharge_number', [1111, rechargeNo]);
         const matchedRecharge =
             recharges.find(r => r.recharge_number === rechargeNo) ||
             recharges.find(r => r.recharge_number === 1111);
@@ -255,9 +254,8 @@ async function getRechargeBanner(req, res) {
         const rechargeNo = Number(count) + 1;
 
         console.log("rechargeNo", rechargeNo);
-        const recharges = await db('recharges')
-            .whereIn('recharge_number', [rechargeNo])
-            .whereNull('deleted_at');
+        const recharges = await db.live('recharges')
+            .whereIn('recharge_number', [rechargeNo]);
         const matchedRecharge = recharges.find(r => r.recharge_number === rechargeNo);
 
         console.log("matchedRecharge", matchedRecharge);
@@ -270,7 +268,7 @@ async function getRechargeBanner(req, res) {
                 `SELECT id, pandit_id FROM (
                     SELECT pandit_id, id, ROW_NUMBER() OVER (PARTITION BY pandit_id ORDER BY id DESC) as rn
                     FROM orders
-                    WHERE user_id = ? AND deleted_at IS NULL
+                    WHERE user_id = ? AND (deleted_at IS NULL OR deleted_at = '')
                 ) t WHERE rn = 1 ORDER BY id DESC LIMIT 5`,
                 [userId]
             );

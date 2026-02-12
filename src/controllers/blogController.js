@@ -11,23 +11,22 @@ async function getList(req, res) {
         if (limit < 1) limit = 20;
         const offset = (page - 1) * limit;
 
-        const filter = { 'b.deleted_at': null, is_publish: true };
-
-        // Filter by category if provided
-        if (category_id) {
-            filter['b.blog_category_id'] = category_id;
-        }
-
-        if (category) {
-            filter['c.slug'] = category;
-        }
-
         let query = db('blogs as b')
-            .where(filter);
-
+            .where(db.liveFilter('b.deleted_at'))
+            .where({ is_publish: true });
         let countQuery = db('blogs as b')
             .leftJoin('blog_categories as c', 'c.id', 'b.blog_category_id')
-            .where(filter);
+            .where(db.liveFilter('b.deleted_at'))
+            .where({ is_publish: true });
+
+        if (category_id) {
+            query = query.where('b.blog_category_id', category_id);
+            countQuery = countQuery.where('b.blog_category_id', category_id);
+        }
+        if (category) {
+            query = query.where('c.slug', category);
+            countQuery = countQuery.where('c.slug', category);
+        }
 
         // Filter by title if provided
         if (title && title.trim()) {
@@ -74,12 +73,11 @@ async function getDetail(req, res) {
         // if (!id) {
         //     return res.status(400).json({ success: false, data: null, message: 'Missing params' });
         // }
-        const filter = { 'b.deleted_at': null }
-        if (id) {
-            filter['b.id'] = Number(id)
-        }
         let query = db('blogs as b')
-            .where(filter);
+            .where(db.liveFilter('b.deleted_at'));
+        if (id) {
+            query = query.where('b.id', Number(id));
+        }
         if (slug) {
             query = query.where('b.slug', 'ilike', `%${slug.trim()}%`);
         }
@@ -106,7 +104,7 @@ async function getDetail(req, res) {
 async function getCategory(req, res) {
     try {
         console.log("inside category");
-        const categories = await db('blog_categories').whereNull('deleted_at');
+        const categories = await db.live('blog_categories');
         console.log("categories", categories);
         return res.status(200).json({
             success: true,

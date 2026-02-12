@@ -92,7 +92,7 @@ async function verifyOtp(req, res) {
         if (mobile == '1999999999' && otp != '956019') {
             return res.status(400).json({ success: false, message: 'Wrong Otp' });
         }
-        let existing = await db('users').whereNull('deleted_at').where({ mobile, country_code }).first();
+        let existing = await db.live('users').where({ mobile, country_code }).first();
         // if (!existing) return res.status(400).json({ success: false, message: 'Wrong Otp' });
 
         if (existing?.deleted_at != null) {
@@ -132,7 +132,7 @@ async function socialUrl(req, res) {
     try {
         const { platform } = req.query
         if (!platform) return res.status(400).json({ success: false, message: 'Missing params' });
-        const banner = await db('banners').whereNull('deleted_at').where({ platform });
+        const banner = await db.live('banners').where({ platform });
         const setting = await db('settings').first();
         const data = {
             banners: banner,

@@ -138,7 +138,7 @@ async function getMessage(req, res) {
         //     })
         //     .countDistinct('order_id as count');
 
-        const messages = await db('chats')
+        const messages = await db.live('chats')
             .andWhere(function () {
                 this.where({
                     sender_type: 'user',
@@ -157,9 +157,8 @@ async function getMessage(req, res) {
             .limit(limit)
             .offset(offset);
 
-        const [{ count }] = await db('chats')
+        const [{ count }] = await db.live('chats')
             .count('* as count')
-            .whereNull('deleted_at')
             .andWhere(function () {
                 this.where({
                     sender_type: 'user',
@@ -610,16 +609,14 @@ async function getOrderChat(req, res) {
         if (page < 1) page = 1;
         if (limit < 1) limit = 100;
         const offset = (page - 1) * limit;
-        const messages = await db('chats')
+        const messages = await db.live('chats')
             .where({ order_id })
-            .whereNull('deleted_at')
             .orderBy('id', 'desc')
             .limit(limit)
             .offset(offset);
 
-        const [{ count }] = await db('chats')
+        const [{ count }] = await db.live('chats')
             .count('* as count')
-            .whereNull('deleted_at')
             .where({ order_id });
         const total = parseInt(count);
         const totalPages = Math.ceil(total / limit);

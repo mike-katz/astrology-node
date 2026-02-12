@@ -238,16 +238,14 @@ async function getPayment(req, res) {
         if (page < 1) page = 1;
         if (limit < 1) limit = 100;
         const offset = (page - 1) * limit;
-        const log = await db('payments')
-            .whereNull('deleted_at')
+        const log = await db.live('payments')
             .andWhere('user_id', req.userId)
             .orderBy('id', 'desc')
             .limit(limit)
             .offset(offset);
 
-        const [{ count }] = await db('payments')
+        const [{ count }] = await db.live('payments')
             .count('* as count')
-            .whereNull('deleted_at')
             .andWhere('user_id', req.userId);
         const total = parseInt(count);
         const totalPages = Math.ceil(total / limit);
@@ -274,16 +272,14 @@ async function getTransactions(req, res) {
         if (page < 1) page = 1;
         if (limit < 1) limit = 100;
         const offset = (page - 1) * limit;
-        const log = await db('balancelogs')
-            .whereNull('deleted_at')
+        const log = await db.live('balancelogs')
             .andWhere('user_id', req.userId)
             .orderBy('id', 'desc')
             .limit(limit)
             .offset(offset);
 
-        const [{ count }] = await db('balancelogs')
+        const [{ count }] = await db.live('balancelogs')
             .count('* as count')
-            .whereNull('deleted_at')
             .andWhere('user_id', req.userId);
         const total = parseInt(count);
         const totalPages = Math.ceil(total / limit);

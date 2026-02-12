@@ -40,9 +40,8 @@ async function createTicket(req, res) {
         let orderDbId = null;
         // Verify payment belongs to user (if payment_id provided)
         if (payment_id) {
-            const payment = await db('payments')
+            const payment = await db.live('payments')
                 .where({ id: payment_id, user_id: req.userId })
-                .whereNull('deleted_at')
                 .first();
 
             if (!payment) {
@@ -57,9 +56,8 @@ async function createTicket(req, res) {
         // Verify order belongs to user (if order_id provided)
 
         if (order_id) {
-            const order = await db('orders')
+            const order = await db.live('orders')
                 .where({ id: order_id, user_id: req.userId })
-                .whereNull('deleted_at')
                 .first();
 
             if (!order) {
@@ -116,27 +114,28 @@ async function listTickets(req, res) {
         if (limit < 1) limit = 20;
         const offset = (page - 1) * limit;
 
-        const filter = { 'st.user_id': req.userId, 'st.deleted_at': null };
-
-        if (type) {
-            filter['st.type'] = type;
-        }
-
-        if (status) {
-            filter['st.status'] = status;
-        }
-
-        const tickets = await db('support_tickets as st')
+        let listQuery = db('support_tickets as st')
             .leftJoin('support_types as s', 's.id', 'st.issue_type')
-            .where(filter)
+            .where(db.liveFilter('st.deleted_at'))
+            .where({ 'st.user_id': req.userId });
+        let countQuery = db('support_tickets as st')
+            .where(db.liveFilter('st.deleted_at'))
+            .where({ 'st.user_id': req.userId });
+        if (type) {
+            listQuery = listQuery.where('st.type', type);
+            countQuery = countQuery.where('st.type', type);
+        }
+        if (status) {
+            listQuery = listQuery.where('st.status', status);
+            countQuery = countQuery.where('st.status', status);
+        }
+        const tickets = await listQuery
             .select('st.*', 's.name as issue_type')
             .orderBy('st.id', 'desc')
             .limit(limit)
             .offset(offset);
 
-        const [{ count }] = await db('support_tickets as st')
-            .where(filter)
-            .count('* as count');
+        const [{ count }] = await countQuery.count('* as count');
 
         const total = parseInt(count);
         const totalPages = Math.ceil(total / limit);
@@ -175,7 +174,7 @@ async function getTicketDetail(req, res) {
             .leftJoin('support_types as s', 's.id', 'st.issue_type')
             .select('st.*', 's.name as issue_type')
             .where({ 'st.id': id, 'st.user_id': req.userId })
-            .whereNull('st.deleted_at')
+            .where(db.liveFilter('st.deleted_at'))
             .first();
 
         if (!ticket) {
@@ -188,7 +187,7 @@ async function getTicketDetail(req, res) {
         // Get chat messages with pagination
         const chatMessages = await db('support_tickets_chat as stc')
             .where({ 'stc.support_tickets_id': id })
-            .whereNull('stc.deleted_at')
+            .where(db.liveFilter('stc.deleted_at'))
             .select(
                 'stc.id',
                 'stc.message',
@@ -206,7 +205,7 @@ async function getTicketDetail(req, res) {
         // Get total count of chat messages
         const [{ count }] = await db('support_tickets_chat as stc')
             .where({ 'stc.support_tickets_id': id })
-            .whereNull('stc.deleted_at')
+            .where(db.liveFilter('stc.deleted_at'))
             .count('* as count');
 
         const total = parseInt(count);
@@ -233,8 +232,7 @@ async function getTicketDetail(req, res) {
 // Get support types list
 async function getSupportTypes(req, res) {
     try {
-        const supportTypes = await db('support_types')
-            .whereNull('deleted_at')
+        const supportTypes = await db.live('support_types')
             .where({ status: true })
             .orderBy('id', 'asc');
 
@@ -264,9 +262,8 @@ async function replyTicket(req, res) {
         }
 
         // Verify ticket belongs to user
-        const ticket = await db('support_tickets')
+        const ticket = await db.live('support_tickets')
             .where({ id: id, user_id: req.userId })
-            .whereNull('deleted_at')
             .first();
 
         if (!ticket) {
@@ -281,9 +278,9 @@ async function replyTicket(req, res) {
         });
 
         if (ticket.status == "reopen") {
-            const chat = await db('support_tickets_chat')
-                .count('* as count').where({ admin_id: null, support_tickets_id: id })
-                .whereNull('deleted_at');
+            const chat = await db.live('support_tickets_chat')
+                .count('* as count')
+                .where({ admin_id: null, support_tickets_id: id });
             if (chat == 2) {
                 return res.status(400).json({
                     success: false,

@@ -400,15 +400,16 @@ async function list(req, res) {
 
         if (page < 1) page = 1;
         if (limit < 1) limit = 20;
-        const { type } = req.query
-        const filter = { 'o.user_id': req.userId, 'o.deleted_at': null }
-        if (type) {
-            filter['o.type'] = type
-        }
+        const { type } = req.query;
         const offset = (page - 1) * limit;
-        const order = await db('orders as o')
+        let orderQuery = db('orders as o')
             .distinctOn('o.pandit_id')
-            .where(filter)
+            .where(db.liveFilter('o.deleted_at'))
+            .where({ 'o.user_id': req.userId });
+        if (type) {
+            orderQuery = orderQuery.where('o.type', type);
+        }
+        const order = await orderQuery
             .andWhereNot('o.status', 'cancel')
             .leftJoin('pandits as p', 'p.id', 'o.pandit_id')
             .leftJoin(
@@ -417,7 +418,7 @@ async function list(req, res) {
               SELECT DISTINCT ON (order_id)
                 *
               FROM chats
-              WHERE order_id IS NOT NULL AND deleted_at IS NULL AND is_system_generate IS NULL
+              WHERE order_id IS NOT NULL AND (deleted_at IS NULL OR deleted_at = '') AND is_system_generate IS NULL
               ORDER BY order_id, id DESC
             ) c
           `),
@@ -470,8 +471,14 @@ async function list(req, res) {
             )
             .limit(limit)
             .offset(offset);
-        const [{ count }] = await db('orders as o')
-            .where(filter)
+        let countQuery = db('orders as o')
+            .where(db.liveFilter('o.deleted_at'))
+            .where({ 'o.user_id': req.userId });
+        if (type) {
+            countQuery = countQuery.where('o.type', type);
+        }
+        const [{ count }] = await countQuery
+            .andWhereNot('o.status', 'cancel')
             .countDistinct('o.pandit_id as count');
 
         const total = parseInt(count);

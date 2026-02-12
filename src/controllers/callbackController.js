@@ -126,9 +126,8 @@ async function razorpay(req, res) {
             .where({ user_id: paymentRow.user_id })
             .whereIn('status', ['pending', 'success']);
         const rechargeNo = Number(count);
-        const recharges = await db('recharges')
-            .whereIn('recharge_number', [1111, rechargeNo])
-            .whereNull('deleted_at');
+        const recharges = await db.live('recharges')
+            .whereIn('recharge_number', [1111, rechargeNo]);
         const matchedRecharge =
             recharges.find(r => r.recharge_number === rechargeNo) ||
             recharges.find(r => r.recharge_number === 1111);

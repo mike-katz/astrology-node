@@ -18,10 +18,7 @@ async function getPandits(req, res) {
         if (limit < 1) limit = 100;
         const offset = (page - 1) * limit;
         const { type = "chat", search, sort_by, skill, language, gender, country, offer, top_astrologers, secondary_expertise } = req.query
-        const filter = {
-            "p.status": "active",
-            "p.deleted_at": null
-        }
+        const filter = { "p.status": "active" };
         let sort
         let orderBy
         let sorting = []
@@ -104,6 +101,7 @@ async function getPandits(req, res) {
                 'p.tag',
                 'p.chat_call_rate',
             ).where(filter)
+            .where(db.liveFilter('p.deleted_at'))
             .andWhere(function () {
                 if (type === 'call') {
                     this.where('p.call', true);
@@ -117,7 +115,7 @@ async function getPandits(req, res) {
             .limit(limit)
             .offset(offset);
         let countQuery = db('pandits as p')
-            .count('* as count').where(filter);
+            .count('* as count').where(filter).where(db.liveFilter('p.deleted_at'));
         if (search && search.trim()) {
             query.andWhere('p.display_name', 'ilike', `%${search.trim()}%`);
             countQuery.andWhere('p.display_name', 'ilike', `%${search.trim()}%`);
@@ -373,14 +371,14 @@ async function signup(req, res) {
         if (!mobile || !country_code) return res.status(400).json({ success: false, message: 'Mobile number required.' });
         const isValid = isValidMobile(mobile);
         if (!isValid) return res.status(400).json({ success: false, message: 'Enter valid mobile number.' });
-        const pandit = await db('pandits').where({ 'mobile': mobile, "deleted_at": null }).first();
+        const pandit = await db.live('pandits').where({ mobile }).first();
         if (pandit) return res.status(400).json({ success: false, message: 'Your mobile number already registered.' });
 
         const user = await db('otpmanages').where(function () {
             this.where('mobile', mobile);
         }).first();
 
-        const onboardings = await db('onboardings').where({ mobile, country_code, deleted_at: null }).first();
+        const onboardings = await db.live('onboardings').where({ mobile, country_code }).first();
         if (onboardings && onboardings?.status == 'blocked') {
             return res.status(400).json({ success: false, message: 'Your account is blocked.' });
         }
@@ -453,7 +451,7 @@ async function verifyOtp(req, res) {
             .where('id', latestRecord?.id)
             .update(update);
 
-        let user = await db('onboardings').where({ 'mobile': mobile, country_code, deleted_at: null }).first();
+        let user = await db.live('onboardings').where({ mobile, country_code }).first();
         if (!user) {
             [user] = await db('onboardings').insert({ mobile, country_code, step: 0, status: "number" }).returning(['id', 'mobile', 'country_code', 'step']);
         }
@@ -535,7 +533,7 @@ async function basicOnboard(req, res) {
         const { name, dob, email, gender, primary_expertise, languages, country_code, mobile, country, city, experience, secondary_expertise } = req.body
         const { files } = req
         if (!name || !dob || !email || !gender || !primary_expertise || !languages || !country_code || !mobile || !country || !city || !experience || !secondary_expertise) return res.status(400).json({ message: 'Missing params.' });
-        const user = await db('onboardings').where({ mobile, country_code, deleted_at: null }).first();
+        const user = await db.live('onboardings').where({ mobile, country_code }).first();
         if (!user) return res.status(400).json({ message: 'Wrong mobile number.' });
         const orderId = Math.floor(1000000000000000 + Math.random() * 9000000000000000).toString();
         const ins = {
@@ -663,7 +661,7 @@ async function onboard(req, res) {
         }
 
         // console.log("tokenData", JSON.stringify(tokenData));
-        const user = await db('onboardings').where({ "mobile": tokenData?.data?.mobile, country_code: tokenData?.data?.country_code, deleted_at: null }).first();
+        const user = await db.live('onboardings').where({ "mobile": tokenData?.data?.mobile, country_code: tokenData?.data?.country_code }).first();
         if (!user) return res.status(400).json({ message: 'Wrong mobile number.' });
 
         // if (display_name) {
@@ -1012,11 +1010,10 @@ async function uploadImage(req, res) {
             const decodedUrl = decodeURIComponent(file);
 
             // Get onboarding record for the user
-            const onboarding = await db('onboardings')
+            const onboarding = await db.live('onboardings')
                 .where({
                     'mobile': tokenData?.data?.mobile,
-                    'country_code': tokenData?.data?.country_code,
-                    'deleted_at': null
+                    'country_code': tokenData?.data?.country_code
                 })
                 .first();
 
@@ -1074,7 +1071,7 @@ async function submitOnboard(req, res) {
         console.log("submitOnboard req.body", req.body);
         const tokenData = decodeJWT(`Bearer ${token}`)
         if (!tokenData?.success) return res.status(400).json({ success: false, message: 'Missing params.' });
-        const user = await db('onboardings').where({ "mobile": tokenData?.data?.mobile, country_code: tokenData?.data?.country_code, deleted_at: null }).first();
+        const user = await db.live('onboardings').where({ "mobile": tokenData?.data?.mobile, country_code: tokenData?.data?.country_code }).first();
         if (!user) return res.status(400).json({ message: 'Wrong mobile number.' });
 
         // Check if user is on step 4

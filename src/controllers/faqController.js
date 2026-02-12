@@ -10,15 +10,12 @@ async function getList(req, res) {
         if (limit < 1) limit = 100;
         const offset = (page - 1) * limit;
 
-        const faqs = await db('faqs')
-            .whereNull('deleted_at')
+        const faqs = await db.live('faqs')
             .orderBy('id', 'asc')
             .limit(limit)
             .offset(offset);
 
-        const [{ count }] = await db('faqs')
-            .count('* as count')
-            .whereNull('deleted_at');
+        const [{ count }] = await db.live('faqs').count('* as count');
 
         const total = parseInt(count);
         const totalPages = Math.ceil(total / limit);
