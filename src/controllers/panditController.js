@@ -406,7 +406,7 @@ async function signup(req, res) {
 
 async function verifyOtp(req, res) {
     try {
-        const { mobile, country_code, otp, adset_id, utm_source, ad_id } = req.body;
+        const { mobile, country_code, otp, ad_set_id, utm_source, ad_id } = req.body;
         if (!mobile || !country_code || !otp) return res.status(400).json({ success: false, message: 'Mobile number and otp required.' });
         const isValid = isValidMobile(mobile);
         if (!isValid) return res.status(400).json({ success: false, message: 'Enter valid mobile number.' });
@@ -455,7 +455,7 @@ async function verifyOtp(req, res) {
 
         let user = await db('onboardings').where({ 'mobile': mobile, country_code, deleted_at: null }).first();
         if (!user) {
-            [user] = await db('onboardings').insert({ mobile, country_code, step: 0, status: "number", adset_id, utm_source, ad_id }).returning(['id', 'mobile', 'country_code', 'step']);
+            [user] = await db('onboardings').insert({ mobile, country_code, step: 0, status: "number", ad_set_id, utm_source, ad_id }).returning(['id', 'mobile', 'country_code', 'step']);
         }
         // console.log("user", user);
         const token = jwt.sign({ userId: user.id, mobile: user.mobile, country_code: user.country_code }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '1h' });
