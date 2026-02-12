@@ -2,7 +2,7 @@ const db = require('../db');
 const { decrypt, encrypt } = require('../utils/crypto');
 const { decodeJWT } = require('../utils/decodeJWT');
 require('dotenv').config();
-const { uploadImageTos3, deleteFileFroms3 } = require('./uploader');
+const { uploadImageToAzure, deleteFileFromAzure } = require('./azureUploader');
 const jwt = require('jsonwebtoken');
 const { isValidMobile } = require('../utils/decodeJWT');
 const axios = require('axios');
@@ -546,7 +546,7 @@ async function basicOnboard(req, res) {
         if (!is18OrAbove(dob)) return res.status(400).json({ success: false, message: 'Enter DOB above 18+ year.' });
 
         if (files?.profile?.length > 0) {
-            const image = await uploadImageTos3('profile', files?.profile[0], 'pandit');
+            const image = await uploadImageToAzure('profile', files?.profile[0], 'pandit');
             ins.profile = image.data.Location;
         }
         if (languages) {
@@ -817,23 +817,23 @@ async function onboard(req, res) {
         // }
 
         if (files?.profile?.length > 0) {
-            const image = await uploadImageTos3('profile', files?.profile[0], 'pandit');
+            const image = await uploadImageToAzure('profile', files?.profile[0], 'pandit');
             ins.profile = image.data.Location;
         }
         if (files?.selfie?.length > 0) {
-            const image = await uploadImageTos3('selfie', files?.selfie[0], 'document');
+            const image = await uploadImageToAzure('selfie', files?.selfie[0], 'document');
             ins.selfie = image.data.Location;
         }
 
         // if (files?.achievement?.length > 0) {
-        //     const image = await uploadImageTos3('achievement', files?.achievement[0], 'document');
+        //     const image = await uploadImageToAzure('achievement', files?.achievement[0], 'document');
         //     ins.achievement_file = image.data.Location;
         // }
 
         // if (files?.certificate?.length > 0) {
         //     const certificates = await Promise.all(
         //         files.certificate.map(file =>
-        //             uploadImageTos3('certificate', file, 'document')
+        //             uploadImageToAzure('certificate', file, 'document')
         //                 .then(res => res.data.Location)
         //         )
         //     );
@@ -843,7 +843,7 @@ async function onboard(req, res) {
         // if (files?.address?.length > 0) {
         //     const addresss = await Promise.all(
         //         files.address.map(file =>
-        //             uploadImageTos3('address', file, 'document')
+        //             uploadImageToAzure('address', file, 'document')
         //                 .then(res => res.data.Location)
         //         )
         //     );
@@ -1000,7 +1000,7 @@ async function uploadImage(req, res) {
 
         if (type == 'upload') {
             if (files?.file?.length > 0) {
-                const image = await uploadImageTos3('file', files?.file[0], 'upload');
+                const image = await uploadImageToAzure('file', files?.file[0], 'upload');
                 url = image.data.Location;
             }
         }
@@ -1055,7 +1055,7 @@ async function uploadImage(req, res) {
             }
 
             // Delete file from S3
-            const dd = await deleteFileFroms3(decodedUrl);
+            const dd = await deleteFileFromAzure(decodedUrl);
             // console.log("dd", dd);
         }
         return res.status(200).json({ success: true, data: url, message: `Image ${type} Successfully` });

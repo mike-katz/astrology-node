@@ -1,6 +1,6 @@
 const db = require('../db');
 require('dotenv').config();
-const { uploadImageTos3 } = require('./uploader');
+const { uploadImageToAzure } = require('./azureUploader');
 
 // Create support ticket
 async function createTicket(req, res) {
@@ -300,7 +300,7 @@ async function replyTicket(req, res) {
                 });
             }
             const file = files[0];
-            const image = await uploadImageTos3('message', file, 'support');
+            const image = await uploadImageToAzure('message', file, 'support');
             messageText = image.data.Location;
             messageType = 'image';
         } else if (type === 'text') {

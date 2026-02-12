@@ -2,7 +2,7 @@ const db = require('../db');
 require('dotenv').config();
 const { callEvent } = require("../socket");
 const { channelLeave } = require('./agoraController');
-const { uploadImageTos3 } = require('./uploader');
+const { uploadImageToAzure } = require('./azureUploader');
 
 async function getRoom(req, res) {
     try {
@@ -224,7 +224,7 @@ async function sendMessage(req, res) {
         let response = [];
         if (files?.length > 0) {
             for (const file of files) {
-                const image = await uploadImageTos3('message', file, 'chat');
+                const image = await uploadImageToAzure('message', file, 'chat');
                 // console.log("image", image.data.Location);
                 const [saved] = await db('chats').insert({
                     sender_type: "user",

@@ -1,7 +1,7 @@
 const db = require('../db');
 
 require('dotenv').config();
-const { uploadImageTos3, deleteFileFroms3 } = require('./uploader');
+const { uploadImageToAzure, deleteFileFromAzure } = require('./azureUploader');
 
 const { deleteKey } = require('../config/redisClient');
 
@@ -186,11 +186,11 @@ async function profileUpdate(req, res) {
         const update = {}
         const { files } = req
         if (files?.profile?.length > 0) {
-            const image = await uploadImageTos3('profile', files?.profile[0], 'upload');
+            const image = await uploadImageToAzure('profile', files?.profile[0], 'upload');
             update.profile = image.data.Location;
         }
         if (order?.profile?.length > 0) {
-            const dd = await deleteFileFroms3(decodeURIComponent(order?.profile))
+            const dd = await deleteFileFromAzure(decodeURIComponent(order?.profile))
             // console.log("dd", dd);
         }
         await db('users').where({ id: req.userId }).update(update);
