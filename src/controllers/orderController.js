@@ -230,43 +230,40 @@ async function createFreeChat(req, res) {
         const settings = await db('settings').first();
         const limit = Number(settings?.free_chat_max_pandit_request) || 30;
 
-        // let pandits = await db('pandits')
-        //     .whereNull('waiting_time')
-        //     .where({ unlimited_free_calls_chats: true, chat: true })
-        //     .orderByRaw('RANDOM()')
-        //     .limit(limit);
+        let pandits = await db('pandits')
+            .whereNull('waiting_time')
+            .where({ unlimited_free_calls_chats: true, chat: true })
+            .orderByRaw('RANDOM()')
+            .limit(limit);
 
-        // if (pandits.length < limit) {
-        //     const excludeIds = pandits.map((p) => p.id);
-        //     const more1 = await db('pandits')
-        //         .where({ unlimited_free_calls_chats: true, chat: true })
-        //         .whereNotIn('id', excludeIds.length ? excludeIds : [0])
-        //         .orderByRaw('RANDOM()')
-        //         .limit(limit - pandits.length);
-        //     pandits = [...pandits, ...more1];
-        // }
-        // if (pandits.length < limit) {
-        //     const excludeIds = pandits.map((p) => p.id);
-        //     const more2 = await db('pandits')
-        //         .whereNull('waiting_time')
-        //         .where({ chat: true })
-        //         .whereNotIn('id', excludeIds.length ? excludeIds : [0])
-        //         .orderByRaw('RANDOM()')
-        //         .limit(limit - pandits.length);
-        //     pandits = [...pandits, ...more2];
-        // }
-        // if (pandits.length < limit) {
-        //     const excludeIds = pandits.map((p) => p.id);
-        //     const more3 = await db('pandits')
-        //         .where({ chat: true })
-        //         .whereNotIn('id', excludeIds.length ? excludeIds : [0])
-        //         .orderByRaw('RANDOM()')
-        //         .limit(limit - pandits.length);
-        //     pandits = [...pandits, ...more3];
-        // }
-
-        let pandits = await db('pandits').whereIn('id', [3, 33, 5]);
-
+        if (pandits.length < limit) {
+            const excludeIds = pandits.map((p) => p.id);
+            const more1 = await db('pandits')
+                .where({ unlimited_free_calls_chats: true, chat: true })
+                .whereNotIn('id', excludeIds.length ? excludeIds : [0])
+                .orderByRaw('RANDOM()')
+                .limit(limit - pandits.length);
+            pandits = [...pandits, ...more1];
+        }
+        if (pandits.length < limit) {
+            const excludeIds = pandits.map((p) => p.id);
+            const more2 = await db('pandits')
+                .whereNull('waiting_time')
+                .where({ chat: true })
+                .whereNotIn('id', excludeIds.length ? excludeIds : [0])
+                .orderByRaw('RANDOM()')
+                .limit(limit - pandits.length);
+            pandits = [...pandits, ...more2];
+        }
+        if (pandits.length < limit) {
+            const excludeIds = pandits.map((p) => p.id);
+            const more3 = await db('pandits')
+                .where({ chat: true })
+                .whereNotIn('id', excludeIds.length ? excludeIds : [0])
+                .orderByRaw('RANDOM()')
+                .limit(limit - pandits.length);
+            pandits = [...pandits, ...more3];
+        }
         const requestedPanditIds = [...new Set((pandits || []).map((p) => p.id))];
         if (requestedPanditIds.length === 0) return res.status(400).json({ success: false, message: 'No pandit available.' });
 
