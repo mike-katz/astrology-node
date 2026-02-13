@@ -4,10 +4,10 @@ require('dotenv').config();
 const config = require('../knexfile');
 const db = knex(config.development);
 
-/** Soft-delete: deleted_at IS NULL OR deleted_at = ''. Returns Knex where-callback. */
+/** Soft-delete: deleted_at IS NULL (live records). Empty string invalid for PostgreSQL timestamp. */
 function liveFilter(column = 'deleted_at') {
   return function () {
-    this.whereNull(column).orWhere(column, '');
+    this.whereNull(column);
   };
 }
 

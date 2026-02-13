@@ -268,7 +268,7 @@ async function getRechargeBanner(req, res) {
                 `SELECT id, pandit_id FROM (
                     SELECT pandit_id, id, ROW_NUMBER() OVER (PARTITION BY pandit_id ORDER BY id DESC) as rn
                     FROM orders
-                    WHERE user_id = ? AND (deleted_at IS NULL OR deleted_at = '')
+                    WHERE user_id = ? AND deleted_at IS NULL
                 ) t WHERE rn = 1 ORDER BY id DESC LIMIT 5`,
                 [userId]
             );

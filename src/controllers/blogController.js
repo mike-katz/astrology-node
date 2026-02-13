@@ -1,6 +1,17 @@
 const db = require('../db');
 require('dotenv').config();
 
+function parseJsonSafe(val, fallback = null) {
+    if (val == null) return fallback;
+    if (typeof val === 'object') return val;
+    if (typeof val !== 'string') return fallback;
+    try {
+        return JSON.parse(val);
+    } catch {
+        return fallback;
+    }
+}
+
 async function getList(req, res) {
     try {
         let page = parseInt(req.query.page) || 1;
@@ -45,9 +56,9 @@ async function getList(req, res) {
 
         const total = parseInt(count);
         const totalPages = Math.ceil(total / limit);
-        blogs.map(item => {
-            item.hash_tag = JSON.parse(item?.hash_tag)
-        })
+        blogs.forEach(item => {
+            item.hash_tag = parseJsonSafe(item?.hash_tag, []);
+        });
         const response = {
             page,
             limit,
@@ -103,9 +114,7 @@ async function getDetail(req, res) {
 
 async function getCategory(req, res) {
     try {
-        console.log("inside category");
-        const categories = await db.live('blog_categories');
-        console.log("categories", categories);
+        const categories = await db.live('blog_categories').orderBy('id', 'asc');
         return res.status(200).json({
             success: true,
             data: categories,

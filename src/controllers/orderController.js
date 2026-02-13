@@ -418,7 +418,7 @@ async function list(req, res) {
               SELECT DISTINCT ON (order_id)
                 *
               FROM chats
-              WHERE order_id IS NOT NULL AND (deleted_at IS NULL OR deleted_at = '') AND is_system_generate IS NULL
+              WHERE order_id IS NOT NULL AND deleted_at IS NULL AND is_system_generate IS NULL
               ORDER BY order_id, id DESC
             ) c
           `),
