@@ -784,7 +784,7 @@ async function callEnd(req, res) {
         const { order_id } = req.body;
 
         if (!order_id) return res.status(400).json({ success: false, message: 'Order id required.' });
-        const order = await db('orders').where({ order_id, pandit_id: req.userId }).first();
+        const order = await db('orders').where({ order_id, user_id: req.userId }).first();
         if (!order) return res.status(400).json({ success: false, message: 'Order not found.' });
 
         const dd = await channelLeave(order_id)
