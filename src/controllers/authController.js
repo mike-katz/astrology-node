@@ -69,7 +69,7 @@ async function login(req, res) {
 
 async function verifyOtp(req, res) {
     try {
-        const { mobile, country_code = '+91', otp } = req.body;
+        const { mobile, country_code = '+91', otp, ad_set_id, utm_source, ad_id } = req.body;
         if (!mobile || !otp || !country_code) return res.status(400).json({ success: false, message: 'Mobile number and otp required.' });
 
         const isValid = isValidMobile(mobile);
@@ -99,7 +99,7 @@ async function verifyOtp(req, res) {
             // await db('users').where({ id: existing?.id }).update({ deleted_at: null })
         }
         if (!existing) {
-            [existing] = await db('users').insert({ mobile, country_code, status: "active", balance: 0 }).returning(['id', 'mobile', 'avatar', 'country_code', 'otp']);
+            [existing] = await db('users').insert({ mobile, country_code, status: "active", balance: 0, ad_set_id, utm_source, ad_id }).returning(['id', 'mobile', 'avatar', 'country_code', 'otp']);
         }
         const token = jwt.sign({ userId: existing.id, mobile: existing.mobile }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '1h' });
         // hide password
