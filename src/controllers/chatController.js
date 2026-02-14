@@ -462,7 +462,7 @@ async function endChat(req, res) {
         const minSec = setting?.chat_end_min_minutes * 60
         console.log("minSec required", minSec);
         // console.log("endChat diffMinutes", diffMinutes, "startTime", order.start_time, "endTime", new Date());
-        if ((totalSeconds < Number(minSec)) && !order?.is_free) return res.status(400).json({ success: false, message: `Can't end chat in first ${setting?.chat_end_min_minutes} minute.` });
+        if ((totalSeconds < Number(minSec)) && order?.type == 'chat' && !order?.is_free) return res.status(400).json({ success: false, message: `Can't end chat in first ${setting?.chat_end_min_minutes} minute.` });
         // const [{ total }] = await db('orders').where({ pandit_id: order?.pandit_id, user_id: req.userId }).count('id as total');
         // if (total == 1) {
         //     return res.status(400).json({ success: false, message: 'You can not end this chat.' });
