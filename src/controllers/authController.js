@@ -69,6 +69,7 @@ async function login(req, res) {
 
 async function verifyOtp(req, res) {
     try {
+        console.log("req.body", req.body);
         const { mobile, country_code = '+91', otp, ad_set_id, utm_source, ad_id } = req.body;
         if (!mobile || !otp || !country_code) return res.status(400).json({ success: false, message: 'Mobile number and otp required.' });
 
