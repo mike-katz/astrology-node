@@ -117,7 +117,16 @@ async function getPandits(req, res) {
             .limit(limit)
             .offset(offset);
         let countQuery = db('pandits as p')
-            .count('* as count').where(filter);
+            .count('* as count')
+            .where(filter)
+            .andWhere(function () {
+                if (type === 'call') {
+                    this.where('p.call', true);
+                }
+                if (type === 'chat') {
+                    this.where('p.chat', true);
+                }
+            });
         if (search && search.trim()) {
             query.andWhere('p.display_name', 'ilike', `%${search.trim()}%`);
             countQuery.andWhere('p.display_name', 'ilike', `%${search.trim()}%`);
@@ -268,8 +277,7 @@ async function getPandits(req, res) {
                 END ASC
             `)
         } else if (sorting?.length > 0) {
-            sorting
-            query.orderBy(sorting)
+            query.orderBy(sorting);
         }
 
         const user = await query;
