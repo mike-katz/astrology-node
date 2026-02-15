@@ -35,10 +35,10 @@ const { encryptResponse } = require('./middleware/encryptResponse.js')
 app.get("/health", (req, res) => {
     res.status(200).send("user OK");
 });
-app.use('/callback', callBackRoutes);
 
 app.use(express.json());
 
+app.use('/callback', callBackRoutes);
 app.use(decryptRequest);
 app.use(encryptResponse);
 RedisCache.initializeRedis();
