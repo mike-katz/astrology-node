@@ -36,6 +36,7 @@ function numberToIndianWords(amount) {
  * Raw body use thay (server.js ma /callback/razorpay par express.raw set che) – req.body Buffer hoy
  */
 async function razorpay(req, res) {
+    console.log("razorpay callback Start")
     try {
         let rawBody;
         if (req.body instanceof Buffer) {
@@ -47,7 +48,9 @@ async function razorpay(req, res) {
         } else {
             return res.status(400).send('Missing request body');
         }
+        console.log("rawBody", rawBody);
         const bodyStr = rawBody.toString('utf8');
+        console.log("bodyStr", bodyStr);
         const signature = req.headers['x-razorpay-signature'];
         // if (!signature) {
         //     return res.status(400).send('Missing signature');
@@ -66,10 +69,11 @@ async function razorpay(req, res) {
         let payload;
         try {
             payload = JSON.parse(bodyStr);
+            console.log("razorpay callback req.body", payload);
         } catch (e) {
             return res.status(400).send('Invalid JSON');
         }
-        console.log("razorpay callback req.body", payload);
+        console.log("payload", payload);
         // Razorpay events: payment.failed | payment.authorized | payment.captured | order.paid
         const event = payload.event;
 
