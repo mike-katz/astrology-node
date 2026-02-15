@@ -217,7 +217,7 @@ async function sendMessage(req, res) {
         if (order?.status == "completed") {
             return res.status(400).json({ success: false, message: 'Order is completed.' });
         }
-        if (order?.status == "pending") {
+        if (order?.status == "pending" && !order?.is_free) {
             return res.status(400).json({ success: false, message: 'Order is pending.' });
         }
         const { files } = req
