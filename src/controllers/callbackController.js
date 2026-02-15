@@ -37,18 +37,23 @@ function numberToIndianWords(amount) {
  */
 async function razorpay(req, res) {
     console.log("razorpay callback Start")
+    console.log("req", req);
     try {
         let rawBody;
         if (req.body instanceof Buffer) {
             rawBody = req.body;
+            console.log("rawBody", rawBody);
         } else if (typeof req.body === 'string') {
             rawBody = Buffer.from(req.body);
+            console.log("rawBody", rawBody);
         } else if (req.body != null) {
             rawBody = Buffer.from(JSON.stringify(req.body));
-        } else {
+            console.log("rawBody", rawBody);
+        }
+        else {
             return res.status(400).send('Missing request body');
         }
-        console.log("rawBody", rawBody);
+
         const bodyStr = rawBody.toString('utf8');
         console.log("bodyStr", bodyStr);
         const signature = req.headers['x-razorpay-signature'];
