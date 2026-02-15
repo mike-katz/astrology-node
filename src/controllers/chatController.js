@@ -314,7 +314,7 @@ async function getDetail(req, res) {
             });
         }
         if (response?.endTime == null) {
-            response?.start_chat = true
+            response.start_chat = true
         }
         return res.status(200).json({ success: true, data: response, message: 'get detail Successfully' });
     } catch (err) {
