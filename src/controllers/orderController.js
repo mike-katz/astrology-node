@@ -175,7 +175,8 @@ async function create(req, res) {
             deduction,
             type,
             profile_id,
-            is_free: false
+            is_free: false,
+            is_accept: false
         }
         if (count == 0 && type == 'chat') {
             ins.is_free = true
