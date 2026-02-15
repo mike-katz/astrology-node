@@ -36,8 +36,7 @@ function numberToIndianWords(amount) {
  * Raw body use thay (server.js ma /callback/razorpay par express.raw set che) – req.body Buffer hoy
  */
 async function razorpay(req, res) {
-    console.log("razorpay callback Start")
-    console.log("req", req);
+    console.log(" razorpay callback req.body", req.body);
     try {
         let rawBody;
         if (req.body instanceof Buffer) {
