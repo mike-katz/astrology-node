@@ -316,6 +316,8 @@ async function getDetail(req, res) {
         if (response?.endTime == null) {
             response.start_chat = true
         }
+
+        console.log("response", response);
         return res.status(200).json({ success: true, data: response, message: 'get detail Successfully' });
     } catch (err) {
         console.error(err);
