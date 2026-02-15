@@ -202,7 +202,8 @@ async function create(req, res) {
 
         const token = pandit?.token || false;
         if (token) {
-            await sendNotification(token, user?.name, pandit?.final_chat_call_rate, panditId, type, orderId, pandit?.display_name, pandit?.profile)
+            const waiting_time = pandit?.waiting_time == null ? true : false
+            await sendNotification(token, user?.name, pandit?.final_chat_call_rate, panditId, type, waiting_time)
         }
         // socket.emit("emit_to_user_for_register", {
         //     key: `user_${req?.userId}`,
@@ -311,7 +312,8 @@ async function createFreeChat(req, res) {
         const panditRecords = await db('pandits').whereIn('id', requestedPanditIds).select('id', 'token', 'display_name', 'profile', 'final_chat_call_rate');
         for (const pandit of panditRecords || []) {
             if (pandit?.token) {
-                await sendNotification(pandit.token, user?.name, settings?.free_chat_amount_per_minute, pandit.id, type, orderId, pandit?.display_name, pandit?.profile);
+                const waiting_time = pandit?.waiting_time == null ? true : false
+                await sendNotification(pandit.token, user?.name, settings?.free_chat_amount_per_minute, pandit.id, type, waiting_time);
             }
         }
         sendAutoMessage(profile, req.userId, orderId);
@@ -322,7 +324,8 @@ async function createFreeChat(req, res) {
     }
 }
 
-async function sendNotification(token, username, chat_call_rate, panditId, type, orderId, panditName, profile) {
+async function sendNotification(token, username, chat_call_rate, panditId, type, is_available = false) {
+    console.log("is_available", is_available);
     try {
         if (token) {
             // console.log("start push notification");
@@ -362,6 +365,9 @@ async function sendNotification(token, username, chat_call_rate, panditId, type,
                     }
                 },
 
+                data: {
+                    is_available: String(is_available),
+                }
             };
             // } else {
             //     message = {
