@@ -267,7 +267,7 @@ async function createFreeChat(req, res) {
         //     pandits = [...pandits, ...more3];
         // }
 
-        let pandits = await db('pandits').whereIn('id', [3, 33, 5]);
+        let pandits = await db('pandits').whereIn('id', [3, 36]);
 
         const requestedPanditIds = [...new Set((pandits || []).map((p) => p.id))];
         if (requestedPanditIds.length === 0) return res.status(400).json({ success: false, message: 'No pandit available.' });
