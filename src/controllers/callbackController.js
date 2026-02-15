@@ -37,18 +37,17 @@ function numberToIndianWords(amount) {
  */
 async function razorpay(req, res) {
     try {
-        console.log("razorpay callback req.body", req.body);
         let rawBody;
-        // if (req.body instanceof Buffer) {
-        //     rawBody = req.body;
-        // } else if (typeof req.body === 'string') {
-        //     rawBody = Buffer.from(req.body);
-        // } else if (req.body != null) {
-        // rawBody = Buffer.from(JSON.stringify(req.body));
-        // } else {
-        //     return res.status(400).send('Missing request body');
-        // }
-        // const bodyStr = rawBody.toString('utf8');
+        if (req.body instanceof Buffer) {
+            rawBody = req.body;
+        } else if (typeof req.body === 'string') {
+            rawBody = Buffer.from(req.body);
+        } else if (req.body != null) {
+            rawBody = Buffer.from(JSON.stringify(req.body));
+        } else {
+            return res.status(400).send('Missing request body');
+        }
+        const bodyStr = rawBody.toString('utf8');
         const signature = req.headers['x-razorpay-signature'];
         // if (!signature) {
         //     return res.status(400).send('Missing signature');
@@ -66,11 +65,11 @@ async function razorpay(req, res) {
 
         let payload;
         try {
-            // payload = JSON.parse(bodyStr);
-            payload = req.body;
+            payload = JSON.parse(bodyStr);
         } catch (e) {
             return res.status(400).send('Invalid JSON');
         }
+        console.log("razorpay callback req.body", payload);
         // Razorpay events: payment.failed | payment.authorized | payment.captured | order.paid
         const event = payload.event;
 
