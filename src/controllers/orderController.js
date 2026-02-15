@@ -276,17 +276,12 @@ async function createFreeChat(req, res) {
         const duration = Number(settings?.free_chat_minutes) || 0;
         if (!duration || duration < 1) return res.status(400).json({ success: false, message: 'Free chat minutes not configured.' });
 
-        const start_time = new Date()
-        const end_time = new Date(Date.now() + `${duration}` * 60 * 1000);
-
         const orderId = `${new Date().getTime().toString()}${Math.floor(100000 + Math.random() * 900000).toString()}`;
         const [saved] = await db('orders').insert({
             user_id: req.userId,
             order_id: orderId,
             status: 'pending',
             rate: settings?.free_chat_amount_per_minute,
-            start_time,
-            end_time,
             duration,
             deduction: 0,
             type: "chat",
