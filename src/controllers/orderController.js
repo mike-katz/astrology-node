@@ -325,7 +325,7 @@ async function sendNotification(token, username, chat_call_rate, panditId, type,
     console.log("is_available", is_available);
     try {
         const filter = {
-            type: 'pandit', type: 'active'
+            type: 'pandit', status: 'active'
         }
         if (type == 'chat' && !is_free) {
             filter.message_type = 'Chat Request'
