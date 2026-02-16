@@ -358,7 +358,7 @@ async function sendNotification(token, username, chat_call_rate, panditId, type,
             // if (type == 'chat') {
             const [{ count: panditCountRow }] = await db('orders')
                 .where({ pandit_id: panditId })
-                .whereIn('status', ['pending', 'continue'])
+                .whereIn('status', ['continue'])
                 .count('* as count');
             const panditCount = Number(panditCountRow) || 0;
             if (panditCount > 0) {
