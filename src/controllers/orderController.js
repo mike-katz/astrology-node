@@ -356,42 +356,81 @@ async function sendNotification(token, username, chat_call_rate, panditId, type,
             const continueOrder = await db('panditnotifications').insert({ user_id: panditId, type: "order", message: messages })
             let message = {}
             // if (type == 'chat') {
-
-            message = {
-                token,
-                notification: {
-                    title: messages,
-                },
-
-                // 🔔 Android
-                android: {
+            const [{ count: panditCountRow }] = await db('orders')
+                .where({ pandit_id: panditId })
+                .whereIn('status', ['pending', 'continue'])
+                .count('* as count');
+            const panditCount = Number(panditCountRow) || 0;
+            if (panditCount > 0) {
+                message = {
+                    token,
                     notification: {
-                        sound: 'default'
-                    }
-                },
+                        title: messages,
+                    },
 
-                // 🔔 iOS
-                apns: {
-                    payload: {
-                        aps: {
+                    // 🔔 Android
+                    android: {
+                        notification: {
                             sound: 'default'
                         }
-                    }
-                },
+                    },
 
-                // 🔔 Web Browser
-                webpush: {
+                    // 🔔 iOS
+                    apns: {
+                        payload: {
+                            aps: {
+                                sound: 'default'
+                            }
+                        }
+                    },
+
+                    // 🔔 Web Browser
+                    webpush: {
+                        notification: {
+                            // icon: '/icon.png',
+                            requireInteraction: true
+                            // NOTE: Browsers play default sound automatically
+                        }
+                    },
+
+                    data: {
+                        is_available: String(is_available),
+                    }
+                };
+            }
+            else {
+                message = {
+                    token, // This must be the VoIP Token, not the standard FCM token
                     notification: {
-                        // icon: '/icon.png',
-                        requireInteraction: true
-                        // NOTE: Browsers play default sound automatically
-                    }
-                },
+                        title: messages,
+                    },
+                    android: {
+                        priority: "high",
+                    },
+                    // Add this for iOS
+                    apns: {
+                        headers: {
+                            "apns-priority": "10",
+                            "apns-push-type": "voip", // CRITICAL: This tells iOS it's a call
+                            "apns-topic": "com.your.bundleid.voip" // Must end in .voip
+                        },
+                        payload: {
+                            aps: {
+                                "content-available": 1
+                            },
+                            // Your custom data
+                            type: type == 'chat' ? "incoming_chat" : "incoming_call",
+                            is_available: String(is_available),
 
-                data: {
-                    is_available: String(is_available),
-                }
-            };
+                            // ... other data
+                        }
+                    },
+                    data: {
+                        type: type == 'chat' ? "incoming_chat" : "incoming_call",
+                        is_available: String(is_available),
+                    },
+                };
+            }
             // } else {
             //     message = {
             //         token,

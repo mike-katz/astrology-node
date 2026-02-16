@@ -311,7 +311,6 @@ async function getDetail(req, res) {
             rating_5: order?.rating_5,
         }
 
-
         if (orderDetail) {
             response.startTime = orderDetail?.start_time;
             response.endTime = orderDetail?.end_time;
