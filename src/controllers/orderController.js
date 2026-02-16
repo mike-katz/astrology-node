@@ -339,7 +339,9 @@ async function sendNotification(token, username, chat_call_rate, panditId, type,
         if (type == 'call' && is_free) {
             filter.message_type = 'Free Call Request'
         }
+        console.log("filter", filter);
         const template = await db('templates').where(filter).first();
+        console.log("template", template);
         if (!template) return true;
 
 
