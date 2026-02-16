@@ -118,8 +118,8 @@ async function getList(req, res) {
                 'p.profile'
             )
             .limit(limit)
-            .offset(offset);
-
+            .offset(offset)
+            .orderBy('id', 'desc');
         const [{ count }] = await db('reviews')
             .count('* as count').where('pandit_id', panditId);
         const total = parseInt(count);
