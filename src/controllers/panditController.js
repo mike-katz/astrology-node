@@ -368,9 +368,9 @@ async function getPanditDetail(req, res) {
         const verified = jwt.verify(decryptToken, process.env.JWT_SECRET);
         // console.log("verified", verified);
         if (verified?.userId) {
-            const user = await db('follows').where({ 'pandit_id': user?.id, 'user_id': verified?.userId }).first();
+            const follow = await db('follows').where({ 'pandit_id': user?.id, 'user_id': verified?.userId }).first();
             // console.log("user", user);
-            if (user) {
+            if (follow) {
                 response.isFollow = true
             }
         }
