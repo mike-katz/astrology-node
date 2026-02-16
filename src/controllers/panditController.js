@@ -313,13 +313,15 @@ async function getPandits(req, res) {
 
 async function getPanditDetail(req, res) {
     const { id, display_name } = req.query;
-    // console.log("authHeader", req.headers);
-    // console.log("getPanditDetail id", id);
-    let filter = { id }
+    let user;
     if (display_name) {
-        filter = { display_name }
+        const trimmedDisplayName = typeof display_name === 'string' ? display_name.trim() : '';
+        user = await db('pandits').whereRaw('TRIM(display_name) = ?', [trimmedDisplayName]).first();
+    } else if (id) {
+        user = await db('pandits').where({ id }).first();
+    } else {
+        return res.status(400).json({ success: false, message: 'Provide id or display_name.' });
     }
-    const user = await db('pandits').where(filter).first();
     if (!user) return res.status(400).json({ success: false, message: 'pandit not available.' });
     // const review = await db('reviews as r')
     //     .where('r.pandit_id', id)
