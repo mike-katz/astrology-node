@@ -302,6 +302,8 @@ async function getDetail(req, res) {
             id: panditId, name: order?.display_name, status: order?.status, profile: order?.profile, isOnline: order?.chat, is_free: orderDetail?.is_free, pandit_id: orderDetail?.pandit_id,
             discounted_chat_call_rate: order?.discounted_chat_call_rate,
             final_chat_call_rate: order?.final_chat_call_rate,
+            chat_call_rate: order?.chat_call_rate,
+            tag: order?.tag,
             rating_1: order?.rating_1,
             rating_2: order?.rating_2,
             rating_3: order?.rating_3,
