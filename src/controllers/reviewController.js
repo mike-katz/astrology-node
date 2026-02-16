@@ -57,7 +57,7 @@ async function addReview(req, res) {
                 const template = await db('templates').where({ type: "pandit", status: "active", message_type: "5 Star Review" }).first();
                 if (template) {
                     const title = replaceTemplate(template?.title);
-                    const body = replaceTemplate(template?.desc, { user_name: userDetail?.name });
+                    const body = replaceTemplate(template?.desc, { user_name: userDetail?.name, message });
                     sendBulkPush([saved?.token], title, body, data = {})
                 }
             }
