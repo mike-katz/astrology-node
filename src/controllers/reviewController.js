@@ -3,6 +3,7 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 require('dotenv').config();
 const admin = require('../config/firebase');
+const { replaceTemplate } = require('../utils/replaceTemplate');
 
 async function sendBulkPush(tokens, title, body, data = {}) {
     // Normalize: allow single token string or array, filter invalid
@@ -53,9 +54,12 @@ async function addReview(req, res) {
             const userDetail = await db('users').where('id', req?.userId).first();
             await db('reviews').insert({ user_id: req?.userId, pandit_id: panditId, order_id: orderId, message, rating, type: "user", hide, gender: userDetail?.gender, profile: userDetail?.profile, avatar: userDetail?.avatar, name: userDetail?.name });
             if (saved?.token && rating == 5) {
-                const title = '⭐ You’re a Star!';
-                const body = `${userDetail?.name} gave you a 5-star rating! "Amazing guidance," they said. This will boost your profile visibility.`
-                sendBulkPush([saved?.token], title, body, data = {})
+                const template = await db('templates').where({ type: "pandit", status: "active", message_type: "5 Star Review" }).first();
+                if (template) {
+                    const title = replaceTemplate(template?.title);
+                    const body = replaceTemplate(template?.desc, { user_name: userDetail?.name });
+                    sendBulkPush([saved?.token], title, body, data = {})
+                }
             }
         } else {
             await db('reviews').where({ id: user?.id }).update({ user_id: req?.userId, pandit_id: panditId, order_id: orderId, hide, message, rating });

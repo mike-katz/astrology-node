@@ -4,6 +4,7 @@ const admin = require('../config/firebase');
 
 const { callEvent } = require("../socket");
 const { channelLeave } = require('./agoraController');
+const { replaceTemplate } = require('../utils/replaceTemplate');
 
 async function sendAutoMessage(profile, userId, orderId, panditId) {
     const panditIdNum = panditId != null && panditId !== '' ? Number(panditId) : null;
@@ -308,7 +309,7 @@ async function createFreeChat(req, res) {
         for (const pandit of panditRecords || []) {
             if (pandit?.token) {
                 const waiting_time = pandit?.waiting_time == null ? true : false
-                await sendNotification(pandit.token, user?.name, settings?.free_chat_amount_per_minute, pandit.id, type, waiting_time);
+                await sendNotification(pandit.token, user?.name, settings?.free_chat_amount_per_minute, pandit.id, type, waiting_time, true);
             }
         }
         sendAutoMessage(profile, req.userId, orderId);
@@ -319,12 +320,36 @@ async function createFreeChat(req, res) {
     }
 }
 
-async function sendNotification(token, username, chat_call_rate, panditId, type, is_available = false) {
+async function sendNotification(token, username, chat_call_rate, panditId, type, is_available = false, is_free = false) {
     console.log("is_available", is_available);
     try {
+        const filter = {
+            type: 'pandit', type: 'active'
+        }
+        if (type == 'chat' && !is_free) {
+            filter.message_type = 'Chat Request'
+        }
+        if (type == 'chat' && is_free) {
+            filter.message_type = 'Free Chat Request'
+        }
+        if (type == 'call' && !is_free) {
+            filter.message_type = 'Call Request'
+        }
+        if (type == 'call' && is_free) {
+            filter.message_type = 'Free Call Request'
+        }
+        const template = await db('templates').where(filter).first();
+        if (!template) return true;
+
+
+        const messages = replaceTemplate(template?.title, {
+            user_name: username,
+            pandit_rate: chat_call_rate
+        })
+
         if (token) {
             // console.log("start push notification");
-            const messages = `new ${type} request from ${username} (Rs ${chat_call_rate}/min).`
+            // const messages = `new ${type} request from ${username} (Rs ${chat_call_rate}/min).`
             const continueOrder = await db('panditnotifications').insert({ user_id: panditId, type: "order", message: messages })
             let message = {}
             // if (type == 'chat') {
