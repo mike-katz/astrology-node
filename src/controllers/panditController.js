@@ -326,7 +326,7 @@ async function getPanditDetail(req, res) {
     //     .orderBy('r.created_at', 'desc')
     //     .limit(3);
 
-    const gallery = await db('panditgallery').where({ pandit_id: id }).orderBy('order', 'asc');
+    const gallery = await db('panditgallery').where({ pandit_id: user?.id }).orderBy('order', 'asc');
     const response = {
         id: user?.id,
         name: user?.display_name,
