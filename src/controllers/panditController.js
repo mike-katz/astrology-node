@@ -315,9 +315,9 @@ async function getPanditDetail(req, res) {
     const { id, display_name } = req.query;
     // console.log("authHeader", req.headers);
     // console.log("getPanditDetail id", id);
-    const filter = { id }
+    let filter = { id }
     if (display_name) {
-        filter.display_name = display_name
+        filter = { display_name }
     }
     const user = await db('pandits').where(filter).first();
     if (!user) return res.status(400).json({ success: false, message: 'pandit not available.' });
