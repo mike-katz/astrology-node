@@ -104,22 +104,17 @@ async function getPandits(req, res) {
                 'p.tag',
                 'p.chat_call_rate',
             ).where(filter)
-            .andWhere(function () {
-                if (type === 'call') {
-                    this.where('p.call', true);
-                }
-                if (type === 'chat') {
-                    this.where('p.chat', true);
-                }
-                // ✅ OR condition
-                // this.orWhere('p.unlimited_free_calls_chats', true);
-            })
             .limit(limit)
             .offset(offset);
         let countQuery = db('pandits as p')
             .count('* as count')
             .where(filter)
-            .andWhere(function () {
+
+        if (search && search.trim()) {
+            query.andWhere('p.display_name', 'ilike', `%${search.trim()}%`);
+            countQuery.andWhere('p.display_name', 'ilike', `%${search.trim()}%`);
+        } else {
+            query.andWhere(function () {
                 if (type === 'call') {
                     this.where('p.call', true);
                 }
@@ -127,9 +122,14 @@ async function getPandits(req, res) {
                     this.where('p.chat', true);
                 }
             });
-        if (search && search.trim()) {
-            query.andWhere('p.display_name', 'ilike', `%${search.trim()}%`);
-            countQuery.andWhere('p.display_name', 'ilike', `%${search.trim()}%`);
+            countQuery.andWhere(function () {
+                if (type === 'call') {
+                    this.where('p.call', true);
+                }
+                if (type === 'chat') {
+                    this.where('p.chat', true);
+                }
+            });
         }
 
         if (secondary_expertise && secondary_expertise != 'all') {
@@ -312,10 +312,14 @@ async function getPandits(req, res) {
 }
 
 async function getPanditDetail(req, res) {
-    const { id } = req.query;
+    const { id, display_name } = req.query;
     // console.log("authHeader", req.headers);
     // console.log("getPanditDetail id", id);
-    const user = await db('pandits').where('id', id).first();
+    const filter = { id }
+    if (display_name) {
+        filter.display_name = display_name
+    }
+    const user = await db('pandits').where(filter).first();
     if (!user) return res.status(400).json({ success: false, message: 'pandit not available.' });
     // const review = await db('reviews as r')
     //     .where('r.pandit_id', id)
