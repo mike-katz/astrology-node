@@ -399,11 +399,13 @@ async function sendNotification(token, username, chat_call_rate, panditId, type,
                 };
             }
             else {
+                console.log("inside else");
+
                 message = {
                     token, // This must be the VoIP Token, not the standard FCM token
-                    notification: {
-                        title: messages,
-                    },
+                    // notification: {
+                    //     title: messages,
+                    // },
                     android: {
                         priority: "high",
                     },
