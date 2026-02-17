@@ -135,24 +135,6 @@ async function getPandits(req, res) {
         }
 
         if (Array.isArray(skill) && skill.length) {
-            // query.andWhere(builder => {
-            //     skill.forEach((s, index) => {
-            //         const condition = ['ilike', `%${s.trim()}%`];
-            //         index === 0
-            //             ? builder.where('p.primary_expertise', ...condition)
-            //             : builder.orWhere('p.primary_expertise', ...condition);
-            //     });
-            // });
-
-            // countQuery.andWhere(builder => {
-            //     skill.forEach((s, index) => {
-            //         const condition = ['ilike', `%${s.trim()}%`];
-            //         index === 0
-            //             ? builder.where('p.primary_expertise', ...condition)
-            //             : builder.orWhere('p.primary_expertise', ...condition);
-            //     });
-            // });
-
             const skills = skill
                 .map(s => s?.trim())
                 .filter(Boolean)
