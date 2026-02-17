@@ -474,15 +474,26 @@ async function endChat(req, res) {
         console.log("totalSeconds", totalSeconds);
         const minSec = setting?.chat_end_min_minutes * 60
         console.log("minSec required", minSec);
+
+        if (order.status == 'pending') {
+            return res.status(400).json({ success: false, message: 'order is pending.' });
+        }
+        if (order.status == 'cancel') {
+            return res.status(400).json({ success: false, message: 'order is rejected.' });
+        }
+        if (order.status == 'completed') {
+            return res.status(200).json({ success: false, message: 'order is already completed.' });
+        }
+
         // console.log("endChat diffMinutes", diffMinutes, "startTime", order.start_time, "endTime", new Date());
         if ((totalSeconds < Number(minSec)) && !order?.is_free && order?.type == 'chat') return res.status(400).json({ success: false, message: `Can't end chat in first ${setting?.chat_end_min_minutes} minute.` });
         // const [{ total }] = await db('orders').where({ pandit_id: order?.pandit_id, user_id: req.userId }).count('id as total');
         // if (total == 1) {
         //     return res.status(400).json({ success: false, message: 'You can not end this chat.' });
         // }
-        if (order.status != 'continue') {
-            return res.status(400).json({ success: false, message: 'order is pending or completed.' });
-        }
+        // if (order.status != 'continue') {
+        //     return res.status(400).json({ success: false, message: 'order is pending or completed.' });
+        // }
         if (order.type == 'call') {
             const dd = await channelLeave(orderId)
         }
@@ -518,8 +529,14 @@ async function forceEndChat(req, res) {
         if (!order) {
             return res.status(400).json({ success: false, message: 'Wrong order. Please enter correct' });
         }
-        if (order.status != 'continue') {
-            return res.status(400).json({ success: false, message: 'order is pending or completed.' });
+        if (order.status == 'pending') {
+            return res.status(400).json({ success: false, message: 'order is pending.' });
+        }
+        if (order.status == 'cancel') {
+            return res.status(400).json({ success: false, message: 'order is rejected.' });
+        }
+        if (order.status == 'completed') {
+            return res.status(200).json({ success: false, message: 'order is already completed.' });
         }
 
         if (order?.end_time && (new Date(order?.end_time).getTime() > new Date())) {
