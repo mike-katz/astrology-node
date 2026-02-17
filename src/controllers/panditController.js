@@ -79,7 +79,6 @@ async function getPandits(req, res) {
             .select(
                 'p.display_name as name',
                 'p.id',
-                'p.knowledge',
                 'p.languages',
                 'p.experience',
                 'p.profile',
@@ -286,10 +285,7 @@ async function getPandits(req, res) {
         user.map(item => {
             item.govt_id = item?.govt_id ? JSON.parse(item?.govt_id) : [];
             item.available_for = item?.available_for ? JSON.parse(item?.available_for) : [];
-            item.consaltance_language = item?.consaltance_language ? JSON.parse(item?.consaltance_language) : [];
             item.languages = item?.languages ? JSON.parse(item?.languages) : [];
-            item.address = item?.address ? JSON.parse(item?.address) : [];
-            item.other_working = item?.other_working ? JSON.parse(item?.other_working) : [];
             item.primary_expertise = item?.primary_expertise ? JSON.parse(item?.primary_expertise) : [];
             item.secondary_expertise = item?.secondary_expertise ? JSON.parse(item?.secondary_expertise) : [];
             item.certificate = item?.certificate ? JSON.parse(item?.certificate) : [];
@@ -324,7 +320,6 @@ async function getPanditDetail(req, res) {
     const response = {
         id: user?.id,
         name: user?.display_name,
-        knowledge: user?.knowledge,
         languages: user?.languages ? JSON.parse(user?.languages) : [],
         primary_expertise: user?.primary_expertise ? JSON.parse(user?.primary_expertise) : [],
         experience: user?.experience,
@@ -347,7 +342,6 @@ async function getPanditDetail(req, res) {
         rating_5: user?.rating_5,
         total_orders: user?.total_orders,
         tag: user?.tag,
-        isverified: user?.isverified,
         audio_intro: user?.audio_intro,
         video_intro: user?.video_intro,
         // reviews: review,
