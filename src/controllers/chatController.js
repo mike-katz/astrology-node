@@ -447,7 +447,7 @@ async function balanceCut(user_id, order, end_time) {
         await db('pandits').where({ id: order.pandit_id }).increment(upd).update({ waiting_time: null });
         const pandit_new_balance = Number(panditDetail?.balance) + Number(panditAmount)
         const type = order.type.charAt(0).toUpperCase() + order.type.slice(1);
-        await db('balancelogs').insert({ user_id, pandit_old_balance: Number(panditDetail?.balance), pandit_new_balance, user_old_balance: Number(user.balance), user_new_balance: Number(newBalance), message: `${type} with ${panditDetail?.display_name} for ${diffMinutes} minutes`, pandit_id: panditDetail?.id, pandit_message: `${type} with ${user?.name} for ${diffMinutes} minutes`, pandit_amount: panditAmount, amount: isFree ? 0 : -deduction });
+        await db('balancelogs').insert({ order_id: order?.order_id, user_id, pandit_old_balance: Number(panditDetail?.balance), pandit_new_balance, user_old_balance: Number(user.balance), user_new_balance: Number(newBalance), message: `${type} with ${panditDetail?.display_name} for ${diffMinutes} minutes`, pandit_id: panditDetail?.id, pandit_message: `${type} with ${user?.name} for ${diffMinutes} minutes`, pandit_amount: panditAmount, amount: isFree ? 0 : -deduction });
         // console.log("user", dd);
         // console.log("order", dds);
         return true
