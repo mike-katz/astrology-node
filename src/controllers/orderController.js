@@ -126,7 +126,8 @@ async function create(req, res) {
 
         // const continueOrder = await db('orders').where({ user_id: req.userId, pandit_id: panditId }).whereIn('status', ['continue', 'pending']).first()
         const continueOrder = await db('orders').where({ user_id: req.userId }).whereIn('status', ['continue', 'pending']).first()
-        if (continueOrder) return res.status(400).json({ success: false, message: `Please complete your ongoing ${type}.` });
+        if (continueOrder?.status == 'continue') return res.status(400).json({ success: false, message: `Please complete your ongoing ${type}.` });
+        if (continueOrder?.status == 'pending') return res.status(400).json({ success: false, message: `Please reject your pending ${type}.` });
 
         const [{ count }] = await db('orders')
             .count('* as count')
