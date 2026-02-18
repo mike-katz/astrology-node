@@ -223,8 +223,8 @@ async function razorpay(req, res) {
             const deduction = Number(duration) * Number(rate);
             await db('orders').where({ id: order.id }).update({ duration, deduction, end_time: endTime });
             if (order.type === 'chat') {
-                callEvent('emit_to_user_chat_end_time', { key: `pandit_${order.pandit_id}`, payload: { startTime: order.start_time, endTime, orderId: order.order_id } });
-                callEvent('emit_to_user_chat_end_time', { key: `user_${order.user_id}`, payload: { startTime: order.start_time, endTime, orderId: order.order_id } });
+                callEvent('emit_to_user_chat_end_time', { key: `pandit_${order.pandit_id}`, payload: { startTime: order.start_time, endTime, orderId: order.order_id, user_id: order?.user_id } });
+                callEvent('emit_to_user_chat_end_time', { key: `user_${order.user_id}`, payload: { startTime: order.start_time, endTime, orderId: order.order_id, pandit_id: order?.pandit_id } });
             }
             if (order.type === 'call') {
                 callEvent('emit_to_user_call_end_time', { key: `pandit_${order.pandit_id}`, payload: { startTime: order.start_time, endTime, orderId: order.order_id } });

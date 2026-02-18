@@ -126,7 +126,7 @@ async function create(req, res) {
 
         // const continueOrder = await db('orders').where({ user_id: req.userId, pandit_id: panditId }).whereIn('status', ['continue', 'pending']).first()
         const continueOrder = await db('orders').where({ user_id: req.userId }).whereIn('status', ['continue', 'pending']).first()
-        if (continueOrder) return res.status(400).json({ success: false, message: 'Please complete your ongoing order.' });
+        if (continueOrder) return res.status(400).json({ success: false, message: `Please complete your ongoing ${type}.` });
 
         const [{ count }] = await db('orders')
             .count('* as count')
@@ -718,7 +718,7 @@ async function acceptOrder(req, res) {
         if (order.type == 'chat') {
             callEvent("emit_to_user_chat_end_time", {
                 key: `pandit_${order?.pandit_id}`,
-                payload: { startTime, endTime, orderId }
+                payload: { startTime, endTime, orderId, user_id: order?.user_id }
             });
         }
         if (order.type == 'call') {
