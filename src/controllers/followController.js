@@ -55,7 +55,6 @@ async function getFollow(req, res) {
             "p.chat_call_rate",
             "p.display_name as name",
             "p.profile",
-            "p.knowledge",
             "p.languages",
             "p.primary_expertise",
             "p.experience",
