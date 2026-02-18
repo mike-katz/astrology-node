@@ -425,13 +425,14 @@ async function sendNotification(token, username, chat_call_rate, panditId, type,
                             // Your custom data
                             type: type == 'chat' ? "incoming_chat" : "incoming_call",
                             is_available: String(is_available),
-
+                            title: messages,
                             // ... other data
                         }
                     },
                     data: {
                         type: type == 'chat' ? "incoming_chat" : "incoming_call",
                         is_available: String(is_available),
+                        title: messages,
                     },
                 };
             }
