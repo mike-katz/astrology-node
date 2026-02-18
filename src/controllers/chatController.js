@@ -381,6 +381,8 @@ function getDuration(start_time, end_time) {
 }
 async function balanceCut(user_id, order, end_time) {
     try {
+        const transaction = await db('balancelogs').where({ order_id: order?.order_id }).first();
+        if (transaction) return;
         const user = await db('users').where({ id: user_id }).first();
         const diffMinutes = getDuration(order.start_time, end_time)
         // console.log("diffMinutes", diffMinutes);
