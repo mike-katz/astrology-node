@@ -236,29 +236,25 @@ async function getPandits(req, res) {
         //     countQuery.andWhere('p.tag', 'ilike', `%${offer.trim()}%`);
         // }
 
+        // Rating ratio: (rating_5 + rating_4) / total_ratings — reuse for tie-breaker
+        const ratingRatioRaw = `
+            CASE 
+                WHEN (COALESCE(p.rating_1, 0) + COALESCE(p.rating_2, 0) + COALESCE(p.rating_3, 0) + COALESCE(p.rating_4, 0) + COALESCE(p.rating_5, 0)) > 0 
+                THEN (COALESCE(p.rating_5, 0) + COALESCE(p.rating_4, 0))::float / 
+                     (COALESCE(p.rating_1, 0) + COALESCE(p.rating_2, 0) + COALESCE(p.rating_3, 0) + COALESCE(p.rating_4, 0) + COALESCE(p.rating_5, 0))::float
+                ELSE 0 
+            END
+        `;
+
         if (sort_by == 'rating_high_to_low') {
-            // Sort by rating ratio: (rating_5 + rating_4) / total_ratings
-            // Higher ratio means more high ratings, so sort desc
-            query.orderByRaw(`
-                CASE 
-                    WHEN (COALESCE(p.rating_1, 0) + COALESCE(p.rating_2, 0) + COALESCE(p.rating_3, 0) + COALESCE(p.rating_4, 0) + COALESCE(p.rating_5, 0)) > 0 
-                    THEN (COALESCE(p.rating_5, 0) + COALESCE(p.rating_4, 0))::float / 
-                         (COALESCE(p.rating_1, 0) + COALESCE(p.rating_2, 0) + COALESCE(p.rating_3, 0) + COALESCE(p.rating_4, 0) + COALESCE(p.rating_5, 0))::float
-                    ELSE 0 
-                END DESC
-            `)
+            query.orderByRaw(ratingRatioRaw + ' DESC').orderBy('p.total_orders', 'desc');
         } else if (sort_by == 'rating_low_to_high') {
-            // Sort by rating ratio ascending (lower ratio first)
-            query.orderByRaw(`
-                CASE 
-                    WHEN (COALESCE(p.rating_1, 0) + COALESCE(p.rating_2, 0) + COALESCE(p.rating_3, 0) + COALESCE(p.rating_4, 0) + COALESCE(p.rating_5, 0)) > 0 
-                    THEN (COALESCE(p.rating_5, 0) + COALESCE(p.rating_4, 0))::float / 
-                         (COALESCE(p.rating_1, 0) + COALESCE(p.rating_2, 0) + COALESCE(p.rating_3, 0) + COALESCE(p.rating_4, 0) + COALESCE(p.rating_5, 0))::float
-                    ELSE 0 
-                END ASC
-            `)
+            query.orderByRaw(ratingRatioRaw + ' ASC').orderBy('p.total_orders', 'desc');
         } else if (sorting?.length > 0) {
-            query.orderBy(sorting);
+            query.orderBy(sorting).orderBy('p.total_orders', 'desc').orderByRaw(ratingRatioRaw + ' DESC');
+        } else {
+            // Default: first total_orders DESC, then rating ratio DESC
+            query.orderBy('p.total_orders', 'desc').orderByRaw(ratingRatioRaw + ' DESC');
         }
 
         const user = await query;
