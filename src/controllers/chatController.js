@@ -326,6 +326,9 @@ async function getDetail(req, res) {
                 order_id: orderDetail?.order_id
             });
         }
+        if (response?.endTime == null) {
+            response.start_chat = true
+        }
         return res.status(200).json({ success: true, data: response, message: 'get detail Successfully' });
     } catch (err) {
         console.error(err);
