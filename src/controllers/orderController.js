@@ -744,12 +744,16 @@ async function cancelOrder(req, res) {
         if (!orderId) return res.status(400).json({ success: false, message: 'Order id required.' });
         const order = await db('orders').where({ order_id: orderId, user_id: req.userId, status: "pending" }).first();
         if (!order) return res.status(400).json({ success: false, message: 'You can not cancel this order.' });
-
+        const upd = {}
         let status = 'cancel';
+        if (!order?.is_accept) {
+            upd.canceled_at = new Date()
+        }
         if (order?.is_accept) {
             status = 'rejected'
         }
-        await db('orders').where({ id: order?.id }).update({ status });
+        upd.status = status
+        await db('orders').where({ id: order?.id }).update(upd);
 
         callEvent("emit_to_pending_order", {
             key: `pandit_${order?.pandit_id}`,
