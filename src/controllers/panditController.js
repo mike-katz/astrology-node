@@ -101,22 +101,17 @@ async function getPandits(req, res) {
                 'p.chat_call_rate',
             ).where(filter)
             .where(db.liveFilter('p.deleted_at'))
-            .andWhere(function () {
-                if (type === 'call') {
-                    this.where('p.call', true);
-                }
-                if (type === 'chat') {
-                    this.where('p.chat', true);
-                }
-                // ✅ OR condition
-                // this.orWhere('p.unlimited_free_calls_chats', true);
-            })
             .limit(limit)
             .offset(offset);
         let countQuery = db('pandits as p')
-            .count('* as count').where(filter)
-            .where(db.liveFilter('p.deleted_at'))
-            .andWhere(function () {
+            .count('* as count')
+            .where(filter)
+
+        if (search && search.trim()) {
+            query.andWhere('p.display_name', 'ilike', `%${search.trim()}%`);
+            countQuery.andWhere('p.display_name', 'ilike', `%${search.trim()}%`);
+        } else {
+            query.andWhere(function () {
                 if (type === 'call') {
                     this.where('p.call', true);
                 }
@@ -124,9 +119,14 @@ async function getPandits(req, res) {
                     this.where('p.chat', true);
                 }
             });
-        if (search && search.trim()) {
-            query.andWhere('p.display_name', 'ilike', `%${search.trim()}%`);
-            countQuery.andWhere('p.display_name', 'ilike', `%${search.trim()}%`);
+            countQuery.andWhere(function () {
+                if (type === 'call') {
+                    this.where('p.call', true);
+                }
+                if (type === 'chat') {
+                    this.where('p.chat', true);
+                }
+            });
         }
 
         if (secondary_expertise && secondary_expertise != 'all') {
@@ -234,29 +234,25 @@ async function getPandits(req, res) {
         //     countQuery.andWhere('p.tag', 'ilike', `%${offer.trim()}%`);
         // }
 
+        // Rating ratio: (rating_5 + rating_4) / total_ratings — reuse for tie-breaker
+        const ratingRatioRaw = `
+            CASE 
+                WHEN (COALESCE(p.rating_1, 0) + COALESCE(p.rating_2, 0) + COALESCE(p.rating_3, 0) + COALESCE(p.rating_4, 0) + COALESCE(p.rating_5, 0)) > 0 
+                THEN (COALESCE(p.rating_5, 0) + COALESCE(p.rating_4, 0))::float / 
+                     (COALESCE(p.rating_1, 0) + COALESCE(p.rating_2, 0) + COALESCE(p.rating_3, 0) + COALESCE(p.rating_4, 0) + COALESCE(p.rating_5, 0))::float
+                ELSE 0 
+            END
+        `;
+
         if (sort_by == 'rating_high_to_low') {
-            // Sort by rating ratio: (rating_5 + rating_4) / total_ratings
-            // Higher ratio means more high ratings, so sort desc
-            query.orderByRaw(`
-                CASE 
-                    WHEN (COALESCE(p.rating_1, 0) + COALESCE(p.rating_2, 0) + COALESCE(p.rating_3, 0) + COALESCE(p.rating_4, 0) + COALESCE(p.rating_5, 0)) > 0 
-                    THEN (COALESCE(p.rating_5, 0) + COALESCE(p.rating_4, 0))::float / 
-                         (COALESCE(p.rating_1, 0) + COALESCE(p.rating_2, 0) + COALESCE(p.rating_3, 0) + COALESCE(p.rating_4, 0) + COALESCE(p.rating_5, 0))::float
-                    ELSE 0 
-                END DESC
-            `)
+            query.orderByRaw(ratingRatioRaw + ' DESC').orderBy('p.total_orders', 'desc');
         } else if (sort_by == 'rating_low_to_high') {
-            // Sort by rating ratio ascending (lower ratio first)
-            query.orderByRaw(`
-                CASE 
-                    WHEN (COALESCE(p.rating_1, 0) + COALESCE(p.rating_2, 0) + COALESCE(p.rating_3, 0) + COALESCE(p.rating_4, 0) + COALESCE(p.rating_5, 0)) > 0 
-                    THEN (COALESCE(p.rating_5, 0) + COALESCE(p.rating_4, 0))::float / 
-                         (COALESCE(p.rating_1, 0) + COALESCE(p.rating_2, 0) + COALESCE(p.rating_3, 0) + COALESCE(p.rating_4, 0) + COALESCE(p.rating_5, 0))::float
-                    ELSE 0 
-                END ASC
-            `)
+            query.orderByRaw(ratingRatioRaw + ' ASC').orderBy('p.total_orders', 'desc');
         } else if (sorting?.length > 0) {
-            query.orderBy(sorting)
+            query.orderBy(sorting).orderBy('p.total_orders', 'desc').orderByRaw(ratingRatioRaw + ' DESC');
+        } else {
+            // Default: first total_orders DESC, then rating ratio DESC
+            query.orderBy('p.total_orders', 'desc').orderByRaw(ratingRatioRaw + ' DESC');
         }
 
         const user = await query;
@@ -288,17 +284,23 @@ async function getPandits(req, res) {
 }
 
 async function getPanditDetail(req, res) {
-    const { id } = req.query;
-    // console.log("authHeader", req.headers);
-    // console.log("getPanditDetail id", id);
-    const user = await db('pandits').where('id', id).first();
+    const { id, display_name } = req.query;
+    let user;
+    if (display_name) {
+        const trimmedDisplayName = typeof display_name === 'string' ? display_name.trim() : '';
+        user = await db('pandits').whereRaw('TRIM(display_name) = ?', [trimmedDisplayName]).first();
+    } else if (id) {
+        user = await db('pandits').where({ id }).first();
+    } else {
+        return res.status(400).json({ success: false, message: 'Provide id or display_name.' });
+    }
     if (!user) return res.status(400).json({ success: false, message: 'pandit not available.' });
     // const review = await db('reviews as r')
     //     .where('r.pandit_id', id)
     //     .orderBy('r.created_at', 'desc')
     //     .limit(3);
 
-    const gallery = await db('panditgallery').where({ pandit_id: id }).orderBy('order', 'asc');
+    const gallery = await db('panditgallery').where({ pandit_id: user?.id }).orderBy('order', 'asc');
     const response = {
         id: user?.id,
         name: user?.display_name,
@@ -338,9 +340,9 @@ async function getPanditDetail(req, res) {
         const verified = jwt.verify(decryptToken, process.env.JWT_SECRET);
         // console.log("verified", verified);
         if (verified?.userId) {
-            const user = await db('follows').where({ 'pandit_id': id, 'user_id': verified?.userId }).first();
+            const follow = await db('follows').where({ 'pandit_id': user?.id, 'user_id': verified?.userId }).first();
             // console.log("user", user);
-            if (user) {
+            if (follow) {
                 response.isFollow = true
             }
         }
@@ -388,7 +390,7 @@ async function signup(req, res) {
 
 async function verifyOtp(req, res) {
     try {
-        const { mobile, country_code, otp } = req.body;
+        const { mobile, country_code, otp, ad_set_id, utm_source, ad_id } = req.body;
         if (!mobile || !country_code || !otp) return res.status(400).json({ success: false, message: 'Mobile number and otp required.' });
         const isValid = isValidMobile(mobile);
         if (!isValid) return res.status(400).json({ success: false, message: 'Enter valid mobile number.' });
@@ -437,7 +439,7 @@ async function verifyOtp(req, res) {
 
         let user = await db.live('onboardings').where({ mobile, country_code }).first();
         if (!user) {
-            [user] = await db('onboardings').insert({ mobile, country_code, step: 0, status: "number" }).returning(['id', 'mobile', 'country_code', 'step']);
+            [user] = await db('onboardings').insert({ mobile, country_code, step: 0, status: "number", ad_set_id, utm_source, ad_id }).returning(['id', 'mobile', 'country_code', 'step']);
         }
         // console.log("user", user);
         const token = jwt.sign({ userId: user.id, mobile: user.mobile, country_code: user.country_code }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '1h' });
