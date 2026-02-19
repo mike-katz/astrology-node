@@ -142,7 +142,7 @@ async function razorpay(req, res) {
         const [{ count }] = await db('payments')
             .count('* as count')
             .where({ user_id: paymentRow.user_id })
-            .whereIn('status', ['pending', 'success']);
+            .whereIn('status', ['success']);
         const rechargeNo = Number(count);
         const recharges = await db('recharges')
             .whereIn('recharge_number', [1111, rechargeNo])
