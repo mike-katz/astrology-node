@@ -101,7 +101,7 @@ async function verifyOtp(req, res) {
         if (!existing) {
             [existing] = await db('users').insert({ mobile, country_code, status: "active", balance: 0, ad_set_id, utm_source, ad_id }).returning(['id', 'mobile', 'avatar', 'country_code', 'otp']);
         }
-        const token = jwt.sign({ userId: existing.id, mobile: existing.mobile }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '1h' });
+        const token = jwt.sign({ userId: existing.id, username: existing.name, mobile: existing.mobile }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '1h' });
         // hide password
         const encryptToken = encrypt(token);
 
