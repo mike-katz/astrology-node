@@ -445,7 +445,7 @@ async function balanceCut(user_id, order, end_time) {
                     receiver_type: "user",
                     order_id: order?.order_id,
                     receiver_id: Number(user_id),
-                    message: `There is more to see in your chart. Please recharge to continue and connect via call or chat for further guidance.\nआपकी कुंडली में और भी बहुत कुछ देखने योग्य है। कृपया आगे बढ़ने के लिए रिचार्ज करें और अधिक मार्गदर्शन के लिए कॉल या चैट के माध्यम से जुड़ें।`,
+                    message: `There is more to see in your chart. Please recharge to continue and connect via call or chat for further guidance.\n\nआपकी कुंडली में और भी बहुत कुछ देखने योग्य है। कृपया आगे बढ़ने के लिए रिचार्ज करें और अधिक मार्गदर्शन के लिए कॉल या चैट के माध्यम से जुड़ें।`,
                     status: "send",
                     type: "text",
                 }).returning('*');
