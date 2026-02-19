@@ -437,6 +437,34 @@ async function balanceCut(user_id, order, end_time) {
                 orderId: order?.order_id,
                 payload: saved,
             });
+
+            if (order?.is_free) {
+                [saved] = await db('chats').insert({
+                    sender_type: "pandit",
+                    sender_id: Number(order?.pandit_id),
+                    receiver_type: "user",
+                    order_id: order?.order_id,
+                    receiver_id: Number(user_id),
+                    message: `There is more to see in your chart. Please recharge to continue and connect via call or chat for further guidance.
+
+                आपकी कुंडली में और भी बहुत कुछ देखने योग्य है। कृपया आगे बढ़ने के लिए रिचार्ज करें और अधिक मार्गदर्शन के लिए कॉल या चैट के माध्यम से जुड़ें।`,
+                    status: "send",
+                    type: "text",
+                    is_system_generate: true
+                }).returning('*');
+                callEvent("emit_to_user", {
+                    toType: "pandit",
+                    toId: order?.pandit_id,
+                    orderId: order?.order_id,
+                    payload: saved,
+                });
+                callEvent("emit_to_user", {
+                    toType: "user",
+                    toId: order?.user_id,
+                    orderId: order?.order_id,
+                    payload: saved,
+                });
+            }
             callEvent("emit_to_chat_end", {
                 toType: "pandit",
                 toId: order?.pandit_id,
