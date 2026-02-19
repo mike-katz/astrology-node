@@ -242,15 +242,6 @@ async function createFreeChat(req, res) {
 
         if (pandits.length < limit) {
             const excludeIds = pandits.map((p) => p.id);
-            const more1 = await db('pandits')
-                .where({ unlimited_free_calls_chats: true, chat: true })
-                .whereNotIn('id', excludeIds.length ? excludeIds : [0])
-                .orderByRaw('RANDOM()')
-                .limit(limit - pandits.length);
-            pandits = [...pandits, ...more1];
-        }
-        if (pandits.length < limit) {
-            const excludeIds = pandits.map((p) => p.id);
             const more2 = await db('pandits')
                 .whereNull('waiting_time')
                 .where({ chat: true })
@@ -258,6 +249,15 @@ async function createFreeChat(req, res) {
                 .orderByRaw('RANDOM()')
                 .limit(limit - pandits.length);
             pandits = [...pandits, ...more2];
+        }
+        if (pandits.length < limit) {
+            const excludeIds = pandits.map((p) => p.id);
+            const more1 = await db('pandits')
+                .where({ unlimited_free_calls_chats: true, chat: true })
+                .whereNotIn('id', excludeIds.length ? excludeIds : [0])
+                .orderByRaw('RANDOM()')
+                .limit(limit - pandits.length);
+            pandits = [...pandits, ...more1];
         }
         if (pandits.length < limit) {
             const excludeIds = pandits.map((p) => p.id);
