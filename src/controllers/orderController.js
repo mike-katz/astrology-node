@@ -358,79 +358,79 @@ async function sendNotification(token, username, chat_call_rate, panditId, type,
                 .whereIn('status', ['continue'])
                 .count('* as count');
             const panditCount = Number(panditCountRow) || 0;
-            if (panditCount > 0) {
-                message = {
-                    token,
-                    notification: {
-                        title: messages,
-                    },
+            // if (panditCount > 0) {
+            message = {
+                token,
+                notification: {
+                    title: messages,
+                },
 
-                    // 🔔 Android
-                    android: {
-                        notification: {
+                // 🔔 Android
+                android: {
+                    notification: {
+                        sound: 'default'
+                    }
+                },
+
+                // 🔔 iOS
+                apns: {
+                    payload: {
+                        aps: {
                             sound: 'default'
                         }
-                    },
-
-                    // 🔔 iOS
-                    apns: {
-                        payload: {
-                            aps: {
-                                sound: 'default'
-                            }
-                        }
-                    },
-
-                    // 🔔 Web Browser
-                    webpush: {
-                        notification: {
-                            // icon: '/icon.png',
-                            requireInteraction: true
-                            // NOTE: Browsers play default sound automatically
-                        }
-                    },
-
-                    data: {
-                        is_available: String(is_available),
                     }
-                };
-            }
-            else {
-                console.log("inside else");
+                },
 
-                message = {
-                    token, // This must be the VoIP Token, not the standard FCM token
-                    // notification: {
-                    //     title: messages,
-                    // },
-                    android: {
-                        priority: "high",
-                    },
-                    // Add this for iOS
-                    apns: {
-                        headers: {
-                            "apns-priority": "10",
-                            "apns-push-type": "voip", // CRITICAL: This tells iOS it's a call
-                            "apns-topic": "com.your.bundleid.voip" // Must end in .voip
-                        },
-                        payload: {
-                            aps: {
-                                "content-available": 1
-                            },
-                            // Your custom data
-                            type: type == 'chat' ? "incoming_chat" : "incoming_call",
-                            is_available: String(is_available),
-                            title: messages,
-                            // ... other data
-                        }
-                    },
-                    data: {
-                        type: type == 'chat' ? "incoming_chat" : "incoming_call",
-                        is_available: String(is_available),
-                        title: messages,
-                    },
-                };
-            }
+                // 🔔 Web Browser
+                webpush: {
+                    notification: {
+                        // icon: '/icon.png',
+                        requireInteraction: true
+                        // NOTE: Browsers play default sound automatically
+                    }
+                },
+
+                data: {
+                    is_available: String(is_available),
+                }
+            };
+            // }
+            // else {
+            //     console.log("inside else");
+
+            //     message = {
+            //         token, // This must be the VoIP Token, not the standard FCM token
+            //         // notification: {
+            //         //     title: messages,
+            //         // },
+            //         android: {
+            //             priority: "high",
+            //         },
+            //         // Add this for iOS
+            //         apns: {
+            //             headers: {
+            //                 "apns-priority": "10",
+            //                 "apns-push-type": "voip", // CRITICAL: This tells iOS it's a call
+            //                 "apns-topic": "com.your.bundleid.voip" // Must end in .voip
+            //             },
+            //             payload: {
+            //                 aps: {
+            //                     "content-available": 1
+            //                 },
+            //                 // Your custom data
+            //                 type: type == 'chat' ? "incoming_chat" : "incoming_call",
+            //                 is_available: String(is_available),
+            //                 title: messages,
+            //                 // ... other data
+            //             }
+            //         },
+            //         data: {
+            //             type: type == 'chat' ? "incoming_chat" : "incoming_call",
+            //             is_available: String(is_available),
+            //             title: messages,
+            //         },
+            //     };
+            // }
             // } else {
             //     message = {
             //         token,
