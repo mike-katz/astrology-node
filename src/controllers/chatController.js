@@ -205,7 +205,7 @@ async function sendMessage(req, res) {
             //     user: order?.userId,
             //     orderId: order?.orderId,
             // });
-            const result = balanceCut(req.userId, order, order?.end_time)
+            const result = balanceCut(req.userId, order, order?.end_time, 'user -> send message')
             if (!result) {
                 return res.status(400).json({ success: false, message: 'Something went wrong.' });
             }
@@ -317,7 +317,7 @@ async function getDetail(req, res) {
         }
 
         if (orderDetail?.end_time && (new Date(orderDetail?.end_time).getTime() < new Date()) && orderDetail.status == 'continue') {
-            const result = balanceCut(req.userId, orderDetail, orderDetail?.end_time)
+            const result = balanceCut(req.userId, orderDetail, orderDetail?.end_time, 'user -> get detail')
             if (!result) {
                 return res.status(400).json({ success: false, message: 'Something went wrong.' });
             }
@@ -379,7 +379,7 @@ function getDuration(start_time, end_time) {
     );
     return diffMinutes
 }
-async function balanceCut(user_id, order, end_time) {
+async function balanceCut(user_id, order, end_time, place) {
     try {
         const transaction = await db('balancelogs').where({ order_id: order?.order_id }).first();
         if (transaction) return;
@@ -477,7 +477,7 @@ async function balanceCut(user_id, order, end_time) {
         await db('pandits').where({ id: order.pandit_id }).increment(upd).update({ waiting_time: null });
         const pandit_new_balance = Number(panditDetail?.balance) + Number(panditAmount)
         const type = order.type.charAt(0).toUpperCase() + order.type.slice(1);
-        await db('balancelogs').insert({ order_id: order?.order_id, user_id, pandit_old_balance: Number(panditDetail?.balance), pandit_new_balance, user_old_balance: Number(user.balance), user_new_balance: Number(newBalance), message: `${type} with ${panditDetail?.display_name} for ${diffMinutes} minutes`, pandit_id: panditDetail?.id, pandit_message: `${type} with ${user?.name} for ${diffMinutes} minutes`, pandit_amount: panditAmount, amount: isFree ? 0 : -deduction });
+        await db('balancelogs').insert({ place, order_id: order?.order_id, user_id, pandit_old_balance: Number(panditDetail?.balance), pandit_new_balance, user_old_balance: Number(user.balance), user_new_balance: Number(newBalance), message: `${type} with ${panditDetail?.display_name} for ${diffMinutes} minutes`, pandit_id: panditDetail?.id, pandit_message: `${type} with ${user?.name} for ${diffMinutes} minutes`, pandit_amount: panditAmount, amount: isFree ? 0 : -deduction });
         // console.log("user", dd);
         // console.log("order", dds);
         return true
@@ -527,7 +527,7 @@ async function endChat(req, res) {
         if (order.type == 'call') {
             const dd = await channelLeave(orderId)
         }
-        const result = await balanceCut(req.userId, order, new Date());
+        const result = await balanceCut(req.userId, order, new Date(), "user -> chat end");
         if (!result) {
             return res.status(400).json({ success: false, message: 'Something went wrong.' });
         }
@@ -573,7 +573,7 @@ async function forceEndChat(req, res) {
             return res.status(400).json({ success: false, message: 'Order is ongoing.' });
         }
 
-        const result = await balanceCut(req.userId, order, order?.end_time);
+        const result = await balanceCut(req.userId, order, order?.end_time, 'user -> force end');
         if (!result) {
             return res.status(400).json({ success: false, message: 'Something went wrong.' });
         }
