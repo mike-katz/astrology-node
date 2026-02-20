@@ -44,13 +44,13 @@ async function getTokenExpireForOrder(channelName) {
         return { expireTs: nowSec + DEFAULT_MAX_CALL_SECONDS, maxCallSeconds: DEFAULT_MAX_CALL_SECONDS };
     }
 
-    // end_time = absolute max call end (use same expire for both user & pandit)
-    // if (order.end_time) {
-    //     const endSec = Math.floor(new Date(order.end_time).getTime() / 1000);
-    //     if (endSec > nowSec) {
-    //         return { expireTs: endSec, maxCallSeconds: endSec - nowSec };
-    //     }
-    // }
+    // end_time = absolute max call end(use same expire for both user & pandit)
+    if (order.end_time) {
+        const endSec = Math.floor(new Date(order.end_time).getTime() / 1000);
+        if (endSec > nowSec) {
+            return { expireTs: endSec, maxCallSeconds: endSec - nowSec };
+        }
+    }
     // call_minutes, max_minutes, minutes = purchased minutes
     const minutes = order.duration;
     if (minutes != null && Number(minutes) > 0) {

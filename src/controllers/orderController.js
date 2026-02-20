@@ -124,8 +124,10 @@ async function create(req, res) {
         const pandit = await db('pandits').where({ id: panditId }).first()
         if (!pandit) return res.status(400).json({ success: false, message: 'Pandit not found.' });
 
-        const continueOrder = await db('orders').where({ user_id: req.userId, pandit_id: panditId }).whereIn('status', ['continue', 'pending']).first()
-        if (continueOrder) return res.status(400).json({ success: false, message: 'Please complete your ongoing order.' });
+        const continueOrder = await db('orders').where({ user_id: req.userId }).whereIn('status', ['continue', 'pending']).first()
+        // const continueOrder = await db('orders').where({ user_id: req.userId, pandit_id: panditId }).whereIn('status', ['continue', 'pending']).first()
+        if (continueOrder?.status == 'continue') return res.status(400).json({ success: false, message: `Please complete your ongoing ${type}.` });
+        if (continueOrder?.status == 'pending') return res.status(400).json({ success: false, message: `Please reject your pending ${type}.` });
 
         const [{ count }] = await db('orders')
             .count('* as count')
@@ -233,42 +235,40 @@ async function createFreeChat(req, res) {
         const settings = await db('settings').first();
         const limit = Number(settings?.free_chat_max_pandit_request) || 30;
 
-        // let pandits = await db('pandits')
-        //     .whereNull('waiting_time')
-        //     .where({ unlimited_free_calls_chats: true, chat: true })
-        //     .orderByRaw('RANDOM()')
-        //     .limit(limit);
+        let pandits = await db('pandits')
+            .whereNull('waiting_time')
+            .where({ unlimited_free_calls_chats: true, chat: true })
+            .orderByRaw('RANDOM()')
+            .limit(limit);
 
-        // if (pandits.length < limit) {
-        //     const excludeIds = pandits.map((p) => p.id);
-        //     const more1 = await db('pandits')
-        //         .where({ unlimited_free_calls_chats: true, chat: true })
-        //         .whereNotIn('id', excludeIds.length ? excludeIds : [0])
-        //         .orderByRaw('RANDOM()')
-        //         .limit(limit - pandits.length);
-        //     pandits = [...pandits, ...more1];
-        // }
-        // if (pandits.length < limit) {
-        //     const excludeIds = pandits.map((p) => p.id);
-        //     const more2 = await db('pandits')
-        //         .whereNull('waiting_time')
-        //         .where({ chat: true })
-        //         .whereNotIn('id', excludeIds.length ? excludeIds : [0])
-        //         .orderByRaw('RANDOM()')
-        //         .limit(limit - pandits.length);
-        //     pandits = [...pandits, ...more2];
-        // }
-        // if (pandits.length < limit) {
-        //     const excludeIds = pandits.map((p) => p.id);
-        //     const more3 = await db('pandits')
-        //         .where({ chat: true })
-        //         .whereNotIn('id', excludeIds.length ? excludeIds : [0])
-        //         .orderByRaw('RANDOM()')
-        //         .limit(limit - pandits.length);
-        //     pandits = [...pandits, ...more3];
-        // }
-
-        let pandits = await db('pandits').whereIn('id', [3, 36]);
+        if (pandits.length < limit) {
+            const excludeIds = pandits.map((p) => p.id);
+            const more2 = await db('pandits')
+                .whereNull('waiting_time')
+                .where({ chat: true })
+                .whereNotIn('id', excludeIds.length ? excludeIds : [0])
+                .orderByRaw('RANDOM()')
+                .limit(limit - pandits.length);
+            pandits = [...pandits, ...more2];
+        }
+        if (pandits.length < limit) {
+            const excludeIds = pandits.map((p) => p.id);
+            const more1 = await db('pandits')
+                .where({ unlimited_free_calls_chats: true, chat: true })
+                .whereNotIn('id', excludeIds.length ? excludeIds : [0])
+                .orderByRaw('RANDOM()')
+                .limit(limit - pandits.length);
+            pandits = [...pandits, ...more1];
+        }
+        if (pandits.length < limit) {
+            const excludeIds = pandits.map((p) => p.id);
+            const more3 = await db('pandits')
+                .where({ chat: true })
+                .whereNotIn('id', excludeIds.length ? excludeIds : [0])
+                .orderByRaw('RANDOM()')
+                .limit(limit - pandits.length);
+            pandits = [...pandits, ...more3];
+        }
 
         const requestedPanditIds = [...new Set((pandits || []).map((p) => p.id))];
         if (requestedPanditIds.length === 0) return res.status(400).json({ success: false, message: 'No pandit available.' });
@@ -430,13 +430,14 @@ async function sendNotification(token, username, chat_call_rate, panditId, type,
                         // Your custom data
                         type: type == 'chat' ? "incoming_chat" : "incoming_call",
                         is_available: String(is_available),
-
+                        title: messages,
                         // ... other data
                     }
                 },
                 data: {
                     type: type == 'chat' ? "incoming_chat" : "incoming_call",
                     is_available: String(is_available),
+                    title: messages,
                 },
             };
             const response = await admin.messaging().send(message);
@@ -740,11 +741,16 @@ async function cancelOrder(req, res) {
         if (!orderId) return res.status(400).json({ success: false, message: 'Order id required.' });
         const order = await db('orders').where({ order_id: orderId, user_id: req.userId, status: "pending" }).first();
         if (!order) return res.status(400).json({ success: false, message: 'You can not cancel this order.' });
+        const upd = {}
         let status = 'cancel';
+        if (!order?.is_accept) {
+            upd.canceled_at = new Date()
+        }
         if (order?.is_accept) {
             status = 'rejected'
         }
-        await db('orders').where({ id: order?.id }).update({ status });
+        upd.status = status
+        await db('orders').where({ id: order?.id }).update(upd);
 
         callEvent("emit_to_pending_order", {
             key: `pandit_${order?.pandit_id}`,

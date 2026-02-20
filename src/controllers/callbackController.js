@@ -36,8 +36,23 @@ function numberToIndianWords(amount) {
  * Raw body use thay (server.js ma /callback/razorpay par express.raw set che) – req.body Buffer hoy
  */
 async function razorpay(req, res) {
+    console.log(" razorpay callback req.body", req.body);
     try {
-        const rawBody = req.body instanceof Buffer ? req.body : (typeof req.body === 'string' ? Buffer.from(req.body) : Buffer.from(JSON.stringify(req.body)));
+        let rawBody;
+        if (req.body instanceof Buffer) {
+            rawBody = req.body;
+            console.log("rawBody", rawBody);
+        } else if (typeof req.body === 'string') {
+            rawBody = Buffer.from(req.body);
+            console.log("rawBody", rawBody);
+        } else if (req.body != null) {
+            rawBody = Buffer.from(JSON.stringify(req.body));
+            console.log("rawBody", rawBody);
+        }
+        else {
+            return res.status(400).send('Missing request body');
+        }
+
         const bodyStr = rawBody.toString('utf8');
         const signature = req.headers['x-razorpay-signature'];
         // if (!signature) {
@@ -124,10 +139,11 @@ async function razorpay(req, res) {
         const [{ count }] = await db('payments')
             .count('* as count')
             .where({ user_id: paymentRow.user_id })
-            .whereIn('status', ['pending', 'success']);
+            .whereIn('status', ['success']);
         const rechargeNo = Number(count);
-        const recharges = await db.live('recharges')
-            .whereIn('recharge_number', [1111, rechargeNo]);
+        const recharges = await db('recharges')
+            .whereIn('recharge_number', [1111, rechargeNo])
+            .whereNull('deleted_at');
         const matchedRecharge =
             recharges.find(r => r.recharge_number === rechargeNo) ||
             recharges.find(r => r.recharge_number === 1111);
@@ -204,8 +220,8 @@ async function razorpay(req, res) {
             const deduction = Number(duration) * Number(rate);
             await db('orders').where({ id: order.id }).update({ duration, deduction, end_time: endTime });
             if (order.type === 'chat') {
-                callEvent('emit_to_user_chat_end_time', { key: `pandit_${order.pandit_id}`, payload: { startTime: order.start_time, endTime, orderId: order.order_id } });
-                callEvent('emit_to_user_chat_end_time', { key: `user_${order.user_id}`, payload: { startTime: order.start_time, endTime, orderId: order.order_id } });
+                callEvent('emit_to_user_chat_end_time', { key: `pandit_${order.pandit_id}`, payload: { startTime: order.start_time, endTime, orderId: order.order_id, user_id: order?.user_id } });
+                callEvent('emit_to_user_chat_end_time', { key: `user_${order.user_id}`, payload: { startTime: order.start_time, endTime, orderId: order.order_id, pandit_id: order?.pandit_id } });
             }
             if (order.type === 'call') {
                 callEvent('emit_to_user_call_end_time', { key: `pandit_${order.pandit_id}`, payload: { startTime: order.start_time, endTime, orderId: order.order_id } });
