@@ -268,10 +268,14 @@ async function createFreeChat(req, res) {
                 .limit(limit - pandits.length);
             pandits = [...pandits, ...more3];
         }
-        const requestedPanditIds = [...new Set((pandits || []).map((p) => p.id))];
+        let requestedPanditIds = [...new Set((pandits || []).map((p) => p.id))];
         if (requestedPanditIds.length === 0) return res.status(400).json({ success: false, message: 'No pandit available.' });
-
-
+        const continueOrder = await db('orders').where({ status: "continue" }).whereIn('pandit_id', requestedPanditIds).select('pandit_id');
+        if (continueOrder?.length) {
+            const busyPanditIds = new Set(continueOrder.map((item) => item.pandit_id));
+            requestedPanditIds = requestedPanditIds.filter((id) => !busyPanditIds.has(id));
+        }
+        if (requestedPanditIds.length === 0) return res.status(400).json({ success: false, message: 'No pandit available.' });
         const duration = Number(settings?.free_chat_minutes) || 0;
         if (!duration || duration < 1) return res.status(400).json({ success: false, message: 'Free chat minutes not configured.' });
 
