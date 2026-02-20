@@ -343,12 +343,10 @@ async function sendNotification(token, username, chat_call_rate, panditId, type,
         const template = await db('templates').where(filter).first();
         if (!template) return true;
 
-        console.log("template", template);
         const messages = replaceTemplate(template?.title, {
             user_name: username,
             pandit_rate: chat_call_rate
         })
-        console.log("messages", messages);
         if (token) {
             // console.log("start push notification");
             // const messages = `new ${type} request from ${username} (Rs ${chat_call_rate}/min).`
@@ -454,6 +452,8 @@ async function sendNotification(token, username, chat_call_rate, panditId, type,
             //         },
             //     };
             // }
+
+            console.log("message", message);
             const response = await admin.messaging().send(message);
             // console.log("push notification response", response);
             // console.log("end push notification");
