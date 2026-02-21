@@ -5,8 +5,8 @@ const auth = require('./middleware/authMiddleware.js');
 
 // Initialize database email queue (Laravel-style)
 // Emails are stored in database and processed in background
-require('./utils/emailQueue');
-require('./workers/emailWorker');
+// require('./utils/emailQueue');
+// require('./workers/emailWorker');
 
 const authRoutes = require('./routes/auth');
 const panditRoutes = require('./routes/pandit');
