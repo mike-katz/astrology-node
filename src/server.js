@@ -22,6 +22,7 @@ const faqRoutes = require('./routes/faq');
 const blogRoutes = require('./routes/blog');
 const bannerRoutes = require('./routes/banners');
 const callBackRoutes = require('./routes/callback');
+const testRoutes = require('./routes/test');
 
 // const cors = require('cors');
 const multer = require('multer');
