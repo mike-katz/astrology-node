@@ -1,7 +1,7 @@
 const WebSocket = require('ws');
 
 // const WS_URL = 'ws://localhost:3001';
-const WS_URL = 'wss://socket.astroguruji.com';
+const WS_URL = process.env.SOCKET_URL;
 
 let socket;
 let retries = 0;
