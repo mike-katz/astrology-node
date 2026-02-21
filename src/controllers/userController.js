@@ -50,9 +50,9 @@ async function getProfile(req, res) {
     const user = await db('users')
         .where('id', req?.userId)
         .first();
-    user.language = user?.language ? JSON.parse(user?.language) : []
-    user.my_interest = user?.my_interest ? JSON.parse(user?.my_interest) : []
     if (!user) return res.status(400).json({ success: false, message: 'Please enter correct user.' });
+    user.language = user?.language ? JSON.parse(user?.language) : [];
+    user.my_interest = user?.my_interest ? JSON.parse(user?.my_interest) : [];
     return res.status(200).json({ success: true, data: user, message: 'Profile get Successfully' });
 }
 
