@@ -5,7 +5,7 @@ const randomPick = (arr) => arr[randomInt(0, arr.length - 1)];
 const randomStr = (len = 8) => Math.random().toString(36).slice(2, 2 + len);
 
 /** GET /test/seed-users?count=5000&batchSize=500 - E j API call ma batch-wise insert. Users table badhi field ma random data. */
-const BATCH_SIZE_MAX = 10000;
+const BATCH_SIZE_MAX = 500;
 const LIMIT_PER_REQUEST_MAX = 1000000;
 
 const USER_CITIES = ['Ahmedabad', 'Mumbai', 'Delhi', 'Surat', 'Rajkot', 'Vadodara', 'Pune', 'Chennai', 'Kolkata'];
@@ -27,7 +27,10 @@ async function seedUsers(req, res) {
         const limit = Math.min(countParam, LIMIT_PER_REQUEST_MAX);
         const batchSize = Math.min(parseInt(req.query.batchSize) || 500, BATCH_SIZE_MAX);
         const batchSizeFinal = Math.min(batchSize, limit);
-
+        console.log("countParam", countParam);
+        console.log("batchSize", batchSize);
+        console.log("batchSizeFinal", batchSizeFinal);
+        console.log("limit", limit);
         const base = Date.now();
         const batches = [];
         for (let b = 0; b < limit; b += batchSizeFinal) {
