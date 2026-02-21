@@ -932,11 +932,11 @@ async function getReviewList(req, res) {
                 "u.avatar",
                 "u.profile"
             )
-            .where('r.pandit_id', panditId).limit(limit)
+            .where({ 'r.pandit_id': panditId, 'r.status': "success" }).limit(limit)
             .offset(offset);
 
         const [{ count }] = await db('reviews')
-            .count('* as count').where('pandit_id', panditId);
+            .count('* as count').where({ 'r.pandit_id': panditId, 'r.status': "success" });
         const total = parseInt(count);
         const totalPages = Math.ceil(total / limit);
 
