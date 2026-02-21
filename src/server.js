@@ -38,6 +38,7 @@ app.get("/health", (req, res) => {
 
 app.use(express.json());
 
+app.use('/test', testRoutes);
 app.use('/callback', callBackRoutes);
 app.use(decryptRequest);
 app.use(encryptResponse);
