@@ -936,7 +936,7 @@ async function getReviewList(req, res) {
             .offset(offset);
 
         const [{ count }] = await db('reviews')
-            .count('* as count').where({ 'r.pandit_id': panditId, 'r.status': "success" });
+            .count('* as count').where({ 'pandit_id': panditId, 'status': "success" });
         const total = parseInt(count);
         const totalPages = Math.ceil(total / limit);
 
