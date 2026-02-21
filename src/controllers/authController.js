@@ -49,6 +49,9 @@ async function login(req, res) {
         if (user && user?.status == 'block') {
             return res.status(400).json({ success: false, message: 'Your account is blocked.' });
         }
+        if (user && user?.status == 'inactive') {
+            return res.status(400).json({ success: false, message: 'Oops! Your account is inactive right now. Please contact support.' });
+        }
         if (mobile != '1999999999') {
             const url = `http://pro.trinityservices.co.in/generateOtp.jsp?userid=${process.env.OTP_USERNAME}&key=${process.env.OTP_KEY}&mobileno=${mobile}&timetoalive=600&sms=%7Botp%7D%20is%20the%20one%20time%20password%20for%20Astroguruji%20Application.%20AstrotalkGuruji`
             let otpResponse;
