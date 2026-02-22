@@ -181,14 +181,7 @@ async function razorpay(req, res) {
             pincode: user?.pincode || '',
             total_in_word,
         };
-        const invoice = await generateInvoicePDF(data);
 
-        await db('payments').where({ id: paymentRow.id }).update({
-            utr,
-            transaction_id: razorpayPaymentId,
-            status: 'success',
-            invoice,
-        });
 
         await db('users').where({ id: user.id }).increment({ balance: Number(Number(paymentRow?.amount) + Number(extra)) });
 
@@ -213,7 +206,6 @@ async function razorpay(req, res) {
                 invoice: "",
             });
         }
-
         const order = await db('orders').where({ user_id: user.id, status: 'continue' }).first();
         if (order) {
             const minute = Math.floor(Number(paymentRow?.amount) / Number(order?.rate || order?.final_chat_call_rate || 1));
@@ -232,6 +224,14 @@ async function razorpay(req, res) {
             }
             callEvent('emit_to_pending_order', { key: `pandit_${order.pandit_id}`, payload: { pandit_id: order.pandit_id } });
         }
+
+        const invoice = await generateInvoicePDF(data);
+        await db('payments').where({ id: paymentRow.id }).update({
+            utr,
+            transaction_id: razorpayPaymentId,
+            status: 'success',
+            invoice,
+        });
 
         return res.status(200).json({ success: true, message: 'Payment success updated' });
     } catch (err) {
