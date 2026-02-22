@@ -40,7 +40,6 @@ async function register(req, res) {
 
 async function login(req, res) {
     try {
-        return res.status(400).json({ success: false, message: 'Under maintenance. We’ll be back at 6:00 AM.' });
         const { mobile, country_code = '+91' } = req.body;
 
         if (!mobile || !country_code) return res.status(400).json({ success: false, message: 'Mobile number required.' });

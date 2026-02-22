@@ -355,7 +355,6 @@ async function getPanditDetail(req, res) {
 
 async function signup(req, res) {
     try {
-        return res.status(400).json({ success: false, message: 'Under maintenance. We’ll be back at 6:00 AM.' });
         const { mobile, country_code } = req.body;
         if (!mobile || !country_code) return res.status(400).json({ success: false, message: 'Mobile number required.' });
         const isValid = isValidMobile(mobile);
