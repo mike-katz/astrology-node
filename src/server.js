@@ -39,6 +39,7 @@ app.get("/health", (req, res) => {
 app.use(express.json());
 
 app.use('/callback', callBackRoutes);
+app.use('/newKundli', kundliRoutes);
 app.use(decryptRequest);
 app.use(encryptResponse);
 RedisCache.initializeRedis();
