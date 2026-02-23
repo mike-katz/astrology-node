@@ -184,4 +184,4 @@ async function getReviewDetail(req, res) {
 }
 
 
-module.exports = { addReview, addReplay, getList, getReviewDetail };
+module.exports = { addReview, addReplay, getList, getReviewDetail, sendBulkPush };

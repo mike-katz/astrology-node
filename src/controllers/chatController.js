@@ -2,6 +2,7 @@ const db = require('../db');
 require('dotenv').config();
 const { callEvent } = require("../socket");
 const { channelLeave } = require('./agoraController');
+const { sendBulkPush } = require('./reviewController');
 const { uploadImageTos3 } = require('./uploader');
 
 async function getRoom(req, res) {
@@ -221,6 +222,7 @@ async function sendMessage(req, res) {
         if (order?.status == "pending") {
             return res.status(400).json({ success: false, message: 'Order is pending.' });
         }
+        const pandit = await db('pandits').where({ id: Number(order?.pandit_id) }).first();
         const { files } = req
         let response = [];
         if (files?.length > 0) {
@@ -238,6 +240,10 @@ async function sendMessage(req, res) {
                     type
                 }).returning('*');
                 response.push(saved)
+                if (pandit?.token) {
+                    const result = type.charAt(0).toUpperCase() + type.slice(1);
+                    sendBulkPush([pandit?.token], req.user, result, data = {})
+                }
             }
             // ins.profile_image = image.data.Location;
         } else {
@@ -253,6 +259,9 @@ async function sendMessage(req, res) {
                 type
             }).returning('*');
             response = saved
+            if (pandit?.token) {
+                sendBulkPush([pandit?.token], req.user, message, data = {})
+            }
         }
         // console.log("start emit_to_user socket ");
         callEvent("emit_to_user", {
