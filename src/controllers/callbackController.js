@@ -221,7 +221,7 @@ async function razorpay(req, res) {
                 invoice: "",
             });
         }
-        const order = await db('orders').where({ user_id: user.id, status: 'continue' }).first();
+        const order = await db('orders').where({ user_id: user.id, status: 'continue', is_free: false }).first();
         if (order) {
             const minute = Math.floor(Number(paymentRow?.amount) / Number(order?.rate || order?.final_chat_call_rate || 1));
             const endTime = new Date(new Date(order.end_time).getTime() + minute * 60 * 1000);
