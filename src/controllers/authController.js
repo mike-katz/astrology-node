@@ -9,6 +9,8 @@ const axios = require('axios');
 const { setCache } = require('../config/redisClient');
 const sendMail = require('../utils/sendMail');
 const SALT_ROUNDS = parseInt(process.env.BCRYPT_SALT_ROUNDS || '12', 10);
+const path = require('path');
+const logger = require('log4js').getLogger(path.parse(__filename).name);
 
 async function register(req, res) {
     try {
@@ -39,6 +41,7 @@ async function register(req, res) {
 
 async function login(req, res) {
     try {
+        logger.info('login called')
         const { mobile, country_code = '+91' } = req.body;
 
         if (!mobile || !country_code) return res.status(400).json({ success: false, message: 'Mobile number required.' });
