@@ -151,7 +151,7 @@ async function razorpay(req, res) {
             .where({ user_id: paymentRow.user_id })
             .whereIn('status', ['success']);
         logger.info('previous recharge count', count);
-        const rechargeNo = Number(count);
+        const rechargeNo = Number(count) + 1;
         const recharges = await db('recharges')
             .whereIn('recharge_number', [1111, rechargeNo])
             .whereNull('deleted_at');
