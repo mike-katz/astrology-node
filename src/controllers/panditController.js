@@ -917,7 +917,21 @@ async function getReviewList(req, res) {
         const offset = (page - 1) * limit;
 
         if (!panditId) return res.status(400).json({ success: false, message: 'Please enter pandit.' });
-        const pandit = await db('pandits').where({ id: Number(panditId) }).first()
+        const pandit = await db('pandits').where({ id: Number(panditId) }).first();
+
+        const loginUserId = req.userId != null ? req.userId : undefined;
+
+        // (1) status approve vadha badha record + (2) login user e jo e pandit ne review aapyu ane reject nathi eva
+        const reviewWhere = function () {
+            this.where('r.pandit_id', panditId).andWhere(function () {
+                this.where('r.status', 'approve');
+                if (loginUserId != null) {
+                    this.orWhere(function () {
+                        this.where('r.user_id', loginUserId).whereNot('r.status', 'reject');
+                    });
+                }
+            });
+        };
 
         const user = await db('reviews as r')
             .leftJoin('users as u', 'u.id', 'r.user_id')
@@ -932,11 +946,13 @@ async function getReviewList(req, res) {
                 "u.avatar",
                 "u.profile"
             )
-            .where({ 'r.pandit_id': panditId, 'r.status': "success" }).limit(limit)
+            .where(reviewWhere)
+            .limit(limit)
             .offset(offset);
 
-        const [{ count }] = await db('reviews')
-            .count('* as count').where({ 'pandit_id': panditId, 'status': "success" });
+        const [{ count }] = await db('reviews as r')
+            .count('* as count')
+            .where(reviewWhere);
         const total = parseInt(count);
         const totalPages = Math.ceil(total / limit);
 
