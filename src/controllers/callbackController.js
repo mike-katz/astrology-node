@@ -195,6 +195,19 @@ async function razorpay(req, res) {
 
         logger.info(`user= ${user?.mobile} old balance ${user.balance} new balance ${Number(Number(paymentRow?.amount) + Number(extra))} extra bonus= ${extra} `);
 
+        const [saved] = await db('balancelogs').insert({
+            user_old_balance: Number(user.balance),
+            user_new_balance: Number(newBalance),
+            user_id: user.id,
+            message: `Purchase of AG-Money via Razorpay (${razorpayPaymentId})`,
+            amount: paymentRow?.amount,
+            gst,
+        }).returning('*');
+        await db('payments').where({ id: paymentRow.id }).update({
+            utr,
+            transaction_id: razorpayPaymentId,
+            status: 'success',
+        });
         await db('users').where({ id: user.id }).increment({ balance: Number(Number(paymentRow?.amount) + Number(extra)) });
 
         if (extra > 0) {
@@ -229,21 +242,12 @@ async function razorpay(req, res) {
 
         const invoice = await generateInvoicePDF(data);
         await db('payments').where({ id: paymentRow.id }).update({
-            utr,
-            transaction_id: razorpayPaymentId,
-            status: 'success',
-            invoice,
+            invoice
+        });
+        await db('balancelogs').where({ id: saved.id }).update({
+            invoice
         });
 
-        await db('balancelogs').insert({
-            user_old_balance: Number(user.balance),
-            user_new_balance: Number(newBalance),
-            user_id: user.id,
-            message: 'Purchase of AG-Money via Razorpay',
-            amount: paymentRow?.amount,
-            gst,
-            invoice,
-        });
         logger.info('razorpay callback end');
         return res.status(200).json({ success: true, message: 'Payment success updated' });
     } catch (err) {
