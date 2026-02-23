@@ -8,9 +8,6 @@ const { checkOrders, isValidMobile } = require('../utils/decodeJWT');
 const axios = require('axios');
 const { setCache } = require('../config/redisClient');
 const sendMail = require('../utils/sendMail');
-const path = require('path');
-const logger = require('log4js').getLogger(path.parse(__filename).name);
-
 const SALT_ROUNDS = parseInt(process.env.BCRYPT_SALT_ROUNDS || '12', 10);
 
 async function register(req, res) {
@@ -42,14 +39,6 @@ async function register(req, res) {
 
 async function login(req, res) {
     try {
-        logger.info('Connected to Redis');
-        logger.log('message');
-        logger.info('info');
-        logger.warn('warning');
-        logger.error('error',);
-        logger.debug('debug');
-
-
         const { mobile, country_code = '+91' } = req.body;
 
         if (!mobile || !country_code) return res.status(400).json({ success: false, message: 'Mobile number required.' });

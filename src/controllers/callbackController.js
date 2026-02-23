@@ -3,6 +3,8 @@ const crypto = require('crypto');
 require('dotenv').config();
 const generateInvoicePDF = require('../utils/generatepdf');
 const { callEvent } = require('../socket');
+const path = require('path');
+const logger = require('log4js').getLogger(path.parse(__filename).name);
 
 function numberToIndianWords(amount) {
     if (amount === undefined || amount === null) return '';
@@ -36,7 +38,7 @@ function numberToIndianWords(amount) {
  * Raw body use thay (server.js ma /callback/razorpay par express.raw set che) – req.body Buffer hoy
  */
 async function razorpay(req, res) {
-    console.log(" razorpay callback req.body", req.body);
+    logger.info('razorpay callback start');
     try {
         let rawBody;
         if (req.body instanceof Buffer) {
@@ -55,6 +57,8 @@ async function razorpay(req, res) {
 
         const bodyStr = rawBody.toString('utf8');
         console.log("bodyStr", bodyStr);
+        logger.info('razorpay callback req.body', bodyStr);
+
         const signature = req.headers['x-razorpay-signature'];
         // if (!signature) {
         //     return res.status(400).send('Missing signature');
@@ -89,10 +93,11 @@ async function razorpay(req, res) {
         // 2. payment.failed | 3. payment.captured | 4. order.paid
         const status = (event === 'payment.captured' || event === 'order.paid') ? 'success' : (event === 'payment.failed') ? 'failed' : null;
         if (!status) {
+            logger.info('event ignore case', payload.payload?.payment?.entity?.order_id);
             return res.status(200).json({ success: true, message: 'Event ignored' });
         }
 
-
+        logger.info('start processing payment event', event)
         const pay = payload.payload?.payment?.entity;
         const orderEntity = payload.payload?.order?.entity;
         let orderId, razorpayPaymentId, amountPaise, utr;
@@ -123,12 +128,14 @@ async function razorpay(req, res) {
 
         // 2. payment.failed – mark payment as failed
         if (status === 'failed') {
+            logger.info('failed case', razorpayPaymentId);
             await db('payments').where({ id: paymentRow.id }).update({ status: 'failed', transaction_id: razorpayPaymentId });
             return res.status(200).json({ success: true, message: 'Payment marked failed' });
         }
 
         const user = await db('users').where('id', paymentRow.user_id).first();
         if (!user) {
+            logger.info('user not found case', razorpayPaymentId);
             await db('payments').where({ id: paymentRow.id }).update({ status: 'failed' });
             return res.status(200).json({ success: true, message: 'User not found' });
         }
@@ -143,6 +150,7 @@ async function razorpay(req, res) {
             .count('* as count')
             .where({ user_id: paymentRow.user_id })
             .whereIn('status', ['success']);
+        logger.info('previous recharge count', count);
         const rechargeNo = Number(count);
         const recharges = await db('recharges')
             .whereIn('recharge_number', [1111, rechargeNo])
@@ -169,6 +177,9 @@ async function razorpay(req, res) {
             }
         }
 
+        logger.info(`bonus amount for ${user?.mobile} ${extra}`);
+        logger.info(`payment amount for ${user?.mobile} ${paymentRow?.amount}`);
+
         const newBalance = Number(user.balance) + Number(paymentRow?.amount);
 
         const data = {
@@ -182,6 +193,7 @@ async function razorpay(req, res) {
             total_in_word,
         };
 
+        logger.info(`user= ${user?.mobile} old balance ${user.balance} new balance ${Number(Number(paymentRow?.amount) + Number(extra))} extra bonus= ${extra} `);
 
         await db('users').where({ id: user.id }).increment({ balance: Number(Number(paymentRow?.amount) + Number(extra)) });
 
@@ -232,8 +244,10 @@ async function razorpay(req, res) {
             gst,
             invoice,
         });
+        logger.info('razorpay callback end');
         return res.status(200).json({ success: true, message: 'Payment success updated' });
     } catch (err) {
+        logger.info('razorpay callback error catch', err);
         console.error('razorpay callback:', err);
         res.status(500).json({ success: false, message: 'Server error' });
     }
