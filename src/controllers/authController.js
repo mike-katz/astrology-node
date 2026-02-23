@@ -9,8 +9,7 @@ const axios = require('axios');
 const { setCache } = require('../config/redisClient');
 const sendMail = require('../utils/sendMail');
 const SALT_ROUNDS = parseInt(process.env.BCRYPT_SALT_ROUNDS || '12', 10);
-const path = require('path');
-const logger = require('log4js').getLogger(path.parse(__filename).name);
+const logger = require('../utils/logger').getLogger('authController');
 
 async function register(req, res) {
     try {
@@ -41,6 +40,7 @@ async function register(req, res) {
 
 async function login(req, res) {
     try {
+        console.log("login");
         logger.info('login called')
         const { mobile, country_code = '+91' } = req.body;
 

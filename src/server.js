@@ -1,4 +1,5 @@
 require('dotenv').config();
+const logger = require('./utils/logger'); // Pela logger load - folder create + log4js config
 const express = require('express');
 const app = express();
 const auth = require('./middleware/authMiddleware.js');
@@ -79,6 +80,4 @@ app.use((err, req, res, next) => {
 });
 const port = process.env.PORT || 4000;
 
-app.listen(port, "0.0.0.0", () => console.log(`Server started on 0.0.0.0:${port}`));
-
-// app.listen(port, () => console.log(`Server started on port ${port}`));
+app.listen(port, "0.0.0.0", () => logger.log(`Server started on 0.0.0.0:${port}`));
