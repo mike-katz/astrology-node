@@ -104,6 +104,9 @@ async function verifyOtp(req, res) {
             // await db('users').where({ id: existing?.id }).update({ deleted_at: null })
         }
         const mode = type ? type : 'APP';
+        if (existing && version) {
+            await db('users').where({ id: Number(existing?.id) }).update({ version })
+        }
         if (!existing) {
             [existing] = await db('users').insert({ mobile, country_code, status: "active", balance: 0, ad_set_id, utm_source, ad_id, mode, version }).returning(['id', 'mobile', 'avatar', 'country_code', 'otp']);
         }
