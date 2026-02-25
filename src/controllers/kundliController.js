@@ -1333,14 +1333,26 @@ async function getFreeLagnaChart(req, res) {
         results.forEach(r => { upd[r.key] = r.value; });
 
         if (Object.keys(upd).length > 0) {
-            [kundli] = await db('basickundlis')
-                .where('id', kundli?.id)
-                .update(upd)
-                .returning('*');
+            if (upd.birth_chart != null) {
+                if (reportRow) await db('lagna_chart').where({ kundli_id }).update({ birth_chart: upd.birth_chart });
+                else await db('lagna_chart').insert({ kundli_id, birth_chart: upd.birth_chart });
+            }
+            if (upd.planets != null) {
+                if (palnetRow) await db('planetkundlis').where({ kundli_id }).update({ planets: upd.planets });
+                else await db('planetkundlis').insert({ kundli_id, planets: upd.planets });
+            }
+            if (upd.sookshma_dasha != null) {
+                if (sookshmaDashaRow) await db('sookshma_dasha').where({ kundli_id }).update({ sookshma_dasha: upd.sookshma_dasha });
+                else await db('sookshma_dasha').insert({ kundli_id, sookshma_dasha: upd.sookshma_dasha });
+            }
         }
 
-        const response = { id: kundli_id };
-        allTasks.forEach(t => { response[t.key] = safeParse(kundli[t.key]); });
+        const response = {
+            id: kundli_id,
+            birth_chart: safeParse(upd.birth_chart ?? reportRow?.birth_chart),
+            planets: safeParse(upd.planets ?? palnetRow?.planets),
+            sookshma_dasha: safeParse(upd.sookshma_dasha ?? sookshmaDashaRow?.sookshma_dasha),
+        };
         return res.status(200).json({ success: true, data: response, message: 'Kundli get Successfully' });
     } catch (err) {
         console.error(err);
