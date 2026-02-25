@@ -18,6 +18,7 @@ const orderRoutes = require('./routes/order');
 const profileRoutes = require('./routes/profile');
 const paymentRoutes = require('./routes/payment');
 const kundliRoutes = require('./routes/kundli');
+const freeKundliRoutes = require('./routes/freekundli');
 const supportTicketRoutes = require('./routes/supportTicket');
 const faqRoutes = require('./routes/faq');
 const blogRoutes = require('./routes/blog');
@@ -40,6 +41,7 @@ app.get("/health", (req, res) => {
 app.use(express.json());
 
 app.use('/callback', callBackRoutes);
+app.use('/freeKundli', freeKundliRoutes);
 app.use('/newKundli', kundliRoutes);
 app.use(decryptRequest);
 app.use(encryptResponse);

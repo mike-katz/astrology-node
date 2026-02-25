@@ -857,4 +857,94 @@ async function ashtakootMilan(req, res) {
     }
 }
 
-module.exports = { findBasicKundli, findkundliTab, findkpTab, findAshtakvargaTab, findChartTab, findDashaTab, findReportTab, getHororscope, getPersonalHororscope, ashtakootMilan };
+async function getFreeBasicKundli(req, res) {
+    try {
+        let { profile_id, name, dob, type, birth_time, gender, birth_place, lat = '22.82', lng = '70.84', language = 'en' } = req.query;
+
+        // console.log("req.query", req.query);
+        if (!type) return res.status(400).json({ success: false, message: 'Missing params.' });
+
+        const authHeader = req.headers.authorization;
+        // console.log("authHeader", authHeader);
+        const url = 'https://astroapi-3.divineapi.com/indian-api/v3/basic-astro-details'
+        if (type == 'profile' && !authHeader?.startsWith('Bearer ')) {
+            return res.status(400).json({ success: false, message: 'Missing params.' });
+        }
+        if (authHeader && type == 'profile' && authHeader.startsWith('Bearer ')) {
+            // console.log("authHeader", authHeader);
+            const tokenData = decodeJWT(authHeader)
+            if (!tokenData?.success || !tokenData?.data?.userId) return res.status(400).json({ success: false, message: 'Your session expired.' });
+            const user = await db('userprofiles')
+                .where({ 'id': Number(profile_id), user_id: tokenData?.data?.userId })
+                .first();
+            if (!user) return res.status(400).json({ success: false, message: 'Your session expired.' });
+            const date = new Date(user?.dob).toISOString().slice(0, 10);
+
+            name = user?.name
+            gender = user?.gender
+            birth_time = user?.birth_time
+            dob = date
+            birth_place = user?.birth_place
+            lat = user?.lat || lat
+            lng = user?.lng || lng
+
+            let kundli = await db('basickundlis')
+                .where({ profile_id, language }).select('dob', 'birth_time', 'name', 'gender', 'birth_place', 'basic', 'ghata_chakra', 'id')
+                .first();
+
+            if (user?.is_updated || !kundli) {
+                const [response, ghataChakra] = await Promise.all([
+                    basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, url),
+                    basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, 'https://astroapi-3.divineapi.com/indian-api/v1/ghata-chakra')
+                ]);
+                kundli = { ...kundli, name, gender, dob, birth_place, birth_time, lng, lat, language, profile_id: Number(profile_id) }
+                kundli.basic = JSON.stringify(response?.data)
+                kundli.ghata_chakra = JSON.stringify(ghataChakra?.data)
+
+                // console.log("kundli", kundli);
+                if (kundli.id) {
+                    await db('basickundlis')
+                        .where({ id: kundli.id }).update(kundli)
+                } else {
+                    const [saved] = await db('basickundlis')
+                        .insert(kundli).returning("*");
+                    kundli.id = saved.id
+                }
+                await db('userprofiles').where({ 'id': Number(profile_id) }).update({ is_updated: false })
+            }
+            kundli.basic = JSON.parse(kundli.basic)
+            kundli.ghata_chakra = JSON.parse(kundli?.ghata_chakra)
+
+            return res.status(200).json({ success: true, data: kundli, message: 'Kundli get Successfully' });
+        }
+        let user = await db('basickundlis')
+            .where({ name, gender, dob, birth_place, birth_time, language })
+            .select('dob', 'birth_time', 'name', 'gender', 'birth_place', 'basic', 'ghata_chakra', 'language', 'id')
+            .first();
+
+        if (!user) {
+            const [response, ghataChakra] = await Promise.all([
+                basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, url),
+                basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, 'https://astroapi-3.divineapi.com/indian-api/v1/ghata-chakra')
+            ]);
+            user = { name, gender, dob, birth_place, birth_time, lat, lng, language }
+            if (profile_id) {
+                user.profile_id = profile_id
+            }
+            user.basic = JSON.stringify(response?.data)
+            user.ghata_chakra = JSON.stringify(ghataChakra?.data)
+            const [saved] = await db('basickundlis').insert(user).returning("*");
+            // await db('follows').insert({ user_id: req?.userId, pandit_id: panditId, type: "user" });
+            user.id = saved.id
+        }
+        // console.log("user", user);
+        user.basic = JSON.parse(user.basic)
+        user.ghata_chakra = JSON.parse(user.ghata_chakra)
+        return res.status(200).json({ success: true, data: user, message: 'Kundli get Successfully' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
+module.exports = { findBasicKundli, findkundliTab, findkpTab, findAshtakvargaTab, findChartTab, findDashaTab, findReportTab, getHororscope, getPersonalHororscope, ashtakootMilan, getFreeBasicKundli };
