@@ -4,6 +4,12 @@ const { decodeJWT } = require('../utils/decodeJWT');
 const axios = require('axios');
 const FormData = require('form-data');
 
+const safeParse = (val) => {
+    if (val == null) return null;
+    if (typeof val === 'object') return val;
+    try { return JSON.parse(val); } catch { return val; }
+};
+
 async function basicKundliApiCall(language = 'en', lat, lng, dob, birth_time, name, gender, birth_place, url, extraparam = []) {
 
     lat = lat ?? '22.82';
@@ -170,16 +176,8 @@ async function findkundliTab(req, res) {
                 .update(upd)
                 .returning('*');
         }
-
-        const response = {
-            id: kundli_id,
-            birth_chart: JSON.parse(kundli.birth_chart),
-            navamsa_chart: JSON.parse(kundli.navamsa_chart),
-            south_birth_chart: JSON.parse(kundli.south_birth_chart),
-            south_navamsa_chart: JSON.parse(kundli.south_navamsa_chart),
-            planets: JSON.parse(kundli.planets),
-            sookshma_dasha: JSON.parse(kundli.sookshma_dasha),
-        }
+        const response = { id: kundli_id };
+        allTasks.forEach(t => { response[t.key] = safeParse(kundli[t.key]); });
         return res.status(200).json({ success: true, data: response, message: 'Kundli get Successfully' });
     } catch (err) {
         console.error(err);
@@ -196,7 +194,7 @@ async function findkpTab(req, res) {
             .where({ id: kundli_id })
             .first();
         if (!kundli) return res.status(400).json({ success: false, message: 'Kundli not found.' });
-        const { lat, lng, dob, language, birth_time, name, gender, birth_place, chalit_chart, ruling_planet, kp_planet, kp_cusps } = kundli
+        const { lat, lng, dob, language, birth_time, name, gender, birth_place } = kundli;
         const base = 'https://astroapi-3.divineapi.com/indian-api';
         const allTasks = [
             { key: 'chalit_chart', url: base + '/v1/horoscope-chart/chalit', extraparam: [] },
@@ -218,13 +216,8 @@ async function findkpTab(req, res) {
                 .update(upd)
                 .returning('*');
         }
-        const response = {
-            id: kundli_id,
-            chalit_chart: JSON.parse(kundli.chalit_chart),
-            ruling_planet: JSON.parse(kundli.ruling_planet),
-            kp_planet: JSON.parse(kundli.kp_planet),
-            kp_cusps: JSON.parse(kundli.kp_cusps),
-        }
+        const response = { id: kundli_id };
+        allTasks.forEach(t => { response[t.key] = safeParse(kundli[t.key]); });
         return res.status(200).json({ success: true, data: response, message: 'Kundli get Successfully' });
     } catch (err) {
         console.error(err);
@@ -276,10 +269,7 @@ async function findChartTab(req, res) {
             .where({ id: kundli_id })
             .first();
         if (!kundli) return res.status(400).json({ success: false, message: 'Kundli not found.' });
-        const { lat, lng, dob, language, birth_time, name, gender, birth_place, chalit_chart, south_chalit_chart, sun_chart, south_sun_chart, moon_chart, south_moon_chart, birth_chart, south_birth_chart,
-            hora_chart, south_hora_chart, drekkana_chart, south_drekkana_chart, chaturthamsha_chart, south_chaturthamsha_chart, saptamsa_chart, south_saptamsa_chart, navamsa_chart, south_navamsa_chart,
-            dasamsa_chart, south_dasamsa_chart, dwadasamsa_chart, south_dwadasamsa_chart, shodasamsa_chart, south_shodasamsa_chart, vimsamsa_chart, south_vimsamsa_chart, chaturvimsamsa_chart, south_chaturvimsamsa_chart, south_transit_ascendant, south_transit_moon, transit_ascendant, transit_moon,
-            saptavimsamsa_chart, south_saptavimsamsa_chart, trimsamsa_chart, south_trimsamsa_chart, khavedamsa_chart, south_khavedamsa_chart, akshavedamsa_chart, south_akshavedamsa_chart, shastiamsa_chart, south_shastiamsa_chart, planets, sookshma_dasha } = kundli;
+        const { lat, lng, dob, language, birth_time, name, gender, birth_place } = kundli;
 
         const [year, month, day] = dob.split('-');
         const transitNorth = [
@@ -349,7 +339,6 @@ async function findChartTab(req, res) {
         const tasks = allTasks.filter(t => kundli[t.key] == null);
         const apiArgs = [language, lat, lng, dob, birth_time, name, gender, birth_place];
 
-        console.log("api call start ", new Date());
         const results = tasks.length > 0
             ? await Promise.all(tasks.map(async (t) => {
                 const data = await basicKundliApiCall(...apiArgs, t.url, t.extraparam);
@@ -359,7 +348,6 @@ async function findChartTab(req, res) {
                 return { key: t.key, value };
             }))
             : [];
-        console.log("api call end ", new Date());
         const upd = {};
         results.forEach(r => { upd[r.key] = r.value; });
 
@@ -370,57 +358,8 @@ async function findChartTab(req, res) {
                 .returning('*');
         }
 
-        const response = {
-            id: kundli_id,
-            chalit_chart: JSON.parse(kundli.chalit_chart),
-            birth_chart: JSON.parse(kundli.birth_chart),
-            navamsa_chart: JSON.parse(kundli.navamsa_chart),
-
-            sun_chart: JSON.parse(kundli.sun_chart),
-            moon_chart: JSON.parse(kundli.moon_chart),
-            hora_chart: JSON.parse(kundli.hora_chart),
-            drekkana_chart: JSON.parse(kundli.drekkana_chart),
-            chaturthamsha_chart: JSON.parse(kundli.chaturthamsha_chart),
-            saptamsa_chart: JSON.parse(kundli.saptamsa_chart),
-            dasamsa_chart: JSON.parse(kundli.dasamsa_chart),
-            dwadasamsa_chart: JSON.parse(kundli.dwadasamsa_chart),
-            shodasamsa_chart: JSON.parse(kundli.shodasamsa_chart),
-            vimsamsa_chart: JSON.parse(kundli.vimsamsa_chart),
-            chaturvimsamsa_chart: JSON.parse(kundli.chaturvimsamsa_chart),
-            saptavimsamsa_chart: JSON.parse(kundli.saptavimsamsa_chart),
-            trimsamsa_chart: JSON.parse(kundli.trimsamsa_chart),
-            khavedamsa_chart: JSON.parse(kundli.khavedamsa_chart),
-            akshavedamsa_chart: JSON.parse(kundli.akshavedamsa_chart),
-            shastiamsa_chart: JSON.parse(kundli.shastiamsa_chart),
-
-            south_chalit_chart: JSON.parse(kundli.south_chalit_chart),
-            south_birth_chart: JSON.parse(kundli.south_birth_chart),
-            south_navamsa_chart: JSON.parse(kundli.south_navamsa_chart),
-
-            south_sun_chart: JSON.parse(kundli.south_sun_chart),
-            south_moon_chart: JSON.parse(kundli.south_moon_chart),
-            south_hora_chart: JSON.parse(kundli.south_hora_chart),
-            south_drekkana_chart: JSON.parse(kundli.south_drekkana_chart),
-            south_chaturthamsha_chart: JSON.parse(kundli.south_chaturthamsha_chart),
-            south_saptamsa_chart: JSON.parse(kundli.south_saptamsa_chart),
-            south_dasamsa_chart: JSON.parse(kundli.south_dasamsa_chart),
-            south_dwadasamsa_chart: JSON.parse(kundli.south_dwadasamsa_chart),
-            south_shodasamsa_chart: JSON.parse(kundli.south_shodasamsa_chart),
-            south_vimsamsa_chart: JSON.parse(kundli.south_vimsamsa_chart),
-            south_chaturvimsamsa_chart: JSON.parse(kundli.south_chaturvimsamsa_chart),
-            south_saptavimsamsa_chart: JSON.parse(kundli.south_saptavimsamsa_chart),
-            south_trimsamsa_chart: JSON.parse(kundli.south_trimsamsa_chart),
-            south_khavedamsa_chart: JSON.parse(kundli.south_khavedamsa_chart),
-            south_akshavedamsa_chart: JSON.parse(kundli.south_akshavedamsa_chart),
-            south_shastiamsa_chart: JSON.parse(kundli.south_shastiamsa_chart),
-
-            planets: JSON.parse(kundli.planets),
-            south_transit_ascendant: JSON.parse(kundli.south_transit_ascendant),
-            south_transit_moon: JSON.parse(kundli.south_transit_moon),
-            transit_ascendant: JSON.parse(kundli.transit_ascendant),
-            transit_moon: JSON.parse(kundli.transit_moon),
-            sookshma_dasha: JSON.parse(kundli.sookshma_dasha),
-        }
+        const response = { id: kundli_id };
+        allTasks.forEach(t => { response[t.key] = safeParse(kundli[t.key]); });
         return res.status(200).json({ success: true, data: response, message: 'Kundli get Successfully' });
     } catch (err) {
         console.error(err);
@@ -437,7 +376,7 @@ async function findDashaTab(req, res) {
             .where({ id: kundli_id })
             .first();
         if (!kundli) return res.status(400).json({ success: false, message: 'Kundli not found.' });
-        const { lat, lng, dob, language, birth_time, name, gender, birth_place, sun_dasha, south_chalit_chart, moon_dasha, mars_dasha, mercury_dasha, venus_dasha, saturn_dasha, jupiter_dasha, ketu_dasha, rahu_dasha, yogini_dasha, birth_chart, south_birth_chart, sookshma_dasha } = kundli
+        const { lat, lng, dob, language, birth_time, name, gender, birth_place } = kundli;
         const base = 'https://astroapi-3.divineapi.com/indian-api';
         const mahaUrl = base + '/v1/maha-dasha-analysis';
         const allTasks = [
@@ -470,23 +409,8 @@ async function findDashaTab(req, res) {
                 .update(upd)
                 .returning('*');
         }
-        const response = {
-            id: kundli_id,
-            sun_dasha: JSON.parse(kundli.sun_dasha),
-            moon_dasha: JSON.parse(kundli.moon_dasha),
-            mars_dasha: JSON.parse(kundli.mars_dasha),
-            mercury_dasha: JSON.parse(kundli.mercury_dasha),
-            venus_dasha: JSON.parse(kundli.venus_dasha),
-            saturn_dasha: JSON.parse(kundli.saturn_dasha),
-            ketu_dasha: JSON.parse(kundli.ketu_dasha),
-            rahu_dasha: JSON.parse(kundli.rahu_dasha),
-            jupiter_dasha: JSON.parse(kundli.jupiter_dasha),
-            south_chalit_chart: JSON.parse(kundli.south_chalit_chart),
-            yogini_dasha: JSON.parse(kundli.yogini_dasha),
-            birth_chart: JSON.parse(kundli.birth_chart),
-            south_birth_chart: JSON.parse(kundli.south_birth_chart),
-            sookshma_dasha: JSON.parse(kundli.sookshma_dasha)
-        }
+        const response = { id: kundli_id };
+        allTasks.forEach(t => { response[t.key] = safeParse(kundli[t.key]); });
         return res.status(200).json({ success: true, data: response, message: 'Kundli get Successfully' });
     } catch (err) {
         console.error(err);
@@ -503,10 +427,7 @@ async function findReportTab(req, res) {
             .where({ id: kundli_id })
             .first();
         if (!kundli) return res.status(400).json({ success: false, message: 'Kundli not found.' });
-        const { lat, lng, dob, language, birth_time, name, gender, birth_place, general_report, kalsarpa_dosha, manglik_dosha, sadesati_dosha, general_yoga_tab,
-            gemstones, planetary_sun, planetary_moon, planetary_mercury, planetary_venus, planetary_mars, planetary_jupiter, planetary_saturn, planetary_rahu, planetary_ketu,
-            sun_dasha, moon_dasha, mars_dasha, mercury_dasha, venus_dasha, saturn_dasha, jupiter_dasha, ketu_dasha, rahu_dasha, pitra_dosha
-        } = kundli
+        const { lat, lng, dob, language, birth_time, name, gender, birth_place } = kundli;
         const base = 'https://astroapi-3.divineapi.com/indian-api';
         const planetUrl = base + '/v2/planet-analysis';
         const mahaUrl = base + '/v1/maha-dasha-analysis';
@@ -551,34 +472,8 @@ async function findReportTab(req, res) {
                 .update(upd)
                 .returning('*');
         }
-        const response = {
-            id: kundli_id,
-            general_report: JSON.parse(kundli.general_report),
-            kalsarpa_dosha: JSON.parse(kundli.kalsarpa_dosha),
-            manglik_dosha: JSON.parse(kundli.manglik_dosha),
-            sadesati_dosha: JSON.parse(kundli.sadesati_dosha),
-            general_yoga_tab: JSON.parse(kundli.general_yoga_tab),
-            gemstones: JSON.parse(kundli.gemstones),
-            planetary_sun: JSON.parse(kundli.planetary_sun),
-            planetary_moon: JSON.parse(kundli.planetary_moon),
-            planetary_mercury: JSON.parse(kundli.planetary_mercury),
-            planetary_venus: JSON.parse(kundli.planetary_venus),
-            planetary_mars: JSON.parse(kundli.planetary_mars),
-            planetary_jupiter: JSON.parse(kundli.planetary_jupiter),
-            planetary_saturn: JSON.parse(kundli.planetary_saturn),
-            planetary_rahu: JSON.parse(kundli.planetary_rahu),
-            planetary_ketu: JSON.parse(kundli.planetary_ketu),
-            sun_dasha: JSON.parse(kundli.sun_dasha),
-            moon_dasha: JSON.parse(kundli.moon_dasha),
-            mars_dasha: JSON.parse(kundli.mars_dasha),
-            mercury_dasha: JSON.parse(kundli.mercury_dasha),
-            venus_dasha: JSON.parse(kundli.venus_dasha),
-            saturn_dasha: JSON.parse(kundli.saturn_dasha),
-            jupiter_dasha: JSON.parse(kundli.jupiter_dasha),
-            ketu_dasha: JSON.parse(kundli.ketu_dasha),
-            rahu_dasha: JSON.parse(kundli.rahu_dasha),
-            pitra_dosha: JSON.parse(kundli.pitra_dosha),
-        }
+        const response = { id: kundli_id };
+        allTasks.forEach(t => { response[t.key] = safeParse(kundli[t.key]); });
         return res.status(200).json({ success: true, data: response, message: 'Kundli get Successfully' });
     } catch (err) {
         console.error(err);
@@ -856,12 +751,6 @@ async function ashtakootMilan(req, res) {
         res.status(500).json({ success: false, message: 'Server error', error: err.message });
     }
 }
-
-const safeParse = (val) => {
-    if (val == null) return null;
-    if (typeof val === 'object') return val;
-    try { return JSON.parse(val); } catch { return val; }
-};
 
 async function getFreeBasicKundli(req, res) {
     try {
@@ -1255,12 +1144,6 @@ async function getGeneralReport(req, res) {
         reportRow = await db('reportkundlis').where({ kundli_id }).first();
         dashakundli = await db('dashakundlis').where({ kundli_id }).first();
 
-        const safeParse = (val) => {
-            if (val == null) return null;
-            if (typeof val === 'object') return val;
-            try { return JSON.parse(val); } catch { return val; }
-        };
-
         const response = {
             id: kundli_id,
             general_report: safeParse(upd.general_report ?? reportRow?.general_report),
@@ -1334,12 +1217,6 @@ async function getRemedieReport(req, res) {
 
         reportRow = await db('reportkundlis').where({ kundli_id }).first();
 
-        const safeParse = (val) => {
-            if (val == null) return null;
-            if (typeof val === 'object') return val;
-            try { return JSON.parse(val); } catch { return val; }
-        };
-
         const response = {
             id: kundli_id,
             general_report: safeParse(upd.general_report ?? reportRow?.general_report),
@@ -1404,12 +1281,6 @@ async function getDoshaReport(req, res) {
 
         reportRow = await db('reportkundlis').where({ kundli_id }).first();
 
-        const safeParse = (val) => {
-            if (val == null) return null;
-            if (typeof val === 'object') return val;
-            try { return JSON.parse(val); } catch { return val; }
-        };
-
         const response = {
             id: kundli_id,
             general_report: safeParse(upd.general_report ?? reportRow?.general_report),
@@ -1434,72 +1305,14 @@ async function getFreeLagnaChart(req, res) {
             .where({ id: kundli_id })
             .first();
         if (!kundli) return res.status(400).json({ success: false, message: 'Kundli not found.' });
-        const { lat, lng, dob, language, birth_time, name, gender, birth_place, chalit_chart, south_chalit_chart, sun_chart, south_sun_chart, moon_chart, south_moon_chart, birth_chart, south_birth_chart,
-            hora_chart, south_hora_chart, drekkana_chart, south_drekkana_chart, chaturthamsha_chart, south_chaturthamsha_chart, saptamsa_chart, south_saptamsa_chart, navamsa_chart, south_navamsa_chart,
-            dasamsa_chart, south_dasamsa_chart, dwadasamsa_chart, south_dwadasamsa_chart, shodasamsa_chart, south_shodasamsa_chart, vimsamsa_chart, south_vimsamsa_chart, chaturvimsamsa_chart, south_chaturvimsamsa_chart, south_transit_ascendant, south_transit_moon, transit_ascendant, transit_moon,
-            saptavimsamsa_chart, south_saptavimsamsa_chart, trimsamsa_chart, south_trimsamsa_chart, khavedamsa_chart, south_khavedamsa_chart, akshavedamsa_chart, south_akshavedamsa_chart, shastiamsa_chart, south_shastiamsa_chart, planets, sookshma_dasha } = kundli;
+        const { lat, lng, dob, language, birth_time, name, gender, birth_place } = kundli;
 
-        const [year, month, day] = dob.split('-');
-        const transitNorth = [
-            { key: 'transit_year', value: year },
-            { key: 'transit_month', value: month },
-            { key: 'transit_day', value: day },
-            { key: 'chart_type', value: 'north' }
-        ];
-        const transitSouth = [
-            { key: 'transit_year', value: year },
-            { key: 'transit_month', value: month },
-            { key: 'transit_day', value: day },
-            { key: 'chart_type', value: 'south' }
-        ];
-        const northParam = [{ key: 'chart_type', value: 'north' }];
-        const southParam = [{ key: 'chart_type', value: 'south' }];
         const base = 'https://astroapi-3.divineapi.com/indian-api/v1';
         const baseChart = base + '/horoscope-chart';
+        const northParam = [{ key: 'chart_type', value: 'north' }];
 
         const allTasks = [
-            { key: 'transit_ascendant', url: base + '/kundli-transit/ascendant', extraparam: transitNorth, type: 'svg' },
-            { key: 'transit_moon', url: base + '/kundli-transit/moon', extraparam: transitNorth, type: 'svg' },
-            { key: 'south_transit_ascendant', url: base + '/kundli-transit/ascendant', extraparam: transitSouth, type: 'svg' },
-            { key: 'south_transit_moon', url: base + '/kundli-transit/moon', extraparam: transitSouth, type: 'svg' },
-            { key: 'chalit_chart', url: baseChart + '/chalit', extraparam: northParam, type: 'svg' },
-            { key: 'sun_chart', url: baseChart + '/SUN', extraparam: northParam, type: 'svg' },
-            { key: 'moon_chart', url: baseChart + '/MOON', extraparam: northParam, type: 'svg' },
             { key: 'birth_chart', url: baseChart + '/D1', extraparam: northParam, type: 'svg' },
-            { key: 'hora_chart', url: baseChart + '/D2', extraparam: northParam, type: 'svg' },
-            { key: 'drekkana_chart', url: baseChart + '/D3', extraparam: northParam, type: 'svg' },
-            { key: 'chaturthamsha_chart', url: baseChart + '/D4', extraparam: northParam, type: 'svg' },
-            { key: 'saptamsa_chart', url: baseChart + '/D7', extraparam: northParam, type: 'svg' },
-            { key: 'navamsa_chart', url: baseChart + '/D9', extraparam: northParam, type: 'svg' },
-            { key: 'dasamsa_chart', url: baseChart + '/D10', extraparam: northParam, type: 'svg' },
-            { key: 'dwadasamsa_chart', url: baseChart + '/D12', extraparam: northParam, type: 'svg' },
-            { key: 'shodasamsa_chart', url: baseChart + '/D16', extraparam: northParam, type: 'svg' },
-            { key: 'vimsamsa_chart', url: baseChart + '/D20', extraparam: northParam, type: 'svg' },
-            { key: 'chaturvimsamsa_chart', url: baseChart + '/D24', extraparam: northParam, type: 'svg' },
-            { key: 'saptavimsamsa_chart', url: baseChart + '/D27', extraparam: northParam, type: 'svg' },
-            { key: 'trimsamsa_chart', url: baseChart + '/D30', extraparam: northParam, type: 'svg' },
-            { key: 'khavedamsa_chart', url: baseChart + '/D40', extraparam: northParam, type: 'svg' },
-            { key: 'akshavedamsa_chart', url: baseChart + '/D45', extraparam: northParam, type: 'svg' },
-            { key: 'shastiamsa_chart', url: baseChart + '/D60', extraparam: northParam, type: 'svg' },
-            { key: 'south_chalit_chart', url: baseChart + '/chalit', extraparam: southParam, type: 'svg' },
-            { key: 'south_sun_chart', url: baseChart + '/SUN', extraparam: southParam, type: 'svg' },
-            { key: 'south_moon_chart', url: baseChart + '/MOON', extraparam: southParam, type: 'svg' },
-            { key: 'south_birth_chart', url: baseChart + '/D1', extraparam: southParam, type: 'svg' },
-            { key: 'south_hora_chart', url: baseChart + '/D2', extraparam: southParam, type: 'svg' },
-            { key: 'south_drekkana_chart', url: baseChart + '/D3', extraparam: southParam, type: 'svg' },
-            { key: 'south_chaturthamsha_chart', url: baseChart + '/D4', extraparam: southParam, type: 'svg' },
-            { key: 'south_saptamsa_chart', url: baseChart + '/D7', extraparam: southParam, type: 'svg' },
-            { key: 'south_navamsa_chart', url: baseChart + '/D9', extraparam: southParam, type: 'svg' },
-            { key: 'south_dasamsa_chart', url: baseChart + '/D10', extraparam: southParam, type: 'svg' },
-            { key: 'south_dwadasamsa_chart', url: baseChart + '/D12', extraparam: southParam, type: 'svg' },
-            { key: 'south_shodasamsa_chart', url: baseChart + '/D16', extraparam: southParam, type: 'svg' },
-            { key: 'south_vimsamsa_chart', url: baseChart + '/D20', extraparam: southParam, type: 'svg' },
-            { key: 'south_chaturvimsamsa_chart', url: baseChart + '/D24', extraparam: southParam, type: 'svg' },
-            { key: 'south_saptavimsamsa_chart', url: baseChart + '/D27', extraparam: southParam, type: 'svg' },
-            { key: 'south_trimsamsa_chart', url: baseChart + '/D30', extraparam: southParam, type: 'svg' },
-            { key: 'south_khavedamsa_chart', url: baseChart + '/D40', extraparam: southParam, type: 'svg' },
-            { key: 'south_akshavedamsa_chart', url: baseChart + '/D45', extraparam: southParam, type: 'svg' },
-            { key: 'south_shastiamsa_chart', url: baseChart + '/D60', extraparam: southParam, type: 'svg' },
             { key: 'planets', url: base.replace('/v1', '/v2') + '/planetary-positions', extraparam: [], type: 'data' },
             { key: 'sookshma_dasha', url: base + '/vimshottari-dasha', extraparam: [{ key: 'dasha_type', value: 'sookshma-dasha' }], type: 'data' },
         ];
@@ -1507,7 +1320,6 @@ async function getFreeLagnaChart(req, res) {
         const tasks = allTasks.filter(t => kundli[t.key] == null);
         const apiArgs = [language, lat, lng, dob, birth_time, name, gender, birth_place];
 
-        console.log("api call start ", new Date());
         const results = tasks.length > 0
             ? await Promise.all(tasks.map(async (t) => {
                 const data = await basicKundliApiCall(...apiArgs, t.url, t.extraparam);
@@ -1517,7 +1329,6 @@ async function getFreeLagnaChart(req, res) {
                 return { key: t.key, value };
             }))
             : [];
-        console.log("api call end ", new Date());
         const upd = {};
         results.forEach(r => { upd[r.key] = r.value; });
 
@@ -1528,12 +1339,8 @@ async function getFreeLagnaChart(req, res) {
                 .returning('*');
         }
 
-        const response = {
-            id: kundli_id,
-            birth_chart: JSON.parse(kundli.birth_chart),
-            planets: JSON.parse(kundli.planets),
-            sookshma_dasha: JSON.parse(kundli.sookshma_dasha),
-        }
+        const response = { id: kundli_id };
+        allTasks.forEach(t => { response[t.key] = safeParse(kundli[t.key]); });
         return res.status(200).json({ success: true, data: response, message: 'Kundli get Successfully' });
     } catch (err) {
         console.error(err);
@@ -1572,7 +1379,6 @@ async function getFreeNavamsaChart(req, res) {
             [kundli] = await db('basickundlis').where('id', kundli?.id).update(upd).returning('*');
         }
 
-        const safeParse = (v) => { if (v == null) return null; if (typeof v === 'object') return v; try { return JSON.parse(v); } catch { return v; } };
         const response = {
             id: kundli_id,
             navamsa_chart: safeParse(upd.navamsa_chart ?? kundli.navamsa_chart),
@@ -1624,7 +1430,6 @@ async function getFreeTransitChart(req, res) {
             [kundli] = await db('basickundlis').where('id', kundli?.id).update(upd).returning('*');
         }
 
-        const safeParse = (v) => { if (v == null) return null; if (typeof v === 'object') return v; try { return JSON.parse(v); } catch { return v; } };
         const response = {
             id: kundli_id,
             planets: safeParse(upd.planets ?? kundli.planets),
@@ -1699,7 +1504,6 @@ async function getFreeDivisionalChart(req, res) {
             [kundli] = await db('basickundlis').where('id', kundli?.id).update(upd).returning('*');
         }
 
-        const safeParse = (v) => { if (v == null) return null; if (typeof v === 'object') return v; try { return JSON.parse(v); } catch { return v; } };
         const response = {
             id: kundli_id,
             chalit_chart: safeParse(upd.chalit_chart ?? kundli.chalit_chart),
@@ -1764,7 +1568,6 @@ async function getFreeSouthLagnaChart(req, res) {
             [kundli] = await db('basickundlis').where('id', kundli?.id).update(upd).returning('*');
         }
 
-        const safeParse = (v) => { if (v == null) return null; if (typeof v === 'object') return v; try { return JSON.parse(v); } catch { return v; } };
         const response = {
             id: kundli_id,
             south_birth_chart: safeParse(upd.south_birth_chart ?? kundli.south_birth_chart),
@@ -1809,7 +1612,6 @@ async function getFreeSouthNavamsaChart(req, res) {
             [kundli] = await db('basickundlis').where('id', kundli?.id).update(upd).returning('*');
         }
 
-        const safeParse = (v) => { if (v == null) return null; if (typeof v === 'object') return v; try { return JSON.parse(v); } catch { return v; } };
         const response = {
             id: kundli_id,
             south_navamsa_chart: safeParse(upd.south_navamsa_chart ?? kundli.south_navamsa_chart),
@@ -1861,7 +1663,6 @@ async function getFreeSouthTransitChart(req, res) {
             [kundli] = await db('basickundlis').where('id', kundli?.id).update(upd).returning('*');
         }
 
-        const safeParse = (v) => { if (v == null) return null; if (typeof v === 'object') return v; try { return JSON.parse(v); } catch { return v; } };
         const response = {
             id: kundli_id,
             planets: safeParse(upd.planets ?? kundli.planets),
@@ -1936,7 +1737,6 @@ async function getFreeSouthDivisionalChart(req, res) {
             [kundli] = await db('basickundlis').where('id', kundli?.id).update(upd).returning('*');
         }
 
-        const safeParse = (v) => { if (v == null) return null; if (typeof v === 'object') return v; try { return JSON.parse(v); } catch { return v; } };
         const response = {
             id: kundli_id,
             south_chalit_chart: safeParse(upd.south_chalit_chart ?? kundli.south_chalit_chart),
