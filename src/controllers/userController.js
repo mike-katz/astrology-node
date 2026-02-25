@@ -250,7 +250,7 @@ async function getRechargeBanner(req, res) {
         const [{ count }] = await db('payments')
             .count('* as count')
             .where({ user_id: userId })
-            .whereIn('status', ['pending', 'success']);
+            .whereIn('status', ['success']);
         // log
         const rechargeNo = Number(count) + 1;
 
