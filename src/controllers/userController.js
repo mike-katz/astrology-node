@@ -246,7 +246,7 @@ async function getRecharge(req, res) {
 async function getRechargeBanner(req, res) {
     try {
         const userId = req.userId;
-        console.log("userId", userId);
+        console.log("getRechargeBanner api userId", userId);
         const [{ count }] = await db('payments')
             .count('* as count')
             .where({ user_id: userId })
