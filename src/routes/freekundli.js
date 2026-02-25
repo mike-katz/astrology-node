@@ -5,5 +5,7 @@ const kundli = require('../controllers/kundliController');
 router.get('/basic', kundli.getFreeBasicKundli);
 router.get('/kp', kundli.getFreekpTab);
 router.get('/ashtakvarga', kundli.getFreeAshtakvargaTab);
+router.get('/dasha', kundli.getFreeDashaTab);
+
 module.exports = router;
 
