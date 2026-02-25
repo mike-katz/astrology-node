@@ -1025,7 +1025,6 @@ async function getFreekpTab(req, res) {
     }
 }
 
-
 async function getFreeAshtakvargaTab(req, res) {
     try {
         const { kundli_id } = req.query;
@@ -1426,4 +1425,548 @@ async function getDoshaReport(req, res) {
     }
 }
 
-module.exports = { findBasicKundli, findkundliTab, findkpTab, findAshtakvargaTab, findChartTab, findDashaTab, findReportTab, getHororscope, getPersonalHororscope, ashtakootMilan, getFreeBasicKundli, getFreekpTab, getFreeAshtakvargaTab, getFreeDashaTab, getGeneralReport, getRemedieReport, getDoshaReport };
+async function getFreeLagnaChart(req, res) {
+    try {
+        const { kundli_id } = req.query;
+        if (!kundli_id) return res.status(400).json({ success: false, message: 'Missing params.' });
+
+        let kundli = await db('basickundlis')
+            .where({ id: kundli_id })
+            .first();
+        if (!kundli) return res.status(400).json({ success: false, message: 'Kundli not found.' });
+        const { lat, lng, dob, language, birth_time, name, gender, birth_place, chalit_chart, south_chalit_chart, sun_chart, south_sun_chart, moon_chart, south_moon_chart, birth_chart, south_birth_chart,
+            hora_chart, south_hora_chart, drekkana_chart, south_drekkana_chart, chaturthamsha_chart, south_chaturthamsha_chart, saptamsa_chart, south_saptamsa_chart, navamsa_chart, south_navamsa_chart,
+            dasamsa_chart, south_dasamsa_chart, dwadasamsa_chart, south_dwadasamsa_chart, shodasamsa_chart, south_shodasamsa_chart, vimsamsa_chart, south_vimsamsa_chart, chaturvimsamsa_chart, south_chaturvimsamsa_chart, south_transit_ascendant, south_transit_moon, transit_ascendant, transit_moon,
+            saptavimsamsa_chart, south_saptavimsamsa_chart, trimsamsa_chart, south_trimsamsa_chart, khavedamsa_chart, south_khavedamsa_chart, akshavedamsa_chart, south_akshavedamsa_chart, shastiamsa_chart, south_shastiamsa_chart, planets, sookshma_dasha } = kundli;
+
+        const [year, month, day] = dob.split('-');
+        const transitNorth = [
+            { key: 'transit_year', value: year },
+            { key: 'transit_month', value: month },
+            { key: 'transit_day', value: day },
+            { key: 'chart_type', value: 'north' }
+        ];
+        const transitSouth = [
+            { key: 'transit_year', value: year },
+            { key: 'transit_month', value: month },
+            { key: 'transit_day', value: day },
+            { key: 'chart_type', value: 'south' }
+        ];
+        const northParam = [{ key: 'chart_type', value: 'north' }];
+        const southParam = [{ key: 'chart_type', value: 'south' }];
+        const base = 'https://astroapi-3.divineapi.com/indian-api/v1';
+        const baseChart = base + '/horoscope-chart';
+
+        const allTasks = [
+            { key: 'transit_ascendant', url: base + '/kundli-transit/ascendant', extraparam: transitNorth, type: 'svg' },
+            { key: 'transit_moon', url: base + '/kundli-transit/moon', extraparam: transitNorth, type: 'svg' },
+            { key: 'south_transit_ascendant', url: base + '/kundli-transit/ascendant', extraparam: transitSouth, type: 'svg' },
+            { key: 'south_transit_moon', url: base + '/kundli-transit/moon', extraparam: transitSouth, type: 'svg' },
+            { key: 'chalit_chart', url: baseChart + '/chalit', extraparam: northParam, type: 'svg' },
+            { key: 'sun_chart', url: baseChart + '/SUN', extraparam: northParam, type: 'svg' },
+            { key: 'moon_chart', url: baseChart + '/MOON', extraparam: northParam, type: 'svg' },
+            { key: 'birth_chart', url: baseChart + '/D1', extraparam: northParam, type: 'svg' },
+            { key: 'hora_chart', url: baseChart + '/D2', extraparam: northParam, type: 'svg' },
+            { key: 'drekkana_chart', url: baseChart + '/D3', extraparam: northParam, type: 'svg' },
+            { key: 'chaturthamsha_chart', url: baseChart + '/D4', extraparam: northParam, type: 'svg' },
+            { key: 'saptamsa_chart', url: baseChart + '/D7', extraparam: northParam, type: 'svg' },
+            { key: 'navamsa_chart', url: baseChart + '/D9', extraparam: northParam, type: 'svg' },
+            { key: 'dasamsa_chart', url: baseChart + '/D10', extraparam: northParam, type: 'svg' },
+            { key: 'dwadasamsa_chart', url: baseChart + '/D12', extraparam: northParam, type: 'svg' },
+            { key: 'shodasamsa_chart', url: baseChart + '/D16', extraparam: northParam, type: 'svg' },
+            { key: 'vimsamsa_chart', url: baseChart + '/D20', extraparam: northParam, type: 'svg' },
+            { key: 'chaturvimsamsa_chart', url: baseChart + '/D24', extraparam: northParam, type: 'svg' },
+            { key: 'saptavimsamsa_chart', url: baseChart + '/D27', extraparam: northParam, type: 'svg' },
+            { key: 'trimsamsa_chart', url: baseChart + '/D30', extraparam: northParam, type: 'svg' },
+            { key: 'khavedamsa_chart', url: baseChart + '/D40', extraparam: northParam, type: 'svg' },
+            { key: 'akshavedamsa_chart', url: baseChart + '/D45', extraparam: northParam, type: 'svg' },
+            { key: 'shastiamsa_chart', url: baseChart + '/D60', extraparam: northParam, type: 'svg' },
+            { key: 'south_chalit_chart', url: baseChart + '/chalit', extraparam: southParam, type: 'svg' },
+            { key: 'south_sun_chart', url: baseChart + '/SUN', extraparam: southParam, type: 'svg' },
+            { key: 'south_moon_chart', url: baseChart + '/MOON', extraparam: southParam, type: 'svg' },
+            { key: 'south_birth_chart', url: baseChart + '/D1', extraparam: southParam, type: 'svg' },
+            { key: 'south_hora_chart', url: baseChart + '/D2', extraparam: southParam, type: 'svg' },
+            { key: 'south_drekkana_chart', url: baseChart + '/D3', extraparam: southParam, type: 'svg' },
+            { key: 'south_chaturthamsha_chart', url: baseChart + '/D4', extraparam: southParam, type: 'svg' },
+            { key: 'south_saptamsa_chart', url: baseChart + '/D7', extraparam: southParam, type: 'svg' },
+            { key: 'south_navamsa_chart', url: baseChart + '/D9', extraparam: southParam, type: 'svg' },
+            { key: 'south_dasamsa_chart', url: baseChart + '/D10', extraparam: southParam, type: 'svg' },
+            { key: 'south_dwadasamsa_chart', url: baseChart + '/D12', extraparam: southParam, type: 'svg' },
+            { key: 'south_shodasamsa_chart', url: baseChart + '/D16', extraparam: southParam, type: 'svg' },
+            { key: 'south_vimsamsa_chart', url: baseChart + '/D20', extraparam: southParam, type: 'svg' },
+            { key: 'south_chaturvimsamsa_chart', url: baseChart + '/D24', extraparam: southParam, type: 'svg' },
+            { key: 'south_saptavimsamsa_chart', url: baseChart + '/D27', extraparam: southParam, type: 'svg' },
+            { key: 'south_trimsamsa_chart', url: baseChart + '/D30', extraparam: southParam, type: 'svg' },
+            { key: 'south_khavedamsa_chart', url: baseChart + '/D40', extraparam: southParam, type: 'svg' },
+            { key: 'south_akshavedamsa_chart', url: baseChart + '/D45', extraparam: southParam, type: 'svg' },
+            { key: 'south_shastiamsa_chart', url: baseChart + '/D60', extraparam: southParam, type: 'svg' },
+            { key: 'planets', url: base.replace('/v1', '/v2') + '/planetary-positions', extraparam: [], type: 'data' },
+            { key: 'sookshma_dasha', url: base + '/vimshottari-dasha', extraparam: [{ key: 'dasha_type', value: 'sookshma-dasha' }], type: 'data' },
+        ];
+
+        const tasks = allTasks.filter(t => kundli[t.key] == null);
+        const apiArgs = [language, lat, lng, dob, birth_time, name, gender, birth_place];
+
+        console.log("api call start ", new Date());
+        const results = tasks.length > 0
+            ? await Promise.all(tasks.map(async (t) => {
+                const data = await basicKundliApiCall(...apiArgs, t.url, t.extraparam);
+                const value = t.type === 'svg'
+                    ? JSON.stringify({ svg: data?.data?.svg })
+                    : JSON.stringify(data?.data);
+                return { key: t.key, value };
+            }))
+            : [];
+        console.log("api call end ", new Date());
+        const upd = {};
+        results.forEach(r => { upd[r.key] = r.value; });
+
+        if (Object.keys(upd).length > 0) {
+            [kundli] = await db('basickundlis')
+                .where('id', kundli?.id)
+                .update(upd)
+                .returning('*');
+        }
+
+        const response = {
+            id: kundli_id,
+            birth_chart: JSON.parse(kundli.birth_chart),
+            planets: JSON.parse(kundli.planets),
+            sookshma_dasha: JSON.parse(kundli.sookshma_dasha),
+        }
+        return res.status(200).json({ success: true, data: response, message: 'Kundli get Successfully' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
+async function getFreeNavamsaChart(req, res) {
+    try {
+        const { kundli_id } = req.query;
+        if (!kundli_id) return res.status(400).json({ success: false, message: 'Missing params.' });
+
+        let kundli = await db('basickundlis').where({ id: kundli_id }).first();
+        if (!kundli) return res.status(400).json({ success: false, message: 'Kundli not found.' });
+        const { lat, lng, dob, language, birth_time, name, gender, birth_place } = kundli;
+
+        const base = 'https://astroapi-3.divineapi.com/indian-api/v1';
+        const northParam = [{ key: 'chart_type', value: 'north' }];
+        const allTasks = [
+            { key: 'navamsa_chart', url: base + '/horoscope-chart/D9', extraparam: northParam, type: 'svg' },
+            { key: 'planets', url: base.replace('/v1', '/v2') + '/planetary-positions', extraparam: [], type: 'data' },
+            { key: 'sookshma_dasha', url: base + '/vimshottari-dasha', extraparam: [{ key: 'dasha_type', value: 'sookshma-dasha' }], type: 'data' },
+        ];
+
+        const tasks = allTasks.filter(t => kundli[t.key] == null);
+        const apiArgs = [language, lat, lng, dob, birth_time, name, gender, birth_place];
+        const results = tasks.length > 0 ? await Promise.all(tasks.map(async (t) => {
+            const data = await basicKundliApiCall(...apiArgs, t.url, t.extraparam);
+            const value = t.type === 'svg' ? JSON.stringify({ svg: data?.data?.svg }) : JSON.stringify(data?.data);
+            return { key: t.key, value };
+        })) : [];
+        const upd = {};
+        results.forEach(r => { upd[r.key] = r.value; });
+
+        if (Object.keys(upd).length > 0) {
+            [kundli] = await db('basickundlis').where('id', kundli?.id).update(upd).returning('*');
+        }
+
+        const safeParse = (v) => { if (v == null) return null; if (typeof v === 'object') return v; try { return JSON.parse(v); } catch { return v; } };
+        const response = {
+            id: kundli_id,
+            navamsa_chart: safeParse(upd.navamsa_chart ?? kundli.navamsa_chart),
+            planets: safeParse(upd.planets ?? kundli.planets),
+            sookshma_dasha: safeParse(upd.sookshma_dasha ?? kundli.sookshma_dasha),
+        };
+        return res.status(200).json({ success: true, data: response, message: 'Kundli get Successfully' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
+async function getFreeTransitChart(req, res) {
+    try {
+        const { kundli_id } = req.query;
+        if (!kundli_id) return res.status(400).json({ success: false, message: 'Missing params.' });
+
+        let kundli = await db('basickundlis').where({ id: kundli_id }).first();
+        if (!kundli) return res.status(400).json({ success: false, message: 'Kundli not found.' });
+        const { lat, lng, dob, language, birth_time, name, gender, birth_place } = kundli;
+
+        const [year, month, day] = dob.split('-');
+        const transitNorth = [
+            { key: 'transit_year', value: year },
+            { key: 'transit_month', value: month },
+            { key: 'transit_day', value: day },
+            { key: 'chart_type', value: 'north' }
+        ];
+        const base = 'https://astroapi-3.divineapi.com/indian-api/v1';
+        const allTasks = [
+            { key: 'transit_ascendant', url: base + '/kundli-transit/ascendant', extraparam: transitNorth, type: 'svg' },
+            { key: 'transit_moon', url: base + '/kundli-transit/moon', extraparam: transitNorth, type: 'svg' },
+            { key: 'planets', url: base.replace('/v1', '/v2') + '/planetary-positions', extraparam: [], type: 'data' },
+            { key: 'sookshma_dasha', url: base + '/vimshottari-dasha', extraparam: [{ key: 'dasha_type', value: 'sookshma-dasha' }], type: 'data' },
+        ];
+
+        const tasks = allTasks.filter(t => kundli[t.key] == null);
+        const apiArgs = [language, lat, lng, dob, birth_time, name, gender, birth_place];
+        const results = tasks.length > 0 ? await Promise.all(tasks.map(async (t) => {
+            const data = await basicKundliApiCall(...apiArgs, t.url, t.extraparam);
+            const value = t.type === 'svg' ? JSON.stringify({ svg: data?.data?.svg }) : JSON.stringify(data?.data);
+            return { key: t.key, value };
+        })) : [];
+        const upd = {};
+        results.forEach(r => { upd[r.key] = r.value; });
+
+        if (Object.keys(upd).length > 0) {
+            [kundli] = await db('basickundlis').where('id', kundli?.id).update(upd).returning('*');
+        }
+
+        const safeParse = (v) => { if (v == null) return null; if (typeof v === 'object') return v; try { return JSON.parse(v); } catch { return v; } };
+        const response = {
+            id: kundli_id,
+            planets: safeParse(upd.planets ?? kundli.planets),
+            transit_ascendant: safeParse(upd.transit_ascendant ?? kundli.transit_ascendant),
+            transit_moon: safeParse(upd.transit_moon ?? kundli.transit_moon),
+            sookshma_dasha: safeParse(upd.sookshma_dasha ?? kundli.sookshma_dasha),
+        };
+        return res.status(200).json({ success: true, data: response, message: 'Kundli get Successfully' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
+async function getFreeDivisionalChart(req, res) {
+    try {
+        const { kundli_id } = req.query;
+        if (!kundli_id) return res.status(400).json({ success: false, message: 'Missing params.' });
+
+        let kundli = await db('basickundlis').where({ id: kundli_id }).first();
+        if (!kundli) return res.status(400).json({ success: false, message: 'Kundli not found.' });
+        const { lat, lng, dob, language, birth_time, name, gender, birth_place } = kundli;
+
+        const [year, month, day] = dob.split('-');
+        const transitNorth = [
+            { key: 'transit_year', value: year },
+            { key: 'transit_month', value: month },
+            { key: 'transit_day', value: day },
+            { key: 'chart_type', value: 'north' }
+        ];
+        const northParam = [{ key: 'chart_type', value: 'north' }];
+        const base = 'https://astroapi-3.divineapi.com/indian-api/v1';
+        const baseChart = base + '/horoscope-chart';
+
+        const allTasks = [
+            { key: 'transit_ascendant', url: base + '/kundli-transit/ascendant', extraparam: transitNorth, type: 'svg' },
+            { key: 'transit_moon', url: base + '/kundli-transit/moon', extraparam: transitNorth, type: 'svg' },
+            { key: 'chalit_chart', url: baseChart + '/chalit', extraparam: northParam, type: 'svg' },
+            { key: 'sun_chart', url: baseChart + '/SUN', extraparam: northParam, type: 'svg' },
+            { key: 'moon_chart', url: baseChart + '/MOON', extraparam: northParam, type: 'svg' },
+            { key: 'birth_chart', url: baseChart + '/D1', extraparam: northParam, type: 'svg' },
+            { key: 'hora_chart', url: baseChart + '/D2', extraparam: northParam, type: 'svg' },
+            { key: 'drekkana_chart', url: baseChart + '/D3', extraparam: northParam, type: 'svg' },
+            { key: 'chaturthamsha_chart', url: baseChart + '/D4', extraparam: northParam, type: 'svg' },
+            { key: 'saptamsa_chart', url: baseChart + '/D7', extraparam: northParam, type: 'svg' },
+            { key: 'navamsa_chart', url: baseChart + '/D9', extraparam: northParam, type: 'svg' },
+            { key: 'dasamsa_chart', url: baseChart + '/D10', extraparam: northParam, type: 'svg' },
+            { key: 'dwadasamsa_chart', url: baseChart + '/D12', extraparam: northParam, type: 'svg' },
+            { key: 'shodasamsa_chart', url: baseChart + '/D16', extraparam: northParam, type: 'svg' },
+            { key: 'vimsamsa_chart', url: baseChart + '/D20', extraparam: northParam, type: 'svg' },
+            { key: 'chaturvimsamsa_chart', url: baseChart + '/D24', extraparam: northParam, type: 'svg' },
+            { key: 'saptavimsamsa_chart', url: baseChart + '/D27', extraparam: northParam, type: 'svg' },
+            { key: 'trimsamsa_chart', url: baseChart + '/D30', extraparam: northParam, type: 'svg' },
+            { key: 'khavedamsa_chart', url: baseChart + '/D40', extraparam: northParam, type: 'svg' },
+            { key: 'akshavedamsa_chart', url: baseChart + '/D45', extraparam: northParam, type: 'svg' },
+            { key: 'shastiamsa_chart', url: baseChart + '/D60', extraparam: northParam, type: 'svg' },
+            { key: 'planets', url: base.replace('/v1', '/v2') + '/planetary-positions', extraparam: [], type: 'data' },
+            { key: 'sookshma_dasha', url: base + '/vimshottari-dasha', extraparam: [{ key: 'dasha_type', value: 'sookshma-dasha' }], type: 'data' },
+        ];
+
+        const tasks = allTasks.filter(t => kundli[t.key] == null);
+        const apiArgs = [language, lat, lng, dob, birth_time, name, gender, birth_place];
+        const results = tasks.length > 0 ? await Promise.all(tasks.map(async (t) => {
+            const data = await basicKundliApiCall(...apiArgs, t.url, t.extraparam);
+            const value = t.type === 'svg' ? JSON.stringify({ svg: data?.data?.svg }) : JSON.stringify(data?.data);
+            return { key: t.key, value };
+        })) : [];
+        const upd = {};
+        results.forEach(r => { upd[r.key] = r.value; });
+
+        if (Object.keys(upd).length > 0) {
+            [kundli] = await db('basickundlis').where('id', kundli?.id).update(upd).returning('*');
+        }
+
+        const safeParse = (v) => { if (v == null) return null; if (typeof v === 'object') return v; try { return JSON.parse(v); } catch { return v; } };
+        const response = {
+            id: kundli_id,
+            chalit_chart: safeParse(upd.chalit_chart ?? kundli.chalit_chart),
+            birth_chart: safeParse(upd.birth_chart ?? kundli.birth_chart),
+            navamsa_chart: safeParse(upd.navamsa_chart ?? kundli.navamsa_chart),
+            sun_chart: safeParse(upd.sun_chart ?? kundli.sun_chart),
+            moon_chart: safeParse(upd.moon_chart ?? kundli.moon_chart),
+            hora_chart: safeParse(upd.hora_chart ?? kundli.hora_chart),
+            drekkana_chart: safeParse(upd.drekkana_chart ?? kundli.drekkana_chart),
+            chaturthamsha_chart: safeParse(upd.chaturthamsha_chart ?? kundli.chaturthamsha_chart),
+            saptamsa_chart: safeParse(upd.saptamsa_chart ?? kundli.saptamsa_chart),
+            dasamsa_chart: safeParse(upd.dasamsa_chart ?? kundli.dasamsa_chart),
+            dwadasamsa_chart: safeParse(upd.dwadasamsa_chart ?? kundli.dwadasamsa_chart),
+            shodasamsa_chart: safeParse(upd.shodasamsa_chart ?? kundli.shodasamsa_chart),
+            vimsamsa_chart: safeParse(upd.vimsamsa_chart ?? kundli.vimsamsa_chart),
+            chaturvimsamsa_chart: safeParse(upd.chaturvimsamsa_chart ?? kundli.chaturvimsamsa_chart),
+            saptavimsamsa_chart: safeParse(upd.saptavimsamsa_chart ?? kundli.saptavimsamsa_chart),
+            trimsamsa_chart: safeParse(upd.trimsamsa_chart ?? kundli.trimsamsa_chart),
+            khavedamsa_chart: safeParse(upd.khavedamsa_chart ?? kundli.khavedamsa_chart),
+            akshavedamsa_chart: safeParse(upd.akshavedamsa_chart ?? kundli.akshavedamsa_chart),
+            shastiamsa_chart: safeParse(upd.shastiamsa_chart ?? kundli.shastiamsa_chart),
+            planets: safeParse(upd.planets ?? kundli.planets),
+            transit_ascendant: safeParse(upd.transit_ascendant ?? kundli.transit_ascendant),
+            transit_moon: safeParse(upd.transit_moon ?? kundli.transit_moon),
+            sookshma_dasha: safeParse(upd.sookshma_dasha ?? kundli.sookshma_dasha),
+        };
+        return res.status(200).json({ success: true, data: response, message: 'Kundli get Successfully' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
+async function getFreeSouthLagnaChart(req, res) {
+    try {
+        const { kundli_id } = req.query;
+        if (!kundli_id) return res.status(400).json({ success: false, message: 'Missing params.' });
+
+        let kundli = await db('basickundlis').where({ id: kundli_id }).first();
+        if (!kundli) return res.status(400).json({ success: false, message: 'Kundli not found.' });
+        const { lat, lng, dob, language, birth_time, name, gender, birth_place } = kundli;
+
+        const base = 'https://astroapi-3.divineapi.com/indian-api/v1';
+        const southParam = [{ key: 'chart_type', value: 'south' }];
+        const allTasks = [
+            { key: 'south_birth_chart', url: base + '/horoscope-chart/D1', extraparam: southParam, type: 'svg' },
+            { key: 'planets', url: base.replace('/v1', '/v2') + '/planetary-positions', extraparam: [], type: 'data' },
+            { key: 'sookshma_dasha', url: base + '/vimshottari-dasha', extraparam: [{ key: 'dasha_type', value: 'sookshma-dasha' }], type: 'data' },
+        ];
+
+        const tasks = allTasks.filter(t => kundli[t.key] == null);
+        const apiArgs = [language, lat, lng, dob, birth_time, name, gender, birth_place];
+        const results = tasks.length > 0 ? await Promise.all(tasks.map(async (t) => {
+            const data = await basicKundliApiCall(...apiArgs, t.url, t.extraparam);
+            const value = t.type === 'svg' ? JSON.stringify({ svg: data?.data?.svg }) : JSON.stringify(data?.data);
+            return { key: t.key, value };
+        })) : [];
+        const upd = {};
+        results.forEach(r => { upd[r.key] = r.value; });
+
+        if (Object.keys(upd).length > 0) {
+            [kundli] = await db('basickundlis').where('id', kundli?.id).update(upd).returning('*');
+        }
+
+        const safeParse = (v) => { if (v == null) return null; if (typeof v === 'object') return v; try { return JSON.parse(v); } catch { return v; } };
+        const response = {
+            id: kundli_id,
+            south_birth_chart: safeParse(upd.south_birth_chart ?? kundli.south_birth_chart),
+            planets: safeParse(upd.planets ?? kundli.planets),
+            sookshma_dasha: safeParse(upd.sookshma_dasha ?? kundli.sookshma_dasha),
+        };
+        return res.status(200).json({ success: true, data: response, message: 'Kundli get Successfully' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
+async function getFreeSouthNavamsaChart(req, res) {
+    try {
+        const { kundli_id } = req.query;
+        if (!kundli_id) return res.status(400).json({ success: false, message: 'Missing params.' });
+
+        let kundli = await db('basickundlis').where({ id: kundli_id }).first();
+        if (!kundli) return res.status(400).json({ success: false, message: 'Kundli not found.' });
+        const { lat, lng, dob, language, birth_time, name, gender, birth_place } = kundli;
+
+        const base = 'https://astroapi-3.divineapi.com/indian-api/v1';
+        const southParam = [{ key: 'chart_type', value: 'south' }];
+        const allTasks = [
+            { key: 'south_navamsa_chart', url: base + '/horoscope-chart/D9', extraparam: southParam, type: 'svg' },
+            { key: 'planets', url: base.replace('/v1', '/v2') + '/planetary-positions', extraparam: [], type: 'data' },
+            { key: 'sookshma_dasha', url: base + '/vimshottari-dasha', extraparam: [{ key: 'dasha_type', value: 'sookshma-dasha' }], type: 'data' },
+        ];
+
+        const tasks = allTasks.filter(t => kundli[t.key] == null);
+        const apiArgs = [language, lat, lng, dob, birth_time, name, gender, birth_place];
+        const results = tasks.length > 0 ? await Promise.all(tasks.map(async (t) => {
+            const data = await basicKundliApiCall(...apiArgs, t.url, t.extraparam);
+            const value = t.type === 'svg' ? JSON.stringify({ svg: data?.data?.svg }) : JSON.stringify(data?.data);
+            return { key: t.key, value };
+        })) : [];
+        const upd = {};
+        results.forEach(r => { upd[r.key] = r.value; });
+
+        if (Object.keys(upd).length > 0) {
+            [kundli] = await db('basickundlis').where('id', kundli?.id).update(upd).returning('*');
+        }
+
+        const safeParse = (v) => { if (v == null) return null; if (typeof v === 'object') return v; try { return JSON.parse(v); } catch { return v; } };
+        const response = {
+            id: kundli_id,
+            south_navamsa_chart: safeParse(upd.south_navamsa_chart ?? kundli.south_navamsa_chart),
+            planets: safeParse(upd.planets ?? kundli.planets),
+            sookshma_dasha: safeParse(upd.sookshma_dasha ?? kundli.sookshma_dasha),
+        };
+        return res.status(200).json({ success: true, data: response, message: 'Kundli get Successfully' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
+async function getFreeSouthTransitChart(req, res) {
+    try {
+        const { kundli_id } = req.query;
+        if (!kundli_id) return res.status(400).json({ success: false, message: 'Missing params.' });
+
+        let kundli = await db('basickundlis').where({ id: kundli_id }).first();
+        if (!kundli) return res.status(400).json({ success: false, message: 'Kundli not found.' });
+        const { lat, lng, dob, language, birth_time, name, gender, birth_place } = kundli;
+
+        const [year, month, day] = dob.split('-');
+        const transitSouth = [
+            { key: 'transit_year', value: year },
+            { key: 'transit_month', value: month },
+            { key: 'transit_day', value: day },
+            { key: 'chart_type', value: 'south' }
+        ];
+        const base = 'https://astroapi-3.divineapi.com/indian-api/v1';
+        const allTasks = [
+            { key: 'south_transit_ascendant', url: base + '/kundli-transit/ascendant', extraparam: transitSouth, type: 'svg' },
+            { key: 'south_transit_moon', url: base + '/kundli-transit/moon', extraparam: transitSouth, type: 'svg' },
+            { key: 'planets', url: base.replace('/v1', '/v2') + '/planetary-positions', extraparam: [], type: 'data' },
+            { key: 'sookshma_dasha', url: base + '/vimshottari-dasha', extraparam: [{ key: 'dasha_type', value: 'sookshma-dasha' }], type: 'data' },
+        ];
+
+        const tasks = allTasks.filter(t => kundli[t.key] == null);
+        const apiArgs = [language, lat, lng, dob, birth_time, name, gender, birth_place];
+        const results = tasks.length > 0 ? await Promise.all(tasks.map(async (t) => {
+            const data = await basicKundliApiCall(...apiArgs, t.url, t.extraparam);
+            const value = t.type === 'svg' ? JSON.stringify({ svg: data?.data?.svg }) : JSON.stringify(data?.data);
+            return { key: t.key, value };
+        })) : [];
+        const upd = {};
+        results.forEach(r => { upd[r.key] = r.value; });
+
+        if (Object.keys(upd).length > 0) {
+            [kundli] = await db('basickundlis').where('id', kundli?.id).update(upd).returning('*');
+        }
+
+        const safeParse = (v) => { if (v == null) return null; if (typeof v === 'object') return v; try { return JSON.parse(v); } catch { return v; } };
+        const response = {
+            id: kundli_id,
+            planets: safeParse(upd.planets ?? kundli.planets),
+            south_transit_ascendant: safeParse(upd.south_transit_ascendant ?? kundli.south_transit_ascendant),
+            south_transit_moon: safeParse(upd.south_transit_moon ?? kundli.south_transit_moon),
+            sookshma_dasha: safeParse(upd.sookshma_dasha ?? kundli.sookshma_dasha),
+        };
+        return res.status(200).json({ success: true, data: response, message: 'Kundli get Successfully' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
+async function getFreeSouthDivisionalChart(req, res) {
+    try {
+        const { kundli_id } = req.query;
+        if (!kundli_id) return res.status(400).json({ success: false, message: 'Missing params.' });
+
+        let kundli = await db('basickundlis').where({ id: kundli_id }).first();
+        if (!kundli) return res.status(400).json({ success: false, message: 'Kundli not found.' });
+        const { lat, lng, dob, language, birth_time, name, gender, birth_place } = kundli;
+
+        const [year, month, day] = dob.split('-');
+        const transitSouth = [
+            { key: 'transit_year', value: year },
+            { key: 'transit_month', value: month },
+            { key: 'transit_day', value: day },
+            { key: 'chart_type', value: 'south' }
+        ];
+        const southParam = [{ key: 'chart_type', value: 'south' }];
+        const base = 'https://astroapi-3.divineapi.com/indian-api/v1';
+        const baseChart = base + '/horoscope-chart';
+
+        const allTasks = [
+            { key: 'south_transit_ascendant', url: base + '/kundli-transit/ascendant', extraparam: transitSouth, type: 'svg' },
+            { key: 'south_transit_moon', url: base + '/kundli-transit/moon', extraparam: transitSouth, type: 'svg' },
+            { key: 'south_chalit_chart', url: baseChart + '/chalit', extraparam: southParam, type: 'svg' },
+            { key: 'south_sun_chart', url: baseChart + '/SUN', extraparam: southParam, type: 'svg' },
+            { key: 'south_moon_chart', url: baseChart + '/MOON', extraparam: southParam, type: 'svg' },
+            { key: 'south_birth_chart', url: baseChart + '/D1', extraparam: southParam, type: 'svg' },
+            { key: 'south_hora_chart', url: baseChart + '/D2', extraparam: southParam, type: 'svg' },
+            { key: 'south_drekkana_chart', url: baseChart + '/D3', extraparam: southParam, type: 'svg' },
+            { key: 'south_chaturthamsha_chart', url: baseChart + '/D4', extraparam: southParam, type: 'svg' },
+            { key: 'south_saptamsa_chart', url: baseChart + '/D7', extraparam: southParam, type: 'svg' },
+            { key: 'south_navamsa_chart', url: baseChart + '/D9', extraparam: southParam, type: 'svg' },
+            { key: 'south_dasamsa_chart', url: baseChart + '/D10', extraparam: southParam, type: 'svg' },
+            { key: 'south_dwadasamsa_chart', url: baseChart + '/D12', extraparam: southParam, type: 'svg' },
+            { key: 'south_shodasamsa_chart', url: baseChart + '/D16', extraparam: southParam, type: 'svg' },
+            { key: 'south_vimsamsa_chart', url: baseChart + '/D20', extraparam: southParam, type: 'svg' },
+            { key: 'south_chaturvimsamsa_chart', url: baseChart + '/D24', extraparam: southParam, type: 'svg' },
+            { key: 'south_saptavimsamsa_chart', url: baseChart + '/D27', extraparam: southParam, type: 'svg' },
+            { key: 'south_trimsamsa_chart', url: baseChart + '/D30', extraparam: southParam, type: 'svg' },
+            { key: 'south_khavedamsa_chart', url: baseChart + '/D40', extraparam: southParam, type: 'svg' },
+            { key: 'south_akshavedamsa_chart', url: baseChart + '/D45', extraparam: southParam, type: 'svg' },
+            { key: 'south_shastiamsa_chart', url: baseChart + '/D60', extraparam: southParam, type: 'svg' },
+            { key: 'planets', url: base.replace('/v1', '/v2') + '/planetary-positions', extraparam: [], type: 'data' },
+            { key: 'sookshma_dasha', url: base + '/vimshottari-dasha', extraparam: [{ key: 'dasha_type', value: 'sookshma-dasha' }], type: 'data' },
+        ];
+
+        const tasks = allTasks.filter(t => kundli[t.key] == null);
+        const apiArgs = [language, lat, lng, dob, birth_time, name, gender, birth_place];
+        const results = tasks.length > 0 ? await Promise.all(tasks.map(async (t) => {
+            const data = await basicKundliApiCall(...apiArgs, t.url, t.extraparam);
+            const value = t.type === 'svg' ? JSON.stringify({ svg: data?.data?.svg }) : JSON.stringify(data?.data);
+            return { key: t.key, value };
+        })) : [];
+        const upd = {};
+        results.forEach(r => { upd[r.key] = r.value; });
+
+        if (Object.keys(upd).length > 0) {
+            [kundli] = await db('basickundlis').where('id', kundli?.id).update(upd).returning('*');
+        }
+
+        const safeParse = (v) => { if (v == null) return null; if (typeof v === 'object') return v; try { return JSON.parse(v); } catch { return v; } };
+        const response = {
+            id: kundli_id,
+            south_chalit_chart: safeParse(upd.south_chalit_chart ?? kundli.south_chalit_chart),
+            south_birth_chart: safeParse(upd.south_birth_chart ?? kundli.south_birth_chart),
+            south_navamsa_chart: safeParse(upd.south_navamsa_chart ?? kundli.south_navamsa_chart),
+            south_sun_chart: safeParse(upd.south_sun_chart ?? kundli.south_sun_chart),
+            south_moon_chart: safeParse(upd.south_moon_chart ?? kundli.south_moon_chart),
+            south_hora_chart: safeParse(upd.south_hora_chart ?? kundli.south_hora_chart),
+            south_drekkana_chart: safeParse(upd.south_drekkana_chart ?? kundli.south_drekkana_chart),
+            south_chaturthamsha_chart: safeParse(upd.south_chaturthamsha_chart ?? kundli.south_chaturthamsha_chart),
+            south_saptamsa_chart: safeParse(upd.south_saptamsa_chart ?? kundli.south_saptamsa_chart),
+            south_dasamsa_chart: safeParse(upd.south_dasamsa_chart ?? kundli.south_dasamsa_chart),
+            south_dwadasamsa_chart: safeParse(upd.south_dwadasamsa_chart ?? kundli.south_dwadasamsa_chart),
+            south_shodasamsa_chart: safeParse(upd.south_shodasamsa_chart ?? kundli.south_shodasamsa_chart),
+            south_vimsamsa_chart: safeParse(upd.south_vimsamsa_chart ?? kundli.south_vimsamsa_chart),
+            south_chaturvimsamsa_chart: safeParse(upd.south_chaturvimsamsa_chart ?? kundli.south_chaturvimsamsa_chart),
+            south_saptavimsamsa_chart: safeParse(upd.south_saptavimsamsa_chart ?? kundli.south_saptavimsamsa_chart),
+            south_trimsamsa_chart: safeParse(upd.south_trimsamsa_chart ?? kundli.south_trimsamsa_chart),
+            south_khavedamsa_chart: safeParse(upd.south_khavedamsa_chart ?? kundli.south_khavedamsa_chart),
+            south_akshavedamsa_chart: safeParse(upd.south_akshavedamsa_chart ?? kundli.south_akshavedamsa_chart),
+            south_shastiamsa_chart: safeParse(upd.south_shastiamsa_chart ?? kundli.south_shastiamsa_chart),
+            planets: safeParse(upd.planets ?? kundli.planets),
+            south_transit_ascendant: safeParse(upd.south_transit_ascendant ?? kundli.south_transit_ascendant),
+            south_transit_moon: safeParse(upd.south_transit_moon ?? kundli.south_transit_moon),
+            sookshma_dasha: safeParse(upd.sookshma_dasha ?? kundli.sookshma_dasha),
+        };
+        return res.status(200).json({ success: true, data: response, message: 'Kundli get Successfully' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+module.exports = { findBasicKundli, findkundliTab, findkpTab, findAshtakvargaTab, findChartTab, findDashaTab, findReportTab, getHororscope, getPersonalHororscope, ashtakootMilan, getFreeBasicKundli, getFreekpTab, getFreeAshtakvargaTab, getFreeDashaTab, getGeneralReport, getRemedieReport, getDoshaReport, getFreeLagnaChart, getFreeNavamsaChart, getFreeTransitChart, getFreeDivisionalChart, getFreeSouthDivisionalChart, getFreeSouthTransitChart, getFreeSouthNavamsaChart, getFreeSouthLagnaChart };
