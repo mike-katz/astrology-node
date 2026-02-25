@@ -947,4 +947,83 @@ async function getFreeBasicKundli(req, res) {
     }
 }
 
-module.exports = { findBasicKundli, findkundliTab, findkpTab, findAshtakvargaTab, findChartTab, findDashaTab, findReportTab, getHororscope, getPersonalHororscope, ashtakootMilan, getFreeBasicKundli };
+async function getFreekpTab(req, res) {
+    try {
+        const { kundli_id } = req.query;
+        if (!kundli_id) return res.status(400).json({ success: false, message: 'Missing params.' });
+
+        const kundli = await db('basickundlis')
+            .where({ id: kundli_id })
+            .first();
+        if (!kundli) return res.status(400).json({ success: false, message: 'Kundli not found.' });
+        const kpkundli = await db('kpkundlis')
+            .where({ kundli_id })
+            .first();
+        const chalit_chart_detail = await db('chalit_chart')
+            .where({ kundli_id })
+            .first();
+        const { lat, lng, dob, language, birth_time, name, gender, birth_place } = kundli
+
+        const params = {
+            chalit_chart: chalit_chart_detail?.chalit_chart,
+            ruling_planet: kpkundli?.ruling_planet,
+            kp_planet: kpkundli?.kp_planet,
+            kp_cusps: kpkundli?.kp_cusps
+        }
+        const base = 'https://astroapi-3.divineapi.com/indian-api';
+        const allTasks = [
+            { key: 'chalit_chart', url: base + '/v1/horoscope-chart/chalit', extraparam: [] },
+            { key: 'ruling_planet', url: base + '/v2/kp/planetary-positions', extraparam: [] },
+            { key: 'kp_planet', url: base + '/v2/kp/planetary-positions', extraparam: [] },
+            { key: 'kp_cusps', url: base + '/v2/kp/cuspal', extraparam: [] },
+        ];
+        const tasks = allTasks.filter(t => params[t.key] == null);
+        const apiArgs = [language, lat, lng, dob, birth_time, name, gender, birth_place];
+        const results = tasks.length > 0 ? await Promise.all(tasks.map(async (t) => {
+            const data = await basicKundliApiCall(...apiArgs, t.url, t.extraparam);
+            return { key: t.key, value: JSON.stringify(data?.data) };
+        })) : [];
+        const upd = {};
+        results.forEach(r => { upd[r.key] = r.value; });
+        if (Object.keys(upd).length > 0) {
+            if (upd.chalit_chart != null) {
+                await db('chalit_chart')
+                    .where({ kundli_id })
+                    .update({ chalit_chart: upd.chalit_chart });
+            }
+            const kpUpd = { ...upd };
+            delete kpUpd.chalit_chart;
+            if (Object.keys(kpUpd).length > 0) {
+                await db('kpkundlis')
+                    .where({ kundli_id })
+                    .update(kpUpd);
+            }
+        }
+
+        // Response: chalit_chart -> chalit_chart table; ruling_planet, kp_planet, kp_cusps -> kpkundlis
+        const chalitFinal = upd.chalit_chart ?? chalit_chart_detail?.chalit_chart;
+        const rulingFinal = upd.ruling_planet ?? kpkundli?.ruling_planet;
+        const kpPlanetFinal = upd.kp_planet ?? kpkundli?.kp_planet;
+        const kpCuspsFinal = upd.kp_cusps ?? kpkundli?.kp_cusps;
+        const response = {
+            id: kundli_id,
+            chalit_chart: safeParse(chalitFinal),
+            ruling_planet: safeParse(rulingFinal),
+            kp_planet: safeParse(kpPlanetFinal),
+            kp_cusps: safeParse(kpCuspsFinal),
+        };
+        return res.status(200).json({ success: true, data: response, message: 'Kundli get Successfully' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
+const safeParse = (val) => {
+    if (val == null) return null;
+    if (typeof val === 'object') return val;
+    try { return JSON.parse(val); } catch { return val; }
+};
+
+
+module.exports = { findBasicKundli, findkundliTab, findkpTab, findAshtakvargaTab, findChartTab, findDashaTab, findReportTab, getHororscope, getPersonalHororscope, ashtakootMilan, getFreeBasicKundli, getFreekpTab };
