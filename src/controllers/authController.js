@@ -114,7 +114,7 @@ async function verifyOtp(req, res) {
         if (existing && ad_set_id) {
             upd.ad_set_id = ad_set_id
         }
-        if (upd) {
+        if (Object.keys(upd).length > 0) {
             await db('users').where({ id: Number(existing?.id) }).update(upd)
         }
         if (!existing) {
