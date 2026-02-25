@@ -74,7 +74,7 @@ async function login(req, res) {
 
 async function verifyOtp(req, res) {
     try {
-        const { mobile, country_code = '+91', otp, ad_set_id, utm_source, ad_id, type, version } = req.body;
+        const { mobile, country_code = '+91', otp, ad_set_id, utm_source, ad_id, type, version, referrer } = req.body;
         if (!mobile || !otp || !country_code) return res.status(400).json({ success: false, message: 'Mobile number and otp required.' });
 
         const isValid = isValidMobile(mobile);
@@ -104,11 +104,21 @@ async function verifyOtp(req, res) {
             // await db('users').where({ id: existing?.id }).update({ deleted_at: null })
         }
         const mode = type ? type : 'APP';
+        const upd = {}
         if (existing && version) {
-            await db('users').where({ id: Number(existing?.id) }).update({ version })
+            upd.version = version
+        }
+        if (existing && referrer) {
+            upd.ad_set_id = referrer
+        }
+        if (existing && ad_set_id) {
+            upd.ad_set_id = ad_set_id
+        }
+        if (Object.keys(upd).length > 0) {
+            await db('users').where({ id: Number(existing?.id) }).update(upd)
         }
         if (!existing) {
-            [existing] = await db('users').insert({ mobile, country_code, status: "active", balance: 0, ad_set_id, utm_source, ad_id, mode, version }).returning(['id', 'mobile', 'avatar', 'country_code', 'otp']);
+            [existing] = await db('users').insert({ mobile, country_code, status: "active", balance: 0, ad_set_id: ad_set_id ?? referrer ?? null, utm_source, ad_id, mode, version }).returning(['id', 'mobile', 'avatar', 'country_code', 'otp']);
         }
         const token = jwt.sign({ userId: existing.id, username: existing.name, mobile: existing.mobile }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '1h' });
         // hide password

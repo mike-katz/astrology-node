@@ -19,5 +19,9 @@ router.get('/south-navamsa-chart', kundli.getFreeSouthNavamsaChart);
 router.get('/south-transit-chart', kundli.getFreeSouthTransitChart);
 router.get('/south-divisional-chart', kundli.getFreeSouthDivisionalChart);
 
+router.get('/planets', kundli.getFreePlanetsChart);
+router.get('/sookshma_dasha', kundli.getFreeSookshmaDasha);
+
+
 module.exports = router;
 

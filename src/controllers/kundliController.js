@@ -2060,4 +2060,78 @@ async function getFreeSouthDivisionalChart(req, res) {
         res.status(500).json({ success: false, message: 'Server error' });
     }
 }
-module.exports = { findBasicKundli, findkundliTab, findkpTab, findAshtakvargaTab, findChartTab, findDashaTab, findReportTab, getHororscope, getPersonalHororscope, ashtakootMilan, getFreeBasicKundli, getFreekpTab, getFreeAshtakvargaTab, getFreeDashaTab, getGeneralReport, getRemedieReport, getDoshaReport, getFreeLagnaChart, getFreeNavamsaChart, getFreeTransitChart, getFreeDivisionalChart, getFreeSouthDivisionalChart, getFreeSouthTransitChart, getFreeSouthNavamsaChart, getFreeSouthLagnaChart };
+
+async function getFreePlanetsChart(req, res) {
+    try {
+        const { kundli_id } = req.query;
+        if (!kundli_id) return res.status(400).json({ success: false, message: 'Missing params.' });
+
+        let kundli = await db('basickundlis')
+            .where({ id: kundli_id })
+            .first();
+        if (!kundli) return res.status(400).json({ success: false, message: 'Kundli not found.' });
+        const { lat, lng, dob, birth_time, language, name, gender, birth_place } = kundli
+        const ashtakvargaDetail = await db('planetkundlis')
+            .where({ kundli_id })
+            .first();
+        let planets = ashtakvargaDetail?.planets || null
+        const upd = {}
+        if (planets == null) {
+            const ChartUrl = 'https://astroapi-3.divineapi.com/indian-api/v1/bhinnashtakvarga/ashtakvarga'
+            const chalitChartresponse = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, ChartUrl)
+            upd.planets = JSON.stringify(chalitChartresponse?.data?.chart);
+            planets = upd.planets
+        }
+        if (Object.keys(upd).length > 0) {
+            await db('planetkundlis')
+                .where({ kundli_id })
+                .update(upd)
+        }
+        const response = {
+            id: kundli_id,
+            planets: JSON.parse(planets),
+        }
+        return res.status(200).json({ success: true, data: response, message: 'Kundli get Successfully' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
+async function getFreeSookshmaDasha(req, res) {
+    try {
+        const { kundli_id } = req.query;
+        if (!kundli_id) return res.status(400).json({ success: false, message: 'Missing params.' });
+
+        let kundli = await db('basickundlis')
+            .where({ id: kundli_id })
+            .first();
+        if (!kundli) return res.status(400).json({ success: false, message: 'Kundli not found.' });
+        const { lat, lng, dob, birth_time, language, name, gender, birth_place } = kundli
+        let sookshmaDashaRow = await db('sookshma_dasha').where({ kundli_id }).first();
+
+        let sookshma_dasha = sookshmaDashaRow?.sookshma_dasha || null
+        const upd = {}
+        if (sookshma_dasha == null) {
+            const ChartUrl = 'https://astroapi-3.divineapi.com/indian-api/v1/bhinnashtakvarga/ashtakvarga'
+            const chalitChartresponse = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, ChartUrl)
+            upd.sookshma_dasha = JSON.stringify(chalitChartresponse?.data?.chart);
+            sookshma_dasha = upd.sookshma_dasha
+        }
+        if (Object.keys(upd).length > 0) {
+            await db('sookshma_dasha')
+                .where({ kundli_id })
+                .update(upd)
+        }
+        const response = {
+            id: kundli_id,
+            sookshma_dasha: JSON.parse(sookshma_dasha),
+        }
+        return res.status(200).json({ success: true, data: response, message: 'Kundli get Successfully' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
+module.exports = { findBasicKundli, findkundliTab, findkpTab, findAshtakvargaTab, findChartTab, findDashaTab, findReportTab, getHororscope, getPersonalHororscope, ashtakootMilan, getFreeBasicKundli, getFreekpTab, getFreeAshtakvargaTab, getFreeDashaTab, getGeneralReport, getRemedieReport, getDoshaReport, getFreeLagnaChart, getFreeNavamsaChart, getFreeTransitChart, getFreeDivisionalChart, getFreeSouthDivisionalChart, getFreeSouthTransitChart, getFreeSouthNavamsaChart, getFreeSouthLagnaChart, getFreePlanetsChart, getFreeSookshmaDasha };
