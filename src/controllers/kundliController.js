@@ -10,6 +10,15 @@ const safeParse = (val) => {
     try { return JSON.parse(val); } catch { return val; }
 };
 
+/** Required basickundlis columns for chart API calls (must exist in migration) */
+const REQUIRED_KUNDLI_API_PARAMS = ['lat', 'lng', 'dob', 'birth_time', 'name', 'gender', 'birth_place', 'language'];
+
+function validateKundliParams(kundli) {
+    const missing = REQUIRED_KUNDLI_API_PARAMS.filter((key) => kundli[key] == null || kundli[key] === '');
+    if (missing.length) return { valid: false, message: `Missing required kundli params: ${missing.join(', ')}` };
+    return { valid: true };
+}
+
 async function basicKundliApiCall(language = 'en', lat, lng, dob, birth_time, name, gender, birth_place, url, extraparam = []) {
 
     lat = lat ?? '22.82';
