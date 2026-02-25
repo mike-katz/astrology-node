@@ -1025,5 +1025,41 @@ const safeParse = (val) => {
     try { return JSON.parse(val); } catch { return val; }
 };
 
+async function getFreeAshtakvargaTab(req, res) {
+    try {
+        const { kundli_id } = req.query;
+        if (!kundli_id) return res.status(400).json({ success: false, message: 'Missing params.' });
+
+        let kundli = await db('basickundlis')
+            .where({ id: kundli_id })
+            .first();
+        if (!kundli) return res.status(400).json({ success: false, message: 'Kundli not found.' });
+        const { lat, lng, dob, birth_time, language, name, gender, birth_place } = kundli
+        const ashtakvargaDetail = await db('ashtakvargakundlis')
+            .where({ kundli_id })
+            .first();
+        let ashtakvarga = ashtakvargaDetail?.ashtakvarga || null
+        const upd = {}
+        if (ashtakvarga == null) {
+            const ChartUrl = 'https://astroapi-3.divineapi.com/indian-api/v1/bhinnashtakvarga/ashtakvarga'
+            const chalitChartresponse = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, ChartUrl)
+            upd.ashtakvarga = JSON.stringify(chalitChartresponse?.data?.chart);
+            ashtakvarga = upd.ashtakvarga
+        }
+        if (Object.keys(upd).length > 0) {
+            await db('ashtakvargakundlis')
+                .where({ kundli_id })
+                .update(upd)
+        }
+        const response = {
+            id: kundli_id,
+            ashtakvarga: JSON.parse(ashtakvarga),
+        }
+        return res.status(200).json({ success: true, data: response, message: 'Kundli get Successfully' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
 
 module.exports = { findBasicKundli, findkundliTab, findkpTab, findAshtakvargaTab, findChartTab, findDashaTab, findReportTab, getHororscope, getPersonalHororscope, ashtakootMilan, getFreeBasicKundli, getFreekpTab };
