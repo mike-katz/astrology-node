@@ -6,6 +6,9 @@ router.get('/basic', kundli.getFreeBasicKundli);
 router.get('/kp', kundli.getFreekpTab);
 router.get('/ashtakvarga', kundli.getFreeAshtakvargaTab);
 router.get('/dasha', kundli.getFreeDashaTab);
-
+router.get('/general-report', kundli.getGeneralReport);
+router.get('/remedie-report', kundli.getRemedieReport);
+router.get('/dosha-report', kundli.getDoshaReport);
+router.get('/dasha', kundli.getFreeDashaTab);
 module.exports = router;
 

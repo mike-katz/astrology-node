@@ -857,6 +857,12 @@ async function ashtakootMilan(req, res) {
     }
 }
 
+const safeParse = (val) => {
+    if (val == null) return null;
+    if (typeof val === 'object') return val;
+    try { return JSON.parse(val); } catch { return val; }
+};
+
 async function getFreeBasicKundli(req, res) {
     try {
         let { profile_id, name, dob, type, birth_time, gender, birth_place, lat = '22.82', lng = '70.84', language = 'en' } = req.query;
@@ -1019,11 +1025,6 @@ async function getFreekpTab(req, res) {
     }
 }
 
-const safeParse = (val) => {
-    if (val == null) return null;
-    if (typeof val === 'object') return val;
-    try { return JSON.parse(val); } catch { return val; }
-};
 
 async function getFreeAshtakvargaTab(req, res) {
     try {
@@ -1157,4 +1158,272 @@ async function getFreeDashaTab(req, res) {
         res.status(500).json({ success: false, message: 'Server error' });
     }
 }
-module.exports = { findBasicKundli, findkundliTab, findkpTab, findAshtakvargaTab, findChartTab, findDashaTab, findReportTab, getHororscope, getPersonalHororscope, ashtakootMilan, getFreeBasicKundli, getFreekpTab, getFreeAshtakvargaTab, getFreeDashaTab };
+
+async function getGeneralReport(req, res) {
+    try {
+        const { kundli_id } = req.query;
+        if (!kundli_id) return res.status(400).json({ success: false, message: 'Missing params.' });
+
+        const kundli = await db('basickundlis').where({ id: kundli_id }).first();
+        if (!kundli) return res.status(400).json({ success: false, message: 'Kundli not found.' });
+        const { lat, lng, dob, language, birth_time, name, gender, birth_place } = kundli;
+
+        let reportRow = await db('reportkundlis').where({ kundli_id }).first();
+        let dashakundli = await db('dashakundlis').where({ kundli_id }).first();
+
+        // Only params used in response – fewer API calls
+        const params = {
+            general_report: reportRow?.general_report,
+            general_yoga_tab: reportRow?.general_yoga_tab,
+            planetary_sun: reportRow?.planetary_sun,
+            planetary_moon: reportRow?.planetary_moon,
+            planetary_mercury: reportRow?.planetary_mercury,
+            planetary_venus: reportRow?.planetary_venus,
+            planetary_mars: reportRow?.planetary_mars,
+            planetary_jupiter: reportRow?.planetary_jupiter,
+            planetary_saturn: reportRow?.planetary_saturn,
+            planetary_rahu: reportRow?.planetary_rahu,
+            planetary_ketu: reportRow?.planetary_ketu,
+            sun_dasha: dashakundli?.sun_dasha,
+            moon_dasha: dashakundli?.moon_dasha,
+            mars_dasha: dashakundli?.mars_dasha,
+            mercury_dasha: dashakundli?.mercury_dasha,
+            venus_dasha: dashakundli?.venus_dasha,
+            saturn_dasha: dashakundli?.saturn_dasha,
+            jupiter_dasha: dashakundli?.jupiter_dasha,
+            ketu_dasha: dashakundli?.ketu_dasha,
+            rahu_dasha: dashakundli?.rahu_dasha,
+        };
+
+        const base = 'https://astroapi-3.divineapi.com/indian-api';
+        const planetUrl = base + '/v2/planet-analysis';
+        const mahaUrl = base + '/v1/maha-dasha-analysis';
+        const allTasks = [
+            { key: 'general_report', url: base + '/v2/ascendant-report', extraparam: [] },
+            { key: 'planetary_sun', url: planetUrl, extraparam: [{ key: 'analysis_planet', value: 'sun' }] },
+            { key: 'planetary_moon', url: planetUrl, extraparam: [{ key: 'analysis_planet', value: 'moon' }] },
+            { key: 'planetary_mercury', url: planetUrl, extraparam: [{ key: 'analysis_planet', value: 'mercury' }] },
+            { key: 'planetary_venus', url: planetUrl, extraparam: [{ key: 'analysis_planet', value: 'venus' }] },
+            { key: 'planetary_mars', url: planetUrl, extraparam: [{ key: 'analysis_planet', value: 'mars' }] },
+            { key: 'planetary_jupiter', url: planetUrl, extraparam: [{ key: 'analysis_planet', value: 'jupiter' }] },
+            { key: 'planetary_saturn', url: planetUrl, extraparam: [{ key: 'analysis_planet', value: 'saturn' }] },
+            { key: 'planetary_rahu', url: planetUrl, extraparam: [{ key: 'analysis_planet', value: 'rahu' }] },
+            { key: 'planetary_ketu', url: planetUrl, extraparam: [{ key: 'analysis_planet', value: 'ketu' }] },
+            { key: 'general_yoga_tab', url: base + '/v2/yogas', extraparam: [] },
+            { key: 'sun_dasha', url: mahaUrl, extraparam: [{ key: 'maha_dasha', value: 'sun' }] },
+            { key: 'moon_dasha', url: mahaUrl, extraparam: [{ key: 'maha_dasha', value: 'moon' }] },
+            { key: 'mars_dasha', url: mahaUrl, extraparam: [{ key: 'maha_dasha', value: 'mars' }] },
+            { key: 'mercury_dasha', url: mahaUrl, extraparam: [{ key: 'maha_dasha', value: 'mercury' }] },
+            { key: 'venus_dasha', url: mahaUrl, extraparam: [{ key: 'maha_dasha', value: 'venus' }] },
+            { key: 'saturn_dasha', url: mahaUrl, extraparam: [{ key: 'maha_dasha', value: 'saturn' }] },
+            { key: 'jupiter_dasha', url: mahaUrl, extraparam: [{ key: 'maha_dasha', value: 'jupiter' }] },
+            { key: 'ketu_dasha', url: mahaUrl, extraparam: [{ key: 'maha_dasha', value: 'ketu' }] },
+            { key: 'rahu_dasha', url: mahaUrl, extraparam: [{ key: 'maha_dasha', value: 'rahu' }] },
+        ];
+
+        const tasks = allTasks.filter(t => params[t.key] == null);
+        const apiArgs = [language, lat, lng, dob, birth_time, name, gender, birth_place];
+        const results = tasks.length > 0 ? await Promise.all(tasks.map(async (t) => {
+            const data = await basicKundliApiCall(...apiArgs, t.url, t.extraparam);
+            return { key: t.key, value: JSON.stringify(data?.data) };
+        })) : [];
+        const upd = {};
+        results.forEach(r => { upd[r.key] = r.value; });
+
+        if (Object.keys(upd).length > 0) {
+            const reportKeys = ['general_report', 'general_yoga_tab', 'planetary_sun', 'planetary_moon', 'planetary_mercury', 'planetary_venus', 'planetary_mars', 'planetary_jupiter', 'planetary_saturn', 'planetary_rahu', 'planetary_ketu'];
+            const reportUpd = {};
+            reportKeys.forEach(k => { if (upd[k] != null) reportUpd[k] = upd[k]; });
+            if (Object.keys(reportUpd).length > 0) {
+                if (reportRow) {
+                    await db('reportkundlis').where({ kundli_id }).update(reportUpd);
+                } else {
+                    await db('reportkundlis').insert({ kundli_id, ...reportUpd });
+                }
+            }
+            const dashaKeys = ['sun_dasha', 'moon_dasha', 'mars_dasha', 'mercury_dasha', 'venus_dasha', 'saturn_dasha', 'jupiter_dasha', 'ketu_dasha', 'rahu_dasha'];
+            const dashaUpd = {};
+            dashaKeys.forEach(k => { if (upd[k] != null) dashaUpd[k] = upd[k]; });
+            if (Object.keys(dashaUpd).length > 0) {
+                if (dashakundli) {
+                    await db('dashakundlis').where({ kundli_id }).update(dashaUpd);
+                } else {
+                    await db('dashakundlis').insert({ kundli_id, ...dashaUpd });
+                }
+            }
+        }
+
+        reportRow = await db('reportkundlis').where({ kundli_id }).first();
+        dashakundli = await db('dashakundlis').where({ kundli_id }).first();
+
+        const safeParse = (val) => {
+            if (val == null) return null;
+            if (typeof val === 'object') return val;
+            try { return JSON.parse(val); } catch { return val; }
+        };
+
+        const response = {
+            id: kundli_id,
+            general_report: safeParse(upd.general_report ?? reportRow?.general_report),
+            general_yoga_tab: safeParse(upd.general_yoga_tab ?? reportRow?.general_yoga_tab),
+            planetary_sun: safeParse(upd.planetary_sun ?? reportRow?.planetary_sun),
+            planetary_moon: safeParse(upd.planetary_moon ?? reportRow?.planetary_moon),
+            planetary_mercury: safeParse(upd.planetary_mercury ?? reportRow?.planetary_mercury),
+            planetary_venus: safeParse(upd.planetary_venus ?? reportRow?.planetary_venus),
+            planetary_mars: safeParse(upd.planetary_mars ?? reportRow?.planetary_mars),
+            planetary_jupiter: safeParse(upd.planetary_jupiter ?? reportRow?.planetary_jupiter),
+            planetary_saturn: safeParse(upd.planetary_saturn ?? reportRow?.planetary_saturn),
+            planetary_rahu: safeParse(upd.planetary_rahu ?? reportRow?.planetary_rahu),
+            planetary_ketu: safeParse(upd.planetary_ketu ?? reportRow?.planetary_ketu),
+            sun_dasha: safeParse(upd.sun_dasha ?? dashakundli?.sun_dasha),
+            moon_dasha: safeParse(upd.moon_dasha ?? dashakundli?.moon_dasha),
+            mars_dasha: safeParse(upd.mars_dasha ?? dashakundli?.mars_dasha),
+            mercury_dasha: safeParse(upd.mercury_dasha ?? dashakundli?.mercury_dasha),
+            venus_dasha: safeParse(upd.venus_dasha ?? dashakundli?.venus_dasha),
+            saturn_dasha: safeParse(upd.saturn_dasha ?? dashakundli?.saturn_dasha),
+            jupiter_dasha: safeParse(upd.jupiter_dasha ?? dashakundli?.jupiter_dasha),
+            ketu_dasha: safeParse(upd.ketu_dasha ?? dashakundli?.ketu_dasha),
+            rahu_dasha: safeParse(upd.rahu_dasha ?? dashakundli?.rahu_dasha),
+        };
+        return res.status(200).json({ success: true, data: response, message: 'Kundli get Successfully' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
+async function getRemedieReport(req, res) {
+    try {
+        const { kundli_id } = req.query;
+        if (!kundli_id) return res.status(400).json({ success: false, message: 'Missing params.' });
+
+        const kundli = await db('basickundlis').where({ id: kundli_id }).first();
+        if (!kundli) return res.status(400).json({ success: false, message: 'Kundli not found.' });
+        const { lat, lng, dob, language, birth_time, name, gender, birth_place } = kundli;
+
+        let reportRow = await db('reportkundlis').where({ kundli_id }).first();
+
+        // Response only uses general_report, gemstones – only these API calls
+        const params = { general_report: reportRow?.general_report, gemstones: reportRow?.gemstones };
+        const base = 'https://astroapi-3.divineapi.com/indian-api';
+        const allTasks = [
+            { key: 'general_report', url: base + '/v2/ascendant-report', extraparam: [] },
+            { key: 'gemstones', url: base + '/v2/gemstone-suggestion', extraparam: [] },
+        ];
+
+        const tasks = allTasks.filter(t => params[t.key] == null);
+        const apiArgs = [language, lat, lng, dob, birth_time, name, gender, birth_place];
+        const results = tasks.length > 0 ? await Promise.all(tasks.map(async (t) => {
+            const data = await basicKundliApiCall(...apiArgs, t.url, t.extraparam);
+            return { key: t.key, value: JSON.stringify(data?.data) };
+        })) : [];
+        const upd = {};
+        results.forEach(r => { upd[r.key] = r.value; });
+
+        if (Object.keys(upd).length > 0) {
+            const reportKeys = ['general_report', 'gemstones'];
+            const reportUpd = {};
+            reportKeys.forEach(k => { if (upd[k] != null) reportUpd[k] = upd[k]; });
+            if (Object.keys(reportUpd).length > 0) {
+                if (reportRow) {
+                    await db('reportkundlis').where({ kundli_id }).update(reportUpd);
+                } else {
+                    await db('reportkundlis').insert({ kundli_id, ...reportUpd });
+                }
+            }
+        }
+
+        reportRow = await db('reportkundlis').where({ kundli_id }).first();
+
+        const safeParse = (val) => {
+            if (val == null) return null;
+            if (typeof val === 'object') return val;
+            try { return JSON.parse(val); } catch { return val; }
+        };
+
+        const response = {
+            id: kundli_id,
+            general_report: safeParse(upd.general_report ?? reportRow?.general_report),
+            gemstones: safeParse(upd.gemstones ?? reportRow?.gemstones),
+        };
+        return res.status(200).json({ success: true, data: response, message: 'Kundli get Successfully' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
+async function getDoshaReport(req, res) {
+    try {
+        const { kundli_id } = req.query;
+        if (!kundli_id) return res.status(400).json({ success: false, message: 'Missing params.' });
+
+        const kundli = await db('basickundlis').where({ id: kundli_id }).first();
+        if (!kundli) return res.status(400).json({ success: false, message: 'Kundli not found.' });
+        const { lat, lng, dob, language, birth_time, name, gender, birth_place } = kundli;
+
+        let reportRow = await db('reportkundlis').where({ kundli_id }).first();
+
+        // Response: general_report + doshas only – only these API calls
+        const params = {
+            general_report: reportRow?.general_report,
+            pitra_dosha: reportRow?.pitra_dosha,
+            kalsarpa_dosha: reportRow?.kalsarpa_dosha,
+            manglik_dosha: reportRow?.manglik_dosha,
+            sadesati_dosha: reportRow?.sadesati_dosha,
+        };
+        const base = 'https://astroapi-3.divineapi.com/indian-api';
+        const allTasks = [
+            { key: 'general_report', url: base + '/v2/ascendant-report', extraparam: [] },
+            { key: 'pitra_dosha', url: base + '/v1/pitra-dosha', extraparam: [] },
+            { key: 'kalsarpa_dosha', url: base + '/v1/kaal-sarpa-yoga', extraparam: [{ key: 'dasha_type', value: 'sookshma-dasha' }] },
+            { key: 'manglik_dosha', url: base + '/v2/manglik-dosha', extraparam: [] },
+            { key: 'sadesati_dosha', url: base + '/v2/sadhe-sati', extraparam: [] },
+        ];
+
+        const tasks = allTasks.filter(t => params[t.key] == null);
+        const apiArgs = [language, lat, lng, dob, birth_time, name, gender, birth_place];
+        const results = tasks.length > 0 ? await Promise.all(tasks.map(async (t) => {
+            const data = await basicKundliApiCall(...apiArgs, t.url, t.extraparam);
+            return { key: t.key, value: JSON.stringify(data?.data) };
+        })) : [];
+        const upd = {};
+        results.forEach(r => { upd[r.key] = r.value; });
+
+        if (Object.keys(upd).length > 0) {
+            const reportKeys = ['general_report', 'pitra_dosha', 'kalsarpa_dosha', 'manglik_dosha', 'sadesati_dosha'];
+            const reportUpd = {};
+            reportKeys.forEach(k => { if (upd[k] != null) reportUpd[k] = upd[k]; });
+            if (Object.keys(reportUpd).length > 0) {
+                if (reportRow) {
+                    await db('reportkundlis').where({ kundli_id }).update(reportUpd);
+                } else {
+                    await db('reportkundlis').insert({ kundli_id, ...reportUpd });
+                }
+            }
+        }
+
+        reportRow = await db('reportkundlis').where({ kundli_id }).first();
+
+        const safeParse = (val) => {
+            if (val == null) return null;
+            if (typeof val === 'object') return val;
+            try { return JSON.parse(val); } catch { return val; }
+        };
+
+        const response = {
+            id: kundli_id,
+            general_report: safeParse(upd.general_report ?? reportRow?.general_report),
+            pitra_dosha: safeParse(upd.pitra_dosha ?? reportRow?.pitra_dosha),
+            kalsarpa_dosha: safeParse(upd.kalsarpa_dosha ?? reportRow?.kalsarpa_dosha),
+            manglik_dosha: safeParse(upd.manglik_dosha ?? reportRow?.manglik_dosha),
+            sadesati_dosha: safeParse(upd.sadesati_dosha ?? reportRow?.sadesati_dosha),
+        };
+        return res.status(200).json({ success: true, data: response, message: 'Kundli get Successfully' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
+module.exports = { findBasicKundli, findkundliTab, findkpTab, findAshtakvargaTab, findChartTab, findDashaTab, findReportTab, getHororscope, getPersonalHororscope, ashtakootMilan, getFreeBasicKundli, getFreekpTab, getFreeAshtakvargaTab, getFreeDashaTab, getGeneralReport, getRemedieReport, getDoshaReport };
