@@ -2077,9 +2077,9 @@ async function getFreePlanetsChart(req, res) {
         let planets = ashtakvargaDetail?.planets || null
         const upd = {}
         if (planets == null) {
-            const ChartUrl = 'https://astroapi-3.divineapi.com/indian-api/v1/bhinnashtakvarga/ashtakvarga'
+            const ChartUrl = 'https://astroapi-3.divineapi.com/indian-api/v2/planetary-positions'
             const chalitChartresponse = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, ChartUrl)
-            upd.planets = JSON.stringify(chalitChartresponse?.data?.chart);
+            upd.planets = JSON.stringify(chalitChartresponse?.data);
             planets = upd.planets
         }
         if (Object.keys(upd).length > 0) {
@@ -2113,9 +2113,9 @@ async function getFreeSookshmaDasha(req, res) {
         let sookshma_dasha = sookshmaDashaRow?.sookshma_dasha || null
         const upd = {}
         if (sookshma_dasha == null) {
-            const ChartUrl = 'https://astroapi-3.divineapi.com/indian-api/v1/bhinnashtakvarga/ashtakvarga'
-            const chalitChartresponse = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, ChartUrl)
-            upd.sookshma_dasha = JSON.stringify(chalitChartresponse?.data?.chart);
+            const ChartUrl = 'https://astroapi-3.divineapi.com/indian-api/v1/vimshottari-dasha'
+            const chalitChartresponse = await basicKundliApiCall(language, lat, lng, dob, birth_time, name, gender, birth_place, ChartUrl, [{ key: 'dasha_type', value: 'sookshma-dasha' }])
+            upd.sookshma_dasha = JSON.stringify(chalitChartresponse?.data);
             sookshma_dasha = upd.sookshma_dasha
         }
         if (Object.keys(upd).length > 0) {
