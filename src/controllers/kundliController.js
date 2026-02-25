@@ -1305,8 +1305,20 @@ async function getFreeLagnaChart(req, res) {
             .where({ id: kundli_id })
             .first();
         if (!kundli) return res.status(400).json({ success: false, message: 'Kundli not found.' });
+        const validation = validateKundliParams(kundli);
+        if (!validation.valid) return res.status(400).json({ success: false, message: validation.message });
         const { lat, lng, dob, language, birth_time, name, gender, birth_place } = kundli;
 
+        let reportRow = await db('lagna_chart').where({ kundli_id }).first();
+        let palnetRow = await db('planetkundlis').where({ kundli_id }).first();
+        let sookshmaDashaRow = await db('sookshma_dasha').where({ kundli_id }).first();
+
+        // Response: general_report + doshas only – only these API calls
+        const params = {
+            birth_chart: reportRow?.birth_chart,
+            planets: palnetRow?.planets,
+            sookshma_dasha: sookshmaDashaRow?.sookshma_dasha,
+        };
         const base = 'https://astroapi-3.divineapi.com/indian-api/v1';
         const baseChart = base + '/horoscope-chart';
         const northParam = [{ key: 'chart_type', value: 'north' }];
@@ -1317,7 +1329,7 @@ async function getFreeLagnaChart(req, res) {
             { key: 'sookshma_dasha', url: base + '/vimshottari-dasha', extraparam: [{ key: 'dasha_type', value: 'sookshma-dasha' }], type: 'data' },
         ];
 
-        const tasks = allTasks.filter(t => kundli[t.key] == null);
+        const tasks = allTasks.filter(t => params[t.key] == null);
         const apiArgs = [language, lat, lng, dob, birth_time, name, gender, birth_place];
 
         const results = tasks.length > 0
