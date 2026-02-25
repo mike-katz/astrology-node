@@ -41,7 +41,6 @@ app.get("/health", (req, res) => {
 app.use(express.json());
 
 app.use('/callback', callBackRoutes);
-app.use('/freeKundli', freeKundliRoutes);
 app.use('/newKundli', kundliRoutes);
 app.use(decryptRequest);
 app.use(encryptResponse);
@@ -52,6 +51,7 @@ app.use('/auth', authRoutes);
 app.use('/pandit', panditRoutes);
 app.use('/upload', panditRoutes);
 app.use('/kundli', kundliRoutes);
+app.use('/freeKundli', freeKundliRoutes);
 app.use('/faq', faqRoutes);
 app.use('/blog', blogRoutes);
 app.use('/banners', bannerRoutes);
