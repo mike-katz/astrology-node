@@ -20,7 +20,7 @@ router.get('/south-transit-chart', kundli.getFreeSouthTransitChart);
 router.get('/south-divisional-chart', kundli.getFreeSouthDivisionalChart);
 
 router.get('/planets', kundli.getFreePlanetsChart);
-router.get('/sookshma_dasha', kundli.getFreeSookshmaDasha);
+router.get('/sookshma-dasha', kundli.getFreeSookshmaDasha);
 
 
 module.exports = router;
