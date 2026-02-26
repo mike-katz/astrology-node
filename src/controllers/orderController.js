@@ -350,7 +350,7 @@ async function sendNotification(token, username, chat_call_rate, panditId, type,
         if (token) {
             // console.log("start push notification");
             // const messages = `new ${type} request from ${username} (Rs ${chat_call_rate}/min).`
-            const continueOrder = await db('panditnotifications').insert({ user_id: panditId, type: "order", message: messages })
+            // const continueOrder = await db('panditnotifications').insert({ user_id: panditId, type: "order", message: messages })
             let message = {}
             // if (type == 'chat') {
             const [{ count: panditCountRow }] = await db('orders')
