@@ -323,6 +323,7 @@ async function getDetail(req, res) {
         if (orderDetail) {
             response.startTime = orderDetail?.start_time;
             response.endTime = orderDetail?.end_time;
+            response.order_status = orderDetail?.status
         }
 
         if (orderDetail?.end_time && (new Date(orderDetail?.end_time).getTime() < new Date()) && orderDetail.status == 'continue') {
