@@ -241,6 +241,7 @@ async function razorpay(req, res) {
         }
 
         const invoice = await generateInvoicePDF(data);
+        console.log("payment invoice", invoice);
         await db('payments').where({ id: paymentRow.id }).update({
             invoice
         });
