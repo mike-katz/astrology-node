@@ -1,6 +1,8 @@
 const axios = require('axios');
 const db = require('../db');
 const RedisCache = require('../config/redisClient');
+const path = require('path');
+const logger = require('log4js').getLogger(path.parse(__filename).name);
 
 require('dotenv').config();
 const { RtcTokenBuilder, RtcRole } = require('agora-access-token');
@@ -69,9 +71,11 @@ async function getTokenExpireForOrder(channelName) {
    Token create thay tyare join thay; 2 users thay to recording auto-start
    ===================================================== */
 async function getRtcToken(req, res) {
+    const { channelName } = req.body || {};
+    logger.info('agora_getRtcToken', { userId: req.userId, channelName });
     try {
-        const { channelName } = req.body;
         if (!channelName) {
+            logger.info('agora_getRtcToken fail', { userId: req.userId, message: 'channelName required' });
             return res.status(400).json({ message: 'channelName required' });
         }
 
@@ -112,6 +116,7 @@ async function getRtcToken(req, res) {
             }
         }
 
+        logger.info('agora_getRtcToken success', { userId: req.userId, channelName, userCount: newCount, recordingStarted });
         return res.json({
             success: true,
             data: {
@@ -126,6 +131,7 @@ async function getRtcToken(req, res) {
         });
 
     } catch (err) {
+        logger.error('agora_getRtcToken error', { userId: req.userId, channelName, err: err?.message });
         console.error(err);
         return res.status(500).json({ message: 'token generation failed' });
     }
@@ -274,6 +280,8 @@ async function channelLeave(channelName) {
    input : channelName, uid, token
    ===================================================== */
 async function recordingStart(req, res) {
+    const { channelName } = req.body || {};
+    logger.info('agora_recordingStart', { userId: req.userId, channelName });
     return _recordingStart(req, res, 'mix');
 }
 
@@ -287,9 +295,10 @@ async function recordingStartIndividual(req, res) {
 
 async function _recordingStart(req, res, mode) {
     try {
-        const { channelName, uid, token } = req.body;
+        const { channelName, uid, token } = req.body || {};
 
         if (!channelName || uid == null || !token) {
+            logger.info('agora_recordingStart fail', { userId: req.userId, channelName, message: 'channelName, uid, token required' });
             return res.status(400).json({ message: 'channelName, uid, token required' });
         }
 
@@ -321,6 +330,7 @@ async function _recordingStart(req, res, mode) {
         );
 
         console.log(`recording start (${mode})`, startRes?.data);
+        logger.info('agora_recordingStart success', { userId: req.userId, channelName, mode });
         return res.json({
             success: true,
             data: {
@@ -331,6 +341,7 @@ async function _recordingStart(req, res, mode) {
             }
         });
     } catch (err) {
+        logger.error('agora_recordingStart error', { userId: req.userId, channelName: req.body?.channelName, err: err?.message });
         console.error(err.response?.data || err.message);
         return res.status(500).json({ message: 'recording start failed' });
     }
@@ -341,6 +352,8 @@ async function _recordingStart(req, res, mode) {
    input : resourceId, sid, channelName, uid
    ===================================================== */
 async function recordingStop(req, res) {
+    const { channelName } = req.body || {};
+    logger.info('agora_recordingStop', { userId: req.userId, channelName });
     return _recordingStop(req, res, 'mix');
 }
 
@@ -354,9 +367,10 @@ async function recordingStopIndividual(req, res) {
 
 async function _recordingStop(req, res, mode) {
     try {
-        const { resourceId, sid, channelName, uid } = req.body;
+        const { resourceId, sid, channelName, uid } = req.body || {};
 
         if (!resourceId || !sid || !channelName || uid == null) {
+            logger.info('agora_recordingStop fail', { userId: req.userId, channelName, message: 'resourceId, sid, channelName, uid required' });
             return res.status(400).json({
                 message: 'resourceId, sid, channelName, uid required'
             });
@@ -372,6 +386,7 @@ async function _recordingStop(req, res, mode) {
             { auth: { username: CUSTOMER_KEY, password: CUSTOMER_SECRET } }
         );
         console.log(`recording stop (${mode})`, JSON.stringify(stopRes?.data));
+        logger.info('agora_recordingStop success', { userId: req.userId, channelName, mode });
         return res.json({
             success: true,
             data: {
@@ -382,8 +397,10 @@ async function _recordingStop(req, res, mode) {
         });
     } catch (err) {
         if (err.response?.data?.code === 435) {
+            logger.info('agora_recordingStop fail', { userId: req.userId, channelName: req.body?.channelName, message: 'No recorded data (safe exit)' });
             return res.json({ message: 'No recorded data (safe exit)' });
         }
+        logger.error('agora_recordingStop error', { userId: req.userId, channelName: req.body?.channelName, err: err?.message });
         console.error(err.response?.data || err.message);
         return res.status(500).json({ message: 'recording stop failed' });
     }

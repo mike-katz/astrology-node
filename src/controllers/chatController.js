@@ -1,11 +1,15 @@
 const db = require('../db');
 require('dotenv').config();
+const path = require('path');
+const logger = require('log4js').getLogger(path.parse(__filename).name);
+
 const { callEvent } = require("../socket");
 const { channelLeave } = require('./agoraController');
 const { sendBulkPush } = require('./reviewController');
 const { uploadImageTos3 } = require('./uploader');
 
 async function getRoom(req, res) {
+    logger.info('chat_getRoom', { userId: req.userId });
     try {
         const type = 'user'
         const id = req.userId
@@ -60,16 +64,20 @@ async function getRoom(req, res) {
                 unread_count: parseInt(unreadCountObj.unread_count || 0)
             }];
         }));
+        logger.info('chat_getRoom success', { userId: req.userId });
         return res.status(200).json({ success: true, data: results, message: 'Get chat Successfully' });
     } catch (err) {
+        logger.error('chat_getRoom error', { userId: req.userId, err: err?.message });
         console.error(err);
         res.status(500).json({ success: false, message: 'Server error' });
     }
 }
 
 async function getMessage(req, res) {
-    const { panditId } = req.query;
+    const { panditId } = req.query || {};
+    logger.info('chat_getMessage', { userId: req.userId, panditId });
     if (!panditId) {
+        logger.info('chat_getMessage fail', { userId: req.userId, message: 'Missing params.' });
         return res.status(400).json({ success: false, message: 'Missing params.' });
     }
     try {
@@ -185,21 +193,28 @@ async function getMessage(req, res) {
             totalPages,
             results: messages
         }
+        logger.info('chat_getMessage success', { userId: req.userId, panditId });
         return res.status(200).json({ success: true, data: response, message: 'Chat get Successfully' });
     } catch (err) {
+        logger.error('chat_getMessage error', { userId: req.userId, panditId, err: err?.message });
         console.error(err);
         res.status(500).json({ success: false, message: 'Server error' });
     }
 }
 
 async function sendMessage(req, res) {
-    const { orderId, message, type = 'text' } = req.body;
+    const { orderId, message, type = 'text' } = req.body || {};
+    logger.info('chat_sendMessage', { userId: req.userId, orderId, type });
     if (!orderId || !type) {
+        logger.info('chat_sendMessage fail', { userId: req.userId, message: 'Missing params.' });
         return res.status(400).json({ success: false, message: 'Missing params.' });
     }
     try {
         const order = await db('orders').where({ user_id: req.userId, order_id: orderId }).first();
-        if (!order) return res.status(400).json({ success: false, message: 'Order not found.' });
+        if (!order) {
+            logger.info('chat_sendMessage fail', { userId: req.userId, orderId, message: 'Order not found.' });
+            return res.status(400).json({ success: false, message: 'Order not found.' });
+        }
 
         if (order?.end_time && (new Date(order?.end_time).getTime() < new Date()) && order.status == 'continue') {
             // socket.emit("emit_to_chat_completed", {
@@ -208,18 +223,22 @@ async function sendMessage(req, res) {
             // });
             const result = balanceCut(req.userId, order, order?.end_time, 'user -> send message')
             if (!result) {
+                logger.info('chat_sendMessage fail', { userId: req.userId, orderId, message: 'Something went wrong.' });
                 return res.status(400).json({ success: false, message: 'Something went wrong.' });
             }
             callEvent("emit_to_chat_completed", {
                 key: `user_${order?.user_id}`,
                 order_id: order?.order_id
             });
+            logger.info('chat_sendMessage fail', { userId: req.userId, orderId, message: 'Please regenerate chat request.' });
             return res.status(400).json({ success: false, message: 'Please regenerate chat request.' });
         }
         if (order?.status == "completed") {
+            logger.info('chat_sendMessage fail', { userId: req.userId, orderId, message: 'Order is completed.' });
             return res.status(400).json({ success: false, message: 'Order is completed.' });
         }
         if (order?.status == "pending") {
+            logger.info('chat_sendMessage fail', { userId: req.userId, orderId, message: 'Order is pending.' });
             return res.status(400).json({ success: false, message: 'Order is pending.' });
         }
         const pandit = await db('pandits').where({ id: Number(order?.pandit_id) }).first();
@@ -247,7 +266,10 @@ async function sendMessage(req, res) {
             }
             // ins.profile_image = image.data.Location;
         } else {
-            if (!message) return res.status(400).json({ success: false, message: 'Message required.' });
+            if (!message) {
+                logger.info('chat_sendMessage fail', { userId: req.userId, orderId, message: 'Message required.' });
+                return res.status(400).json({ success: false, message: 'Message required.' });
+            }
             const [saved] = await db('chats').insert({
                 sender_type: "user",
                 sender_id: Number(req.userId),
@@ -278,21 +300,30 @@ async function sendMessage(req, res) {
         //     orderId: order?.orderId,
         //     payload: response,
         // });
+        logger.info('chat_sendMessage success', { userId: req.userId, orderId });
         return res.status(200).json({ success: true, data: response, message: 'Message send Successfully' });
     } catch (err) {
+        logger.error('chat_sendMessage error', { userId: req.userId, orderId, err: err?.message });
         console.error(err);
         res.status(500).json({ success: false, message: 'Server error' });
     }
 }
 
 async function getDetail(req, res) {
-    const { panditId, orderId } = req.query;
+    const { panditId, orderId } = req.query || {};
+    logger.info('chat_getDetail', { userId: req.userId, panditId, orderId });
     try {
-        if (!orderId) return res.status(400).json({ success: false, message: 'Missing param.' });
+        if (!orderId) {
+            logger.info('chat_getDetail fail', { userId: req.userId, message: 'Missing param.' });
+            return res.status(400).json({ success: false, message: 'Missing param.' });
+        }
         let order
         if (panditId) {
             order = await db('pandits').where({ id: panditId }).first();
-            if (!order) return res.status(400).json({ success: false, message: 'Pandit not found.' });
+            if (!order) {
+                logger.info('chat_getDetail fail', { userId: req.userId, panditId, message: 'Pandit not found.' });
+                return res.status(400).json({ success: false, message: 'Pandit not found.' });
+            }
         }
         let orderDetail
         // let isFirstOrder = true
@@ -329,6 +360,7 @@ async function getDetail(req, res) {
         if (orderDetail?.end_time && (new Date(orderDetail?.end_time).getTime() < new Date()) && orderDetail.status == 'continue') {
             const result = balanceCut(req.userId, orderDetail, orderDetail?.end_time, 'user -> get detail')
             if (!result) {
+                logger.info('chat_getDetail fail', { userId: req.userId, orderId, message: 'Something went wrong.' });
                 return res.status(400).json({ success: false, message: 'Something went wrong.' });
             }
             callEvent("emit_to_chat_completed", {
@@ -339,21 +371,28 @@ async function getDetail(req, res) {
         if (response?.endTime == null) {
             response.start_chat = true
         }
+        logger.info('chat_getDetail success', { userId: req.userId, orderId });
         return res.status(200).json({ success: true, data: response, message: 'get detail Successfully' });
     } catch (err) {
+        logger.error('chat_getDetail error', { userId: req.userId, err: err?.message });
         console.error(err);
         res.status(500).json({ success: false, message: 'Server error' });
     }
 }
 
 async function getOrderDetail(req, res) {
-    const { orderId } = req.query;
+    const { orderId } = req.query || {};
+    logger.info('chat_getOrderDetail', { userId: req.userId, orderId });
     try {
         if (!orderId) {
+            logger.info('chat_getOrderDetail fail', { userId: req.userId, message: 'Missing params.' });
             return res.status(400).json({ success: false, message: 'Missing params.' });
         }
         const orderexist = await db('orders').where({ user_id: req.userId, order_id: orderId }).first();
-        if (!orderexist) return res.status(400).json({ success: false, message: 'Wrong order. Please enter correct' });
+        if (!orderexist) {
+            logger.info('chat_getOrderDetail fail', { userId: req.userId, orderId, message: 'Wrong order. Please enter correct' });
+            return res.status(400).json({ success: false, message: 'Wrong order. Please enter correct' });
+        }
         let page = parseInt(req.query.page) || 1;
         let limit = parseInt(req.query.limit) || 50;
 
@@ -376,8 +415,10 @@ async function getOrderDetail(req, res) {
             totalPages,
             results: order
         }
+        logger.info('chat_getOrderDetail success', { userId: req.userId, orderId });
         return res.status(200).json({ success: true, data: response, message: 'Get Successfully' });
     } catch (err) {
+        logger.error('chat_getOrderDetail error', { userId: req.userId, orderId, err: err?.message });
         console.error(err);
         res.status(500).json({ success: false, message: 'Server error' });
     }
@@ -498,13 +539,16 @@ async function balanceCut(user_id, order, end_time, place) {
 }
 
 async function endChat(req, res) {
-    const { orderId } = req.body;
+    const { orderId } = req.body || {};
+    logger.info('chat_endChat', { userId: req.userId, orderId });
     if (!orderId) {
+        logger.info('chat_endChat fail', { userId: req.userId, message: 'Missing params.' });
         return res.status(400).json({ success: false, message: 'Missing params.' });
     }
     try {
         const order = await db('orders').where({ user_id: req.userId, order_id: orderId }).first();
         if (!order) {
+            logger.info('chat_endChat fail', { userId: req.userId, orderId, message: 'Wrong order. Please enter correct' });
             return res.status(400).json({ success: false, message: 'Wrong order. Please enter correct' });
         }
         // const diffMinutes = getDuration(order.start_time, new Date());
@@ -516,17 +560,23 @@ async function endChat(req, res) {
         console.log("minSec required", minSec);
 
         if (order.status == 'pending') {
+            logger.info('chat_endChat fail', { userId: req.userId, orderId, message: 'order is pending.' });
             return res.status(400).json({ success: false, message: 'order is pending.' });
         }
         if (order.status == 'cancel') {
+            logger.info('chat_endChat fail', { userId: req.userId, orderId, message: 'order is rejected.' });
             return res.status(400).json({ success: false, message: 'order is rejected.' });
         }
         if (order.status == 'completed') {
+            logger.info('chat_endChat fail', { userId: req.userId, orderId, message: 'order is already completed.' });
             return res.status(200).json({ success: false, message: 'order is already completed.' });
         }
 
         // console.log("endChat diffMinutes", diffMinutes, "startTime", order.start_time, "endTime", new Date());
-        if ((totalSeconds < Number(minSec)) && !order?.is_free && order?.type == 'chat') return res.status(400).json({ success: false, message: `Can't end chat in first ${setting?.chat_end_min_minutes} minute.` });
+        if ((totalSeconds < Number(minSec)) && !order?.is_free && order?.type == 'chat') {
+            logger.info('chat_endChat fail', { userId: req.userId, orderId, message: `Can't end chat in first ${setting?.chat_end_min_minutes} minute.` });
+            return res.status(400).json({ success: false, message: `Can't end chat in first ${setting?.chat_end_min_minutes} minute.` });
+        }
         // const [{ total }] = await db('orders').where({ pandit_id: order?.pandit_id, user_id: req.userId }).count('id as total');
         // if (total == 1) {
         //     return res.status(400).json({ success: false, message: 'You can not end this chat.' });
@@ -546,6 +596,7 @@ async function endChat(req, res) {
         }
         const result = await balanceCut(req.userId, order, now, "user -> chat end");
         if (!result) {
+            logger.info('chat_endChat fail', { userId: req.userId, orderId, message: 'Something went wrong.' });
             return res.status(400).json({ success: false, message: 'Something went wrong.' });
         }
         // calculate pandit and user balance 
@@ -559,39 +610,49 @@ async function endChat(req, res) {
             order_id: order?.order_id,
         });
 
+        logger.info('chat_endChat success', { userId: req.userId, orderId });
         return res.status(200).json({ success: true, data: null, message: 'End chat successfully.' });
     } catch (err) {
+        logger.error('chat_endChat error', { userId: req.userId, orderId, err: err?.message });
         console.error(err);
         res.status(500).json({ success: false, message: 'Server error' });
     }
 }
 
 async function forceEndChat(req, res) {
-    const { orderId } = req.body;
+    const { orderId } = req.body || {};
+    logger.info('chat_forceEndChat', { userId: req.userId, orderId });
     if (!orderId) {
+        logger.info('chat_forceEndChat fail', { userId: req.userId, message: 'Missing params.' });
         return res.status(400).json({ success: false, message: 'Missing params.' });
     }
     try {
         const order = await db('orders').where({ user_id: req.userId, order_id: orderId }).first();
         if (!order) {
+            logger.info('chat_forceEndChat fail', { userId: req.userId, orderId, message: 'Wrong order. Please enter correct' });
             return res.status(400).json({ success: false, message: 'Wrong order. Please enter correct' });
         }
         if (order.status == 'pending') {
+            logger.info('chat_forceEndChat fail', { userId: req.userId, orderId, message: 'order is pending.' });
             return res.status(400).json({ success: false, message: 'order is pending.' });
         }
         if (order.status == 'cancel') {
+            logger.info('chat_forceEndChat fail', { userId: req.userId, orderId, message: 'order is rejected.' });
             return res.status(400).json({ success: false, message: 'order is rejected.' });
         }
         if (order.status == 'completed') {
+            logger.info('chat_forceEndChat fail', { userId: req.userId, orderId, message: 'order is already completed.' });
             return res.status(200).json({ success: false, message: 'order is already completed.' });
         }
 
         if (order?.end_time && (new Date(order?.end_time).getTime() > new Date())) {
+            logger.info('chat_forceEndChat fail', { userId: req.userId, orderId, message: 'Order is ongoing.' });
             return res.status(400).json({ success: false, message: 'Order is ongoing.' });
         }
 
         const result = await balanceCut(req.userId, order, order?.end_time, 'user -> force end');
         if (!result) {
+            logger.info('chat_forceEndChat fail', { userId: req.userId, orderId, message: 'Something went wrong.' });
             return res.status(400).json({ success: false, message: 'Something went wrong.' });
         }
 
@@ -606,29 +667,38 @@ async function forceEndChat(req, res) {
             order_id: order?.order_id,
         });
 
+        logger.info('chat_forceEndChat success', { userId: req.userId, orderId });
         return res.status(200).json({ success: true, data: null, message: 'End chat successfully.' });
     } catch (err) {
+        logger.error('chat_forceEndChat error', { userId: req.userId, orderId, err: err?.message });
         console.error(err);
         res.status(500).json({ success: false, message: 'Server error' });
     }
 }
 
 async function readMessage(req, res) {
-    const { chatId } = req.body
+    const { chatId } = req.body || {};
+    logger.info('chat_readMessage', { userId: req.userId, chatId });
     try {
         await db('chats').where({ id: chatId }).update({ status: "read" });
+        logger.info('chat_readMessage success', { userId: req.userId, chatId });
         return res.status(200).json({ success: true, message: 'Read success.' });
     }
     catch (err) {
+        logger.error('chat_readMessage error', { userId: req.userId, chatId, err: err?.message });
         console.error(err);
         res.status(500).json({ success: false, message: 'Server error' });
     }
 }
 
 async function deleteChat(req, res) {
+    const { id } = req.query || {};
+    logger.info('chat_deleteChat', { userId: req.userId, id });
     try {
-        const { id } = req.query;
-        if (!id) return res.status(400).json({ success: false, message: 'Missing params.' });
+        if (!id) {
+            logger.info('chat_deleteChat fail', { userId: req.userId, message: 'Missing params.' });
+            return res.status(400).json({ success: false, message: 'Missing params.' });
+        }
 
         const chat = await db('chats').where({ id })
             .andWhere(function () {
@@ -642,7 +712,10 @@ async function deleteChat(req, res) {
                     });
             }).first();
 
-        if (!chat) return res.status(400).json({ success: false, message: 'You can not delete this message.' });
+        if (!chat) {
+            logger.info('chat_deleteChat fail', { userId: req.userId, id, message: 'You can not delete this message.' });
+            return res.status(400).json({ success: false, message: 'You can not delete this message.' });
+        }
         const upd = {
             receiver_delete: false,
             sender_delete: false,
@@ -667,16 +740,20 @@ async function deleteChat(req, res) {
             });
         }
         await db('chats').where({ id }).update(upd);
+        logger.info('chat_deleteChat success', { userId: req.userId, id });
         return res.status(200).json({ success: true, message: 'Chat delete Successfully' });
     } catch (err) {
+        logger.error('chat_deleteChat error', { userId: req.userId, id, err: err?.message });
         console.error(err);
         res.status(500).json({ success: false, message: 'Server error' });
     }
 }
 
 async function getOrderChat(req, res) {
-    const { order_id } = req.query;
+    const { order_id } = req.query || {};
+    logger.info('chat_getOrderChat', { userId: req.userId, order_id });
     if (!order_id) {
+        logger.info('chat_getOrderChat fail', { userId: req.userId, message: 'Missing params.' });
         return res.status(400).json({ success: false, message: 'Missing params.' });
     }
     try {
@@ -706,8 +783,10 @@ async function getOrderChat(req, res) {
             totalPages,
             results: messages
         }
+        logger.info('chat_getOrderChat success', { userId: req.userId, order_id });
         return res.status(200).json({ success: true, data: response, message: 'Chat get Successfully' });
     } catch (err) {
+        logger.error('chat_getOrderChat error', { userId: req.userId, order_id, err: err?.message });
         console.error(err);
         res.status(500).json({ success: false, message: 'Server error' });
     }

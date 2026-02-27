@@ -1,5 +1,7 @@
 const db = require('../db');
 const crypto = require('crypto');
+const path = require('path');
+const logger = require('log4js').getLogger(path.parse(__filename).name);
 const { callEvent } = require('../socket');
 require('dotenv').config();
 const generateInvoicePDF = require('../utils/generatepdf');
@@ -76,10 +78,12 @@ function numberToIndianWords(amount) {
 
 /** Create Razorpay order (no SMS/OTP – use Razorpay Checkout on frontend) */
 async function createRazorpayOrder(req, res) {
+    const { amount } = req.body || {};
+    logger.info('payment_createRazorpayOrder', { userId: req.userId, amount });
     try {
-        const { amount } = req.body;
         // amount frontend par thi aave (user/recharge API no amounts array mathi select)
         if (!Number.isFinite(Number(amount)) || Number(amount) < 0) {
+            logger.info('payment_createRazorpayOrder fail', { userId: req.userId, amount, message: 'Invalid amount.' });
             return res.status(400).json({ success: false, message: 'Invalid amount.' });
         }
         const gateway = await db('payment_gateways').where('status', true).first();
@@ -88,10 +92,14 @@ async function createRazorpayOrder(req, res) {
         const keyId = gateway?.credentials?.key_id || "rzp_test_S9nToUfWEFILCz";
         const keySecret = gateway?.credentials?.key_secret || "HTbBCXlFb7xEa2rVltcKIvNy";
         if (!keyId || !keySecret) {
+            logger.info('payment_createRazorpayOrder fail', { userId: req.userId, message: 'Razorpay is not configured.' });
             return res.status(500).json({ success: false, message: 'Razorpay is not configured.' });
         }
         const user = await db('users').where('id', req.userId).first();
-        if (!user) return res.status(400).json({ success: false, message: 'User not found.' });
+        if (!user) {
+            logger.info('payment_createRazorpayOrder fail', { userId: req.userId, message: 'User not found.' });
+            return res.status(400).json({ success: false, message: 'User not found.' });
+        }
 
         const instance = new Razorpay({ key_id: keyId, key_secret: keySecret });
 
@@ -111,6 +119,7 @@ async function createRazorpayOrder(req, res) {
         // console.log("order", order);
 
         await db('payments').insert({ user_id: req?.userId, order_id: order.id, gst, amount: base, status: "pending", type: "recharge" });
+        logger.info('payment_createRazorpayOrder success', { userId: req.userId, orderId: order.id, amount });
         return res.status(200).json({
             success: true,
             data: {
@@ -122,6 +131,7 @@ async function createRazorpayOrder(req, res) {
             message: 'Order created.',
         });
     } catch (err) {
+        logger.error('payment_createRazorpayOrder error', { userId: req.userId, err: err?.message });
         console.error('createRazorpayOrder:', err);
         res.status(500).json({ success: false, message: 'Server error' });
     }
@@ -129,10 +139,11 @@ async function createRazorpayOrder(req, res) {
 
 /** Verify Razorpay payment signature and credit balance (no SMS) */
 async function verifyRazorpayPayment(req, res) {
+    const { razorpay_order_id } = req.body || {};
+    logger.info('payment_verifyRazorpayPayment', { userId: req.userId, razorpay_order_id });
     try {
-        // console.log("verifyRazorpayPayment req.body", req.body);
-        const { razorpay_order_id } = req.body;
         if (!razorpay_order_id) {
+            logger.info('payment_verifyRazorpayPayment fail', { userId: req.userId, message: 'Missing params.' });
             return res.status(400).json({ success: false, message: 'Missing params.' });
         }
 
@@ -140,16 +151,21 @@ async function verifyRazorpayPayment(req, res) {
             .where({ user_id: req.userId, order_id: razorpay_order_id })
             .first();
         if (!existing) {
+            logger.info('payment_verifyRazorpayPayment fail', { userId: req.userId, razorpay_order_id, message: 'Payment not found.' });
             return res.status(200).json({ success: true, message: 'Payment not found.' });
         }
+        logger.info('payment_verifyRazorpayPayment success', { userId: req.userId, razorpay_order_id, status: existing?.status });
         return res.status(200).json({ success: true, data: { status: existing?.status }, message: 'Payment verified and balance updated.' });
     } catch (err) {
+        logger.error('payment_verifyRazorpayPayment error', { userId: req.userId, err: err?.message });
         console.error('verifyRazorpayPayment:', err);
         res.status(500).json({ success: false, message: 'Server error' });
     }
 }
 
 async function addPayment(req, res) {
+    logger.info('payment_addPayment', { userId: req.userId });
+    logger.info('payment_addPayment fail', { userId: req.userId, message: 'API in maintenance.' });
     return res.status(400).json({ success: false, message: 'API in maintenance.' });
     // try {
 
@@ -231,6 +247,7 @@ async function addPayment(req, res) {
 }
 
 async function getPayment(req, res) {
+    logger.info('payment_getPayment', { userId: req.userId, page: req.query?.page });
     try {
         let page = parseInt(req.query.page) || 1;
         let limit = parseInt(req.query.limit) || 100;
@@ -259,14 +276,17 @@ async function getPayment(req, res) {
             totalPages,
             results: log
         }
+        logger.info('payment_getPayment success', { userId: req.userId });
         return res.status(200).json({ success: true, data: response, message: 'List Successfully' });
     } catch (err) {
+        logger.error('payment_getPayment error', { userId: req.userId, err: err?.message });
         console.error(err);
         res.status(500).json({ success: false, message: 'Server error' });
     }
 }
 
 async function getTransactions(req, res) {
+    logger.info('payment_getTransactions', { userId: req.userId, page: req.query?.page });
     try {
         let page = parseInt(req.query.page) || 1;
         let limit = parseInt(req.query.limit) || 100;
@@ -295,62 +315,82 @@ async function getTransactions(req, res) {
             totalPages,
             results: log
         }
+        logger.info('payment_getTransactions success', { userId: req.userId });
         return res.status(200).json({ success: true, data: response, message: 'List Successfully' });
     } catch (err) {
+        logger.error('payment_getTransactions error', { userId: req.userId, err: err?.message });
         console.error(err);
         res.status(500).json({ success: false, message: 'Server error' });
     }
 }
 
 async function deleteSinglePayment(req, res) {
-    const { id } = req.query;
+    const { id } = req.query || {};
+    logger.info('payment_deleteSinglePayment', { userId: req.userId, id });
     try {
-        if (!id) return res.status(400).json({ success: false, message: 'Missing params.' });
+        if (!id) {
+            logger.info('payment_deleteSinglePayment fail', { userId: req.userId, message: 'Missing params.' });
+            return res.status(400).json({ success: false, message: 'Missing params.' });
+        }
         await db('payments').where({
             'id': id,
             'user_id': req?.userId
         }).update({ deleted_at: new Date() });
+        logger.info('payment_deleteSinglePayment success', { userId: req.userId, id });
         return res.status(200).json({ success: true, data: null, message: 'Delete Successfully' });
     } catch (err) {
+        logger.error('payment_deleteSinglePayment error', { userId: req.userId, err: err?.message });
         console.error(err);
         res.status(500).json({ success: false, message: 'Server error' });
     }
 }
 
 async function deleteSingleTransaction(req, res) {
-    const { id } = req.query;
+    const { id } = req.query || {};
+    logger.info('payment_deleteSingleTransaction', { userId: req.userId, id });
     try {
-        if (!id) return res.status(400).json({ success: false, message: 'Missing params.' });
+        if (!id) {
+            logger.info('payment_deleteSingleTransaction fail', { userId: req.userId, message: 'Missing params.' });
+            return res.status(400).json({ success: false, message: 'Missing params.' });
+        }
         await db('balancelogs').where({
             'id': id,
             'user_id': req?.userId
         }).update({ deleted_at: new Date() });
+        logger.info('payment_deleteSingleTransaction success', { userId: req.userId, id });
         return res.status(200).json({ success: true, data: null, message: 'Delete Successfully' });
     } catch (err) {
+        logger.error('payment_deleteSingleTransaction error', { userId: req.userId, err: err?.message });
         console.error(err);
         res.status(500).json({ success: false, message: 'Server error' });
     }
 }
 
 async function deleteAllPayment(req, res) {
+    logger.info('payment_deleteAllPayment', { userId: req.userId });
     try {
         await db('payments').where({
             'user_id': req?.userId
         }).update({ deleted_at: new Date() });
+        logger.info('payment_deleteAllPayment success', { userId: req.userId });
         return res.status(200).json({ success: true, data: null, message: 'Delete Successfully' });
     } catch (err) {
+        logger.error('payment_deleteAllPayment error', { userId: req.userId, err: err?.message });
         console.error(err);
         res.status(500).json({ success: false, message: 'Server error' });
     }
 }
 
 async function deleteAllTransaction(req, res) {
+    logger.info('payment_deleteAllTransaction', { userId: req.userId });
     try {
         await db('balancelogs').where({
             'user_id': req?.userId
         }).update({ deleted_at: new Date() });
+        logger.info('payment_deleteAllTransaction success', { userId: req.userId });
         return res.status(200).json({ success: true, data: null, message: 'Delete Successfully' });
     } catch (err) {
+        logger.error('payment_deleteAllTransaction error', { userId: req.userId, err: err?.message });
         console.error(err);
         res.status(500).json({ success: false, message: 'Server error' });
     }

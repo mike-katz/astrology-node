@@ -1,6 +1,8 @@
 const db = require('../db');
 require('dotenv').config();
 const admin = require('../config/firebase');
+const path = require('path');
+const logger = require('log4js').getLogger(path.parse(__filename).name);
 
 const { callEvent } = require("../socket");
 const { channelLeave } = require('./agoraController');
@@ -114,7 +116,9 @@ async function sendAutoMessage(profile, userId, orderId, panditId) {
 
 async function create(req, res) {
     const { panditId, type, profile_id } = req.body;
+    logger.info('order_create', { userId: req.userId, panditId, type, profile_id });
     if (!panditId || !profile_id) {
+        logger.info('order_create fail', { userId: req.userId, message: 'Missing params' });
         return res.status(400).json({ success: false, message: 'Missing params' });
     }
     // console.log("create order req.body", req.body);
@@ -122,12 +126,21 @@ async function create(req, res) {
         const user = await db('users').where({ id: req.userId }).first()
 
         const pandit = await db('pandits').where({ id: panditId }).first()
-        if (!pandit) return res.status(400).json({ success: false, message: 'Pandit not found.' });
+        if (!pandit) {
+            logger.info('order_create fail', { userId: req.userId, panditId, message: 'Pandit not found.' });
+            return res.status(400).json({ success: false, message: 'Pandit not found.' });
+        }
 
         // const continueOrder = await db('orders').where({ user_id: req.userId, pandit_id: panditId }).whereIn('status', ['continue', 'pending']).first()
         const continueOrder = await db('orders').where({ user_id: req.userId }).whereIn('status', ['continue', 'pending']).first()
-        if (continueOrder?.status == 'continue') return res.status(400).json({ success: false, message: `Please complete your ongoing ${type}.` });
-        if (continueOrder?.status == 'pending') return res.status(400).json({ success: false, message: `Please reject your pending ${type}.` });
+        if (continueOrder?.status == 'continue') {
+            logger.info('order_create fail', { userId: req.userId, message: `Please complete your ongoing ${type}.` });
+            return res.status(400).json({ success: false, message: `Please complete your ongoing ${type}.` });
+        }
+        if (continueOrder?.status == 'pending') {
+            logger.info('order_create fail', { userId: req.userId, message: `Please reject your pending ${type}.` });
+            return res.status(400).json({ success: false, message: `Please reject your pending ${type}.` });
+        }
 
         const [{ count }] = await db('orders')
             .count('* as count')
@@ -142,20 +155,29 @@ async function create(req, res) {
             deduction = 0;
             rate = settings?.free_chat_amount_per_minute || 1;
         } else {
-            if (user?.balance < 1) return res.status(400).json({ success: false, message: 'Please recharge your wallet.' });
+            if (user?.balance < 1) {
+                logger.info('order_create fail', { userId: req.userId, message: 'Please recharge your wallet.' });
+                return res.status(400).json({ success: false, message: 'Please recharge your wallet.' });
+            }
             if (duration < 5) {
+                logger.info('order_create fail', { userId: req.userId, message: 'Min. 5 min balance required.' });
                 return res.status(400).json({ success: false, message: 'Min. 5 min balance required.' });
             }
-            if (Number(user?.balance) < deduction) return res.status(400).json({ success: false, message: 'Min. 5 min balance required.' });
+            if (Number(user?.balance) < deduction) {
+                logger.info('order_create fail', { userId: req.userId, message: 'Min. 5 min balance required.' });
+                return res.status(400).json({ success: false, message: 'Min. 5 min balance required.' });
+            }
         }
         // const order = await db('orders').where({ user_id: req.userId, pandit_id: panditId }).first()
         const orderId = `${new Date().getTime().toString()}${Math.floor(100000 + Math.random() * 900000).toString()}`;
         // console.log("duration", duration);
         if (!Number.isFinite(duration)) {
+            logger.info('order_create fail', { userId: req.userId, message: 'Min. 5 min balance required.' });
             return res.status(400).json({ success: false, message: 'Min. 5 min balance required.' });
         }
 
         if (isNaN(deduction)) {
+            logger.info('order_create fail', { userId: req.userId, message: 'Balance could not be NaN.' });
             return res.status(400).json({ success: false, message: 'Balance could not be NaN.' });
         }
         // console.log("last order", order);
@@ -211,8 +233,10 @@ async function create(req, res) {
         //     key: `user_${req?.userId}`,
         //     payload: [{ ...saved, name: pandit?.name, profile: pandit?.profile }],
         // });
+        logger.info('order_create success', { userId: req.userId, orderId, panditId, type });
         return res.status(200).json({ success: true, data: { orderId }, message: 'Order create Successfully' });
     } catch (err) {
+        logger.error('order_create error', { userId: req.userId, err: err?.message });
         console.error(err);
         res.status(500).json({ success: false, message: 'Server error' });
     }
@@ -220,7 +244,9 @@ async function create(req, res) {
 
 async function createFreeChat(req, res) {
     const { profile_id, type } = req.body;
+    logger.info('order_createFreeChat', { userId: req.userId, profile_id, type });
     if (!profile_id || !type) {
+        logger.info('order_createFreeChat fail', { userId: req.userId, message: 'Missing params' });
         return res.status(400).json({ success: false, message: 'Missing params' });
     }
     try {
@@ -229,7 +255,10 @@ async function createFreeChat(req, res) {
             .count('* as count')
             .where({ user_id: req.userId })
             .whereIn('status', ['continue', 'completed', 'pending']);
-        if (count > 0) return res.status(400).json({ success: false, message: 'Your free chat already completed.' });
+        if (count > 0) {
+            logger.info('order_createFreeChat fail', { userId: req.userId, message: 'Your free chat already completed.' });
+            return res.status(400).json({ success: false, message: 'Your free chat already completed.' });
+        }
 
         const settings = await db('settings').first();
         const limit = Number(settings?.free_chat_max_pandit_request) || 30;
@@ -269,15 +298,24 @@ async function createFreeChat(req, res) {
             pandits = [...pandits, ...more3];
         }
         let requestedPanditIds = [...new Set((pandits || []).map((p) => p.id))];
-        if (requestedPanditIds.length === 0) return res.status(400).json({ success: false, message: 'No pandit available.' });
+        if (requestedPanditIds.length === 0) {
+            logger.info('order_createFreeChat fail', { userId: req.userId, message: 'No pandit available.' });
+            return res.status(400).json({ success: false, message: 'No pandit available.' });
+        }
         const continueOrder = await db('orders').where({ status: "continue" }).whereIn('pandit_id', requestedPanditIds).select('pandit_id');
         if (continueOrder?.length) {
             const busyPanditIds = new Set(continueOrder.map((item) => item.pandit_id));
             requestedPanditIds = requestedPanditIds.filter((id) => !busyPanditIds.has(id));
         }
-        if (requestedPanditIds.length === 0) return res.status(400).json({ success: false, message: 'No pandit available.' });
+        if (requestedPanditIds.length === 0) {
+            logger.info('order_createFreeChat fail', { userId: req.userId, message: 'No pandit available.' });
+            return res.status(400).json({ success: false, message: 'No pandit available.' });
+        }
         const duration = Number(settings?.free_chat_minutes) || 0;
-        if (!duration || duration < 1) return res.status(400).json({ success: false, message: 'Free chat minutes not configured.' });
+        if (!duration || duration < 1) {
+            logger.info('order_createFreeChat fail', { userId: req.userId, message: 'Free chat minutes not configured.' });
+            return res.status(400).json({ success: false, message: 'Free chat minutes not configured.' });
+        }
 
         const orderId = `${new Date().getTime().toString()}${Math.floor(100000 + Math.random() * 900000).toString()}`;
         const [saved] = await db('orders').insert({
@@ -315,8 +353,10 @@ async function createFreeChat(req, res) {
             }
         }
         sendAutoMessage(profile, req.userId, orderId);
+        logger.info('order_createFreeChat success', { userId: req.userId, orderId });
         return res.status(200).json({ success: true, data: { orderId, ...saved }, message: 'Free chat order created successfully.' });
     } catch (err) {
+        logger.error('order_createFreeChat error', { userId: req.userId, err: err?.message });
         console.error(err);
         res.status(500).json({ success: false, message: 'Server error' });
     }
@@ -470,13 +510,14 @@ async function sendNotification(token, username, chat_call_rate, panditId, type,
 }
 
 async function list(req, res) {
+    const { type } = req.query || {};
+    logger.info('order_list', { userId: req.userId, type });
     try {
         let page = parseInt(req.query.page) || 1;
         let limit = parseInt(req.query.limit) || 20;
 
         if (page < 1) page = 1;
         if (limit < 1) limit = 20;
-        const { type } = req.query
         const filter = { 'o.user_id': req.userId, 'o.deleted_at': null }
         if (type) {
             filter['o.type'] = type
@@ -560,8 +601,10 @@ async function list(req, res) {
             totalPages,
             results: order
         }
+        logger.info('order_list success', { userId: req.userId });
         return res.status(200).json({ success: true, data: response, message: 'Order list Successfully' });
     } catch (err) {
+        logger.error('order_list error', { userId: req.userId, err: err?.message });
         console.error(err);
         res.status(500).json({ success: false, message: 'Server error' });
     }
@@ -586,9 +629,13 @@ function formatDOB(dob) {
 }
 
 async function acceptOrder(req, res) {
+    const { orderId } = req.body || {};
+    logger.info('order_acceptOrder', { userId: req.userId, orderId });
     try {
-        const { orderId } = req.body;
-        if (!orderId) return res.status(400).json({ success: false, message: 'Order id required.' });
+        if (!orderId) {
+            logger.info('order_acceptOrder fail', { userId: req.userId, message: 'Order id required.' });
+            return res.status(400).json({ success: false, message: 'Order id required.' });
+        }
         const order = await db('orders as o')
             .leftJoin('pandits as p', 'p.id', 'o.pandit_id')
             .where({
@@ -604,7 +651,10 @@ async function acceptOrder(req, res) {
                 'p.final_chat_call_rate',
             )
             .first();
-        if (!order) return res.status(400).json({ success: false, message: 'Order not accepted by pandit.' });
+        if (!order) {
+            logger.info('order_acceptOrder fail', { userId: req.userId, orderId, message: 'Order not accepted by pandit.' });
+            return res.status(400).json({ success: false, message: 'Order not accepted by pandit.' });
+        }
 
         const userDetail = await db('users').where({ id: req.userId }).first();
 
@@ -618,14 +668,17 @@ async function acceptOrder(req, res) {
             duration = Math.floor(Number(Number(userDetail?.balance)) / Number(order?.final_chat_call_rate));
             // console.log("duration", duration);
             if (!Number.isFinite(duration)) {
+                logger.info('order_acceptOrder fail', { userId: req.userId, orderId, message: 'Min. 5 min balance required.' });
                 return res.status(400).json({ success: false, message: 'Min. 5 min balance required.' });
             }
 
             if (duration < 5) {
+                logger.info('order_acceptOrder fail', { userId: req.userId, orderId, message: 'Min. 5 min balance required.' });
                 return res.status(400).json({ success: false, message: 'Min. 5 min balance required.' });
             }
             deduction = Number(duration) * Number(order?.final_chat_call_rate)
             if (isNaN(deduction)) {
+                logger.info('order_acceptOrder fail', { userId: req.userId, orderId, message: 'Balance could not be NaN.' });
                 return res.status(400).json({ success: false, message: 'Balance could not be NaN.' });
             }
         }
@@ -740,19 +793,28 @@ async function acceptOrder(req, res) {
             payload: { pandit_id: order?.pandit_id }
         });
 
+        logger.info('order_acceptOrder success', { userId: req.userId, orderId });
         return res.status(200).json({ success: true, data: { startTime, endTime, orderId }, message: 'Order accept Successfully' });
     } catch (err) {
+        logger.error('order_acceptOrder error', { userId: req.userId, orderId, err: err?.message });
         console.error(err);
         res.status(500).json({ success: false, message: 'Server error' });
     }
 }
 
 async function cancelOrder(req, res) {
+    const { orderId } = req.body || {};
+    logger.info('order_cancelOrder', { userId: req.userId, orderId });
     try {
-        const { orderId } = req.body;
-        if (!orderId) return res.status(400).json({ success: false, message: 'Order id required.' });
+        if (!orderId) {
+            logger.info('order_cancelOrder fail', { userId: req.userId, message: 'Order id required.' });
+            return res.status(400).json({ success: false, message: 'Order id required.' });
+        }
         const order = await db('orders').where({ order_id: orderId, user_id: req.userId, status: "pending" }).first();
-        if (!order) return res.status(400).json({ success: false, message: 'You can not cancel this order.' });
+        if (!order) {
+            logger.info('order_cancelOrder fail', { userId: req.userId, orderId, message: 'You can not cancel this order.' });
+            return res.status(400).json({ success: false, message: 'You can not cancel this order.' });
+        }
         const upd = {}
         let status = 'cancel';
         if (!order?.is_accept) {
@@ -780,43 +842,73 @@ async function cancelOrder(req, res) {
                 order_id: order?.order_id,
             });
         }
+        logger.info('order_cancelOrder success', { userId: req.userId, orderId });
         return res.status(200).json({ success: true, message: 'Order cancel Successfully' });
     } catch (err) {
+        logger.error('order_cancelOrder error', { userId: req.userId, orderId, err: err?.message });
         console.error(err);
         res.status(500).json({ success: false, message: 'Server error' });
     }
 }
 
 async function deleteOrder(req, res) {
+    const { order_id } = req.query || {};
+    logger.info('order_deleteOrder', { userId: req.userId, order_id });
     try {
-        const { order_id } = req.query;
-        if (!order_id) return res.status(400).json({ success: false, message: 'Order id required.' });
+        if (!order_id) {
+            logger.info('order_deleteOrder fail', { userId: req.userId, message: 'Order id required.' });
+            return res.status(400).json({ success: false, message: 'Order id required.' });
+        }
         const order = await db('orders').where({ order_id, user_id: req.userId }).first();
-        if (!order) return res.status(400).json({ success: false, message: 'You can not delete this order.' });
+        if (!order) {
+            logger.info('order_deleteOrder fail', { userId: req.userId, order_id, message: 'You can not delete this order.' });
+            return res.status(400).json({ success: false, message: 'You can not delete this order.' });
+        }
 
         await db('orders').where({ id: order?.id }).update({ deleted_at: new Date() });
         await db('chats').where({ order_id }).update({ deleted_at: new Date() });
+        logger.info('order_deleteOrder success', { userId: req.userId, order_id });
         return res.status(200).json({ success: true, message: 'Order cancel Successfully' });
     } catch (err) {
+        logger.error('order_deleteOrder error', { userId: req.userId, order_id, err: err?.message });
         console.error(err);
         res.status(500).json({ success: false, message: 'Server error' });
     }
 }
 
 async function sendGift(req, res) {
+    const { name, pandit_id, amount, qty } = req.body || {};
+    logger.info('order_sendGift', { userId: req.userId, pandit_id, amount, qty });
     try {
-        const { name, pandit_id, amount, qty } = req.body;
-        if (!pandit_id || !amount || !qty) return res.status(400).json({ success: false, message: 'Missing params.' });
-        if (isNaN(qty)) return res.status(400).json({ success: false, message: 'Missing params.' });
+        if (!pandit_id || !amount || !qty) {
+            logger.info('order_sendGift fail', { userId: req.userId, message: 'Missing params.' });
+            return res.status(400).json({ success: false, message: 'Missing params.' });
+        }
+        if (isNaN(qty)) {
+            logger.info('order_sendGift fail', { userId: req.userId, message: 'Missing params.' });
+            return res.status(400).json({ success: false, message: 'Missing params.' });
+        }
         const pandit = await db('pandits').where({ id: pandit_id }).first();
         const user = await db('users').where({ id: req.userId }).first();
         const order = await db('orders').where({ user_id: req.userId, status: "continue" }).first();
-        if (order) return res.status(400).json({ success: false, message: 'please finish your continue order.' });
+        if (order) {
+            logger.info('order_sendGift fail', { userId: req.userId, message: 'please finish your continue order.' });
+            return res.status(400).json({ success: false, message: 'please finish your continue order.' });
+        }
 
         const final = qty * amount
-        if (user?.balance < Number(final)) return res.status(400).json({ success: false, message: 'Insufficient balance.' });
-        if (!pandit) return res.status(400).json({ success: false, message: 'Pandit not found.' });
-        if (isNaN(final)) return res.status(400).json({ success: false, message: 'Invalid amount.' });
+        if (user?.balance < Number(final)) {
+            logger.info('order_sendGift fail', { userId: req.userId, message: 'Insufficient balance.' });
+            return res.status(400).json({ success: false, message: 'Insufficient balance.' });
+        }
+        if (!pandit) {
+            logger.info('order_sendGift fail', { userId: req.userId, pandit_id, message: 'Pandit not found.' });
+            return res.status(400).json({ success: false, message: 'Pandit not found.' });
+        }
+        if (isNaN(final)) {
+            logger.info('order_sendGift fail', { userId: req.userId, message: 'Invalid amount.' });
+            return res.status(400).json({ success: false, message: 'Invalid amount.' });
+        }
 
         const panditAmount = (Number(final) * Number(pandit?.gift_share)) / 100
         await db('pandits').where({ id: pandit.id }).increment({ balance: Number(panditAmount) });
@@ -824,34 +916,42 @@ async function sendGift(req, res) {
         const newBalance = Number(user.balance) - Number(final)
         const pandit_new_balance = Number(pandit.balance) + Number(panditAmount)
         await db('balancelogs').insert({ pandit_old_balance: Number(pandit?.balance), pandit_new_balance, user_old_balance: Number(user.balance), user_new_balance: Number(newBalance), user_id: req.userId, message: `Send gift to ${pandit?.display_name} (${name}) - ${qty}`, pandit_id: pandit?.id, pandit_message: `Receive gift from ${user?.name} (${name}) - ${qty}`, pandit_amount: panditAmount, amount: - final });
+        logger.info('order_sendGift success', { userId: req.userId, pandit_id, amount: final });
         return res.status(200).json({ success: true, message: 'Order cancel Successfully' });
     } catch (err) {
+        logger.error('order_sendGift error', { userId: req.userId, err: err?.message });
         console.error(err);
         res.status(500).json({ success: false, message: 'Server error' });
     }
 }
 
 async function generateCallToken(req, res) {
-    const { order_id, pandit_id } = req.body;
+    const { order_id, pandit_id } = req.body || {};
+    logger.info('order_generateCallToken', { userId: req.userId, order_id, pandit_id });
     if (!order_id || !pandit_id) {
+        logger.info('order_generateCallToken fail', { userId: req.userId, message: 'Missing params.' });
         return res.status(400).json({ error: 'Missing params.' });
     }
     callEvent("emit_to_call_request", {
         key: `pandit_${pandit_id}`,
         payload: [{ order_id }]
     });
+    logger.info('order_generateCallToken success', { userId: req.userId, order_id, pandit_id });
     return res.status(200).json({ success: true, message: 'Call requested Successfully' });
 }
 
 async function callReject(req, res) {
-    console.log("req.body callReject", req.body);
-    const { order_id, pandit_id } = req.body;
+    const { order_id, pandit_id } = req.body || {};
+    logger.info('order_callReject', { userId: req.userId, order_id, pandit_id });
     if (!order_id || !pandit_id) {
+        logger.info('order_callReject fail', { userId: req.userId, message: 'Missing params.' });
         return res.status(400).json({ error: 'Missing params.' });
     }
     const order = await db('orders').where({ order_id, user_id: req.userId, }).first();
-    console.log("order", order);
-    if (!order) return res.status(400).json({ success: false, message: 'You can not cancel this order.' });
+    if (!order) {
+        logger.info('order_callReject fail', { userId: req.userId, order_id, message: 'You can not cancel this order.' });
+        return res.status(400).json({ success: false, message: 'You can not cancel this order.' });
+    }
     if (order?.type == "call" && order?.status == "pending") {
         await db('orders').where({ id: order?.id }).update({ status: "cancel" });
     }
@@ -859,24 +959,32 @@ async function callReject(req, res) {
         key: `pandit_${pandit_id}`,
         order_id,
     });
+    logger.info('order_callReject success', { userId: req.userId, order_id, pandit_id });
     return res.status(200).json({ success: true, message: 'Call requested Successfully' });
 }
 
 
 async function callEnd(req, res) {
+    const { order_id } = req.body || {};
+    logger.info('order_callEnd', { panditId: req.userId, order_id });
     try {
-        const { order_id } = req.body;
-
-        if (!order_id) return res.status(400).json({ success: false, message: 'Order id required.' });
+        if (!order_id) {
+            logger.info('order_callEnd fail', { panditId: req.userId, message: 'Order id required.' });
+            return res.status(400).json({ success: false, message: 'Order id required.' });
+        }
         const order = await db('orders').where({ order_id, pandit_id: req.userId }).first();
-        if (!order) return res.status(400).json({ success: false, message: 'Order not found.' });
+        if (!order) {
+            logger.info('order_callEnd fail', { panditId: req.userId, order_id, message: 'Order not found.' });
+            return res.status(400).json({ success: false, message: 'Order not found.' });
+        }
 
         const dd = await channelLeave(order_id)
-        // console.log("order end resposne", dd);
+        logger.info('order_callEnd success', { panditId: req.userId, order_id });
         return res.status(200).json({
             success: true, data: null, message: 'Call ended Successfully'
         });
     } catch (err) {
+        logger.error('order_callEnd error', { panditId: req.userId, order_id, err: err?.message });
         console.error(err);
         res.status(500).json({ success: false, message: 'Server error' });
     }
