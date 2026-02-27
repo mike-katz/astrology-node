@@ -260,7 +260,7 @@ async function getRechargeBanner(req, res) {
             .whereNull('deleted_at');
         const matchedRecharge = recharges.find(r => r.recharge_number === rechargeNo);
 
-        console.log("matchedRecharge", matchedRecharge);
+        // console.log("matchedRecharge", matchedRecharge);
         // Last 5 unique orders (one per pandit, most recent first) – full order list for Flutter model
 
 
