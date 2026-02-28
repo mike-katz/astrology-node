@@ -430,10 +430,15 @@ function getDuration(start_time, end_time) {
     );
     return diffMinutes
 }
+
 async function balanceCut(user_id, order, end_time, place) {
+    logger.info('balancecut called', { user_id, orderId: order?.order_id });
     try {
         const transaction = await db('balancelogs').where({ order_id: order?.order_id }).first();
-        if (transaction) return;
+        if (transaction) {
+            logger.info('balancecut fail', { user_id, orderId: order?.order_id, message: "already order completed" });
+            return
+        };
         const user = await db('users').where({ id: user_id }).first();
         const diffMinutes = getDuration(order.start_time, end_time)
         // console.log("diffMinutes", diffMinutes);
@@ -456,8 +461,12 @@ async function balanceCut(user_id, order, end_time, place) {
             panditAmount = (Number(deduction) * Number(panditDetail?.chat_call_share)) / 100;
         }
 
-        // console.log("deduction", deduction);
-        // console.log("newBalance", newBalance, "username", user?.name);
+        logger.info('balancecut function -> user ', { user_id, newBalance, oldBalance: user?.balance });
+        logger.info('balancecut function -> pandit ', { pandit_id: order?.pandit_id, panditAmount });
+
+        if (newBalance < 0) {
+            return false
+        }
         const upd = { total_orders: 1, }
         if (order.type == 'call') {
             upd.total_call_minutes = Number(diffMinutes)
@@ -525,6 +534,7 @@ async function balanceCut(user_id, order, end_time, place) {
         }
         await db('orders').where({ id: order.id }).update({ status: "completed", deduction, duration: diffMinutes, end_time: new Date(end_time) });
         upd.balance = panditAmount
+        logger.info('balancecut function -> pandit update param', { ...upd, pandit_id: order.pandit_id })
         await db('pandits').where({ id: order.pandit_id }).increment(upd).update({ waiting_time: null });
         const pandit_new_balance = Number(panditDetail?.balance) + Number(panditAmount)
         const type = order.type.charAt(0).toUpperCase() + order.type.slice(1);
@@ -534,6 +544,7 @@ async function balanceCut(user_id, order, end_time, place) {
         return true
     } catch (err) {
         // console.log("err", err);
+        logger.info('balancecut function -> fail', { user_id, orderId: order?.order_id, err: err?.message })
         return false
     }
 }

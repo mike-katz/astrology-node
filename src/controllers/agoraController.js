@@ -41,26 +41,26 @@ const DEFAULT_MAX_CALL_SECONDS = parseInt(process.env.AGORA_DEFAULT_MAX_CALL_SEC
    ===================================================== */
 async function getTokenExpireForOrder(channelName) {
     const nowSec = Math.floor(Date.now() / 1000);
-    const order = await db('orders').where({ order_id: channelName }).first();
+    const order = await db('orders').where({ order_id: channelName }).whereIn('status', ['pending', 'continue']).first();
     if (!order) {
-        return { expireTs: nowSec + DEFAULT_MAX_CALL_SECONDS, maxCallSeconds: DEFAULT_MAX_CALL_SECONDS };
+        return { success: false }
     }
-
+    // order pending continue 
     // end_time = absolute max call end (use same expire for both user & pandit)
     if (order.end_time) {
         const endSec = Math.floor(new Date(order.end_time).getTime() / 1000);
         if (endSec > nowSec) {
-            return { expireTs: endSec, maxCallSeconds: endSec - nowSec };
+            return { success: true, expireTs: endSec, maxCallSeconds: endSec - nowSec };
         }
     }
     // call_minutes, max_minutes, minutes = purchased minutes
     const minutes = order.duration;
     if (minutes != null && Number(minutes) > 0) {
         const sec = Number(minutes) * 60;
-        return { expireTs: nowSec + sec, maxCallSeconds: sec };
+        return { success: true, expireTs: nowSec + sec, maxCallSeconds: sec };
     }
 
-    return { expireTs: nowSec + DEFAULT_MAX_CALL_SECONDS, maxCallSeconds: DEFAULT_MAX_CALL_SECONDS };
+    return { success: true, expireTs: nowSec + DEFAULT_MAX_CALL_SECONDS, maxCallSeconds: DEFAULT_MAX_CALL_SECONDS };
 }
 
 /* =====================================================
@@ -76,14 +76,17 @@ async function getRtcToken(req, res) {
     try {
         if (!channelName) {
             logger.info('agora_getRtcToken fail', { userId: req.userId, message: 'channelName required' });
-            return res.status(400).json({ message: 'channelName required' });
+            return res.status(400).json({ success: false, message: 'channelName required' });
         }
 
         // 👤 frontend user UID (random)
         const uid = Math.floor(Math.random() * 900000) + 100000;
 
         // Order-wise max call time - when token expires, Agora auto-disconnects user (no API needed)
-        const { expireTs, maxCallSeconds } = await getTokenExpireForOrder(channelName);
+        const { expireTs, maxCallSeconds, success } = await getTokenExpireForOrder(channelName);
+        if (!success) {
+            return res.status(400).json({ success: false, message: 'Order not found' });
+        }
         console.log("maxCallSeconds", maxCallSeconds);
         const nowSec = Math.floor(Date.now() / 1000);
         const expire = maxCallSeconds < 60 ? nowSec + 60 : expireTs; // min 1 min validity
@@ -133,7 +136,7 @@ async function getRtcToken(req, res) {
     } catch (err) {
         logger.error('agora_getRtcToken error', { userId: req.userId, channelName, err: err?.message });
         console.error(err);
-        return res.status(500).json({ message: 'token generation failed' });
+        return res.status(500).json({ success: false, message: 'token generation failed' });
     }
 }
 
