@@ -72,6 +72,10 @@ async function login(req, res) {
     }
 }
 
+function isNumber(str) {
+    return /^-?\d+(\.\d+)?$/.test(str);
+}
+
 async function verifyOtp(req, res) {
     try {
         const { mobile, country_code = '+91', otp, ad_set_id, utm_source, ad_id, type, version, referrer } = req.body;
@@ -113,6 +117,14 @@ async function verifyOtp(req, res) {
         }
         if (existing && ad_set_id) {
             upd.ad_set_id = ad_set_id
+        }
+
+        if (upd.ad_set_id) {
+            const parsed = isNumber(upd.ad_set_id)
+            upd.ad_set_id = null
+            if (parsed) {
+                upd.ad_set_id = parsed
+            }
         }
         if (Object.keys(upd).length > 0) {
             await db('users').where({ id: Number(existing?.id) }).update(upd)
