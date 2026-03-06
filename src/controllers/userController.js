@@ -134,6 +134,38 @@ async function updateProfile(req, res) {
         delete update.avatar
 
         if (isProfileExist) {
+            await db.transaction(async (trx) => {
+                const kundli = await trx('kundlis')
+                    .where({ profile_id: isProfileExist?.id })
+                    .first('id');
+                if (kundli) {
+                    await trx('kundlis').where({ id: kundli.id }).del();
+                }
+                const basicKundli = await trx('basickundlis')
+                    .where({ profile_id: isProfileExist?.id })
+                    .first('id');
+
+                if (basicKundli) {
+                    const kid = basicKundli.id;
+                    const tables = [
+                        'chalit_chart',
+                        'dashakundlis',
+                        'divisonal_chart',
+                        'kpkundlis',
+                        'lagna_chart',
+                        'navamsa_chart',
+                        'planetkundlis',
+                        'reportkundlis',
+                        'sookshma_dasha',
+                        'transit_chart',
+                        'ashtakvargakundlis'
+                    ];
+                    await Promise.all(
+                        tables.map(table => trx(table).where({ kundli_id: kid }).del())
+                    );
+                    await trx('basickundlis').where({ id: kid }).del();
+                }
+            });
             await db('userprofiles')
                 .where('id', isProfileExist?.id)
                 .update(update);

@@ -149,6 +149,40 @@ async function updateProfile(req, res) {
         }
         await db('userprofiles').where('id', profileId).update(upd);
 
+
+        await db.transaction(async (trx) => {
+            const kundli = await trx('kundlis')
+                .where({ profile_id: profileId })
+                .first('id');
+            if (kundli) {
+                await trx('kundlis').where({ id: kundli.id }).del();
+            }
+            const basicKundli = await trx('basickundlis')
+                .where({ profile_id: profileId })
+                .first('id');
+
+            if (basicKundli) {
+                const kid = basicKundli.id;
+                const tables = [
+                    'chalit_chart',
+                    'dashakundlis',
+                    'divisonal_chart',
+                    'kpkundlis',
+                    'lagna_chart',
+                    'navamsa_chart',
+                    'planetkundlis',
+                    'reportkundlis',
+                    'sookshma_dasha',
+                    'transit_chart',
+                    'ashtakvargakundlis'
+                ];
+                await Promise.all(
+                    tables.map(table => trx(table).where({ kundli_id: kid }).del())
+                );
+                await trx('basickundlis').where({ id: kid }).del();
+            }
+        });
+
         if (count.is_first) {
             delete upd.is_updated
 
