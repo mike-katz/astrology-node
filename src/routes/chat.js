@@ -35,4 +35,14 @@ router.post('/endChat', chat.endChat);
 router.post('/forceEndChat', chat.forceEndChat);
 router.post('/readMessage', chat.readMessage);
 router.delete('/delete', chat.deleteChat);
+
+
+//new api
+router.post('/order/create', chat.newCreateOrder);
+router.post('/order/accept', chat.orderAccept);
+router.post('/order/cancel', chat.orderCancel);
+router.post('/order/reject', chat.orderReject);
+router.get('/order/detail', chat.newOrderDetail);
+router.post('/order/complete', chat.endOrder);
+
 module.exports = router;
