@@ -274,33 +274,33 @@ async function createFreeChat(req, res) {
             return q;
         };
 
-        let panditsQuery = db('pandits').where({ unlimited_free_calls_chats: true, chat: true }).whereNull('waiting_time');
+        let panditsQuery = db('pandits').select('id').where({ unlimited_free_calls_chats: true, chat: true }).whereNull('waiting_time');
         applyLanguage(panditsQuery);
         let pandits = await panditsQuery.orderByRaw('RANDOM()').limit(limit);
-
         if (pandits.length < limit) {
             const excludeIds = pandits.map((p) => p.id);
-            let more2Query = db('pandits').whereNull('waiting_time').where({ chat: true }).whereNotIn('id', excludeIds.length ? excludeIds : [0]);
+            let more2Query = db('pandits').select('id').whereNull('waiting_time').where({ chat: true }).whereNotIn('id', excludeIds.length ? excludeIds : [0]);
             applyLanguage(more2Query);
             const more2 = await more2Query.orderByRaw('RANDOM()').limit(limit - pandits.length);
             pandits = [...pandits, ...more2];
         }
         if (pandits.length < limit) {
             const excludeIds = pandits.map((p) => p.id);
-            let more1Query = db('pandits').where({ unlimited_free_calls_chats: true, chat: true }).whereNotIn('id', excludeIds.length ? excludeIds : [0]);
+            let more1Query = db('pandits').select('id').where({ unlimited_free_calls_chats: true, chat: true }).whereNotIn('id', excludeIds.length ? excludeIds : [0]);
             applyLanguage(more1Query);
             const more1 = await more1Query.orderByRaw('RANDOM()').limit(limit - pandits.length);
             pandits = [...pandits, ...more1];
         }
         if (pandits.length < limit) {
             const excludeIds = pandits.map((p) => p.id);
-            let more3Query = db('pandits').where({ chat: true }).whereNotIn('id', excludeIds.length ? excludeIds : [0]);
+            let more3Query = db('pandits').select('id').where({ chat: true }).whereNotIn('id', excludeIds.length ? excludeIds : [0]);
             applyLanguage(more3Query);
             const more3 = await more3Query.orderByRaw('RANDOM()').limit(limit - pandits.length);
             pandits = [...pandits, ...more3];
         }
 
         let requestedPanditIds = [...new Set((pandits || []).map((p) => p.id))];
+        console.log("query mathi requestedPanditIds", requestedPanditIds);
         if (requestedPanditIds.length === 0) {
             logger.info('order_createFreeChat fail', { userId: req.userId, message: 'No pandit available.' });
             return res.status(400).json({ success: false, message: 'No pandit available.' });
@@ -315,6 +315,8 @@ async function createFreeChat(req, res) {
             logger.info('order_createFreeChat fail', { userId: req.userId, message: 'No pandit available.' });
             return res.status(400).json({ success: false, message: 'No pandit available.' });
         }
+
+        console.log("final requestedPanditIds count", requestedPanditIds);
 
         const duration = Number(settings?.free_chat_minutes) || 0;
         if (!duration || duration < 1) {
