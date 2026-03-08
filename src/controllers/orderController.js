@@ -299,8 +299,10 @@ async function createFreeChat(req, res) {
             pandits = [...pandits, ...more3];
         }
 
+        const orderId = `${new Date().getTime().toString()}${Math.floor(100000 + Math.random() * 900000).toString()}`;
+
         let requestedPanditIds = [...new Set((pandits || []).map((p) => p.id))];
-        console.log("query mathi requestedPanditIds", requestedPanditIds);
+        logger.info("query mathi requestedPanditIds", { requestedPanditIds, orderId });
         if (requestedPanditIds.length === 0) {
             logger.info('order_createFreeChat fail', { userId: req.userId, message: 'No pandit available.' });
             return res.status(400).json({ success: false, message: 'No pandit available.' });
@@ -316,7 +318,7 @@ async function createFreeChat(req, res) {
             return res.status(400).json({ success: false, message: 'No pandit available.' });
         }
 
-        console.log("final requestedPanditIds count", requestedPanditIds);
+        logger.info("final requestedPanditIds count", { requestedPanditIds, orderId });
 
         const duration = Number(settings?.free_chat_minutes) || 0;
         if (!duration || duration < 1) {
@@ -324,7 +326,6 @@ async function createFreeChat(req, res) {
             return res.status(400).json({ success: false, message: 'Free chat minutes not configured.' });
         }
 
-        const orderId = `${new Date().getTime().toString()}${Math.floor(100000 + Math.random() * 900000).toString()}`;
         const [saved] = await db('orders').insert({
             user_id: req.userId,
             order_id: orderId,
