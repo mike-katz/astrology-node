@@ -62,6 +62,9 @@ async function addReview(req, res) {
                 }
             }
         } else {
+            if (user?.status != 'pending') {
+                return res.status(400).json({ success: false, message: 'This review is no longer available for updates.' });
+            }
             await db('reviews').where({ id: user?.id }).update({ user_id: req?.userId, pandit_id: panditId, order_id: orderId, hide, message, rating });
         }
         return res.status(200).json({ success: true, message: 'Review added Successfully' });
