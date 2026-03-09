@@ -280,21 +280,21 @@ async function createFreeChat(req, res) {
         if (pandits.length < limit) {
             const excludeIds = pandits.map((p) => p.id);
             let more2Query = db('pandits').select('id').whereNull('waiting_time').where({ chat: true }).whereNotIn('id', excludeIds.length ? excludeIds : [0]);
-            applyLanguage(more2Query);
+            // applyLanguage(more2Query);
             const more2 = await more2Query.orderByRaw('RANDOM()').limit(limit - pandits.length);
             pandits = [...pandits, ...more2];
         }
         if (pandits.length < limit) {
             const excludeIds = pandits.map((p) => p.id);
             let more1Query = db('pandits').select('id').where({ unlimited_free_calls_chats: true, chat: true }).whereNotIn('id', excludeIds.length ? excludeIds : [0]);
-            applyLanguage(more1Query);
+            // applyLanguage(more1Query);
             const more1 = await more1Query.orderByRaw('RANDOM()').limit(limit - pandits.length);
             pandits = [...pandits, ...more1];
         }
         if (pandits.length < limit) {
             const excludeIds = pandits.map((p) => p.id);
             let more3Query = db('pandits').select('id').where({ chat: true }).whereNotIn('id', excludeIds.length ? excludeIds : [0]);
-            applyLanguage(more3Query);
+            // applyLanguage(more3Query);
             const more3 = await more3Query.orderByRaw('RANDOM()').limit(limit - pandits.length);
             pandits = [...pandits, ...more3];
         }
