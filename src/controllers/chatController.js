@@ -4,7 +4,7 @@ const path = require('path');
 const logger = require('log4js').getLogger(path.parse(__filename).name);
 
 const { callEvent } = require("../socket");
-const { channelLeave } = require('./agoraController');
+const { channelLeave, geneateToken } = require('./agoraController');
 const { sendBulkPush } = require('./reviewController');
 const { uploadImageTos3 } = require('./uploader');
 
@@ -1461,7 +1461,7 @@ async function newOrderDetail(req, res) {
 }
 
 async function endOrder(req, res) {
-    const { order_id } = req.body || {};
+    const { order_id, return_event } = req.body || {};
     logger.info('chat_endChat', { userId: req.userId, order_id });
     if (!order_id) {
         logger.info('chat_endChat fail', { userId: req.userId, message: 'Missing params.' });
@@ -1531,6 +1531,12 @@ async function endOrder(req, res) {
             key: `user_${order?.user_id}`,
             order_id: order?.order_id,
         });
+        if (return_event) {
+            callEvent("emit_to_chat_order_call_completed", {
+                key: `user_${order?.user_id}`,
+                order_id: order?.order_id,
+            });
+        }
 
         logger.info('chat_endChat success', { userId: req.userId, order_id });
         return res.status(200).json({ success: true, data: null, message: 'End chat successfully.' });
@@ -1541,7 +1547,49 @@ async function endOrder(req, res) {
     }
 }
 
+async function createCall(req, res) {
+    const { order_id, pandit_id } = req.body;
+    try {
+        const response = await geneateToken(order_id);
+        console.log("createCall response", response);
+        let status = 200
+        if (!response?.success) {
+            status = 400
+        }
+        console.log("dda", { order_id, user_id: req.userId });
+        console.log("status", status);
+        if (status == 200) {
+            callEvent("emit_to_chat_order_call_request", {
+                key: `pandit_${pandit_id}`,
+                payload: { order_id, user_id: req.userId }
+            });
+        }
+        // console.log("response", response);
+        res.status(status).json(response);
+
+    } catch (err) {
+        logger.error('chat_endChat error', { userId: req.userId, order_id, err: err?.message });
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
+async function rejectCall(req, res) {
+    const { order_id, pandit_id } = req.body;
+    try {
+        callEvent("emit_to_chat_order_call_reject", {
+            key: `pandit_${pandit_id}`,
+            order_id,
+        });
+        return res.status(200).json({ success: true, data: null, message: 'End chat successfully.' });
+    } catch (err) {
+        logger.error('rejectCall error', { userId: req.userId, order_id, err: err?.message });
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
 module.exports = {
     getRoom, getMessage, sendMessage, getDetail, getOrderDetail, endChat, forceEndChat, readMessage, deleteChat, getOrderChat,
-    newCreateOrder, orderAccept, orderCancel, orderReject, newOrderDetail, endOrder
+    newCreateOrder, orderAccept, orderCancel, orderReject, newOrderDetail, endOrder, createCall, rejectCall
 };

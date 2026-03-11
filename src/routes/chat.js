@@ -44,5 +44,6 @@ router.post('/order/cancel', chat.orderCancel);
 router.post('/order/reject', chat.orderReject);
 router.get('/order/detail', chat.newOrderDetail);
 router.post('/order/complete', chat.endOrder);
-
+router.post('/order/call', chat.createCall);
+router.post('/order/call/reject', chat.rejectCall);
 module.exports = router;
