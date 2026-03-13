@@ -1935,4 +1935,30 @@ async function getFreeSookshmaDasha(req, res) {
     }
 }
 
-module.exports = { findBasicKundli, findkundliTab, findkpTab, findAshtakvargaTab, findChartTab, findDashaTab, findReportTab, getHororscope, getPersonalHororscope, ashtakootMilan, getFreeBasicKundli, getFreekpTab, getFreeAshtakvargaTab, getFreeDashaTab, getGeneralReport, getRemedieReport, getDoshaReport, getFreeLagnaChart, getFreeNavamsaChart, getFreeTransitChart, getFreeDivisionalChart, getFreeSouthDivisionalChart, getFreeSouthTransitChart, getFreeSouthNavamsaChart, getFreeSouthLagnaChart, getFreePlanetsChart, getFreeSookshmaDasha };
+async function sendCall(req, res) {
+    try {
+        const { from, to } = req.body
+        const numbers = ["1413232575", "1413231101", "1413232574", "1413231093"]
+        const did = numbers[Math.floor(Math.random() * numbers.length)];
+
+        const response = await axios({
+            method: 'post',
+            url: "https://voicecallconnect.com/ctc/external/create-call",
+            headers: { Authorization: "Bearer 669B2JB1EKFF9aa0jUpwMvk4cel6ie47TyF3ZZJSxgjHGvKkHsbm9k6c9GQ0g669" },
+            data: {
+                source: from,
+                destination: to,
+                // did: "+911413231099",//["+911413231091", "+911413231099"]
+                did
+            }
+        });
+        console.log("response,response", response?.data);
+        res.status(200).json({ success: true, message: "test" });
+
+    } catch (err) {
+        logger.error('chat_endChat error', { userId: req.userId, order_id, err: err?.message });
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+module.exports = { findBasicKundli, findkundliTab, findkpTab, findAshtakvargaTab, findChartTab, findDashaTab, findReportTab, getHororscope, getPersonalHororscope, ashtakootMilan, getFreeBasicKundli, getFreekpTab, getFreeAshtakvargaTab, getFreeDashaTab, getGeneralReport, getRemedieReport, getDoshaReport, getFreeLagnaChart, getFreeNavamsaChart, getFreeTransitChart, getFreeDivisionalChart, getFreeSouthDivisionalChart, getFreeSouthTransitChart, getFreeSouthNavamsaChart, getFreeSouthLagnaChart, getFreePlanetsChart, getFreeSookshmaDasha, sendCall };

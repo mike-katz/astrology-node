@@ -40,6 +40,7 @@ app.get("/health", (req, res) => {
 
 app.use(express.json());
 
+app.use('/call', freeKundliRoutes);
 app.use('/callback', callBackRoutes);
 app.use('/newKundli', freeKundliRoutes);
 app.use(decryptRequest);
