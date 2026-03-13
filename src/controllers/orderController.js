@@ -150,7 +150,7 @@ async function create(req, res) {
         let duration = Math.floor(Number(Number(user?.balance)) / Number(pandit?.final_chat_call_rate));
         let deduction = Number(duration) * Number(pandit?.final_chat_call_rate)
         let rate = pandit?.final_chat_call_rate;
-        if (count == 0 && type == 'chat') {
+        if (count == 0) {
             const settings = await db('settings').first();
             duration = Number(settings?.free_chat_minutes) || 0;
             deduction = 0;
