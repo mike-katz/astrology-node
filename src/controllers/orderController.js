@@ -203,7 +203,7 @@ async function create(req, res) {
             profile_id,
             is_free: false
         }
-        if (count == 0 && type == 'chat') {
+        if (count == 0) {
             ins.is_free = true
         }
 
