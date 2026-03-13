@@ -3,6 +3,7 @@ require('dotenv').config();
 const admin = require('../config/firebase');
 const path = require('path');
 const logger = require('log4js').getLogger(path.parse(__filename).name);
+const axios = require('axios');
 
 const { callEvent } = require("../socket");
 const { channelLeave } = require('./agoraController');
@@ -149,7 +150,7 @@ async function create(req, res) {
         let duration = Math.floor(Number(Number(user?.balance)) / Number(pandit?.final_chat_call_rate));
         let deduction = Number(duration) * Number(pandit?.final_chat_call_rate)
         let rate = pandit?.final_chat_call_rate;
-        if (count == 0 && type == 'chat') {
+        if (count == 0) {
             const settings = await db('settings').first();
             duration = Number(settings?.free_chat_minutes) || 0;
             deduction = 0;
@@ -202,7 +203,7 @@ async function create(req, res) {
             profile_id,
             is_free: false
         }
-        if (count == 0 && type == 'chat') {
+        if (count == 0) {
             ins.is_free = true
         }
 
@@ -233,6 +234,17 @@ async function create(req, res) {
         //     key: `user_${req?.userId}`,
         //     payload: [{ ...saved, name: pandit?.name, profile: pandit?.profile }],
         // });
+        axios({
+            method: 'post',
+            url: process.env.ADMIN_CALLBACK_URL,
+            data: {
+                name: pandit?.display_name,
+                id: pandit?.id,
+                mobile: pandit?.mobile,
+                order_id: orderId,
+                type: "astrologer"
+            }
+        });
         logger.info('order_create success', { userId: req.userId, orderId, panditId, type });
         return res.status(200).json({ success: true, data: { orderId }, message: 'Order create Successfully' });
     } catch (err) {
@@ -250,100 +262,64 @@ async function createFreeChat(req, res) {
         return res.status(400).json({ success: false, message: 'Missing params' });
     }
     try {
-        const user = await db('users').where({ id: req.userId }).first();
-        const [{ count }] = await db('orders')
-            .count('* as count')
-            .where({ user_id: req.userId })
-            .whereIn('status', ['continue', 'completed', 'pending']);
+        const [user, countRows, settings, profile] = await Promise.all([
+            db('users').where({ id: req.userId }).first(),
+            db('orders').count('* as count').where({ user_id: req.userId }).whereIn('status', ['continue', 'completed', 'pending']),
+            db('settings').first(),
+            db('userprofiles').where({ id: Number(profile_id) }).first(),
+        ]);
+        const count = Number(countRows?.[0]?.count ?? 0);
         if (count > 0) {
             logger.info('order_createFreeChat fail', { userId: req.userId, message: 'Your free chat already completed.' });
             return res.status(400).json({ success: false, message: 'Your free chat already completed.' });
         }
 
-        const settings = await db('settings').first();
         const limit = Number(settings?.free_chat_max_pandit_request) || 30;
 
         let languages = user?.language ? JSON.parse(user.language) : null;
-
         if (languages?.length > 0) {
-            languages = languages
-                .map(s => s?.trim())
-                .filter(Boolean)
-                .map(s => `%${s}%`);
-
-
+            languages = languages.map(s => s?.trim()).filter(Boolean).map(s => `%${s}%`);
         }
 
-        let panditsQuery = db('pandits')
-            .where({ unlimited_free_calls_chats: true, chat: true });
-        if (languages?.length) {
-            panditsQuery.andWhereRaw(
-                `languages ILIKE ANY (ARRAY[${languages.map(() => '?').join(',')}])`,
-                languages
-            );
-        }
+        const applyLanguage = (q) => {
+            if (languages?.length) q.andWhereRaw(`languages ILIKE ANY (ARRAY[${languages.map(() => '?').join(',')}])`, languages);
+            return q;
+        };
 
-        let pandits = await panditsQuery
-            .orderByRaw('RANDOM()')
-            .whereNull('waiting_time')
-            .limit(limit);
-
+        let panditsQuery = db('pandits').select('id').where({ unlimited_free_calls_chats: true, chat: true }).whereNull('waiting_time');
+        applyLanguage(panditsQuery);
+        let pandits = await panditsQuery.orderByRaw('RANDOM()').limit(limit);
         if (pandits.length < limit) {
             const excludeIds = pandits.map((p) => p.id);
-            let more2Query = db('pandits')
-                .whereNull('waiting_time')
-                .where({ chat: true })
-                .whereNotIn('id', excludeIds.length ? excludeIds : [0])
-                .orderByRaw('RANDOM()')
-                .limit(limit - pandits.length);
-            if (languages?.length) {
-                more2Query = more2Query.andWhereRaw(
-                    `languages ILIKE ANY (ARRAY[${languages.map(() => '?').join(',')}])`,
-                    languages
-                );
-            }
-            const more2 = await more2Query;
+            let more2Query = db('pandits').select('id').whereNull('waiting_time').where({ chat: true }).whereNotIn('id', excludeIds.length ? excludeIds : [0]);
+            // applyLanguage(more2Query);
+            const more2 = await more2Query.orderByRaw('RANDOM()').limit(limit - pandits.length);
             pandits = [...pandits, ...more2];
         }
         if (pandits.length < limit) {
             const excludeIds = pandits.map((p) => p.id);
-            let more1Query = db('pandits')
-                .where({ unlimited_free_calls_chats: true, chat: true })
-                .whereNotIn('id', excludeIds.length ? excludeIds : [0])
-                .orderByRaw('RANDOM()')
-                .limit(limit - pandits.length);
-            if (languages?.length) {
-                more1Query = more1Query.andWhereRaw(
-                    `languages ILIKE ANY (ARRAY[${languages.map(() => '?').join(',')}])`,
-                    languages
-                );
-            }
-            const more1 = await more1Query;
+            let more1Query = db('pandits').select('id').where({ unlimited_free_calls_chats: true, chat: true }).whereNotIn('id', excludeIds.length ? excludeIds : [0]);
+            // applyLanguage(more1Query);
+            const more1 = await more1Query.orderByRaw('RANDOM()').limit(limit - pandits.length);
             pandits = [...pandits, ...more1];
         }
         if (pandits.length < limit) {
             const excludeIds = pandits.map((p) => p.id);
-            let more3Query = db('pandits')
-                .where({ chat: true })
-                .whereNotIn('id', excludeIds.length ? excludeIds : [0])
-                .orderByRaw('RANDOM()')
-                .limit(limit - pandits.length);
-            if (languages?.length) {
-                more3Query = more3Query.andWhereRaw(
-                    `languages ILIKE ANY (ARRAY[${languages.map(() => '?').join(',')}])`,
-                    languages
-                );
-            }
-            const more3 = await more3Query;
+            let more3Query = db('pandits').select('id').where({ chat: true }).whereNotIn('id', excludeIds.length ? excludeIds : [0]);
+            // applyLanguage(more3Query);
+            const more3 = await more3Query.orderByRaw('RANDOM()').limit(limit - pandits.length);
             pandits = [...pandits, ...more3];
         }
+
+        const orderId = `${new Date().getTime().toString()}${Math.floor(100000 + Math.random() * 900000).toString()}`;
+
         let requestedPanditIds = [...new Set((pandits || []).map((p) => p.id))];
-        // let requestedPanditIds = [36];
-        console.log("requestedPanditIds", requestedPanditIds?.length);
+        logger.info("query mathi requestedPanditIds", { requestedPanditIds, orderId });
         if (requestedPanditIds.length === 0) {
             logger.info('order_createFreeChat fail', { userId: req.userId, message: 'No pandit available.' });
             return res.status(400).json({ success: false, message: 'No pandit available.' });
         }
+
         const continueOrder = await db('orders').where({ status: "continue" }).whereIn('pandit_id', requestedPanditIds).select('pandit_id');
         if (continueOrder?.length) {
             const busyPanditIds = new Set(continueOrder.map((item) => item.pandit_id));
@@ -353,13 +329,15 @@ async function createFreeChat(req, res) {
             logger.info('order_createFreeChat fail', { userId: req.userId, message: 'No pandit available.' });
             return res.status(400).json({ success: false, message: 'No pandit available.' });
         }
+
+        logger.info("final requestedPanditIds count", { requestedPanditIds, orderId });
+
         const duration = Number(settings?.free_chat_minutes) || 0;
         if (!duration || duration < 1) {
             logger.info('order_createFreeChat fail', { userId: req.userId, message: 'Free chat minutes not configured.' });
             return res.status(400).json({ success: false, message: 'Free chat minutes not configured.' });
         }
 
-        const orderId = `${new Date().getTime().toString()}${Math.floor(100000 + Math.random() * 900000).toString()}`;
         const [saved] = await db('orders').insert({
             user_id: req.userId,
             order_id: orderId,
@@ -373,27 +351,20 @@ async function createFreeChat(req, res) {
             requested_pandits: JSON.stringify(requestedPanditIds),
         }).returning('*');
 
-        const profile = await db('userprofiles').where({ id: Number(profile_id) }).first();
+        const panditRecords = await db('pandits').whereIn('id', requestedPanditIds).select('id', 'token', 'waiting_time', 'display_name', 'profile', 'final_chat_call_rate');
 
-        // callEvent('emit_to_user_for_register', {
-        //     key: `user_${req.userId}`,
-        //     payload: [{ ...saved, profile_name: profile?.name, requested_pandits: requestedPanditIds }],
-        // });
-
-        for (const panditId of requestedPanditIds) {
+        requestedPanditIds.forEach((panditId) => {
             callEvent('emit_to_pending_order', {
                 key: `pandit_${panditId}`,
                 payload: { pandit_id: panditId, order_id: orderId, requested_pandits: requestedPanditIds },
             });
-        }
+        });
 
-        const panditRecords = await db('pandits').whereIn('id', requestedPanditIds).select('id', 'token', 'display_name', 'profile', 'final_chat_call_rate');
-        for (const pandit of panditRecords || []) {
-            if (pandit?.token) {
-                const waiting_time = pandit?.waiting_time == null ? true : false
-                await sendNotification(pandit.token, user?.name, settings?.free_chat_amount_per_minute, pandit.id, type, waiting_time, true);
-            }
-        }
+        const notificationPromises = (panditRecords || [])
+            .filter((p) => p?.token)
+            .map((p) => sendNotification(p.token, user?.name, settings?.free_chat_amount_per_minute, p.id, type, p.waiting_time == null, true));
+        if (notificationPromises.length) await Promise.all(notificationPromises);
+
         sendAutoMessage(profile, req.userId, orderId);
         logger.info('order_createFreeChat success', { userId: req.userId, orderId });
         return res.status(200).json({ success: true, data: { orderId, ...saved }, message: 'Free chat order created successfully.' });

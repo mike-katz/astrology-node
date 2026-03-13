@@ -1,4 +1,6 @@
+const FormData = require('form-data');
 const db = require('../db');
+const axios = require('axios');
 
 require('dotenv').config();
 const { uploadImageTos3, deleteFileFroms3 } = require('./uploader');
@@ -365,4 +367,26 @@ async function getRechargeBanner(req, res) {
     }
 }
 
-module.exports = { updateProfile, getProfile, getBalance, updateToken, profileUpdate, makeAvtarString, deleteMyAccount, getRecharge, getRechargeBanner };
+async function getCookie(req, res) {
+    const { language = 'en' } = req.query;
+    const formData = new FormData();
+
+    formData.append('api_key', process.env.KUNDLI_API_KEY);
+    formData.append('lan', language);
+    const config = {
+        method: 'post',
+        url: "https://astroapi-5-translator.divineapi.com/api/v2/fortune-cookie",
+        headers: {
+            Authorization: `Bearer ${process.env.KUNDLI_API_TOKEN}`,
+            ...formData.getHeaders(),
+        },
+        data: formData,
+    };
+    // console.log("config", config);
+    const response = await axios(config);
+    // console.log("response", response.data);
+
+    return res.status(200).json({ success: true, data: response?.data?.data?.prediction, message: 'Recharge list success' });
+}
+
+module.exports = { updateProfile, getProfile, getBalance, updateToken, profileUpdate, makeAvtarString, deleteMyAccount, getRecharge, getRechargeBanner, getCookie };
