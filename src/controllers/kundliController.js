@@ -1946,8 +1946,8 @@ async function sendCall(req, res) {
             url: "https://voicecallconnect.com/ctc/external/create-call",
             headers: { Authorization: "Bearer 669B2JB1EKFF9aa0jUpwMvk4cel6ie47TyF3ZZJSxgjHGvKkHsbm9k6c9GQ0g669" },
             data: {
-                source: from,
-                destination: to,
+                source: `+91${from}`,
+                destination: `+91${to}`,
                 // did: "+911413231099",//["+911413231091", "+911413231099"]
                 did
             }
