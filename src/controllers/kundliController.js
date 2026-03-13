@@ -1938,9 +1938,16 @@ async function getFreeSookshmaDasha(req, res) {
 async function sendCall(req, res) {
     try {
         const { from, to } = req.body
-        const numbers = ["1413232575", "1413231101", "1413232574", "1413231093"]
+        console.log("req.body", req.body);
+        const numbers = ["+911413232575", "+911413231101", "+911413232574", "+911413231093"]
         const did = numbers[Math.floor(Math.random() * numbers.length)];
 
+        console.log("sscds", {
+            source: `+91${from}`,
+            destination: `+91${to}`,
+            // did: "+911413231099",//["+911413231091", "+911413231099"]
+            did
+        });
         const response = await axios({
             method: 'post',
             url: "https://voicecallconnect.com/ctc/external/create-call",
