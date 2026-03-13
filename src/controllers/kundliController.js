@@ -1956,7 +1956,6 @@ async function sendCall(req, res) {
         res.status(200).json({ success: true, message: "test" });
 
     } catch (err) {
-        logger.error('chat_endChat error', { userId: req.userId, order_id, err: err?.message });
         console.error(err);
         res.status(500).json({ success: false, message: 'Server error' });
     }
