@@ -55,7 +55,7 @@ app.use('/freeKundli', freeKundliRoutes);
 app.use('/faq', faqRoutes);
 app.use('/blog', blogRoutes);
 app.use('/banners', bannerRoutes);
-app.use('/call', freeKundliRoutes);
+app.use('/call', authRoutes);
 
 // app.use('/agora', agoraRoutes);
 

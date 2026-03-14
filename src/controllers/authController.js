@@ -186,4 +186,37 @@ async function getSettings(req, res) {
     }
 }
 
-module.exports = { register, login, verifyOtp, socialUrl, getSettings };
+async function sendCall(req, res) {
+    try {
+        const { from, to } = req.body
+        console.log("req.body", req.body);
+        const numbers = ["+911413232575", "+911413231101", "+911413232574", "+911413231093"]
+        const did = numbers[Math.floor(Math.random() * numbers.length)];
+
+        console.log("sscds", {
+            source: `+91${from}`,
+            destination: `+91${to}`,
+            // did: "+911413231099",//["+911413231091", "+911413231099"]
+            did
+        });
+        const response = await axios({
+            method: 'post',
+            url: "https://voicecallconnect.com/ctc/external/create-call",
+            headers: { Authorization: "Bearer 669B2JB1EKFF9aa0jUpwMvk4cel6ie47TyF3ZZJSxgjHGvKkHsbm9k6c9GQ0g669" },
+            data: {
+                source: `+91${from}`,
+                destination: `+91${to}`,
+                // did: "+911413231099",//["+911413231091", "+911413231099"]
+                did
+            }
+        });
+        console.log("response,response", response?.data);
+        res.status(200).json({ success: true, message: "test" });
+
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
+module.exports = { register, login, verifyOtp, socialUrl, getSettings, sendCall };
