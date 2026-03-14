@@ -2,11 +2,13 @@ const db = require('../db');
 require('dotenv').config();
 const path = require('path');
 const logger = require('log4js').getLogger(path.parse(__filename).name);
+const axios = require('axios');
 
 const { callEvent } = require("../socket");
 const { channelLeave, geneateToken } = require('./agoraController');
 const { sendBulkPush } = require('./reviewController');
 const { uploadImageTos3 } = require('./uploader');
+const { emitCallDurationUpdate } = require('../callSocket');
 
 async function getRoom(req, res) {
     logger.info('chat_getRoom', { userId: req.userId });
@@ -1550,25 +1552,52 @@ async function endOrder(req, res) {
 async function createCall(req, res) {
     const { order_id, pandit_id } = req.body;
     try {
-        const response = await geneateToken(order_id);
-        console.log("createCall response", response);
-        let status = 200
-        if (!response?.success) {
-            status = 400
+        const oredrDetail = await db('orders').where({ order_id, status: "continue", pandit_id }).first();
+        if (!oredrDetail) {
+            logger.info('chat_order_call fail', { order_id, message: 'Order not found.' });
+            return res.status(400).json({ success: false, message: 'Something went wrong.' });
         }
-        console.log("dda", { order_id, user_id: req.userId });
-        console.log("status", status);
-        if (status == 200) {
-            callEvent("emit_to_chat_order_call_request", {
-                key: `pandit_${pandit_id}`,
-                payload: { order_id, user_id: req.userId }
-            });
+        const numbers = ["+911413232575", "+911413231101", "+911413232574", "+911413231093"]
+        const userDetail = await db('users').select('id', 'mobile', 'country_code').where({ id: Number(req.userId) }).first()
+        const panditDetail = await db('pandits').select('id', 'mobile', 'country_code').where({ id: Number(pandit_id) }).first()
+        const setting = await db('settings').select('minimum_call_send_time').first()
+        const did = numbers[Math.floor(Math.random() * numbers.length)];
+        console.log("call params", {
+            source: `${panditDetail?.country_code}${panditDetail?.mobile}`,
+            destination: `${userDetail?.country_code}${userDetail?.mobile}`,
+            did,
+            order_id
+        });
+        const createdAt = new Date(oredrDetail?.end_time);
+        const diffSeconds = Math.floor((createdAt.getTime() - Date.now()) / 1000);
+        console.log("diffSeconds", diffSeconds);
+        if (diffSeconds < Number(setting?.minimum_call_send_time || 60)) {
+            logger.info('chat_order_call fail', { order_id, message: 'Minimum call duration.' });
+            return res.status(400).json({ success: false, message: `Minimum call duration ${Number(setting?.minimum_call_send_time || 60)} Required.` });
         }
-        // console.log("response", response);
-        res.status(status).json(response);
+        const response = await axios({
+            method: 'post',
+            url: process.env.CALL_URL,
+            headers: { Authorization: process.env.CALL_TOKEN },
+            data: {
+                source: `${panditDetail?.country_code}${panditDetail?.mobile}`,
+                destination: `${userDetail?.country_code}${userDetail?.mobile}`,
+                // did: "+911413231099",//["+911413231091", "+911413231099"]
+                did
+            }
+        });
+
+        console.log("response,response", response?.data);
+        // emitCallDurationUpdate(response?.data?.call_id, Number(diffSeconds))
+        callEvent("emit_to_u_chat_order_call_send_user", {
+            key: `user_${userDetail?.id}`,
+            order_id,
+        });
+        await db('orders').where({ order_id }).update({ call_id: response?.data?.call_id, call_from: "user" })
+        await db('order_call_log').insert({ call_id: response?.data?.call_id, order_id, pandit_id, user_id: req.userId, status: "Call Initiated" })
+        res.status(200).json({ success: true, message: "Call initiated" });
 
     } catch (err) {
-        logger.error('chat_endChat error', { userId: req.userId, order_id, err: err?.message });
         console.error(err);
         res.status(500).json({ success: false, message: 'Server error' });
     }
