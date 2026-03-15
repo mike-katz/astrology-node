@@ -24,33 +24,33 @@ async function getPandits(req, res) {
             "p.deleted_at": null
         }
         const authHeader = req.headers.authorization;
-        const token = authHeader.split(' ')[1];
-        let isFree = false
-        if (token) {
-            const decryptToken = decrypt(token);
-            if (decryptToken) {
-                const verified = jwt.verify(decryptToken, process.env.JWT_SECRET);
-                const username = verified?.userId;
-                const redisKey = `user_${username}`;
-                const redisToken = await getCache(redisKey);
+        if (authHeader) {
+            const token = authHeader?.split(' ')[1];
+            if (token) {
+                const decryptToken = decrypt(token);
+                if (decryptToken) {
+                    const verified = jwt.verify(decryptToken, process.env.JWT_SECRET);
+                    const username = verified?.userId;
+                    const redisKey = `user_${username}`;
+                    const redisToken = await getCache(redisKey);
 
-                if (!redisToken || redisToken == token) {
-                    const [{ count }] = await db('orders')
-                        .count('* as count')
-                        .where({ user_id: existing.id })
-                        .whereIn('status', ['continue', 'completed', 'pending']);
-                    isFree = count == 0 ? true : false;
-
-                    if (isFree) {
-                        const userData = await db('users').select('language').where({ id: Number(username) }).first();
-                        if (userData) {
-                            language = userData?.language || []
+                    if (!redisToken || redisToken == token) {
+                        const [{ count }] = await db('orders')
+                            .count('* as count')
+                            .where({ user_id: username })
+                            .whereIn('status', ['continue', 'completed', 'pending']);
+                        // isFree = count == 0 ? true : false;
+                        const isFree = true;
+                        if (isFree) {
+                            const userData = await db('users').select('language').where({ id: Number(username) }).first();
+                            if (userData) {
+                                language = userData?.language ? JSON.parse(userData?.language) : [] || []
+                            }
                         }
                     }
                 }
             }
         }
-
         let sort
         let orderBy
         let sorting = []
@@ -275,16 +275,18 @@ async function getPandits(req, res) {
             END
         `;
 
+        // Primary sort: RANDOM() so response order changes every time
+        query.orderByRaw('RANDOM()');
         if (sort_by == 'rating_high_to_low') {
             query.orderByRaw(ratingRatioRaw + ' DESC').orderBy('p.total_orders', 'desc');
         } else if (sort_by == 'rating_low_to_high') {
             query.orderByRaw(ratingRatioRaw + ' ASC').orderBy('p.total_orders', 'desc');
-        } else if (sorting?.length > 0) {
-            query.orderBy(sorting).orderBy('p.total_orders', 'desc').orderByRaw(ratingRatioRaw + ' DESC');
-        } else {
-            // Default: first total_orders DESC, then rating ratio DESC
-            query.orderBy('p.total_orders', 'desc').orderByRaw(ratingRatioRaw + ' DESC');
         }
+        // else if (sorting?.length > 0) {
+        //     query.orderBy(sorting).orderBy('p.total_orders', 'desc').orderByRaw(ratingRatioRaw + ' DESC');
+        // } else {
+        //     query.orderBy('p.total_orders', 'desc').orderByRaw(ratingRatioRaw + ' DESC');
+        // }
 
         const user = await query;
         const [{ count }] = await countQuery
