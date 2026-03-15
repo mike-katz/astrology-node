@@ -12,7 +12,18 @@ const { getCache } = require("../config/redisClient")
 async function getPandits(req, res) {
     try {
         // console.log("req.query", req.query);
-        let page = parseInt(req.query.page) || 1;
+        const reqPage = parseInt(req.query.page) || 1;
+        if (reqPage != 1) {
+            const response = {
+                page: reqPage,
+                limit: 100,
+                total: 0,
+                totalPages: 1,
+                results: []
+            }
+            return res.status(200).json({ success: true, data: response, message: 'List success' });
+        }
+        let page = 1;
         let limit = 100
         //  parseInt(req.query.limit) || 20;
         if (page < 1) page = 1;
@@ -274,24 +285,64 @@ async function getPandits(req, res) {
             END
         `;
 
+        console.log("sort_by", sort_by);
         // Primary sort: RANDOM() so response order changes every time
-        query.orderByRaw('RANDOM()');
         if (sort_by == 'rating_high_to_low') {
             query.orderByRaw(ratingRatioRaw + ' DESC').orderBy('p.total_orders', 'desc');
         } else if (sort_by == 'rating_low_to_high') {
             query.orderByRaw(ratingRatioRaw + ' ASC').orderBy('p.total_orders', 'desc');
         }
-        // else if (sorting?.length > 0) {
-        //     query.orderBy(sorting).orderBy('p.total_orders', 'desc').orderByRaw(ratingRatioRaw + ' DESC');
-        // } else {
+        else if (sorting?.length > 0) {
+            query.orderBy(sorting)
+
+            // .orderBy('p.total_orders', 'desc').orderByRaw(ratingRatioRaw + ' DESC');
+        }
+        //  else {
         //     query.orderBy('p.total_orders', 'desc').orderByRaw(ratingRatioRaw + ' DESC');
         // }
-
-        const user = await query;
-        const [{ count }] = await countQuery
-        const total = parseInt(count);
+        query.orderByRaw('RANDOM()');
+        console.log("sd", query.toQuery());
+        let user = await query;
+        // const [{ count }] = await countQuery
+        // const total = parseInt(count);
+        const total = 100
         const totalPages = Math.ceil(total / limit);
 
+        if (user?.length < 100) {
+            console.log("inside if");
+            const newLimit = 100 - user?.length
+            console.log("newLimit", newLimit);
+            const query = db('pandits as p')
+                //.distinctOn('p.id')
+                .select(
+                    'p.display_name as name',
+                    'p.id',
+                    'p.languages',
+                    'p.experience',
+                    'p.profile',
+                    'p.available_for',
+                    'p.total_chat_minutes',
+                    'p.total_call_minutes',
+                    'p.primary_expertise',
+                    'p.secondary_expertise',
+                    'p.discounted_chat_call_rate',
+                    'p.final_chat_call_rate',
+                    'p.waiting_time',
+                    'p.online',
+                    'p.rating_1',
+                    'p.rating_2',
+                    'p.rating_3',
+                    'p.rating_5',
+                    'p.rating_4',
+                    'p.total_orders',
+                    'p.tag',
+                    'p.chat_call_rate',
+                ).where(filter)
+                .limit(newLimit)
+            query.orderByRaw('RANDOM()');
+            const newUser = await query;
+            user = [...user, ...newUser]
+        }
         user.map(item => {
             item.govt_id = item?.govt_id ? JSON.parse(item?.govt_id) : [];
             item.available_for = item?.available_for ? JSON.parse(item?.available_for) : [];
@@ -304,7 +355,7 @@ async function getPandits(req, res) {
             page,
             limit,
             total,
-            totalPages,
+            totalPages: 1,
             results: user
         }
         return res.status(200).json({ success: true, data: response, message: 'List success' });
