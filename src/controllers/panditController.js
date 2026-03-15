@@ -39,8 +39,7 @@ async function getPandits(req, res) {
                             .count('* as count')
                             .where({ user_id: username })
                             .whereIn('status', ['continue', 'completed', 'pending']);
-                        // isFree = count == 0 ? true : false;
-                        const isFree = true;
+                        const isFree = count == 0 ? true : false;
                         if (isFree) {
                             const userData = await db('users').select('language').where({ id: Number(username) }).first();
                             if (userData) {
