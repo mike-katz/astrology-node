@@ -7,50 +7,21 @@ const jwt = require('jsonwebtoken');
 const { isValidMobile } = require('../utils/decodeJWT');
 const axios = require('axios');
 const sendMail = require('../utils/sendMail');
-const { getCache } = require("../config/redisClient")
 
 async function getPandits(req, res) {
     try {
         // console.log("req.query", req.query);
         let page = parseInt(req.query.page) || 1;
-        let limit = 100
-        //  parseInt(req.query.limit) || 20;
+        let limit = parseInt(req.query.limit) || 20;
+
         if (page < 1) page = 1;
-        // if (limit < 1) limit = 100;
+        if (limit < 1) limit = 100;
         const offset = (page - 1) * limit;
-        let { type = "chat", search, sort_by, skill, language, gender, country, offer, top_astrologers, secondary_expertise } = req.query
+        const { type = "chat", search, sort_by, skill, language, gender, country, offer, top_astrologers, secondary_expertise } = req.query
         const filter = {
             "p.status": "active",
             "p.deleted_at": null
         }
-        const authHeader = req.headers.authorization;
-        const token = authHeader.split(' ')[1];
-        let isFree = false
-        if (token) {
-            const decryptToken = decrypt(token);
-            if (decryptToken) {
-                const verified = jwt.verify(decryptToken, process.env.JWT_SECRET);
-                const username = verified?.userId;
-                const redisKey = `user_${username}`;
-                const redisToken = await getCache(redisKey);
-
-                if (!redisToken || redisToken == token) {
-                    const [{ count }] = await db('orders')
-                        .count('* as count')
-                        .where({ user_id: existing.id })
-                        .whereIn('status', ['continue', 'completed', 'pending']);
-                    isFree = count == 0 ? true : false;
-
-                    if (isFree) {
-                        const userData = await db('users').select('language').where({ id: Number(username) }).first();
-                        if (userData) {
-                            language = userData?.language || []
-                        }
-                    }
-                }
-            }
-        }
-
         let sort
         let orderBy
         let sorting = []
