@@ -55,16 +55,40 @@ function connect() {
         }
         // console.log("order", order);
         const { order_id, pandit_id, user_id, call_from, type, end_time } = order;
+        const userDetail = await db('users').where({ id: Number(user_id) }).first();
         console.log("order_id, pandit_id, user_id, call_from", order_id, pandit_id, user_id, call_from);
         let status;
         const call = await db('order_call_log')
             .where({ call_id: String(call_id) })
             .orderBy('id', 'desc')
             .first();
+        console.log("call", call);
         let newEventSocket = [];
         if (event === 'destination-answered') {
-            const createdAt = new Date(end_time);
-            const diffSeconds = Math.floor((createdAt.getTime() - Date.now()) / 1000);
+            let createdAt = new Date(end_time);
+            if (type == 'call' && order?.status == 'pending') {
+                let duration;
+                let deduction;
+                if (order.is_free) {
+                    const settings = await db('settings').first();
+                    duration = Number(settings?.free_chat_minutes) || 0;
+                    deduction = 0;
+                } else {
+                    duration = Math.floor(Number(Number(userDetail?.balance)) / Number(order?.rate));
+                    deduction = Number(duration) * Number(order?.rate);
+                }
+
+                const startTime = new Date()
+                const endTime = new Date(Date.now() + `${duration}` * 60 * 1000);
+                createdAt = (new Date(endTime))
+                console.log("upd params", { status: "continue", duration, deduction, start_time: startTime, end_time: endTime });
+                await db('orders').where({ id: order?.id }).update({ status: "continue", duration, deduction, start_time: startTime, end_time: endTime });
+                await db('pandits').where({ id: order?.pandit_id }).update({ waiting_time: endTime });
+            }
+            let diffSeconds = Math.floor((createdAt.getTime() - Date.now()) / 1000);
+            if (type == 'call' && order?.status != 'pending') {
+                diffSeconds = 5;
+            }
             console.log("diffSeconds", diffSeconds);
             emitCallDurationUpdate(call_id, diffSeconds)
         }
@@ -74,12 +98,22 @@ function connect() {
                 newEventSocket.push({ event: 'emit_to_u_chat_order_call_accept_astrologer', key: `pandit_${pandit_id}` })
                 status = 'Astrologer Accepted'
             }
+            if (type == 'call') {
+                newEventSocket.push({ event: 'emit_to_call_order_accept_astrologer', key: `user_${user_id}` })
+                newEventSocket.push({ event: 'emit_to_call_order_accept_astrologer', key: `pandit_${pandit_id}` })
+                status = 'Astrologer Accepted'
+            }
         }
         else if (call_from == 'user' && event === 'destination-answered') {
             if (type == 'chat') {
                 status = 'User Accepted'
                 newEventSocket.push({ event: 'emit_to_u_chat_order_call_accept_user', key: `pandit_${pandit_id}` })
                 newEventSocket.push({ event: 'emit_to_u_chat_order_call_accept_user', key: `user_${user_id}` })
+            }
+            if (type == 'call') {
+                newEventSocket.push({ event: 'emit_to_call_order_accept_user', key: `user_${user_id}` })
+                newEventSocket.push({ event: 'emit_to_call_order_accept_user', key: `pandit_${pandit_id}` })
+                status = 'User Accepted'
             }
         }
         else if (call_from == 'user' && event === 'hangup') {
@@ -100,6 +134,28 @@ function connect() {
                     newEventSocket.push({ event: 'emit_to_u_chat_order_call_completed', key: `pandit_${pandit_id}` })
                     newEventSocket.push({ event: 'emit_to_u_chat_order_call_completed', key: `user_${user_id}` })
                 }
+            }
+
+            if (type == 'call') {
+                console.log("call?.status", call?.status);
+                if (call?.status == 'Call Initiated') {
+                    status = 'Astrologer Rejected'
+                    newEventSocket.push({ event: 'emit_to_call_order_reject_astrologer', key: `user_${user_id}` })
+                    newEventSocket.push({ event: 'emit_to_call_order_reject_astrologer', key: `pandit_${pandit_id}` })
+                }
+
+                if (call?.status == 'Astrologer Accepted') {
+                    status = 'User Rejected'
+                    newEventSocket.push({ event: 'emit_to_call_order_reject_user', key: `pandit_${pandit_id}` })
+                    newEventSocket.push({ event: 'emit_to_call_order_reject_user', key: `user_${user_id}` })
+                }
+
+                if (call?.status == 'User Accepted') {
+                    status = 'Call Completed'
+                    newEventSocket.push({ event: 'emit_to_call_order_completed', key: `pandit_${pandit_id}` })
+                    newEventSocket.push({ event: 'emit_to_call_order_completed', key: `user_${user_id}` })
+                }
+
             }
         }
 
@@ -137,6 +193,7 @@ function connect() {
                 }
             }
         }
+
 
         console.log("newEventSocket", JSON.stringify(newEventSocket));
         await db('order_call_log').insert({ call_id, order_id, pandit_id, user_id, status })
@@ -197,7 +254,7 @@ function emitCallDurationUpdate(callId, durationInSeconds) {
     console.log("durationInSeconds", durationInSeconds);
     callSocketEvent('call_duration_update', {
         call_id: callId,
-        duration: String(durationInSeconds),
+        duration: String(60),
     });
 }
 
