@@ -226,9 +226,12 @@ async function create(req, res) {
         // console.log(" socket end call");
 
         const token = pandit?.token || false;
+        console.log("token", token);
         if (token) {
             const waiting_time = pandit?.waiting_time == null ? true : false
-            await sendNotification(token, user?.name, pandit?.final_chat_call_rate, panditId, type, waiting_time)
+
+            const resposne = await sendNotification(token, user?.name, pandit?.final_chat_call_rate, panditId, type, waiting_time)
+            logger.info('resposne', resposne)
         }
         // socket.emit("emit_to_user_for_register", {
         //     key: `user_${req?.userId}`,
@@ -517,8 +520,8 @@ async function sendNotification(token, username, chat_call_rate, panditId, type,
 
             logger.info("message", message);
             const response = await admin.messaging().send(message);
-            // console.log("push notification response", response);
-            // console.log("end push notification");
+            console.log("push notification response", response);
+            console.log("end push notification");
             return true;
         }
     } catch (e) {
