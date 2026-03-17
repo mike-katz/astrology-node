@@ -963,109 +963,105 @@ async function sendNotification(token, username, chat_call_rate, panditId, type,
             filter.message_type = 'Free Call Request'
         }
         const template = await db('templates').where(filter).first();
+        logger.info("template", template);
         if (!template) return true;
 
         const messages = replaceTemplate(template?.title, {
             user_name: username,
             pandit_rate: chat_call_rate
         })
+        logger.info("messages", messages);
         if (token) {
             // console.log("start push notification");
             // const messages = `new ${type} request from ${username} (Rs ${chat_call_rate}/min).`
             // const continueOrder = await db('panditnotifications').insert({ user_id: panditId, type: "order", message: messages })
             let message = {}
             // if (type == 'chat') {
-            const [{ count: panditCountRow }] = await db('orders')
-                .where({ pandit_id: panditId })
-                .whereIn('status', ['continue'])
-                .count('* as count');
-            const panditCount = Number(panditCountRow) || 0;
-            is_available = false
-            console.log("panditCount", panditCount);
-            if (panditCount == 0) {
-                is_available = true
-            }
-            if (panditCount > 0) {
-                message = {
-                    token,
-                    notification: {
-                        title: messages,
-                    },
+            // const [{ count: panditCountRow }] = await db('orders')
+            //     .where({ pandit_id: panditId })
+            //     .whereIn('status', ['continue'])
+            //     .count('* as count');
+            // const panditCount = Number(panditCountRow) || 0;
+            // is_available = false
+            // console.log("panditCount", panditCount);
+            // if (panditCount == 0) {
+            //     is_available = true
+            // }
+            // if (panditCount > 0) {
+            //     message = {
+            //         token,
+            //         notification: {
+            //             title: messages,
+            //         },
 
-                    // 🔔 Android
-                    android: {
-                        notification: {
-                            sound: 'default'
-                        }
-                    },
+            //         // 🔔 Android
+            //         android: {
+            //             notification: {
+            //                 sound: 'default'
+            //             }
+            //         },
 
-                    // 🔔 iOS
-                    apns: {
-                        payload: {
-                            aps: {
-                                sound: 'default'
-                            }
-                        }
-                    },
+            //         // 🔔 iOS
+            //         apns: {
+            //             payload: {
+            //                 aps: {
+            //                     sound: 'default'
+            //                 }
+            //             }
+            //         },
 
-                    // 🔔 Web Browser
-                    webpush: {
-                        notification: {
-                            // icon: '/icon.png',
-                            requireInteraction: true
-                            // NOTE: Browsers play default sound automatically
-                        }
-                    },
+            //         // 🔔 Web Browser
+            //         webpush: {
+            //             notification: {
+            //                 // icon: '/icon.png',
+            //                 requireInteraction: true
+            //                 // NOTE: Browsers play default sound automatically
+            //             }
+            //         },
 
-                    data: {
-                        is_available: String(is_available),
-                        username,
-                        type,
-                        order_id,
-                        user_id
-                    }
-                };
-            }
-            else {
-                console.log("inside else");
+            //         data: {
+            //             is_available: String(is_available),
+            //         }
+            //     };
+            // }
+            // else {
+            logger.info("inside else");
 
-                message = {
-                    token, // This must be the VoIP Token, not the standard FCM token
-                    // notification: {
-                    //     title: messages,
-                    // },
-                    android: {
-                        priority: "high",
+            message = {
+                token, // This must be the VoIP Token, not the standard FCM token
+                // notification: {
+                //     title: messages,
+                // },
+                android: {
+                    priority: "high",
+                },
+                // Add this for iOS
+                apns: {
+                    headers: {
+                        "apns-priority": "10",
+                        "apns-push-type": "voip", // CRITICAL: This tells iOS it's a call
+                        "apns-topic": "com.your.bundleid.voip" // Must end in .voip
                     },
-                    // Add this for iOS
-                    apns: {
-                        headers: {
-                            "apns-priority": "10",
-                            "apns-push-type": "voip", // CRITICAL: This tells iOS it's a call
-                            "apns-topic": "com.your.bundleid.voip" // Must end in .voip
+                    payload: {
+                        aps: {
+                            "content-available": 1
                         },
-                        payload: {
-                            aps: {
-                                "content-available": 1
-                            },
-                            // Your custom data
-                            type: type == 'chat' ? "incoming_chat" : "incoming_call",
-                            is_available: String(is_available),
-                            title: messages,
-                            // ... other data
-                        }
-                    },
-                    data: {
+                        // Your custom data
                         type: type == 'chat' ? "incoming_chat" : "incoming_call",
                         is_available: String(is_available),
                         title: messages,
-                        order_id,
-                        user_id,
-                        username,
-                        type,
-                    },
-                };
-            }
+                        // ... other data
+                    }
+                },
+                data: {
+                    type: type == 'chat' ? "incoming_chat" : "incoming_call",
+                    is_available: String(is_available),
+                    title: messages,
+                    order_id: "123",
+                    userId: "userId"
+                },
+            };
+            // }
             // } else {
             //     message = {
             //         token,
@@ -1088,13 +1084,14 @@ async function sendNotification(token, username, chat_call_rate, panditId, type,
             //     };
             // }
 
-            console.log("message", message);
+            logger.info("message", message);
             const response = await admin.messaging().send(message);
-            // console.log("push notification response", response);
-            // console.log("end push notification");
+            console.log("push notification response", response);
+            console.log("end push notification");
             return true;
         }
     } catch (e) {
+        logger.error("sendNotification error", e);
         return true;
     }
 }
