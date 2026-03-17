@@ -406,16 +406,16 @@ async function sendNotification(token, username, chat_call_rate, panditId, type,
             // const continueOrder = await db('panditnotifications').insert({ user_id: panditId, type: "order", message: messages })
             let message = {}
             // if (type == 'chat') {
-            const [{ count: panditCountRow }] = await db('orders')
-                .where({ pandit_id: panditId })
-                .whereIn('status', ['continue'])
-                .count('* as count');
-            const panditCount = Number(panditCountRow) || 0;
-            is_available = false
-            console.log("panditCount", panditCount);
-            if (panditCount == 0) {
-                is_available = true
-            }
+            // const [{ count: panditCountRow }] = await db('orders')
+            //     .where({ pandit_id: panditId })
+            //     .whereIn('status', ['continue'])
+            //     .count('* as count');
+            // const panditCount = Number(panditCountRow) || 0;
+            // is_available = false
+            // console.log("panditCount", panditCount);
+            // if (panditCount == 0) {
+            //     is_available = true
+            // }
             // if (panditCount > 0) {
             //     message = {
             //         token,
