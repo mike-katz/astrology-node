@@ -9,6 +9,7 @@ const { channelLeave, geneateToken } = require('./agoraController');
 const { sendBulkPush } = require('./reviewController');
 const { uploadImageTos3 } = require('./uploader');
 const { emitCallDurationUpdate } = require('../callSocket');
+const { replaceTemplate } = require('../utils/replaceTemplate');
 
 async function getRoom(req, res) {
     logger.info('chat_getRoom', { userId: req.userId });
