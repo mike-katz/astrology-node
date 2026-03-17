@@ -35,6 +35,7 @@ async function getPandits(req, res) {
             "p.deleted_at": null
         }
         const authHeader = req.headers.authorization;
+        let isFree = false
         if (authHeader) {
             const token = authHeader?.split(' ')[1];
             if (token) {
@@ -50,7 +51,7 @@ async function getPandits(req, res) {
                             .count('* as count')
                             .where({ user_id: username })
                             .whereIn('status', ['continue', 'completed', 'pending']);
-                        const isFree = count == 0 ? true : false;
+                        isFree = count == 0 ? true : false;
                         if (isFree) {
                             const userData = await db('users').select('language').where({ id: Number(username) }).first();
                             if (userData) {
@@ -312,6 +313,9 @@ async function getPandits(req, res) {
             console.log("inside if");
             const newLimit = 100 - user?.length
             console.log("newLimit", newLimit);
+            if (isFree) {
+                filter.unlimited_free_calls_chats = true
+            }
             const query = db('pandits as p')
                 //.distinctOn('p.id')
                 .select(
@@ -339,6 +343,13 @@ async function getPandits(req, res) {
                     'p.chat_call_rate',
                 ).where(filter)
                 .limit(newLimit)
+            if (!isFree) {
+                query.andWhere(function () {
+                    this.where('p.unlimited_free_calls_chats', true)
+                        .orWhere('p.chat', true)
+                        .orWhere('p.call', true);
+                });
+            }
             query.orderByRaw('RANDOM()');
             const newUser = await query;
             user = [...user, ...newUser]
