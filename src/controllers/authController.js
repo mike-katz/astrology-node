@@ -219,4 +219,15 @@ async function sendCall(req, res) {
     }
 }
 
-module.exports = { register, login, verifyOtp, socialUrl, getSettings, sendCall };
+async function test(req, res) {
+    try {
+        res.status(200).json({ success: true, message: "test" });
+
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
+
+module.exports = { register, login, verifyOtp, socialUrl, getSettings, sendCall, test };

@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { body } = require('express-validator');
-const { register, login, verifyOtp, socialUrl, getSettings, sendCall } = require('../controllers/authController');
+const { register, login, verifyOtp, socialUrl, getSettings, sendCall, test } = require('../controllers/authController');
 
 router.get('/setting', getSettings);
 
@@ -19,4 +19,6 @@ router.post('/login', login);
 router.post('/verifyOtP', verifyOtp);
 router.get('/config', socialUrl);
 router.post('/test-call', sendCall);
+router.get('/test', test);
+
 module.exports = router;
