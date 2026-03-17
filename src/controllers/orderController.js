@@ -376,7 +376,7 @@ async function createFreeChat(req, res) {
 }
 
 async function sendNotification(token, username, chat_call_rate, panditId, type, is_available = false, is_free = false) {
-    console.log("is_available", is_available);
+    logger.info("is_available", is_available);
     try {
         const filter = {
             type: 'pandit', status: 'active'
@@ -394,14 +394,14 @@ async function sendNotification(token, username, chat_call_rate, panditId, type,
             filter.message_type = 'Free Call Request'
         }
         const template = await db('templates').where(filter).first();
-        console.log("template", template);
+        logger.info("template", template);
         if (!template) return true;
 
         const messages = replaceTemplate(template?.title, {
             user_name: username,
             pandit_rate: chat_call_rate
         })
-        console.log("messages", messages);
+        logger.info("messages", messages);
         if (token) {
             // console.log("start push notification");
             // const messages = `new ${type} request from ${username} (Rs ${chat_call_rate}/min).`
@@ -456,7 +456,7 @@ async function sendNotification(token, username, chat_call_rate, panditId, type,
             //     };
             // }
             // else {
-            console.log("inside else");
+            logger.info("inside else");
 
             message = {
                 token, // This must be the VoIP Token, not the standard FCM token
@@ -515,13 +515,14 @@ async function sendNotification(token, username, chat_call_rate, panditId, type,
             //     };
             // }
 
-            console.log("message", message);
+            logger.info("message", message);
             const response = await admin.messaging().send(message);
             // console.log("push notification response", response);
             // console.log("end push notification");
             return true;
         }
     } catch (e) {
+        logger.error("sendNotification error", e);
         return true;
     }
 }
