@@ -946,8 +946,9 @@ async function newCreateOrder(req, res) {
     }
 }
 
-async function sendNotification(token, username, chat_call_rate, panditId, type, is_available = false, is_free = false, order_id, user_id) {
+async function sendNotification(token, username, chat_call_rate, type, is_available = false, is_free = false, order_id, user_id) {
     console.log("is_available", is_available);
+    console.log("order_id, user_id", order_id, user_id);
     try {
         const filter = {
             type: 'pandit', status: 'active'
