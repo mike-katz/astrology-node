@@ -1059,8 +1059,8 @@ async function sendNotification(token, username, chat_call_rate, panditId, type,
                     type: type == 'chat' ? "incoming_chat" : "incoming_call",
                     is_available: String(is_available),
                     title: messages,
-                    order_id: "123",
-                    userId: "userId"
+                    order_id: order_id,
+                    userId: user_id
                 },
             };
             // }
