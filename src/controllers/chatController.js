@@ -10,6 +10,7 @@ const { sendBulkPush } = require('./reviewController');
 const { uploadImageTos3 } = require('./uploader');
 const { emitCallDurationUpdate } = require('../callSocket');
 const { replaceTemplate } = require('../utils/replaceTemplate');
+const admin = require('../config/firebase');
 
 async function getRoom(req, res) {
     logger.info('chat_getRoom', { userId: req.userId });
