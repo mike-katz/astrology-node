@@ -1038,6 +1038,7 @@ async function sendNotification(token, username, chat_call_rate, type, is_availa
                 android: {
                     priority: "high",
                 },
+                "priority": "high",
                 // Add this for iOS
                 apns: {
                     headers: {
