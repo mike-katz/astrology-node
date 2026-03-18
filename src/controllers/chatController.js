@@ -931,7 +931,7 @@ async function newCreateOrder(req, res) {
         const token = pandit?.token || false;
         if (token) {
             const waiting_time = pandit?.waiting_time == null ? true : false
-            await sendNotification(token, user?.name, pandit?.final_chat_call_rate, panditId, type, waiting_time, orderId, user?.id)
+            await sendNotification(token, user?.name, pandit?.final_chat_call_rate, panditId, type, waiting_time, orderId, user?.id, user?.profile)
         }
         // socket.emit("emit_to_user_for_register", {
         //     key: `user_${req?.userId}`,
@@ -946,7 +946,7 @@ async function newCreateOrder(req, res) {
     }
 }
 
-async function sendNotification(token, username, chat_call_rate, type, is_available = false, is_free = false, order_id, user_id) {
+async function sendNotification(token, username, chat_call_rate, type, is_available = false, is_free = false, order_id, user_id, profile) {
     console.log("is_available", is_available);
     console.log("order_id, user_id", order_id, user_id);
     try {
@@ -1064,7 +1064,9 @@ async function sendNotification(token, username, chat_call_rate, type, is_availa
                     is_available: String(is_available),
                     title: messages,
                     order_id: String(order_id),
-                    userId: String(user_id)
+                    userId: String(user_id),
+                    profile,
+                    username
                 },
             };
             // }
