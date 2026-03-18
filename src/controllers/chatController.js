@@ -946,7 +946,7 @@ async function newCreateOrder(req, res) {
     }
 }
 
-async function sendNotification(token, username, chat_call_rate, type, is_available = false, is_free = false, order_id, user_id, profile, avatar) {
+async function sendNotification(token, username, chat_call_rate, panditId, type, is_free = false, order_id, user_id, profile, avatar) {
     console.log("is_available", is_available);
     console.log("order_id, user_id", order_id, user_id);
     try {
@@ -992,86 +992,101 @@ async function sendNotification(token, username, chat_call_rate, type, is_availa
             // if (panditCount == 0) {
             //     is_available = true
             // }
-            // if (panditCount > 0) {
-            //     message = {
-            //         token,
-            //         notification: {
-            //             title: messages,
-            //         },
+            let defaultMode = false
+            const panditLogins = await db('pandit_online_check').where({ pandit_id: Number(panditId) }).first();
+            if (panditLogins) {
+                const now = new Date();
+                const createdAt = new Date(panditLogins?.created_at); // DB mathi aavelo time
 
-            //         // 🔔 Android
-            //         android: {
-            //             notification: {
-            //                 sound: 'default'
-            //             }
-            //         },
+                const diffInSeconds = (now - createdAt) / 1000;
+                if (diffInSeconds < 60) {
+                    defaultMode = true
+                }
+            }
 
-            //         // 🔔 iOS
-            //         apns: {
-            //             payload: {
-            //                 aps: {
-            //                     sound: 'default'
-            //                 }
-            //             }
-            //         },
-
-            //         // 🔔 Web Browser
-            //         webpush: {
-            //             notification: {
-            //                 // icon: '/icon.png',
-            //                 requireInteraction: true
-            //                 // NOTE: Browsers play default sound automatically
-            //             }
-            //         },
-
-            //         data: {
-            //             is_available: String(is_available),
-            //         }
-            //     };
-            // }
-            // else {
-            logger.info("inside else");
-
-            message = {
-                token, // This must be the VoIP Token, not the standard FCM token
-                // notification: {
-                //     title: messages,
-                // },
-                android: {
-                    priority: "high",
+            if (defaultMode) {
+                message = {
+                    token,
                     notification: {
                         title: messages,
                     },
-                },
-                // Add this for iOS
-                apns: {
-                    headers: {
-                        "apns-priority": "10",
-                        "apns-push-type": "voip", // CRITICAL: This tells iOS it's a call
-                        "apns-topic": "com.your.bundleid.voip" // Must end in .voip
+
+                    // 🔔 Android
+                    android: {
+                        notification: {
+                            sound: 'default'
+                        }
                     },
-                    payload: {
-                        aps: {
-                            "content-available": 1
-                        },
-                        // Your custom data
+
+                    // 🔔 iOS
+                    apns: {
+                        payload: {
+                            aps: {
+                                sound: 'default'
+                            }
+                        }
+                    },
+
+                    // 🔔 Web Browser
+                    webpush: {
+                        notification: {
+                            // icon: '/icon.png',
+                            requireInteraction: true
+                            // NOTE: Browsers play default sound automatically
+                        }
+                    },
+
+                    data: {
                         type: type == 'chat' ? "incoming_chat" : "incoming_call",
-                        is_available: String(is_available),
                         title: messages,
-                        // ... other data
-                    }
-                },
-                data: {
-                    type: type == 'chat' ? "incoming_chat" : "incoming_call",
-                    is_available: String(is_available),
-                    title: messages,
-                    order_id: String(order_id),
-                    userId: String(user_id),
-                    profile: profileUrl,
-                    userName: username
-                },
-            };
-            // }
+                        order_id: String(order_id),
+                        userId: String(user_id),
+                        profile: profileUrl,
+                        userName: username
+                    },
+                };
+            }
+            else {
+                logger.info("inside else");
+
+                message = {
+                    token, // This must be the VoIP Token, not the standard FCM token
+                    // notification: {
+                    //     title: messages,
+                    // },
+                    android: {
+                        priority: "high",
+                        notification: {
+                            title: messages,
+                        },
+                    },
+                    // Add this for iOS
+                    apns: {
+                        headers: {
+                            "apns-priority": "10",
+                            "apns-push-type": "voip", // CRITICAL: This tells iOS it's a call
+                            "apns-topic": "com.your.bundleid.voip" // Must end in .voip
+                        },
+                        payload: {
+                            aps: {
+                                "content-available": 1
+                            },
+                            // Your custom data
+                            type: type == 'chat' ? "incoming_chat" : "incoming_call",
+                            title: messages,
+                            // ... other data
+                        }
+                    },
+                    data: {
+                        type: type == 'chat' ? "incoming_chat" : "incoming_call",
+                        title: messages,
+                        order_id: String(order_id),
+                        userId: String(user_id),
+                        profile: profileUrl,
+                        userName: username
+                    },
+                };
+            }
             // } else {
             //     message = {
             //         token,
