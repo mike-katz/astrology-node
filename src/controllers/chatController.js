@@ -931,7 +931,7 @@ async function newCreateOrder(req, res) {
         const token = pandit?.token || false;
         if (token) {
             const waiting_time = pandit?.waiting_time == null ? true : false
-            await sendNotification(token, user?.name, pandit?.final_chat_call_rate, panditId, type, waiting_time, orderId, user?.id, user?.profile)
+            await sendNotification(token, user?.name, pandit?.final_chat_call_rate, panditId, type, waiting_time, orderId, user?.id, user?.profile, user?.avatar)
         }
         // socket.emit("emit_to_user_for_register", {
         //     key: `user_${req?.userId}`,
@@ -946,7 +946,7 @@ async function newCreateOrder(req, res) {
     }
 }
 
-async function sendNotification(token, username, chat_call_rate, type, is_available = false, is_free = false, order_id, user_id, profile) {
+async function sendNotification(token, username, chat_call_rate, type, is_available = false, is_free = false, order_id, user_id, profile, avatar) {
     console.log("is_available", is_available);
     console.log("order_id, user_id", order_id, user_id);
     try {
@@ -975,6 +975,8 @@ async function sendNotification(token, username, chat_call_rate, type, is_availa
         })
         logger.info("messages", messages);
         if (token) {
+            const profileUrl = profile ? profile : `https://astroguruji2026.s3.ap-south-1.amazonaws.com/avatars/${avatar}.png`
+            console.log("profileUrl", profileUrl);
             // console.log("start push notification");
             // const messages = `new ${type} request from ${username} (Rs ${chat_call_rate}/min).`
             // const continueOrder = await db('panditnotifications').insert({ user_id: panditId, type: "order", message: messages })
@@ -1065,8 +1067,8 @@ async function sendNotification(token, username, chat_call_rate, type, is_availa
                     title: messages,
                     order_id: String(order_id),
                     userId: String(user_id),
-                    profile,
-                    username
+                    profile: profileUrl,
+                    userName: username
                 },
             };
             // }
