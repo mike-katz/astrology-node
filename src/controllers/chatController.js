@@ -999,6 +999,7 @@ async function sendNotification(token, username, chat_call_rate, panditId, type,
                 const createdAt = new Date(panditLogins?.created_at); // DB mathi aavelo time
 
                 const diffInSeconds = (now - createdAt) / 1000;
+                console.log("diffInSeconds", diffInSeconds);
                 if (diffInSeconds < 60) {
                     defaultMode = true
                 }
