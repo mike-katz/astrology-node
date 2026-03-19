@@ -830,7 +830,7 @@ async function cancelOrder(req, res) {
             logger.info('order_cancelOrder fail', { userId: req.userId, orderId, message: 'You can not cancel this order.' });
             return res.status(400).json({ success: false, message: 'You can not cancel this order.' });
         }
-        const upd = {}
+        const upd = { order_action: 'user' }
         let status = 'cancel';
         if (!order?.is_accept) {
             upd.canceled_at = new Date()
@@ -968,7 +968,7 @@ async function callReject(req, res) {
         return res.status(400).json({ success: false, message: 'You can not cancel this order.' });
     }
     if (order?.type == "call" && order?.status == "pending") {
-        await db('orders').where({ id: order?.id }).update({ status: "cancel" });
+        await db('orders').where({ id: order?.id }).update({ status: "cancel", order_action: "user" });
     }
     callEvent("emit_to_call_rejected", {
         key: `pandit_${pandit_id}`,
