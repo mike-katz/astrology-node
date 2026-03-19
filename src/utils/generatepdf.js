@@ -61,7 +61,12 @@ async function generateInvoicePDF(data) {
     const browser = await puppeteer.launch({
         headless: 'new',
         // executablePath: '/snap/bin/chromium',
-        executablePath: '/snap/chromium/current/usr/lib/chromium-browser/chrome',
+        executablePath: '/snap/chromium/3390/usr/lib/chromium-browser/chrome',
+        env: {
+            ...process.env,
+            LD_LIBRARY_PATH: '/snap/chromium/3390/usr/lib/chromium-browser/libs:/snap/chromium/3390/lib/x86_64-linux-gnu:/snap/core22/current/lib/x86_64-linux-gnu',
+            FONTCONFIG_PATH: '/snap/chromium/3390/etc/fonts',
+        },
         args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
