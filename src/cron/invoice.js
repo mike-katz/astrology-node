@@ -29,55 +29,65 @@ function numberToIndianWords(amount) {
 }
 const runInvoiceCron = async () => {
     try {
-        const paymentRow = await db('payments')
+        const payments = await db('payments')
             .where({ status: 'success' })
+            .whereNotNull('transaction_id')
             .where(function () {
                 this.whereNull('invoice').orWhere('invoice', '');
             })
-            .orderBy('id', 'desc')
-            .first();
+            .orderBy('id', 'asc');
 
-        if (!paymentRow) {
-            console.log('[InvoiceCron] No payment with status success and invoice null. Skip.');
+        if (!payments || payments.length === 0) {
+            console.log('[InvoiceCron] No payment with status success, invoice null, and transaction_id not null. Skip.');
             return;
         }
 
-        const user = await db('users').where({ id: paymentRow.user_id }).first();
-        if (!user) {
-            console.warn('[InvoiceCron] User not found for payment id', paymentRow.id);
-            return;
+        let processed = 0;
+        for (const paymentRow of payments) {
+            try {
+                const user = await db('users').where({ id: paymentRow.user_id }).first();
+                if (!user) {
+                    console.warn('[InvoiceCron] User not found for payment id', paymentRow.id);
+                    continue;
+                }
+
+                const gst = Number(paymentRow?.gst) || 0;
+                const with_tax_amount = Number(Number(gst) + Number(paymentRow?.amount)).toFixed(2);
+                const total_in_word = numberToIndianWords(Number(with_tax_amount));
+
+                const data = {
+                    transaction_id: paymentRow.transaction_id || '',
+                    utr: paymentRow.utr || paymentRow.transaction_id || '',
+                    amount: Number(paymentRow?.amount).toFixed(2),
+                    with_tax_amount: String(with_tax_amount),
+                    gst: Number(gst).toFixed(2),
+                    city: user?.city_state_country || '',
+                    pincode: user?.pincode || '',
+                    total_in_word,
+                };
+
+                const invoice = await generateInvoicePDF(data);
+                await db('payments').where({ id: paymentRow.id }).update({ invoice });
+
+                const balanceLog = await db('balancelogs')
+                    .where({ user_id: paymentRow.user_id })
+                    .where('message', 'like', `%${paymentRow.transaction_id}%`)
+                    .where(function () {
+                        this.whereNull('invoice').orWhere('invoice', '');
+                    })
+                    .first();
+                if (balanceLog) {
+                    await db('balancelogs').where({ id: balanceLog.id }).update({ invoice });
+                }
+
+                processed++;
+                console.log('[InvoiceCron] Processed payment id', paymentRow.id);
+            } catch (err) {
+                console.error(`[InvoiceCron] Error processing payment id ${paymentRow.id}:`, err?.message);
+            }
         }
 
-        const gst = Number(paymentRow?.gst) || 0;
-        const with_tax_amount = Number(Number(gst) + Number(paymentRow?.amount)).toFixed(2);
-        const total_in_word = numberToIndianWords(Number(with_tax_amount));
-
-        const data = {
-            transaction_id: paymentRow.transaction_id || '',
-            utr: paymentRow.utr || paymentRow.transaction_id || '',
-            amount: Number(paymentRow?.amount).toFixed(2),
-            with_tax_amount: String(with_tax_amount),
-            gst: Number(gst).toFixed(2),
-            city: user?.city_state_country || '',
-            pincode: user?.pincode || '',
-            total_in_word,
-        };
-
-        const invoice = await generateInvoicePDF(data);
-        await db('payments').where({ id: paymentRow.id }).update({ invoice });
-
-        const balanceLog = await db('balancelogs')
-            .where({ user_id: paymentRow.user_id })
-            .where('message', 'like', `%${paymentRow.transaction_id || paymentRow.id}%`)
-            .where(function () {
-                this.whereNull('invoice').orWhere('invoice', '');
-            })
-            .first();
-        if (balanceLog) {
-            await db('balancelogs').where({ id: balanceLog.id }).update({ invoice });
-        }
-
-        console.log('[InvoiceCron] Processed 1 payment, invoice updated for payment id', paymentRow.id);
+        console.log(`[InvoiceCron] Completed. Processed ${processed} out of ${payments.length} payment(s).`);
     } catch (err) {
         console.error('[InvoiceCron] error:', err?.message);
     }
