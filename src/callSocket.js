@@ -140,12 +140,22 @@ function connect() {
                 console.log("call?.status", call?.status);
                 if (call?.status == 'Call Initiated') {
                     status = 'Astrologer Rejected'
+                    await db('orders').where({ id: order?.id }).update({ status: "cancel" });
+                    callEvent("emit_to_pending_order", {
+                        key: `pandit_${pandit_id}`,
+                        payload: { pandit_id: pandit_id }
+                    });
                     newEventSocket.push({ event: 'emit_to_call_order_reject_astrologer', key: `user_${user_id}` })
                     newEventSocket.push({ event: 'emit_to_call_order_reject_astrologer', key: `pandit_${pandit_id}` })
                 }
 
                 if (call?.status == 'Astrologer Accepted') {
                     status = 'User Rejected'
+                    await db('orders').where({ id: order?.id }).update({ status: "rejected" });
+                    callEvent("emit_to_pending_order", {
+                        key: `pandit_${pandit_id}`,
+                        payload: { pandit_id: pandit_id }
+                    });
                     newEventSocket.push({ event: 'emit_to_call_order_reject_user', key: `pandit_${pandit_id}` })
                     newEventSocket.push({ event: 'emit_to_call_order_reject_user', key: `user_${user_id}` })
                 }
