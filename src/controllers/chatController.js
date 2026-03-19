@@ -431,7 +431,7 @@ function getDuration(start_time, end_time) {
     return diffMinutes
 }
 
-async function balanceCut(user_id, order, end_time, place) {
+async function balanceCut(user_id, order, end_time, place, action = 'system') {
     logger.info('balancecut called', { user_id, orderId: order?.order_id });
     try {
         const transaction = await db('balancelogs').where({ order_id: order?.order_id }).first();
@@ -532,7 +532,7 @@ async function balanceCut(user_id, order, end_time, place) {
         if (!isFree) {
             await db('users').where({ id: user_id }).update({ balance: newBalance });
         }
-        await db('orders').where({ id: order.id }).update({ status: "completed", deduction, duration: diffMinutes, end_time: new Date(end_time) });
+        await db('orders').where({ id: order.id }).update({ status: "completed", deduction, duration: diffMinutes, end_time: new Date(end_time), order_action: action });
         upd.balance = panditAmount
         logger.info('balancecut function -> pandit update param', { ...upd, pandit_id: order.pandit_id })
         await db('pandits').where({ id: order.pandit_id }).increment(upd).update({ waiting_time: null });
@@ -605,7 +605,7 @@ async function endChat(req, res) {
                 now = order.end_time
             }
         }
-        const result = await balanceCut(req.userId, order, now, "user -> chat end");
+        const result = await balanceCut(req.userId, order, now, "user -> chat end", 'user');
         if (!result) {
             logger.info('chat_endChat fail', { userId: req.userId, orderId, message: 'Something went wrong.' });
             return res.status(400).json({ success: false, message: 'Something went wrong.' });
@@ -661,7 +661,7 @@ async function forceEndChat(req, res) {
             return res.status(400).json({ success: false, message: 'Order is ongoing.' });
         }
 
-        const result = await balanceCut(req.userId, order, order?.end_time, 'user -> force end');
+        const result = await balanceCut(req.userId, order, order?.end_time, 'user -> force end', 'user');
         if (!result) {
             logger.info('chat_forceEndChat fail', { userId: req.userId, orderId, message: 'Something went wrong.' });
             return res.status(400).json({ success: false, message: 'Something went wrong.' });
