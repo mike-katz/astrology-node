@@ -542,6 +542,10 @@ async function balanceCut(user_id, order, end_time, place) {
                 payload: { pandit_id: order?.pandit_id }
             });
         }
+        callEvent("emit_to_order_completed", {
+            key: `user_${order?.user_id}`,
+            payload: { order_id: order?.order_id }
+        });
 
         if (!isFree) {
             await db('users').where({ id: user_id }).update({ balance: newBalance });
@@ -1040,7 +1044,7 @@ async function sendNotification(token, username, chat_call_rate, panditId, type,
                     data: {
                         type: type == 'chat' ? "incoming_chat" : "incoming_call",
                         title: messages,
-                        order_id: String(order_id),
+                        orderId: String(order_id),
                         userId: String(user_id),
                         profile: profileUrl,
                         userName: username
