@@ -1220,7 +1220,7 @@ async function orderAccept(req, res) {
         if (order?.profile_id && order.type == 'chat') {
             const profile = await db('userprofiles').where({ id: order?.profile_id }).first();
 
-            let message = `Hello ${order?.display_name},\n Below are my details:
+            let message = `Hello ${order?.display_name},\nBelow are my details:
 Name: ${formatValue(profile?.name)} 
 Gender: ${formatValue(profile?.gender)} 
 DOB: ${formatDOB(profile?.dob)} 
