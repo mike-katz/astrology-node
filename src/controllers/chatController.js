@@ -941,6 +941,18 @@ async function newCreateOrder(req, res) {
         //     key: `user_${req?.userId}`,
         //     payload: [{ ...saved, name: pandit?.name, profile: pandit?.profile }],
         // });
+
+        axios({
+            method: 'post',
+            url: process.env.ADMIN_CALLBACK_URL,
+            data: {
+                name: pandit?.display_name,
+                id: pandit?.id,
+                mobile: pandit?.mobile,
+                order_id: orderId,
+                type: "astrologer"
+            }
+        });
         logger.info('order_create success', { userId: req.userId, orderId, panditId, type });
         return res.status(200).json({ success: true, data: { orderId }, message: 'Order create Successfully' });
     } catch (err) {
