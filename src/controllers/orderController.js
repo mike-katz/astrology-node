@@ -211,9 +211,11 @@ async function create(req, res) {
         // console.log("order inserted", saved);
 
         // console.log("start socket call");
-
         const profile = await db('userprofiles').where({ id: Number(profile_id) }).first();
 
+        if (count == 0) {
+            sendAutoMessage(profile, req.userId, orderId, panditId);
+        }
         callEvent("emit_to_user_for_register", {
             key: `user_${req?.userId}`,
             payload: [{ ...saved, name: pandit?.display_name, profile: pandit?.profile, profile_name: profile?.name }]
@@ -836,7 +838,7 @@ async function cancelOrder(req, res) {
             logger.info('order_cancelOrder fail', { userId: req.userId, orderId, message: 'You can not cancel this order.' });
             return res.status(400).json({ success: false, message: 'You can not cancel this order.' });
         }
-        const upd = {}
+        const upd = { order_action: 'user' }
         let status = 'cancel';
         if (!order?.is_accept) {
             upd.canceled_at = new Date()
@@ -974,7 +976,7 @@ async function callReject(req, res) {
         return res.status(400).json({ success: false, message: 'You can not cancel this order.' });
     }
     if (order?.type == "call" && order?.status == "pending") {
-        await db('orders').where({ id: order?.id }).update({ status: "cancel" });
+        await db('orders').where({ id: order?.id }).update({ status: "cancel", order_action: "user" });
     }
     callEvent("emit_to_call_rejected", {
         key: `pandit_${pandit_id}`,
