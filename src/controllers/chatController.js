@@ -1221,12 +1221,12 @@ async function orderAccept(req, res) {
             const profile = await db('userprofiles').where({ id: order?.profile_id }).first();
 
             let message = `Hello ${order?.display_name},\n Below are my details:
-    Name: ${formatValue(profile?.name)} 
-    Gender: ${formatValue(profile?.gender)} 
-    DOB: ${formatDOB(profile?.dob)} 
-    Birth Time: ${profile?.birth_time} 
-    Birth Place: ${formatValue(profile?.birth_place)} 
-    Marital Status: ${formatValue(profile?.marital_status)} \n`;
+Name: ${formatValue(profile?.name)} 
+Gender: ${formatValue(profile?.gender)} 
+DOB: ${formatDOB(profile?.dob)} 
+Birth Time: ${profile?.birth_time} 
+Birth Place: ${formatValue(profile?.birth_place)} 
+Marital Status: ${formatValue(profile?.marital_status)} \n`;
             if (profile?.occupation) {
                 message += `    Occupation: ${formatValue(profile?.occupation)}\n`
             }
