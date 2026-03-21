@@ -14,16 +14,15 @@ const { generateTwilioVoiceToken } = require('../utils/twilioVoiceToken');
  */
 async function getVoiceAccessToken(req, res) {
     try {
-        const userId = req.userId;
+        const { userId, role } = req.query
         if (userId == null) {
             return res.status(401).json({ success: false, message: 'Unauthorized' });
         }
 
-        const role = String(req.query.role || 'user').toLowerCase();
         const identity =
             role === 'pandit' ? `pandit_${userId}` : `user_${userId}`;
 
-        let ttlSeconds = parseInt(req.query.ttl, 10);
+        let ttlSeconds = parseInt(10000, 10);
         if (Number.isNaN(ttlSeconds)) ttlSeconds = undefined;
 
         const twimlOverride =
