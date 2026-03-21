@@ -267,4 +267,10 @@ async function razorpay(req, res) {
     }
 }
 
-module.exports = { razorpay };
+async function twilio(req, res) {
+    logger.info('twilio callback start');
+    logger.info("req.body", req.body)
+    logger.info("req.query", req.query)
+}
+
+module.exports = { razorpay, twilio };
