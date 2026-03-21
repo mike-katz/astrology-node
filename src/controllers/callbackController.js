@@ -4,6 +4,7 @@ require('dotenv').config();
 const generateInvoicePDF = require('../utils/generatepdf');
 const { callEvent } = require('../socket');
 const path = require('path');
+const { emitCallDurationUpdate } = require('../callSocket');
 const logger = require('log4js').getLogger(path.parse(__filename).name);
 
 function numberToIndianWords(amount) {
@@ -238,6 +239,14 @@ async function razorpay(req, res) {
                 callEvent('emit_to_user_call_end_time', { key: `user_${order.user_id}`, payload: { startTime: order.start_time, endTime, orderId: order.order_id } });
             }
             callEvent('emit_to_pending_order', { key: `pandit_${order.pandit_id}`, payload: { pandit_id: order.pandit_id } });
+
+            // normal call event start
+            if (order?.call_id) {
+                const currentTime = new Date();
+                const diffInSec = Math.floor((endTime - currentTime) / 1000);
+                console.log(diffInSec);
+                emitCallDurationUpdate(order?.call_id, diffInSec)
+            }
         }
 
         const invoice = await generateInvoicePDF(data);
