@@ -29,6 +29,7 @@ const callBackRoutes = require('./routes/callback');
 const multer = require('multer');
 const RedisCache = require('./config/redisClient');
 const agoraRoutes = require('./routes/agora');
+const twilioVoiceRoutes = require('./routes/twilioVoice');
 const chatRoutes = require('./routes/chat');
 const { decryptRequest } = require('./middleware/decryptRequest.js');
 const { encryptResponse } = require('./middleware/encryptResponse.js')
@@ -70,6 +71,7 @@ app.use('/profile', profileRoutes);
 app.use('/payment', paymentRoutes);
 app.use('/support-ticket', supportTicketRoutes);
 app.use('/agora', agoraRoutes);
+app.use('/twilio/voice', twilioVoiceRoutes);
 
 
 app.use((err, req, res, next) => {
