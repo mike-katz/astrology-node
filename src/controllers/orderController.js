@@ -213,9 +213,9 @@ async function create(req, res) {
         // console.log("start socket call");
         const profile = await db('userprofiles').where({ id: Number(profile_id) }).first();
 
-        if (count == 0) {
-            sendAutoMessage(profile, req.userId, orderId, panditId);
-        }
+        // if (count == 0) {
+        //     sendAutoMessage(profile, req.userId, orderId, panditId);
+        // }
         callEvent("emit_to_user_for_register", {
             key: `user_${req?.userId}`,
             payload: [{ ...saved, name: pandit?.display_name, profile: pandit?.profile, profile_name: profile?.name }]
