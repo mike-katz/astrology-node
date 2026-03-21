@@ -43,6 +43,7 @@ app.use(express.json());
 
 app.use('/callback', callBackRoutes);
 app.use('/newKundli', freeKundliRoutes);
+app.use('/twilio/voice', twilioVoiceRoutes);
 app.use(decryptRequest);
 app.use(encryptResponse);
 RedisCache.initializeRedis();
@@ -60,7 +61,6 @@ app.use('/call', authRoutes);
 
 // app.use('/agora', agoraRoutes);
 
-
 app.use(auth)
 app.use('/chat', chatRoutes);
 app.use('/order', orderRoutes);
@@ -71,7 +71,6 @@ app.use('/profile', profileRoutes);
 app.use('/payment', paymentRoutes);
 app.use('/support-ticket', supportTicketRoutes);
 app.use('/agora', agoraRoutes);
-app.use('/twilio/voice', twilioVoiceRoutes);
 
 
 app.use((err, req, res, next) => {
