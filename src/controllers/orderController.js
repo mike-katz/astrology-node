@@ -524,89 +524,116 @@ async function sendNotification(token, username, chat_call_rate, panditId, type,
     }
 }
 
+/** DISTINCT ON sort key — same as CASE in ORDER BY */
+const ORDER_LIST_STATUS_RANK_SQL = `
+  CASE trim(o.status)
+    WHEN 'continue' THEN 1
+    WHEN 'pending' THEN 2
+    WHEN 'completed' THEN 3
+    ELSE 4
+  END
+`;
+
+const ORDER_LIST_MAX_LIMIT = 100;
+
+/**
+ * Order list: one row per pandit, last chat per order.
+ * Perf: subquery DISTINCT ON first (no full chats denormalized join on every order row);
+ * LATERAL limits chat work to final page rows; count + list in parallel.
+ * DB: indexes on orders (user_id, pandit_id, …) and chats (order_id, id) help a lot — add in your DB if missing.
+ * Optional: ?skip_last_message=1 — faster list if client does not need last_message JSON.
+ */
 async function list(req, res) {
     const { type } = req.query || {};
-    logger.info('order_list', { userId: req.userId, type });
+    const skipLastMessage = String(req.query.skip_last_message || '') === '1';
+    logger.info('order_list', { userId: req.userId, type, skipLastMessage });
     try {
-        let page = parseInt(req.query.page) || 1;
-        let limit = parseInt(req.query.limit) || 20;
+        let page = parseInt(req.query.page, 10) || 1;
+        let limit = parseInt(req.query.limit, 10) || 20;
 
         if (page < 1) page = 1;
         if (limit < 1) limit = 20;
-        const filter = { 'o.user_id': req.userId, 'o.deleted_at': null }
+        if (limit > ORDER_LIST_MAX_LIMIT) limit = ORDER_LIST_MAX_LIMIT;
+
+        const filter = { 'o.user_id': req.userId, 'o.deleted_at': null };
         if (type) {
-            filter['o.type'] = type
+            filter['o.type'] = type;
         }
         const offset = (page - 1) * limit;
-        const order = await db('orders as o')
-            .distinctOn('o.pandit_id')
-            .where(filter)
-            .andWhereNot('o.status', 'cancel')
-            .leftJoin('pandits as p', 'p.id', 'o.pandit_id')
-            .leftJoin(
-                db.raw(`
-            (
-              SELECT DISTINCT ON (order_id)
-                *
-              FROM chats
-              WHERE order_id IS NOT NULL AND deleted_at IS NULL AND is_system_generate IS NULL
-              ORDER BY order_id, id DESC
-            ) c
-          `),
-                'c.order_id',
-                'o.order_id'
-            )
 
-            // IMPORTANT: distinctOn column MUST be first in ORDER BY
+        const statusRank = db.raw(ORDER_LIST_STATUS_RANK_SQL);
+
+        const oneOrderPerPandit = db('orders as o')
+            .select('o.*')
+            .where(filter)
+            .whereNot('o.status', 'cancel')
+            .distinctOn('o.pandit_id')
             .orderBy([
                 { column: 'o.pandit_id', order: 'asc' },
-                {
-                    column: db.raw(`
-              CASE trim(o.status)
-                WHEN 'continue' THEN 1
-                WHEN 'pending' THEN 2
-                WHEN 'completed' THEN 3
-                ELSE 4
-              END
-            `),
-                    order: 'asc'
-                },
-                { column: 'o.id', order: 'desc' } // latest order per pandit
+                { column: statusRank, order: 'asc' },
+                { column: 'o.id', order: 'desc' },
+            ]);
+
+        let listQb = db.from(oneOrderPerPandit.as('o')).leftJoin('pandits as p', 'p.id', 'o.pandit_id');
+
+        if (!skipLastMessage) {
+            listQb = listQb.joinRaw(
+                `LEFT JOIN LATERAL (
+                  SELECT c.id, c.message, c.sender_type, c.sender_id, c.receiver_type, c.receiver_id,
+                         c.type, c.status, c.created_at, c.receiver_delete, c.sender_delete, c.is_system_generate
+                  FROM chats c
+                  WHERE c.order_id = o.order_id
+                    AND c.deleted_at IS NULL
+                    AND c.is_system_generate IS NULL
+                  ORDER BY c.id DESC
+                  LIMIT 1
+                ) AS c ON true`
+            );
+        }
+
+        const lastMessageSelect = skipLastMessage
+            ? db.raw('NULL::json as last_message')
+            : db.raw(`
+                CASE
+                    WHEN c.id IS NOT NULL THEN
+                        json_build_object(
+                            'id', c.id,
+                            'message', c.message,
+                            'sender_type', c.sender_type,
+                            'sender_id', c.sender_id,
+                            'receiver_type', c.receiver_type,
+                            'receiver_id', c.receiver_id,
+                            'type', c.type,
+                            'status', c.status,
+                            'created_at', c.created_at,
+                            'receiver_delete', c.receiver_delete,
+                            'sender_delete', c.sender_delete,
+                            'is_system_generate', c.is_system_generate
+                        )
+                    ELSE NULL
+                END as last_message
+            `);
+
+        const listPromise = listQb
+            .clone()
+            .select('o.*', 'p.display_name as name', 'p.profile', 'p.online', 'p.tag', lastMessageSelect)
+            .orderBy([
+                { column: 'o.pandit_id', order: 'asc' },
+                { column: db.raw(ORDER_LIST_STATUS_RANK_SQL), order: 'asc' },
+                { column: 'o.id', order: 'desc' },
             ])
-            .select(
-                'o.*',
-                'p.display_name as name',
-                'p.profile',
-                'p.online',
-                'p.tag',
-                db.raw(`
-                    CASE 
-                        WHEN c.id IS NOT NULL THEN
-                            json_build_object(
-                                'id', c.id,
-                                'message', c.message,
-                                'sender_type', c.sender_type,
-                                'sender_id', c.sender_id,
-                                'receiver_type', c.receiver_type,
-                                'receiver_id', c.receiver_id,
-                                'type', c.type,
-                                'status', c.status,
-                                'created_at', c.created_at,
-                                'receiver_delete', c.receiver_delete,
-                                'sender_delete', c.sender_delete,
-                                'is_system_generate', c.is_system_generate
-                            )
-                        ELSE NULL
-                    END as last_message
-                `)
-            )
             .limit(limit)
             .offset(offset);
-        const [{ count }] = await db('orders as o')
+
+        const countPromise = db('orders as o')
             .where(filter)
+            .whereNot('o.status', 'cancel')
             .countDistinct('o.pandit_id as count');
 
-        const total = parseInt(count);
+        const [order, countRows] = await Promise.all([listPromise, countPromise]);
+
+        const count = countRows[0]?.count ?? 0;
+        const total = parseInt(count, 10);
         const totalPages = Math.ceil(total / limit);
 
         const response = {
@@ -614,8 +641,8 @@ async function list(req, res) {
             limit,
             total,
             totalPages,
-            results: order
-        }
+            results: order,
+        };
         logger.info('order_list success', { userId: req.userId });
         return res.status(200).json({ success: true, data: response, message: 'Order list Successfully' });
     } catch (err) {
