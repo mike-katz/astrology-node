@@ -4,6 +4,7 @@ const twilio = require('twilio');
 
 async function voice(req, res) {
     try {
+        console.log("here voice api");
         const VoiceResponse = require('twilio').twiml.VoiceResponse;
         const response = new VoiceResponse();
 
@@ -13,6 +14,7 @@ async function voice(req, res) {
         dial.client(req.body.To);
 
         res.type('text/xml');
+        console.log("response", response);
         res.send(response.toString());
     }
     catch (e) {
