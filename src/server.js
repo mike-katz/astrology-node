@@ -29,7 +29,6 @@ const callBackRoutes = require('./routes/callback');
 const multer = require('multer');
 const RedisCache = require('./config/redisClient');
 const agoraRoutes = require('./routes/agora');
-const twilioVoiceRoutes = require('./routes/twilioVoice');
 const chatRoutes = require('./routes/chat');
 const { decryptRequest } = require('./middleware/decryptRequest.js');
 const { encryptResponse } = require('./middleware/encryptResponse.js')
@@ -43,7 +42,6 @@ app.use(express.json());
 
 app.use('/callback', callBackRoutes);
 app.use('/newKundli', freeKundliRoutes);
-app.use('/twilio/voice', twilioVoiceRoutes);
 app.use(decryptRequest);
 app.use(encryptResponse);
 RedisCache.initializeRedis();
