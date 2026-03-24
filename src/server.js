@@ -39,7 +39,7 @@ const { encryptResponse } = require('./middleware/encryptResponse.js')
 app.get("/health", (req, res) => {
     res.status(200).send("user OK");
 });
-
+app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
 app.use('/callback', callBackRoutes);
