@@ -5,6 +5,7 @@ const twilio = require('twilio');
 async function voice(req, res) {
     try {
         console.log("here voice api");
+        console.log("req.body", req.body);
         const VoiceResponse = require('twilio').twiml.VoiceResponse;
         const response = new VoiceResponse();
 
