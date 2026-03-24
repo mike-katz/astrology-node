@@ -37,14 +37,14 @@ async function generateToken(req, res) {
 
         const token = new AccessToken(
             process.env.TWILIO_ACCOUNT_SID,
-            process.env.TWILIO_API_KEY,
-            process.env.TWILIO_API_SECRET,
+            process.env.TWILIO_API_KEY_SID,
+            process.env.TWILIO_API_KEY_SECRET,
             // { identity: `user_${req.userId}` } // user1, user2
             { identity: user_id } // user1, user2
         );
 
         const voiceGrant = new VoiceGrant({
-            outgoingApplicationSid: process.env.TWIML_APP_SID,
+            outgoingApplicationSid: process.env.TWILIO_TWIML_APP_SID,
             incomingAllow: true,
         });
 
