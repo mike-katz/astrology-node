@@ -24,6 +24,8 @@ const faqRoutes = require('./routes/faq');
 const blogRoutes = require('./routes/blog');
 const bannerRoutes = require('./routes/banners');
 const callBackRoutes = require('./routes/callback');
+const twilloVoiceRoutes = require('./routes/twilioVoice');
+const twilioRoutes = require('./routes/twilio');
 
 // const cors = require('cors');
 const multer = require('multer');
@@ -41,6 +43,8 @@ app.get("/health", (req, res) => {
 app.use(express.json());
 
 app.use('/callback', callBackRoutes);
+app.use('/voice', twilloVoiceRoutes);
+
 app.use('/newKundli', freeKundliRoutes);
 app.use(decryptRequest);
 app.use(encryptResponse);
@@ -69,6 +73,7 @@ app.use('/profile', profileRoutes);
 app.use('/payment', paymentRoutes);
 app.use('/support-ticket', supportTicketRoutes);
 app.use('/agora', agoraRoutes);
+app.use('/twilio', twilioRoutes);
 
 
 app.use((err, req, res, next) => {
