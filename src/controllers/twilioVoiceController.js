@@ -10,7 +10,10 @@ async function voice(req, res) {
         const VoiceResponse = require('twilio').twiml.VoiceResponse;
         const response = new VoiceResponse();
 
-        const dial = response.dial();
+        const dial = response.dial({
+            record: "record-from-answer",   // 👈 important
+            recordingStatusCallback: "https://beta.astroguruji.com/api/voice/recording"
+        });
 
         // one-to-one call
         dial.client(req.body.To);
@@ -28,7 +31,7 @@ async function voice(req, res) {
 
 async function generateToken(req, res) {
     try {
-
+        const { user_id = "user_1" } = req.query
         const AccessToken = twilio.jwt.AccessToken;
         const VoiceGrant = AccessToken.VoiceGrant;
 
@@ -36,7 +39,8 @@ async function generateToken(req, res) {
             process.env.TWILIO_ACCOUNT_SID,
             process.env.TWILIO_API_KEY,
             process.env.TWILIO_API_SECRET,
-            { identity: `user_${req.userId}` } // user1, user2
+            // { identity: `user_${req.userId}` } // user1, user2
+            { identity: user_id } // user1, user2
         );
 
         const voiceGrant = new VoiceGrant({
@@ -63,5 +67,10 @@ async function callback(req, res) {
     console.log("callback body param", req.body);
 }
 
+async function recording(req, res) {
+    console.log("recording query param", req.query);
+    console.log("recording body param", req.body);
+}
 
-module.exports = { voice, generateToken, fallback, callback };
+
+module.exports = { voice, generateToken, fallback, callback, recording };

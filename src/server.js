@@ -44,7 +44,7 @@ app.use(express.json());
 
 app.use('/callback', callBackRoutes);
 app.use('/voice', twilloVoiceRoutes);
-
+app.use('/twilio', twilioRoutes);
 app.use('/newKundli', freeKundliRoutes);
 app.use(decryptRequest);
 app.use(encryptResponse);
@@ -73,7 +73,7 @@ app.use('/profile', profileRoutes);
 app.use('/payment', paymentRoutes);
 app.use('/support-ticket', supportTicketRoutes);
 app.use('/agora', agoraRoutes);
-app.use('/twilio', twilioRoutes);
+
 
 
 app.use((err, req, res, next) => {
