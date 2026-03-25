@@ -1697,7 +1697,22 @@ async function callRemove(req, res) {
     logger.info('callRemove success', { userId: req.userId, order_id, pandit_id });
     return res.status(200).json({ success: true, data: null, message: 'remove successfully.' });
 }
+
+async function callEndAgora(req, res) {
+    const { order_id } = req.body || {};
+    logger.info('callEndAgora', { userId: req.userId, order_id });
+    const dd = await channelLeave(order_id)
+
+    // callEvent("emit_to_u_chat_order_call_end", {
+    //     key: `pandit_${pandit_id}`,
+    //     payload: { order_id }
+    // });
+
+    logger.info('callEndAgora success', { userId: req.userId, order_id });
+    return res.status(200).json({ success: true, data: null, message: 'remove successfully.' });
+}
+
 module.exports = {
     getRoom, getMessage, sendMessage, getDetail, getOrderDetail, endChat, forceEndChat, readMessage, deleteChat, getOrderChat,
-    newCreateOrder, orderAccept, orderCancel, orderReject, newOrderDetail, endOrder, createCall, rejectCall, initAgoraCall, callRemove
+    newCreateOrder, orderAccept, orderCancel, orderReject, newOrderDetail, endOrder, createCall, rejectCall, initAgoraCall, callRemove, callEndAgora
 };
