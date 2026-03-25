@@ -828,7 +828,7 @@ async function initAgoraCall(req, res) {
     });
 
     logger.info('initAgoraCall success', { userId: req.userId, order_id, pandit_id, response });
-    return res.status(200).json({ success: true, data: { ...response }, message: 'Call requested Successfully' });
+    return res.status(200).json(response);
 }
 
 module.exports = { getRoom, getMessage, sendMessage, getDetail, getOrderDetail, endChat, forceEndChat, readMessage, deleteChat, getOrderChat, initAgoraCall };
