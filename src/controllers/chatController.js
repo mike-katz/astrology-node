@@ -840,8 +840,8 @@ async function callRemove(req, res) {
         payload: { order_id }
     });
 
-    logger.info('initAgoraCall success', { userId: req.userId, order_id, pandit_id, response });
-    return res.status(200).json(response);
+    logger.info('callRemove success', { userId: req.userId, order_id, pandit_id });
+    return res.status(200).json({ success: true, data: null, message: 'remove successfully.' });
 }
 
 module.exports = { getRoom, getMessage, sendMessage, getDetail, getOrderDetail, endChat, forceEndChat, readMessage, deleteChat, getOrderChat, initAgoraCall, callRemove };
