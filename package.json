@@ -11,9 +11,10 @@
     "migrate:rollback": "knex migrate:rollback --knexfile knexfile.js"
   },
   "dependencies": {
+    "@azure/storage-blob": "^12.31.0",
     "agora-access-token": "^2.0.4",
     "aws-sdk": "^2.1691.0",
-    "axios": "^1.13.2",
+    "axios": "^1.13.6",
     "bcrypt": "^5.1.0",
     "cors": "^2.8.5",
     "crypto-js": "^4.2.0",

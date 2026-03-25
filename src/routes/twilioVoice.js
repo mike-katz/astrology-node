@@ -6,5 +6,6 @@ router.post('/', twilio.voice);
 router.post('/fallback', twilio.fallback);
 router.post('/callback', twilio.callback);
 router.post('/recording', twilio.recording);
+router.post('/status', twilio.completedStatus);
 
 module.exports = router;
