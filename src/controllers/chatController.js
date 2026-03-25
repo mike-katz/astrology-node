@@ -1657,7 +1657,47 @@ async function rejectCall(req, res) {
     }
 }
 
+async function initAgoraCall(req, res) {
+    const { order_id, pandit_id } = req.body || {};
+    logger.info('initAgoraCall', { userId: req.userId, order_id, pandit_id });
+    if (!order_id || !pandit_id) {
+        logger.info('initAgoraCall fail', { userId: req.userId, message: 'Missing params.' });
+        return res.status(400).json({ success: false, message: 'Missing params.' });
+    }
+    const response = await geneateToken(order_id);
+    if (!response?.success) {
+        return res.status(400).json({ success: false, message: response?.message });
+    }
+
+    const userData = await db('users').where({ id: Number(req.userId) }).select("profile", "avatar", 'name').first();
+    let profile = userData?.profile;
+    if (!profile) {
+        profile = `https://astroguruji2026.s3.ap-south-1.amazonaws.com/avatars/${userData?.avatar}.png`
+    }
+
+    console.log("{ order_id, username: userData?.name, profile }", { order_id, username: userData?.name, profile });
+    callEvent("emit_to_p_chat_order_call_incoming", {
+        key: `pandit_${pandit_id}`,
+        payload: { order_id, username: userData?.name, profile }
+    });
+
+    logger.info('initAgoraCall success', { userId: req.userId, order_id, pandit_id, response });
+    return res.status(200).json(response);
+}
+
+async function callRemove(req, res) {
+    const { order_id, pandit_id } = req.body || {};
+    logger.info('callRemove', { userId: req.userId, order_id, pandit_id });
+
+    callEvent("emit_to_u_chat_order_call_remove", {
+        key: `pandit_${pandit_id}`,
+        payload: { order_id }
+    });
+
+    logger.info('callRemove success', { userId: req.userId, order_id, pandit_id });
+    return res.status(200).json({ success: true, data: null, message: 'remove successfully.' });
+}
 module.exports = {
     getRoom, getMessage, sendMessage, getDetail, getOrderDetail, endChat, forceEndChat, readMessage, deleteChat, getOrderChat,
-    newCreateOrder, orderAccept, orderCancel, orderReject, newOrderDetail, endOrder, createCall, rejectCall
+    newCreateOrder, orderAccept, orderCancel, orderReject, newOrderDetail, endOrder, createCall, rejectCall, initAgoraCall, callRemove
 };
