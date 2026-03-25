@@ -821,13 +821,14 @@ async function initAgoraCall(req, res) {
         profile = `https://astroguruji2026.s3.ap-south-1.amazonaws.com/avatars/${userData?.avatar}.png`
     }
 
+    console.log("{ order_id, username: userData?.name, profile }", { order_id, username: userData?.name, profile });
     callEvent("emit_to_p_chat_order_call_incoming", {
         key: `pandit_${pandit_id}`,
         payload: { order_id, username: userData?.name, profile }
     });
 
     logger.info('initAgoraCall success', { userId: req.userId, order_id, pandit_id, response });
-    return res.status(200).json({ success: true, data: response, message: 'Call requested Successfully' });
+    return res.status(200).json({ success: true, data: { ...response }, message: 'Call requested Successfully' });
 }
 
 module.exports = { getRoom, getMessage, sendMessage, getDetail, getOrderDetail, endChat, forceEndChat, readMessage, deleteChat, getOrderChat, initAgoraCall };
