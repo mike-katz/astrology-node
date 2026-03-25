@@ -817,7 +817,7 @@ async function initAgoraCall(req, res) {
 
     const userData = await db('users').where({ id: Number(req.userId) }).select("profile", "avatar", 'name').first();
     let profile = userData?.profile;
-    if (profile) {
+    if (!profile) {
         profile = `https://astroguruji2026.s3.ap-south-1.amazonaws.com/avatars/${userData?.avatar}.png`
     }
 
