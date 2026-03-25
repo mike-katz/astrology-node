@@ -823,7 +823,7 @@ async function initAgoraCall(req, res) {
 
     callEvent("emit_to_p_chat_order_call_incoming", {
         key: `pandit_${pandit_id}`,
-        paylaod: { order_id, username: userData?.name, profile }
+        payload: { order_id, username: userData?.name, profile }
     });
 
     logger.info('initAgoraCall success', { userId: req.userId, order_id, pandit_id, response });
