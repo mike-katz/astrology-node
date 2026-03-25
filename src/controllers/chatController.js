@@ -814,9 +814,16 @@ async function initAgoraCall(req, res) {
     if (!response?.success) {
         return res.status(400).json({ success: false, message: response?.message });
     }
+
+    const userData = await db('users').where({ id: Number(req.userId) }).select("profile", "avatar", 'name').first();
+    let profile = userData?.profile;
+    if (profile) {
+        profile = `https://astroguruji2026.s3.ap-south-1.amazonaws.com/avatars/${userData?.avatar}.png`
+    }
+
     callEvent("emit_to_p_chat_order_call_incoming", {
         key: `pandit_${pandit_id}`,
-        payload: [{ order_id }]
+        paylaod: { order_id, username: userData?.name, profile }
     });
 
     logger.info('initAgoraCall success', { userId: req.userId, order_id, pandit_id, response });
