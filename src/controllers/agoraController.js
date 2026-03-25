@@ -63,6 +63,75 @@ async function getTokenExpireForOrder(channelName) {
     return { success: true, expireTs: nowSec + DEFAULT_MAX_CALL_SECONDS, maxCallSeconds: DEFAULT_MAX_CALL_SECONDS };
 }
 
+async function geneateToken(channelName) {
+    try {
+        if (!channelName) {
+            // logger.info('agora_getRtcToken fail', { userId: req.userId, message: 'channelName required' });
+            return { success: false, message: 'channelName required' };
+        }
+
+        // 👤 frontend user UID (random)
+        const uid = Math.floor(Math.random() * 900000) + 100000;
+
+        // Order-wise max call time - when token expires, Agora auto-disconnects user (no API needed)
+        const { expireTs, maxCallSeconds, success } = await getTokenExpireForOrder(channelName);
+        if (!success) {
+            return { success: false, message: 'Order not found' };
+        }
+        console.log("maxCallSeconds", maxCallSeconds);
+        const nowSec = Math.floor(Date.now() / 1000);
+        const expire = maxCallSeconds < 60 ? nowSec + 60 : expireTs; // min 1 min validity
+        const actualMaxCallSeconds = expire - nowSec;
+        console.log("expire", expire);
+        console.log("actualMaxCallSeconds", actualMaxCallSeconds);
+        const token = RtcTokenBuilder.buildTokenWithUid(
+            APP_ID,
+            APP_CERT,
+            channelName,
+            uid,
+            RtcRole.PUBLISHER,
+            expire
+        );
+
+        // Token create = join count; 2 users thay to recording start
+        const countKey = CHANNEL_COUNT_KEY(channelName);
+        const recordingKey = CHANNEL_RECORDING_KEY(channelName);
+        const newCount = await RedisCache.incr(countKey);
+        let recordingStarted = false;
+        if (newCount === MIN_USERS_TO_START_RECORDING) {
+            try {
+                const { resourceId, sid } = await startRecordingForChannel(channelName);
+                await RedisCache.setCache(recordingKey, JSON.stringify({ resourceId, sid }), 86400);
+                recordingStarted = true;
+                console.log(`[Agora] recording auto-started for channel ${channelName} (2 users)`);
+            } catch (err) {
+                console.error('[Agora] auto start recording failed', err.response?.data || err.message);
+                await RedisCache.decr(countKey);
+            }
+        }
+
+        // logger.info('agora_getRtcToken success', { userId: req.userId, channelName, userCount: newCount, recordingStarted });
+        return {
+            success: true,
+            message: "Token created",
+            data: {
+                appId: APP_ID,
+                channelName,
+                uid,
+                token,
+                userCount: newCount,
+                recordingStarted,
+                maxCallSeconds: actualMaxCallSeconds  // frontend: show timer; Agora auto-ends call when token expires
+            }
+        };
+
+    } catch (err) {
+        // logger.error('agora_getRtcToken error', { userId: req.userId, channelName, err: err?.message });
+        console.error(err);
+        return { success: false, message: 'token generation failed' };
+    }
+}
+
 /* =====================================================
    1️⃣ getRtcToken
    input  : channelName (order_id)
@@ -509,5 +578,6 @@ module.exports = {
     recordingStop,
     recordingStartIndividual,
     recordingStopIndividual,
-    recordingWebhook
+    recordingWebhook,
+    geneateToken
 };

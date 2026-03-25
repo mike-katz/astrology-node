@@ -4,7 +4,7 @@ const path = require('path');
 const logger = require('log4js').getLogger(path.parse(__filename).name);
 
 const { callEvent } = require("../socket");
-const { channelLeave } = require('./agoraController');
+const { channelLeave, geneateToken } = require('./agoraController');
 const { sendBulkPush } = require('./reviewController');
 const { uploadImageTos3 } = require('./uploader');
 
@@ -803,4 +803,24 @@ async function getOrderChat(req, res) {
     }
 }
 
-module.exports = { getRoom, getMessage, sendMessage, getDetail, getOrderDetail, endChat, forceEndChat, readMessage, deleteChat, getOrderChat };
+async function initAgoraCall(req, res) {
+    const { order_id, pandit_id } = req.body || {};
+    logger.info('initAgoraCall', { userId: req.userId, order_id, pandit_id });
+    if (!order_id || !pandit_id) {
+        logger.info('initAgoraCall fail', { userId: req.userId, message: 'Missing params.' });
+        return res.status(400).json({ success: false, message: 'Missing params.' });
+    }
+    const response = await geneateToken(order_id);
+    if (!response?.success) {
+        return res.status(400).json({ success: false, message: response?.message });
+    }
+    callEvent("emit_to_p_chat_order_call_incoming", {
+        key: `pandit_${pandit_id}`,
+        payload: [{ order_id }]
+    });
+
+    logger.info('initAgoraCall success', { userId: req.userId, order_id, pandit_id, response });
+    return res.status(200).json({ success: true, data: response, message: 'Call requested Successfully' });
+}
+
+module.exports = { getRoom, getMessage, sendMessage, getDetail, getOrderDetail, endChat, forceEndChat, readMessage, deleteChat, getOrderChat, initAgoraCall };
