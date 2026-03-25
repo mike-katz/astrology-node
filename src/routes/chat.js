@@ -32,8 +32,10 @@ router.get('/orderChat', chat.getOrderChat);
 router.get('/getDetail', chat.getDetail);
 router.get('/getOrderDetail', chat.getOrderDetail);
 router.post('/endChat', chat.endChat);
-router.post('/order/call/initiate', chat.initAgoraCall);
 router.post('/forceEndChat', chat.forceEndChat);
 router.post('/readMessage', chat.readMessage);
 router.delete('/delete', chat.deleteChat);
+
+router.post('/order/call/initiate', chat.initAgoraCall);
+router.post('/order/call/remove', chat.callRemove);
 module.exports = router;

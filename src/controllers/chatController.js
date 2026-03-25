@@ -831,4 +831,17 @@ async function initAgoraCall(req, res) {
     return res.status(200).json(response);
 }
 
-module.exports = { getRoom, getMessage, sendMessage, getDetail, getOrderDetail, endChat, forceEndChat, readMessage, deleteChat, getOrderChat, initAgoraCall };
+async function callRemove(req, res) {
+    const { order_id, pandit_id } = req.body || {};
+    logger.info('callRemove', { userId: req.userId, order_id, pandit_id });
+
+    callEvent("emit_to_u_chat_order_call_remove", {
+        key: `pandit_${pandit_id}`,
+        payload: { order_id }
+    });
+
+    logger.info('initAgoraCall success', { userId: req.userId, order_id, pandit_id, response });
+    return res.status(200).json(response);
+}
+
+module.exports = { getRoom, getMessage, sendMessage, getDetail, getOrderDetail, endChat, forceEndChat, readMessage, deleteChat, getOrderChat, initAgoraCall, callRemove };
