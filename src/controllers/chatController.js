@@ -1712,7 +1712,27 @@ async function callEndAgora(req, res) {
     return res.status(200).json({ success: true, data: null, message: 'remove successfully.' });
 }
 
+async function callRejectAgora(req, res) {
+    const { order_id, pandit_id } = req.body || {};
+    logger.info('callRejectAgora', { userId: req.userId, order_id });
+    // const dd = await channelLeave(order_id)
+
+    callEvent("emit_to_p_chat_order_call_reject", {
+        key: `pandit_${pandit_id}`,
+        payload: { order_id }
+    });
+
+    callEvent("emit_to_p_chat_order_call_reject", {
+        key: `user_${req.userId}`,
+        payload: { order_id }
+    });
+
+    logger.info('callRejectAgora success', { userId: req.userId, order_id });
+    return res.status(200).json({ success: true, data: null, message: 'remove successfully.' });
+}
+
+
 module.exports = {
     getRoom, getMessage, sendMessage, getDetail, getOrderDetail, endChat, forceEndChat, readMessage, deleteChat, getOrderChat,
-    newCreateOrder, orderAccept, orderCancel, orderReject, newOrderDetail, endOrder, createCall, rejectCall, initAgoraCall, callRemove, callEndAgora
+    newCreateOrder, orderAccept, orderCancel, orderReject, newOrderDetail, endOrder, createCall, rejectCall, initAgoraCall, callRemove, callEndAgora, callRejectAgora
 };
