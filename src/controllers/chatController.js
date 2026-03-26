@@ -1745,6 +1745,10 @@ async function rejectAgoraCall(req, res) {
         key: `pandit_${order?.pandit_id}`,
         payload: { order_id }
     });
+    callEvent("emit_to_pending_order", {
+        key: `pandit_${order?.pandit_id}`,
+        payload: { pandit_id: order?.pandit_id }
+    });
     return res.status(200).json({ success: true, data: null, message: 'reject successfully.' });
 }
 
