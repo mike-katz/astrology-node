@@ -53,4 +53,7 @@ router.post('/order/call/remove', chat.callRemove);
 router.post('/order/call/end', chat.callEndAgora);
 router.post('/order/call/reject', chat.callRejectAgora);
 
+router.post('/call/order/reject', chat.rejectAgoraCall);
+router.post('/call/order/complete', chat.completedAgoraCall);
+
 module.exports = router;
