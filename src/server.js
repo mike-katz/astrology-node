@@ -26,6 +26,8 @@ const bannerRoutes = require('./routes/banners');
 const callBackRoutes = require('./routes/callback');
 const twilloVoiceRoutes = require('./routes/twilioVoice');
 const twilioRoutes = require('./routes/twilio');
+const callRoutes = require('./routes/call');
+
 
 // const cors = require('cors');
 const multer = require('multer');
@@ -59,7 +61,6 @@ app.use('/freeKundli', freeKundliRoutes);
 app.use('/faq', faqRoutes);
 app.use('/blog', blogRoutes);
 app.use('/banners', bannerRoutes);
-app.use('/call', authRoutes);
 
 // app.use('/agora', agoraRoutes);
 
@@ -73,6 +74,7 @@ app.use('/profile', profileRoutes);
 app.use('/payment', paymentRoutes);
 app.use('/support-ticket', supportTicketRoutes);
 app.use('/agora', agoraRoutes);
+app.use('/call', callRoutes);
 
 
 
