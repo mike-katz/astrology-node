@@ -1759,15 +1759,8 @@ async function completedAgoraCall(req, res) {
             logger.info('completedAgoraCall fail', { userId: req.userId, message: 'Missing params.' });
             return res.status(400).json({ success: false, message: 'Missing params.' });
         }
-        const order = await db('orders').where({ order_id }).select("user_id", "status").first();
+        const order = await db('orders').where({ order_id }).first();
         if (!order) return res.status(400).json({ success: false, message: 'Missing params.' });
-
-        const diffMs = Math.abs(new Date() - new Date(order.start_time));
-        const totalSeconds = Math.floor(diffMs / 1000);
-        const setting = await db('settings').first();
-        console.log("totalSeconds", totalSeconds);
-        const minSec = setting?.chat_end_min_minutes * 60
-        console.log("minSec required", minSec);
 
         if (order.status == 'pending') {
             logger.info('completedAgoraCall fail', { userId: req.userId, order_id, message: 'order is pending.' });
@@ -1780,12 +1773,6 @@ async function completedAgoraCall(req, res) {
         if (order.status == 'completed') {
             logger.info('completedAgoraCall fail', { userId: req.userId, order_id, message: 'order is already completed.' });
             return res.status(200).json({ success: false, message: 'order is already completed.' });
-        }
-
-        // console.log("endChat diffMinutes", diffMinutes, "startTime", order.start_time, "endTime", new Date());
-        if ((totalSeconds < Number(minSec)) && !order?.is_free && order?.type == 'chat') {
-            logger.info('completedAgoraCall fail', { userId: req.userId, order_id, message: `Can't end chat in first ${setting?.chat_end_min_minutes} minute.` });
-            return res.status(400).json({ success: false, message: `Can't end chat in first ${setting?.chat_end_min_minutes} minute.` });
         }
 
         const result = balanceCut(req.userId, order, order?.end_time, 'user -> agora call completed')
