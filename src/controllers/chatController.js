@@ -1775,7 +1775,15 @@ async function completedAgoraCall(req, res) {
             return res.status(200).json({ success: false, message: 'order is already completed.' });
         }
 
-        const result = balanceCut(req.userId, order, order?.end_time, 'user -> agora call completed')
+        let now = new Date();
+        if (order.end_time) {
+            const orderEndTime = new Date(order.end_time);
+            if (now > orderEndTime) {
+                now = order.end_time;
+            }
+        }
+
+        const result = balanceCut(req.userId, order, now, 'user -> agora call completed')
         if (!result) {
             logger.info('chat_sendMessage fail', { userId: req.userId, order_id, message: 'Something went wrong.' });
             return res.status(400).json({ success: false, message: 'Something went wrong.' });
