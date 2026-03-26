@@ -1772,7 +1772,7 @@ async function completedAgoraCall(req, res) {
         }
         if (order.status == 'completed') {
             logger.info('completedAgoraCall fail', { userId: req.userId, order_id, message: 'order is already completed.' });
-            return res.status(200).json({ success: false, message: 'order is already completed.' });
+            return res.status(200).json({ success: true, message: 'order is already completed.' });
         }
 
         let now = new Date();
