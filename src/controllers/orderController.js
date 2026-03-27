@@ -1013,4 +1013,4 @@ async function callEnd(req, res) {
     }
 }
 
-module.exports = { create, createFreeChat, list, acceptOrder, cancelOrder, deleteOrder, sendGift, generateCallToken, callReject, callEnd };
+module.exports = { create, createFreeChat, list, acceptOrder, cancelOrder, deleteOrder, sendGift, generateCallToken, callReject, callEnd, sendAutoMessage };
