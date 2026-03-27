@@ -48,7 +48,7 @@ app.use('/callback', callBackRoutes);
 app.use('/voice', twilloVoiceRoutes);
 app.use('/twilio', twilioRoutes);
 app.use('/newKundli', freeKundliRoutes);
-app.use('/call', authRoutes);
+
 app.use(decryptRequest);
 app.use(encryptResponse);
 RedisCache.initializeRedis();
@@ -62,7 +62,7 @@ app.use('/freeKundli', freeKundliRoutes);
 app.use('/faq', faqRoutes);
 app.use('/blog', blogRoutes);
 app.use('/banners', bannerRoutes);
-
+app.use('/call', authRoutes);
 // app.use('/agora', agoraRoutes);
 
 app.use(auth)
