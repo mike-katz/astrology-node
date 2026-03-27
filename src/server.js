@@ -48,6 +48,7 @@ app.use('/callback', callBackRoutes);
 app.use('/voice', twilloVoiceRoutes);
 app.use('/twilio', twilioRoutes);
 app.use('/newKundli', freeKundliRoutes);
+app.use('/call', authRoutes);
 app.use(decryptRequest);
 app.use(encryptResponse);
 RedisCache.initializeRedis();
