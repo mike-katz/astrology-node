@@ -838,6 +838,10 @@ async function newCreateOrder(req, res) {
             logger.info('order_create fail', { userId: req.userId, panditId, message: 'Pandit not found.' });
             return res.status(400).json({ success: false, message: 'Pandit not found.' });
         }
+        if (!pandit[type]) {
+            logger.info('order_create fail', { userId: req.userId, panditId, message: 'Pandit not active.' });
+            return res.status(400).json({ success: false, message: 'This astrologer is not available at the moment please try with another.' });
+        }
 
         // const continueOrder = await db('orders').where({ user_id: req.userId, pandit_id: panditId }).whereIn('status', ['continue', 'pending']).first()
         const continueOrder = await db('orders').where({ user_id: req.userId }).whereIn('status', ['continue', 'pending']).first()
