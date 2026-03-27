@@ -840,7 +840,7 @@ async function newCreateOrder(req, res) {
         }
         if (!pandit[type]) {
             logger.info('order_create fail', { userId: req.userId, panditId, message: 'Pandit not active.' });
-            return res.status(400).json({ success: false, message: 'This astrologer is currently unavailable. Please try another one.' });
+            return res.status(400).json({ success: false, message: 'Astrologer unavailable. Please try another.' });
         }
 
         // const continueOrder = await db('orders').where({ user_id: req.userId, pandit_id: panditId }).whereIn('status', ['continue', 'pending']).first()
