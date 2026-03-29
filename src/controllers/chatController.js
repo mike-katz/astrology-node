@@ -1073,6 +1073,13 @@ async function sendNotification(token, username, chat_call_rate, panditId, type,
             else {
                 logger.info("inside else");
 
+                await db.raw(
+                    `INSERT INTO pandit_online_check (pandit_id, created_at)
+                     VALUES (?, NOW())
+                     ON CONFLICT (pandit_id) DO UPDATE SET created_at = NOW()`,
+                    [Number(panditId)]
+                );
+
                 message = {
                     token, // This must be the VoIP Token, not the standard FCM token
                     // notification: {
