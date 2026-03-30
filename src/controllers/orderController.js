@@ -203,9 +203,12 @@ async function create(req, res) {
             profile_id,
             is_free: false
         }
+        const upd = { is_free_order: "paid" }
         if (count == 0) {
             ins.is_free = true
+            upd.is_free_order = "free"
         }
+        await db('users').where({ id: Number(req.userId) }).update(upd);
 
         const [saved] = await db('orders').insert(ins).returning('*');
         // console.log("order inserted", saved);
