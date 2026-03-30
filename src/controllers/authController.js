@@ -115,8 +115,8 @@ async function verifyOtp(req, res) {
         upd.ad_set_id = null
         let set_id = ad_set_id ?? referrer ?? null
         if (set_id && isNumber(set_id)) {
-            set_id = set_id;
-            upd.ad_set_id = set_id;
+            set_id = Number(set_id);
+            upd.ad_set_id = Number(set_id);
         }
         if (Object.keys(upd).length > 0) {
             await db('users').where({ id: Number(existing?.id) }).update(upd)
