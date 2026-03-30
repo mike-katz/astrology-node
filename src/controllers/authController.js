@@ -112,25 +112,33 @@ async function verifyOtp(req, res) {
         if (existing && version) {
             upd.version = version
         }
-        if (existing && referrer) {
-            upd.ad_set_id = referrer
-        }
-        if (existing && ad_set_id) {
-            upd.ad_set_id = ad_set_id
+
+        let set_id = ad_set_id ?? referrer ?? null;
+
+        if (set_id != null) {
+            const isValid = isNumber(set_id);
+
+            if (!isValid) {
+                console.log("Invalid set_id:", set_id);
+                set_id = null;
+
+                if (existing) {
+                    upd.ad_set_id = null;
+                }
+            } else {
+                console.log("Valid set_id:", set_id);
+
+                if (existing) {
+                    upd.ad_set_id = Number(set_id);
+                }
+            }
         }
 
-        if (upd.ad_set_id) {
-            const parsed = isNumber(upd.ad_set_id)
-            upd.ad_set_id = null
-            if (parsed) {
-                upd.ad_set_id = parsed
-            }
+        if (!existing) {
+            [existing] = await db('users').insert({ mobile, country_code, status: "active", balance: 0, ad_set_id: set_id, utm_source, ad_id, mode, version }).returning(['id', 'mobile', 'avatar', 'country_code', 'otp']);
         }
         if (Object.keys(upd).length > 0) {
             await db('users').where({ id: Number(existing?.id) }).update(upd)
-        }
-        if (!existing) {
-            [existing] = await db('users').insert({ mobile, country_code, status: "active", balance: 0, ad_set_id: ad_set_id ?? referrer ?? null, utm_source, ad_id, mode, version }).returning(['id', 'mobile', 'avatar', 'country_code', 'otp']);
         }
         const token = jwt.sign({ userId: existing.id, username: existing.name, mobile: existing.mobile }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '1h' });
         // hide password
