@@ -6,8 +6,8 @@ const auth = require('./middleware/authMiddleware.js');
 
 // Initialize database email queue (Laravel-style)
 // Emails are stored in database and processed in background
-require('./utils/emailQueue');
-require('./workers/emailWorker');
+// require('./utils/emailQueue');
+// require('./workers/emailWorker');
 
 const authRoutes = require('./routes/auth');
 const panditRoutes = require('./routes/pandit');
@@ -24,6 +24,10 @@ const faqRoutes = require('./routes/faq');
 const blogRoutes = require('./routes/blog');
 const bannerRoutes = require('./routes/banners');
 const callBackRoutes = require('./routes/callback');
+const twilloVoiceRoutes = require('./routes/twilioVoice');
+const twilioRoutes = require('./routes/twilio');
+const callRoutes = require('./routes/call');
+
 
 // const cors = require('cors');
 const multer = require('multer');
@@ -37,11 +41,14 @@ const { encryptResponse } = require('./middleware/encryptResponse.js')
 app.get("/health", (req, res) => {
     res.status(200).send("user OK");
 });
-
+app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
 app.use('/callback', callBackRoutes);
+app.use('/voice', twilloVoiceRoutes);
+app.use('/twilio', twilioRoutes);
 app.use('/newKundli', freeKundliRoutes);
+
 app.use(decryptRequest);
 app.use(encryptResponse);
 RedisCache.initializeRedis();
@@ -55,9 +62,8 @@ app.use('/freeKundli', freeKundliRoutes);
 app.use('/faq', faqRoutes);
 app.use('/blog', blogRoutes);
 app.use('/banners', bannerRoutes);
-
+app.use('/call', authRoutes);
 // app.use('/agora', agoraRoutes);
-
 
 app.use(auth)
 app.use('/chat', chatRoutes);
@@ -69,6 +75,8 @@ app.use('/profile', profileRoutes);
 app.use('/payment', paymentRoutes);
 app.use('/support-ticket', supportTicketRoutes);
 app.use('/agora', agoraRoutes);
+app.use('/call', callRoutes);
+
 
 
 app.use((err, req, res, next) => {

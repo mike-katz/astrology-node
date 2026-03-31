@@ -2,11 +2,16 @@ const db = require('../db');
 require('dotenv').config();
 const path = require('path');
 const logger = require('log4js').getLogger(path.parse(__filename).name);
+const axios = require('axios');
 
 const { callEvent } = require("../socket");
-const { channelLeave } = require('./agoraController');
+const { channelLeave, geneateToken } = require('./agoraController');
 const { sendBulkPush } = require('./reviewController');
 const { uploadImageTos3 } = require('./uploader');
+const { emitCallDurationUpdate } = require('../callSocket');
+const { replaceTemplate } = require('../utils/replaceTemplate');
+const admin = require('../config/firebase');
+const { sendAutoMessage } = require('./orderController');
 
 async function getRoom(req, res) {
     logger.info('chat_getRoom', { userId: req.userId });
@@ -527,7 +532,21 @@ async function balanceCut(user_id, order, end_time, place) {
                 toId: order?.pandit_id,
                 orderId: order?.order_id,
             });
+            callEvent("emit_to_chat_order_completed", {
+                toType: "pandit",
+                toId: order?.pandit_id,
+                orderId: order?.order_id,
+            });
+
+            callEvent("emit_to_pending_order", {
+                key: `pandit_${order?.pandit_id}`,
+                payload: { pandit_id: order?.pandit_id }
+            });
         }
+        callEvent("emit_to_order_completed", {
+            key: `user_${order?.user_id}`,
+            payload: { order_id: order?.order_id }
+        });
 
         if (!isFree) {
             await db('users').where({ id: user_id }).update({ balance: newBalance });
@@ -803,4 +822,1008 @@ async function getOrderChat(req, res) {
     }
 }
 
-module.exports = { getRoom, getMessage, sendMessage, getDetail, getOrderDetail, endChat, forceEndChat, readMessage, deleteChat, getOrderChat };
+async function newCreateOrder(req, res) {
+    const { panditId, type, profile_id } = req.body;
+    logger.info('order_create', { userId: req.userId, panditId, type, profile_id });
+    if (!panditId || !profile_id) {
+        logger.info('order_create fail', { userId: req.userId, message: 'Missing params' });
+        return res.status(400).json({ success: false, message: 'Missing params' });
+    }
+    // console.log("create order req.body", req.body);
+    try {
+        const user = await db('users').where({ id: req.userId }).first()
+
+        const pandit = await db('pandits').where({ id: panditId }).first()
+        if (!pandit) {
+            logger.info('order_create fail', { userId: req.userId, panditId, message: 'Pandit not found.' });
+            return res.status(400).json({ success: false, message: 'Pandit not found.' });
+        }
+        if (!pandit[type]) {
+            logger.info('order_create fail', { userId: req.userId, panditId, message: 'Pandit not active.' });
+            return res.status(400).json({ success: false, message: 'Astrologer unavailable. Please try another.' });
+        }
+
+        // const continueOrder = await db('orders').where({ user_id: req.userId, pandit_id: panditId }).whereIn('status', ['continue', 'pending']).first()
+        const continueOrder = await db('orders').where({ user_id: req.userId }).whereIn('status', ['continue', 'pending']).first()
+        if (continueOrder?.status == 'continue') {
+            logger.info('order_create fail', { userId: req.userId, message: `Please complete your ongoing ${type}.` });
+            return res.status(400).json({ success: false, message: `Please complete your ongoing ${type}.` });
+        }
+        if (continueOrder?.status == 'pending') {
+            logger.info('order_create fail', { userId: req.userId, message: `Please reject your pending ${type}.` });
+            return res.status(400).json({ success: false, message: `Please reject your pending ${type}.` });
+        }
+
+        const [{ count }] = await db('orders')
+            .count('* as count')
+            .where({ user_id: req.userId })
+            .whereIn('status', ['continue', 'completed', 'pending']);
+        let duration = Math.floor(Number(Number(user?.balance)) / Number(pandit?.final_chat_call_rate));
+        let deduction = Number(duration) * Number(pandit?.final_chat_call_rate)
+        let rate = pandit?.final_chat_call_rate;
+        if (count == 0) {
+            const settings = await db('settings').first();
+            duration = Number(settings?.free_chat_minutes) || 0;
+            deduction = 0;
+            rate = settings?.free_chat_amount_per_minute || 1;
+        } else {
+            if (user?.balance < 1) {
+                logger.info('order_create fail', { userId: req.userId, message: 'Please recharge your wallet.' });
+                return res.status(400).json({ success: false, message: 'Please recharge your wallet.' });
+            }
+            if (duration < 1) {
+                logger.info('order_create fail', { userId: req.userId, message: 'Min. 5 min balance required.' });
+                return res.status(400).json({ success: false, message: 'Min. 5 min balance required.' });
+            }
+            if (Number(user?.balance) < deduction) {
+                logger.info('order_create fail', { userId: req.userId, message: 'Min. 5 min balance required.' });
+                return res.status(400).json({ success: false, message: 'Min. 5 min balance required.' });
+            }
+        }
+        // const order = await db('orders').where({ user_id: req.userId, pandit_id: panditId }).first()
+        const orderId = `${new Date().getTime().toString()}${Math.floor(100000 + Math.random() * 900000).toString()}`;
+        // console.log("duration", duration);
+        if (!Number.isFinite(duration)) {
+            logger.info('order_create fail', { userId: req.userId, message: 'Min. 5 min balance required.' });
+            return res.status(400).json({ success: false, message: 'Min. 5 min balance required.' });
+        }
+
+        if (isNaN(deduction)) {
+            logger.info('order_create fail', { userId: req.userId, message: 'Balance could not be NaN.' });
+            return res.status(400).json({ success: false, message: 'Balance could not be NaN.' });
+        }
+        // console.log("last order", order);
+        // if (!order) {
+        //     //create 5 minute order
+        //     deduction = (5 * pandit?.chat_call_rate || 1);
+
+        // } else {
+        //     deduction = (5 * pandit?.chat_call_rate || 1);
+        // deduction = (user?.balance - 50) / (pandit?.chat_call_rate || 1)
+        // }
+        // if (user?.balance < deduction) return res.status(400).json({ success: false, message: 'Insufficient fund.' });
+        const ins = {
+            pandit_id: panditId,
+            user_id: req.userId,
+            order_id: orderId,
+            status: "pending",
+            rate,
+            duration,
+            deduction,
+            type,
+            profile_id,
+            is_free: false
+        }
+        if (count == 0) {
+            ins.is_free = true
+        }
+
+        const upd = { is_free_order: "paid" }
+        if (count == 0) {
+            ins.is_free = true
+            upd.is_free_order = "free"
+        }
+        await db('users').where({ id: Number(req.userId) }).update(upd);
+
+        const [saved] = await db('orders').insert(ins).returning('*');
+        // console.log("order inserted", saved);
+
+        // console.log("start socket call");
+
+        const profile = await db('userprofiles').where({ id: Number(profile_id) }).first();
+
+        if (count == 0) {
+            sendAutoMessage(profile, req.userId, orderId, panditId);
+        }
+        callEvent("emit_to_user_for_register", {
+            key: `user_${req?.userId}`,
+            payload: [{ ...saved, name: pandit?.display_name, profile: pandit?.profile, profile_name: profile?.name }]
+        });
+
+        callEvent("emit_to_pending_order", {
+            key: `pandit_${pandit?.id}`,
+            payload: { pandit_id: pandit?.id }
+        });
+        // console.log(" socket end call");
+
+        const token = pandit?.token || false;
+        if (token) {
+            const waiting_time = pandit?.waiting_time == null ? true : false
+            await sendNotification(token, user?.name, pandit?.final_chat_call_rate, panditId, type, waiting_time, orderId, user?.id, user?.profile, user?.avatar)
+        }
+        // socket.emit("emit_to_user_for_register", {
+        //     key: `user_${req?.userId}`,
+        //     payload: [{ ...saved, name: pandit?.name, profile: pandit?.profile }],
+        // });
+
+        axios({
+            method: 'post',
+            url: process.env.ADMIN_CALLBACK_URL,
+            data: {
+                name: pandit?.display_name,
+                id: pandit?.id,
+                mobile: pandit?.mobile,
+                order_id: orderId,
+                type: "astrologer"
+            }
+        });
+        logger.info('order_create success', { userId: req.userId, orderId, panditId, type });
+        return res.status(200).json({ success: true, data: { orderId }, message: 'Order create Successfully' });
+    } catch (err) {
+        logger.error('order_create error', { userId: req.userId, err: err?.message });
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
+async function sendNotification(token, username, chat_call_rate, panditId, type, is_free = false, order_id, user_id, profile, avatar) {
+    // console.log("is_available", is_available);
+    console.log("order_id, user_id", order_id, user_id);
+    try {
+        const filter = {
+            type: 'pandit', status: 'active'
+        }
+        if (type == 'chat' && !is_free) {
+            filter.message_type = 'Chat Request'
+        }
+        if (type == 'chat' && is_free) {
+            filter.message_type = 'Free Chat Request'
+        }
+        if (type == 'call' && !is_free) {
+            filter.message_type = 'Call Request'
+        }
+        if (type == 'call' && is_free) {
+            filter.message_type = 'Free Call Request'
+        }
+        const template = await db('templates').where(filter).first();
+        logger.info("template", template);
+        if (!template) return true;
+
+        const messages = replaceTemplate(template?.title, {
+            user_name: username,
+            pandit_rate: chat_call_rate
+        })
+        logger.info("messages", messages);
+        if (token) {
+            const profileUrl = profile ? profile : `https://astroguruji2026.s3.ap-south-1.amazonaws.com/avatars/${avatar}.png`
+            console.log("profileUrl", profileUrl);
+            // console.log("start push notification");
+            // const messages = `new ${type} request from ${username} (Rs ${chat_call_rate}/min).`
+            // const continueOrder = await db('panditnotifications').insert({ user_id: panditId, type: "order", message: messages })
+            let message = {}
+            // if (type == 'chat') {
+            // const [{ count: panditCountRow }] = await db('orders')
+            //     .where({ pandit_id: panditId })
+            //     .whereIn('status', ['continue'])
+            //     .count('* as count');
+            // const panditCount = Number(panditCountRow) || 0;
+            // is_available = false
+            // console.log("panditCount", panditCount);
+            // if (panditCount == 0) {
+            //     is_available = true
+            // }
+            let defaultMode = false
+            const panditLogins = await db('pandit_online_check').where({ pandit_id: Number(panditId) }).first();
+            if (panditLogins) {
+                const now = new Date();
+                const createdAt = new Date(panditLogins?.created_at); // DB mathi aavelo time
+
+                const diffInSeconds = (now - createdAt) / 1000;
+                console.log("diffInSeconds", diffInSeconds);
+                if (diffInSeconds < 60) {
+                    defaultMode = true
+                }
+            }
+
+            if (defaultMode) {
+                message = {
+                    token,
+                    notification: {
+                        title: messages,
+                    },
+
+                    // 🔔 Android
+                    android: {
+                        notification: {
+                            sound: 'default'
+                        }
+                    },
+
+                    // 🔔 iOS
+                    apns: {
+                        payload: {
+                            aps: {
+                                sound: 'default'
+                            }
+                        }
+                    },
+
+                    // 🔔 Web Browser
+                    webpush: {
+                        notification: {
+                            // icon: '/icon.png',
+                            requireInteraction: true
+                            // NOTE: Browsers play default sound automatically
+                        }
+                    },
+
+                    data: {
+                        type: type == 'chat' ? "incoming_chat" : "incoming_call",
+                        title: messages,
+                        orderId: String(order_id),
+                        userId: String(user_id),
+                        profile: profileUrl,
+                        userName: username
+                    },
+                };
+            }
+            else {
+                logger.info("inside else");
+
+                await db.raw(
+                    `INSERT INTO pandit_online_check (pandit_id, created_at)
+                     VALUES (?, NOW())
+                     ON CONFLICT (pandit_id) DO UPDATE SET created_at = NOW()`,
+                    [Number(panditId)]
+                );
+
+                message = {
+                    token, // This must be the VoIP Token, not the standard FCM token
+                    // notification: {
+                    //     title: messages,
+                    // },
+                    android: {
+                        priority: "high",
+                        notification: {
+                            title: messages,
+                        },
+                    },
+                    // Add this for iOS
+                    apns: {
+                        headers: {
+                            "apns-priority": "10",
+                            "apns-push-type": "voip", // CRITICAL: This tells iOS it's a call
+                            "apns-topic": "com.your.bundleid.voip" // Must end in .voip
+                        },
+                        payload: {
+                            aps: {
+                                "content-available": 1
+                            },
+                            // Your custom data
+                            type: type == 'chat' ? "incoming_chat" : "incoming_call",
+                            title: messages,
+                            // ... other data
+                        }
+                    },
+                    data: {
+                        type: type == 'chat' ? "incoming_chat" : "incoming_call",
+                        title: messages,
+                        order_id: String(order_id),
+                        userId: String(user_id),
+                        profile: profileUrl,
+                        userName: username
+                    },
+                };
+            }
+            // } else {
+            //     message = {
+            //         token,
+
+            //         // 🔥 ANDROID ONLY – HIGH PRIORITY
+            //         android: {
+            //             priority: "high",
+            //         },
+
+            //         // 🔥 DATA ONLY (NO notification block)
+            //         data: {
+            //             type: "incoming_call",
+            //             userName: String(username),
+            //             userId: String("userId"),
+            //             channelName: String(orderId),
+            //             agoraToken: String("agoraToken"),
+            //             panditName,
+            //             profile: profile == null ? "" : profile
+            //         },
+            //     };
+            // }
+
+            logger.info("message", message);
+            const response = await admin.messaging().send(message);
+            console.log("push notification response", response);
+            console.log("end push notification");
+            return true;
+        }
+    } catch (e) {
+        logger.error("sendNotification error", e);
+        return true;
+    }
+}
+
+
+function formatDOB(dob) {
+    if (!dob) return '';
+    return new Date(dob).toLocaleDateString('en-GB', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric'
+    });
+}
+
+function formatValue(value) {
+    if (!value) return '';
+
+    return value
+        .toString()
+        .replace(/_/g, ' ')
+        .replace(/\b\w/g, c => c.toUpperCase());
+}
+
+async function orderAccept(req, res) {
+    const { orderId } = req.body || {};
+    logger.info('order_acceptOrder', { userId: req.userId, orderId });
+    try {
+        if (!orderId) {
+            logger.info('order_acceptOrder fail', { userId: req.userId, message: 'Order id required.' });
+            return res.status(400).json({ success: false, message: 'Order id required.' });
+        }
+        const order = await db('orders as o')
+            .leftJoin('pandits as p', 'p.id', 'o.pandit_id')
+            .where({
+                'o.order_id': orderId,
+                'o.user_id': req.userId,
+                'o.status': 'pending',
+                'o.is_accept': true
+            })
+            .select(
+                'o.*',
+                'p.display_name as name',
+                'p.display_name',
+                'p.final_chat_call_rate',
+            )
+            .first();
+        if (!order) {
+            logger.info('order_acceptOrder fail', { userId: req.userId, orderId, message: 'Order not accepted by pandit.' });
+            return res.status(400).json({ success: false, message: 'Order not accepted by pandit.' });
+        }
+
+        const userDetail = await db('users').where({ id: order.user_id }).first();
+
+        let duration;
+        let deduction;
+        if (order.is_free) {
+            const settings = await db('settings').first();
+            duration = Number(settings?.free_chat_minutes) || 0;
+            deduction = 0;
+        } else {
+            duration = Math.floor(Number(Number(userDetail?.balance)) / Number(order?.final_chat_call_rate));
+            // console.log("duration", duration);
+            if (!Number.isFinite(duration)) {
+                logger.info('order_acceptOrder fail', { userId: req.userId, orderId, message: 'Min. 5 min balance required.' });
+                return res.status(400).json({ success: false, message: 'Min. 5 min balance required.' });
+            }
+
+            if (duration < 1) {
+                logger.info('order_acceptOrder fail', { userId: req.userId, orderId, message: 'Min. 5 min balance required.' });
+                return res.status(400).json({ success: false, message: 'Min. 5 min balance required.' });
+            }
+            deduction = Number(duration) * Number(order?.final_chat_call_rate)
+            if (isNaN(deduction)) {
+                logger.info('order_acceptOrder fail', { userId: req.userId, orderId, message: 'Balance could not be NaN.' });
+                return res.status(400).json({ success: false, message: 'Balance could not be NaN.' });
+            }
+        }
+
+        const startTime = new Date()
+        const endTime = new Date(Date.now() + `${duration}` * 60 * 1000);
+        await db('orders').where({ id: order?.id }).update({ status: "continue", duration, deduction, start_time: startTime, end_time: endTime });
+        await db('pandits').where({ id: order?.pandit_id }).update({ waiting_time: endTime });
+
+        if (order?.profile_id && order.type == 'chat') {
+            const profile = await db('userprofiles').where({ id: order?.profile_id }).first();
+
+            let message = `Hello ${order?.display_name},\nBelow are my details:
+Name: ${formatValue(profile?.name)} 
+Gender: ${formatValue(profile?.gender)} 
+DOB: ${formatDOB(profile?.dob)} 
+Birth Time: ${profile?.birth_time} 
+Birth Place: ${formatValue(profile?.birth_place)} 
+Marital Status: ${formatValue(profile?.marital_status)} \n`;
+            if (profile?.occupation) {
+                message += `    Occupation: ${formatValue(profile?.occupation)}\n`
+            }
+            if (profile?.topic_of_concern) {
+                message += `    Concern Topic: ${formatValue(profile?.topic_of_concern)}\n`
+            }
+            if (profile?.topic_of_concern_other) {
+                message += `    Other Concern: ${formatValue(profile?.topic_of_concern_other)}\n`
+            }
+            if (profile?.partner_name) {
+                message += `    Partner Name: ${formatValue(profile?.partner_name)}`
+            }
+            if (profile?.partner_dob) {
+                message += `    Partner DOB: ${formatDOB(profile?.partner_dob)}`
+            }
+            if (profile?.partner_dot) {
+                message += `    Partner Birth Time: ${formatValue(profile?.partner_dot)}`
+            }
+            if (profile?.partner_place) {
+                message += `    Partner Birth Place: ${formatValue(profile?.partner_place)} \n`
+            }
+
+            let [saved] = await db('chats').insert({
+                sender_type: "user",
+                sender_id: Number(req.userId),
+                receiver_type: "pandit",
+                order_id: orderId,
+                receiver_id: Number(order?.pandit_id),
+                message: message,
+                status: "send",
+                type: "text"
+            }).returning('*');
+            callEvent("emit_to_user", {
+                toType: "pandit",
+                toId: order?.pandit_id,
+                orderId: order?.order_id,
+                payload: saved,
+            });
+            callEvent("emit_to_user", {
+                toType: "user",
+                toId: req.userId,
+                orderId: order?.order_id,
+                payload: saved,
+            });
+
+            [saved] = await db('chats').insert({
+                sender_type: "user",
+                sender_id: Number(req.userId),
+                receiver_type: "pandit",
+                order_id: orderId,
+                receiver_id: Number(order?.pandit_id),
+                message: "This is an automated message to confirm that chat has started.",
+                status: "send",
+                is_system_generate: true,
+                type: "text"
+            }).returning('*');
+
+            callEvent("emit_to_user", {
+                toType: "pandit",
+                toId: order?.pandit_id,
+                orderId: order?.order_id,
+                payload: saved,
+            });
+            callEvent("emit_to_user", {
+                toType: "user",
+                toId: req.userId,
+                orderId: order?.order_id,
+                payload: saved,
+            });
+        }
+        // socket.emit("emit_to_user_for_pandit_accept", {
+        //     toType: `user_${order?.userId}`,
+        //     payload: order,
+        // });
+        if (order.type == 'chat') {
+            callEvent("emit_to_chat_order_accepted", {
+                key: `pandit_${order?.pandit_id}`,
+                payload: { startTime, endTime, orderId, user_id: order?.user_id }
+            });
+        }
+        // if (order.type == 'call') {
+        //     // console.log("emit_to_user_call_end_time call start",);
+        //     callEvent("emit_to_chat_order_accepted", {
+        //         key: `pandit_${order?.pandit_id}`,
+        //         payload: { startTime, endTime, orderId }
+        //     });
+        //     // console.log("emit_to_user_call_end_time call end",);
+
+        // }
+
+        callEvent("emit_to_pending_order", {
+            key: `pandit_${order?.pandit_id}`,
+            payload: { pandit_id: order?.pandit_id }
+        });
+
+        logger.info('order_acceptOrder success', { userId: req.userId, orderId });
+        return res.status(200).json({ success: true, data: { startTime, endTime, orderId }, message: 'Order accept Successfully' });
+    } catch (err) {
+        logger.error('order_acceptOrder error', { userId: req.userId, orderId, err: err?.message });
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
+async function orderCancel(req, res) {
+    const { order_id } = req.body || {};
+    logger.info('order_cancelOrder', { userId: req.userId, order_id });
+    try {
+        if (!order_id) {
+            logger.info('order_cancelOrder fail', { userId: req.userId, message: 'Order id required.' });
+            return res.status(400).json({ success: false, message: 'Order id required.' });
+        }
+        const order = await db('orders').where({ order_id: order_id, user_id: req.userId, status: "pending" }).first();
+        if (!order) {
+            logger.info('order_cancelOrder fail', { userId: req.userId, order_id, message: 'You can not cancel this order.' });
+            return res.status(400).json({ success: false, message: 'You can not cancel this order.' });
+        }
+        const upd = {}
+        let status = 'cancel';
+        // if (!order?.is_accept) {
+        //     upd.canceled_at = new Date()
+        // }
+        // if (order?.is_accept) {
+        //     status = 'rejected'
+        // }
+        upd.status = status
+        await db('orders').where({ id: order?.id }).update(upd);
+
+        callEvent("emit_to_pending_order", {
+            key: `pandit_${order?.pandit_id}`,
+            payload: { pandit_id: order?.pandit_id }
+        });
+
+        // if (order.type == 'chat') {
+        //     callEvent("emit_to_chat_rejected", {
+        //         key: `pandit_${order?.pandit_id}`,
+        //         order_id: order?.order_id,
+        //     });
+        // } else {
+        //     callEvent("emit_to_call_rejected", {
+        //         key: `pandit_${order?.pandit_id}`,
+        //         order_id: order?.order_id,
+        //     });
+        // }
+        logger.info('order_cancelOrder success', { userId: req.userId, order_id });
+        return res.status(200).json({ success: true, message: 'Order cancel Successfully' });
+    } catch (err) {
+        logger.error('order_cancelOrder error', { userId: req.userId, order_id, err: err?.message });
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
+async function orderReject(req, res) {
+    const { order_id } = req.body || {};
+    logger.info('order_rejectOrder', { userId: req.userId, order_id });
+    try {
+        if (!order_id) {
+            logger.info('order_rejectOrder fail', { userId: req.userId, message: 'Order id required.' });
+            return res.status(400).json({ success: false, message: 'Order id required.' });
+        }
+        const order = await db('orders').where({ order_id: order_id, user_id: req.userId, status: "pending" }).first();
+        if (!order) {
+            logger.info('order_rejectOrder fail', { userId: req.userId, order_id, message: 'You can not cancel this order.' });
+            return res.status(400).json({ success: false, message: 'You can not cancel this order.' });
+        }
+        const upd = {}
+        let status = 'rejected';
+        // if (!order?.is_accept) {
+        //     upd.canceled_at = new Date()
+        // }
+        // if (order?.is_accept) {
+        //     status = 'rejected'
+        // }
+        upd.status = status
+        await db('orders').where({ id: order?.id }).update(upd);
+
+        callEvent("emit_to_pending_order", {
+            key: `pandit_${order?.pandit_id}`,
+            payload: { pandit_id: order?.pandit_id }
+        });
+
+        if (order.type == 'chat') {
+            callEvent("emit_to_order_chat_rejected", {
+                key: `pandit_${order?.pandit_id}`,
+                order_id: order?.order_id,
+            });
+        }
+        //  else {
+        //     callEvent("emit_to_call_rejected", {
+        //         key: `pandit_${order?.pandit_id}`,
+        //         order_id: order?.order_id,
+        //     });
+        // }
+        logger.info('order_rejectOrder success', { userId: req.userId, order_id });
+        return res.status(200).json({ success: true, message: 'Order cancel Successfully' });
+    } catch (err) {
+        logger.error('order_rejectOrder error', { userId: req.userId, order_id, err: err?.message });
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
+async function newOrderDetail(req, res) {
+    const { order_id } = req.query || {};
+    logger.info('chat_getDetail', { userId: req.userId, order_id });
+    try {
+        if (!order_id) {
+            logger.info('chat_getDetail fail', { userId: req.userId, message: 'Missing param.' });
+            return res.status(400).json({ success: false, message: 'Missing param.' });
+        }
+        let pandit
+        // if (panditId) {
+        //     order = await db('pandits').where({ id: panditId }).first();
+        //     if (!order) {
+        //         logger.info('chat_getDetail fail', { userId: req.userId, panditId, message: 'Pandit not found.' });
+        //         return res.status(400).json({ success: false, message: 'Pandit not found.' });
+        //     }
+        // }
+        let orderDetail = await db('orders').where({ order_id }).first();
+        // let isFirstOrder = true
+        // const [{ total }] = await db('orders').where({ pandit_id: panditId, user_id: req.userId }).count('id as total');
+        // if (total > 1) {
+        //     isFirstOrder = false
+        // }
+        // if (order_id) {
+
+        // }
+
+        if (orderDetail?.pandit_id != null) {
+            pandit = await db('pandits').where({ id: orderDetail?.pandit_id }).first();
+        }
+        const response = {
+            id: orderDetail?.pandit_id, name: pandit?.display_name, status: pandit?.status, profile: pandit?.profile, isOnline: pandit?.chat, is_free: orderDetail?.is_free, pandit_id: orderDetail?.pandit_id,
+            discounted_chat_call_rate: pandit?.discounted_chat_call_rate,
+            final_chat_call_rate: pandit?.final_chat_call_rate,
+            chat_call_rate: pandit?.chat_call_rate,
+            tag: pandit?.tag,
+            rating_1: pandit?.rating_1,
+            rating_2: pandit?.rating_2,
+            rating_3: pandit?.rating_3,
+            rating_4: pandit?.rating_4,
+            rating_5: pandit?.rating_5,
+        }
+
+        if (orderDetail) {
+            response.startTime = orderDetail?.start_time;
+            response.endTime = orderDetail?.end_time;
+            response.order_status = orderDetail?.status
+        }
+
+        if (orderDetail?.end_time && (new Date(orderDetail?.end_time).getTime() < new Date()) && orderDetail.status == 'continue') {
+            const result = balanceCut(req.userId, orderDetail, orderDetail?.end_time, 'user -> get detail')
+            if (!result) {
+                logger.info('chat_getDetail fail', { userId: req.userId, order_id, message: 'Something went wrong.' });
+                return res.status(400).json({ success: false, message: 'Something went wrong.' });
+            }
+            callEvent("emit_to_chat_completed", {
+                key: `user_${orderDetail?.user_id}`,
+                order_id: orderDetail?.order_id
+            });
+        }
+        if (response?.endTime == null) {
+            response.start_chat = true
+        }
+        logger.info('chat_getDetail success', { userId: req.userId, order_id });
+        return res.status(200).json({ success: true, data: response, message: 'get detail Successfully' });
+    } catch (err) {
+        logger.error('chat_getDetail error', { userId: req.userId, err: err?.message });
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
+async function endOrder(req, res) {
+    const { order_id, return_event } = req.body || {};
+    logger.info('chat_endChat', { userId: req.userId, order_id });
+    if (!order_id) {
+        logger.info('chat_endChat fail', { userId: req.userId, message: 'Missing params.' });
+        return res.status(400).json({ success: false, message: 'Missing params.' });
+    }
+    try {
+        const order = await db('orders').where({ user_id: req.userId, order_id: order_id }).first();
+        if (!order) {
+            logger.info('chat_endChat fail', { userId: req.userId, order_id, message: 'Wrong order. Please enter correct' });
+            return res.status(400).json({ success: false, message: 'Wrong order. Please enter correct' });
+        }
+        // const diffMinutes = getDuration(order.start_time, new Date());
+        const diffMs = Math.abs(new Date() - new Date(order.start_time));
+        const totalSeconds = Math.floor(diffMs / 1000);
+        const setting = await db('settings').first();
+        console.log("totalSeconds", totalSeconds);
+        const minSec = setting?.chat_end_min_minutes * 60
+        console.log("minSec required", minSec);
+
+        if (order.status == 'pending') {
+            logger.info('chat_endChat fail', { userId: req.userId, order_id, message: 'order is pending.' });
+            return res.status(400).json({ success: false, message: 'order is pending.' });
+        }
+        if (order.status == 'cancel') {
+            logger.info('chat_endChat fail', { userId: req.userId, order_id, message: 'order is rejected.' });
+            return res.status(400).json({ success: false, message: 'order is rejected.' });
+        }
+        if (order.status == 'completed') {
+            logger.info('chat_endChat fail', { userId: req.userId, order_id, message: 'order is already completed.' });
+            return res.status(200).json({ success: false, message: 'order is already completed.' });
+        }
+
+        // console.log("endChat diffMinutes", diffMinutes, "startTime", order.start_time, "endTime", new Date());
+        if ((totalSeconds < Number(minSec)) && !order?.is_free && order?.type == 'chat') {
+            logger.info('chat_endChat fail', { userId: req.userId, order_id, message: `Can't end chat in first ${setting?.chat_end_min_minutes} minute.` });
+            return res.status(400).json({ success: false, message: `Can't end chat in first ${setting?.chat_end_min_minutes} minute.` });
+        }
+        // const [{ total }] = await db('orders').where({ pandit_id: order?.pandit_id, user_id: req.userId }).count('id as total');
+        // if (total == 1) {
+        //     return res.status(400).json({ success: false, message: 'You can not end this chat.' });
+        // }
+        // if (order.status != 'continue') {
+        //     return res.status(400).json({ success: false, message: 'order is pending or completed.' });
+        // }
+        if (order.type == 'call') {
+            const dd = await channelLeave(order_id)
+        }
+        let now = new Date();
+        if (order.end_time) {
+            const orderEndTime = new Date(order.end_time);
+            if (now > orderEndTime) {
+                now = order.end_time
+            }
+        }
+        const result = await balanceCut(req.userId, order, now, "user -> chat end");
+        if (!result) {
+            logger.info('chat_endChat fail', { userId: req.userId, order_id, message: 'Something went wrong.' });
+            return res.status(400).json({ success: false, message: 'Something went wrong.' });
+        }
+        // calculate pandit and user balance 
+        // socket.emit("emit_to_chat_completed", {
+        //     user: order?.userId,
+        //     order_id: order?.order_id,
+        // });
+
+        callEvent("emit_to_chat_completed", {
+            key: `user_${order?.user_id}`,
+            order_id: order?.order_id,
+        });
+        if (return_event) {
+            callEvent("emit_to_chat_order_call_completed", {
+                key: `user_${order?.user_id}`,
+                order_id: order?.order_id,
+            });
+        }
+
+        logger.info('chat_endChat success', { userId: req.userId, order_id });
+        return res.status(200).json({ success: true, data: null, message: 'End chat successfully.' });
+    } catch (err) {
+        logger.error('chat_endChat error', { userId: req.userId, order_id, err: err?.message });
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
+async function createCall(req, res) {
+    const { order_id, pandit_id } = req.body;
+    try {
+        const oredrDetail = await db('orders').where({ order_id, status: "continue", pandit_id }).first();
+        if (!oredrDetail) {
+            logger.info('chat_order_call fail', { order_id, message: 'Order not found.' });
+            return res.status(400).json({ success: false, message: 'Something went wrong.' });
+        }
+        const numbers = ["+911413232575", "+911413231101", "+911413232574", "+911413231093"]
+        const userDetail = await db('users').select('id', 'mobile', 'country_code').where({ id: Number(req.userId) }).first()
+        const panditDetail = await db('pandits').select('id', 'mobile', 'country_code').where({ id: Number(pandit_id) }).first()
+        const setting = await db('settings').select('minimum_call_send_time').first()
+        const did = numbers[Math.floor(Math.random() * numbers.length)];
+        console.log("call params", {
+            source: `${panditDetail?.country_code}${panditDetail?.mobile}`,
+            destination: `${userDetail?.country_code}${userDetail?.mobile}`,
+            did,
+            order_id
+        });
+        const createdAt = new Date(oredrDetail?.end_time);
+        const diffSeconds = Math.floor((createdAt.getTime() - Date.now()) / 1000);
+        console.log("diffSeconds", diffSeconds);
+        if (diffSeconds < Number(setting?.minimum_call_send_time || 60)) {
+            logger.info('chat_order_call fail', { order_id, message: 'Minimum call duration.' });
+            return res.status(400).json({ success: false, message: `Minimum call duration ${Number(setting?.minimum_call_send_time || 60)} Required.` });
+        }
+        const response = await axios({
+            method: 'post',
+            url: process.env.CALL_URL,
+            headers: { Authorization: process.env.CALL_TOKEN },
+            data: {
+                source: `${panditDetail?.country_code}${panditDetail?.mobile}`,
+                destination: `${userDetail?.country_code}${userDetail?.mobile}`,
+                // did: "+911413231099",//["+911413231091", "+911413231099"]
+                did
+            }
+        });
+
+        console.log("response,response", response?.data);
+        // emitCallDurationUpdate(response?.data?.call_id, Number(diffSeconds))
+        callEvent("emit_to_u_chat_order_call_send_user", {
+            key: `user_${userDetail?.id}`,
+            order_id,
+        });
+        await db('orders').where({ order_id }).update({ call_id: response?.data?.call_id, call_from: "user" })
+        await db('order_call_log').insert({ call_id: response?.data?.call_id, order_id, pandit_id, user_id: req.userId, status: "Call Initiated" })
+        res.status(200).json({ success: true, message: "Call initiated" });
+
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
+async function rejectCall(req, res) {
+    const { order_id, pandit_id } = req.body;
+    try {
+        callEvent("emit_to_chat_order_call_reject", {
+            key: `pandit_${pandit_id}`,
+            order_id,
+        });
+        return res.status(200).json({ success: true, data: null, message: 'End chat successfully.' });
+    } catch (err) {
+        logger.error('rejectCall error', { userId: req.userId, order_id, err: err?.message });
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
+async function initAgoraCall(req, res) {
+    const { order_id, pandit_id } = req.body || {};
+    logger.info('initAgoraCall', { userId: req.userId, order_id, pandit_id });
+    if (!order_id || !pandit_id) {
+        logger.info('initAgoraCall fail', { userId: req.userId, message: 'Missing params.' });
+        return res.status(400).json({ success: false, message: 'Missing params.' });
+    }
+    const response = await geneateToken(order_id);
+    if (!response?.success) {
+        return res.status(400).json({ success: false, message: response?.message });
+    }
+
+    const userData = await db('users').where({ id: Number(req.userId) }).select("profile", "avatar", 'name').first();
+    let profile = userData?.profile;
+    if (!profile) {
+        profile = `https://astroguruji2026.s3.ap-south-1.amazonaws.com/avatars/${userData?.avatar}.png`
+    }
+
+    console.log("{ order_id, username: userData?.name, profile }", { order_id, username: userData?.name, profile });
+    callEvent("emit_to_p_chat_order_call_incoming", {
+        key: `pandit_${pandit_id}`,
+        payload: { order_id, username: userData?.name, profile }
+    });
+
+    logger.info('initAgoraCall success', { userId: req.userId, order_id, pandit_id, response });
+    return res.status(200).json(response);
+}
+
+async function callRemove(req, res) {
+    const { order_id, pandit_id } = req.body || {};
+    logger.info('callRemove', { userId: req.userId, order_id, pandit_id });
+
+    callEvent("emit_to_u_chat_order_call_remove", {
+        key: `pandit_${pandit_id}`,
+        payload: { order_id }
+    });
+
+    logger.info('callRemove success', { userId: req.userId, order_id, pandit_id });
+    return res.status(200).json({ success: true, data: null, message: 'remove successfully.' });
+}
+
+async function callEndAgora(req, res) {
+    const { order_id } = req.body || {};
+    logger.info('callEndAgora', { userId: req.userId, order_id });
+    const dd = await channelLeave(order_id)
+
+    // callEvent("emit_to_u_chat_order_call_end", {
+    //     key: `pandit_${pandit_id}`,
+    //     payload: { order_id }
+    // });
+
+    logger.info('callEndAgora success', { userId: req.userId, order_id });
+    return res.status(200).json({ success: true, data: null, message: 'remove successfully.' });
+}
+
+async function callRejectAgora(req, res) {
+    const { order_id, pandit_id } = req.body || {};
+    logger.info('callRejectAgora', { userId: req.userId, order_id });
+    // const dd = await channelLeave(order_id)
+
+    callEvent("emit_to_p_chat_order_call_reject", {
+        key: `pandit_${pandit_id}`,
+        payload: { order_id }
+    });
+
+    callEvent("emit_to_p_chat_order_call_reject", {
+        key: `user_${req.userId}`,
+        payload: { order_id }
+    });
+
+    logger.info('callRejectAgora success', { userId: req.userId, order_id });
+    return res.status(200).json({ success: true, data: null, message: 'remove successfully.' });
+}
+
+async function rejectAgoraCall(req, res) {
+    const { order_id } = req.body || {};
+    if (!order_id) {
+        logger.info('rejectAgoraCall fail', { userId: req.userId, message: 'Missing params.' });
+        return res.status(400).json({ success: false, message: 'Missing params.' });
+    }
+    const order = await db('orders').where({ order_id }).select("pandit_id", "status").first();
+    if (!order) return res.status(400).json({ success: false, message: 'Missing params.' });
+
+    await db('orders').where({ order_id }).update({ status: "rejected" });
+    callEvent("emit_to_u_call_order_reject", {
+        key: `pandit_${order?.pandit_id}`,
+        payload: { order_id }
+    });
+    callEvent("emit_to_pending_order", {
+        key: `pandit_${order?.pandit_id}`,
+        payload: { pandit_id: order?.pandit_id }
+    });
+    return res.status(200).json({ success: true, data: null, message: 'reject successfully.' });
+}
+
+async function completedAgoraCall(req, res) {
+    try {
+        const { order_id } = req.body || {};
+        if (!order_id) {
+            logger.info('completedAgoraCall fail', { userId: req.userId, message: 'Missing params.' });
+            return res.status(400).json({ success: false, message: 'Missing params.' });
+        }
+        const order = await db('orders').where({ order_id }).first();
+        if (!order) return res.status(400).json({ success: false, message: 'Missing params.' });
+
+        if (order.status == 'pending') {
+            logger.info('completedAgoraCall fail', { userId: req.userId, order_id, message: 'order is pending.' });
+            return res.status(400).json({ success: false, message: 'order is pending.' });
+        }
+        if (order.status == 'cancel') {
+            logger.info('completedAgoraCall fail', { userId: req.userId, order_id, message: 'order is rejected.' });
+            return res.status(400).json({ success: false, message: 'order is rejected.' });
+        }
+        if (order.status == 'completed') {
+            logger.info('completedAgoraCall fail', { userId: req.userId, order_id, message: 'order is already completed.' });
+            return res.status(200).json({ success: true, message: 'order is already completed.' });
+        }
+
+        let now = new Date();
+        if (order.end_time) {
+            const orderEndTime = new Date(order.end_time);
+            if (now > orderEndTime) {
+                now = order.end_time;
+            }
+        }
+
+        const result = balanceCut(req.userId, order, now, 'user -> agora call completed')
+        if (!result) {
+            logger.info('chat_sendMessage fail', { userId: req.userId, order_id, message: 'Something went wrong.' });
+            return res.status(400).json({ success: false, message: 'Something went wrong.' });
+        }
+        callEvent("emit_to_u_call_order_complete", {
+            key: `pandit_${order?.pandit_id}`,
+            payload: { order_id }
+        });
+        return res.status(200).json({ success: true, data: null, message: 'Call ended successfully.' });
+
+    }
+    catch (err) {
+        logger.error('chat_getRoom error', { userId: req.userId, err: err?.message });
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
+module.exports = {
+    getRoom, getMessage, sendMessage, getDetail, getOrderDetail, endChat, forceEndChat, readMessage, deleteChat, getOrderChat,
+    newCreateOrder, orderAccept, orderCancel, orderReject, newOrderDetail, endOrder, createCall, rejectCall, initAgoraCall, callRemove, callEndAgora, callRejectAgora, rejectAgoraCall, completedAgoraCall
+};

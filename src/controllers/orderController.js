@@ -231,25 +231,28 @@ async function create(req, res) {
         // console.log(" socket end call");
 
         const token = pandit?.token || false;
+        console.log("token", token);
         if (token) {
             const waiting_time = pandit?.waiting_time == null ? true : false
-            await sendNotification(token, user?.name, pandit?.final_chat_call_rate, panditId, type, waiting_time)
+
+            const resposne = await sendNotification(token, user?.name, pandit?.final_chat_call_rate, panditId, type, waiting_time)
+            logger.info('resposne', resposne)
         }
         // socket.emit("emit_to_user_for_register", {
         //     key: `user_${req?.userId}`,
         //     payload: [{ ...saved, name: pandit?.name, profile: pandit?.profile }],
         // });
-        axios({
-            method: 'post',
-            url: process.env.ADMIN_CALLBACK_URL,
-            data: {
-                name: pandit?.display_name,
-                id: pandit?.id,
-                mobile: pandit?.mobile,
-                order_id: orderId,
-                type: "astrologer"
-            }
-        });
+        // axios({
+        //     method: 'post',
+        //     url: process.env.ADMIN_CALLBACK_URL,
+        //     data: {
+        //         name: pandit?.display_name,
+        //         id: pandit?.id,
+        //         mobile: pandit?.mobile,
+        //         order_id: orderId,
+        //         type: "astrologer"
+        //     }
+        // });
         logger.info('order_create success', { userId: req.userId, orderId, panditId, type });
         return res.status(200).json({ success: true, data: { orderId }, message: 'Order create Successfully' });
     } catch (err) {
@@ -381,7 +384,7 @@ async function createFreeChat(req, res) {
 }
 
 async function sendNotification(token, username, chat_call_rate, panditId, type, is_available = false, is_free = false) {
-    console.log("is_available", is_available);
+    logger.info("is_available", is_available);
     try {
         const filter = {
             type: 'pandit', status: 'active'
@@ -399,101 +402,105 @@ async function sendNotification(token, username, chat_call_rate, panditId, type,
             filter.message_type = 'Free Call Request'
         }
         const template = await db('templates').where(filter).first();
+        logger.info("template", template);
         if (!template) return true;
 
         const messages = replaceTemplate(template?.title, {
             user_name: username,
             pandit_rate: chat_call_rate
         })
+        logger.info("messages", messages);
         if (token) {
             // console.log("start push notification");
             // const messages = `new ${type} request from ${username} (Rs ${chat_call_rate}/min).`
             // const continueOrder = await db('panditnotifications').insert({ user_id: panditId, type: "order", message: messages })
             let message = {}
             // if (type == 'chat') {
-            const [{ count: panditCountRow }] = await db('orders')
-                .where({ pandit_id: panditId })
-                .whereIn('status', ['continue'])
-                .count('* as count');
-            const panditCount = Number(panditCountRow) || 0;
-            is_available = false
-            console.log("panditCount", panditCount);
-            if (panditCount == 0) {
-                is_available = true
-            }
-            if (panditCount > 0) {
-                message = {
-                    token,
-                    notification: {
-                        title: messages,
-                    },
+            // const [{ count: panditCountRow }] = await db('orders')
+            //     .where({ pandit_id: panditId })
+            //     .whereIn('status', ['continue'])
+            //     .count('* as count');
+            // const panditCount = Number(panditCountRow) || 0;
+            // is_available = false
+            // console.log("panditCount", panditCount);
+            // if (panditCount == 0) {
+            //     is_available = true
+            // }
+            // if (panditCount > 0) {
+            //     message = {
+            //         token,
+            //         notification: {
+            //             title: messages,
+            //         },
 
-                    // 🔔 Android
-                    android: {
-                        notification: {
-                            sound: 'default'
-                        }
-                    },
+            //         // 🔔 Android
+            //         android: {
+            //             notification: {
+            //                 sound: 'default'
+            //             }
+            //         },
 
-                    // 🔔 iOS
-                    apns: {
-                        payload: {
-                            aps: {
-                                sound: 'default'
-                            }
-                        }
-                    },
+            //         // 🔔 iOS
+            //         apns: {
+            //             payload: {
+            //                 aps: {
+            //                     sound: 'default'
+            //                 }
+            //             }
+            //         },
 
-                    // 🔔 Web Browser
-                    webpush: {
-                        notification: {
-                            // icon: '/icon.png',
-                            requireInteraction: true
-                            // NOTE: Browsers play default sound automatically
-                        }
-                    },
+            //         // 🔔 Web Browser
+            //         webpush: {
+            //             notification: {
+            //                 // icon: '/icon.png',
+            //                 requireInteraction: true
+            //                 // NOTE: Browsers play default sound automatically
+            //             }
+            //         },
 
-                    data: {
-                        is_available: String(is_available),
-                    }
-                };
-            }
-            else {
-                console.log("inside else");
+            //         data: {
+            //             is_available: String(is_available),
+            //         }
+            //     };
+            // }
+            // else {
+            logger.info("inside else");
 
-                message = {
-                    token, // This must be the VoIP Token, not the standard FCM token
-                    // notification: {
-                    //     title: messages,
-                    // },
-                    android: {
-                        priority: "high",
+            message = {
+                token, // This must be the VoIP Token, not the standard FCM token
+                // notification: {
+                //     title: messages,
+                // },
+                android: {
+                    priority: "high",
+                },
+                // Add this for iOS
+                apns: {
+                    headers: {
+                        "apns-priority": "10",
+                        "apns-push-type": "voip", // CRITICAL: This tells iOS it's a call
+                        "apns-topic": "com.your.bundleid.voip" // Must end in .voip
                     },
-                    // Add this for iOS
-                    apns: {
-                        headers: {
-                            "apns-priority": "10",
-                            "apns-push-type": "voip", // CRITICAL: This tells iOS it's a call
-                            "apns-topic": "com.your.bundleid.voip" // Must end in .voip
+                    payload: {
+                        aps: {
+                            "content-available": 1
                         },
-                        payload: {
-                            aps: {
-                                "content-available": 1
-                            },
-                            // Your custom data
-                            type: type == 'chat' ? "incoming_chat" : "incoming_call",
-                            is_available: String(is_available),
-                            title: messages,
-                            // ... other data
-                        }
-                    },
-                    data: {
+                        // Your custom data
                         type: type == 'chat' ? "incoming_chat" : "incoming_call",
                         is_available: String(is_available),
                         title: messages,
-                    },
-                };
-            }
+                        // ... other data
+                    }
+                },
+                data: {
+                    type: type == 'chat' ? "incoming_chat" : "incoming_call",
+                    is_available: String(is_available),
+                    title: messages,
+                    order_id: "123",
+                    userId: "userId"
+                },
+            };
+            // }
             // } else {
             //     message = {
             //         token,
@@ -516,13 +523,14 @@ async function sendNotification(token, username, chat_call_rate, panditId, type,
             //     };
             // }
 
-            console.log("message", message);
+            logger.info("message", message);
             const response = await admin.messaging().send(message);
-            // console.log("push notification response", response);
-            // console.log("end push notification");
+            console.log("push notification response", response);
+            console.log("end push notification");
             return true;
         }
     } catch (e) {
+        logger.error("sendNotification error", e);
         return true;
     }
 }
@@ -1035,4 +1043,4 @@ async function callEnd(req, res) {
     }
 }
 
-module.exports = { create, createFreeChat, list, acceptOrder, cancelOrder, deleteOrder, sendGift, generateCallToken, callReject, callEnd };
+module.exports = { create, createFreeChat, list, acceptOrder, cancelOrder, deleteOrder, sendGift, generateCallToken, callReject, callEnd, sendAutoMessage };

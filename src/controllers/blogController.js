@@ -105,6 +105,7 @@ async function getDetail(req, res) {
 
 async function getCategory(req, res) {
     try {
+        console.log("category called");
         const categories = await db('blog_categories').whereNull('deleted_at');
         return res.status(200).json({
             success: true,
