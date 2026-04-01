@@ -867,11 +867,11 @@ async function newCreateOrder(req, res) {
             deduction = 0;
             rate = settings?.free_chat_amount_per_minute || 1;
         } else {
-            if (user?.balance < 1) {
+            if (user?.balance < 5) {
                 logger.info('order_create fail', { userId: req.userId, message: 'Please recharge your wallet.' });
                 return res.status(400).json({ success: false, message: 'Please recharge your wallet.' });
             }
-            if (duration < 1) {
+            if (duration < 5) {
                 logger.info('order_create fail', { userId: req.userId, message: 'Min. 5 min balance required.' });
                 return res.status(400).json({ success: false, message: 'Min. 5 min balance required.' });
             }
