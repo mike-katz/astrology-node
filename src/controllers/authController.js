@@ -140,7 +140,7 @@ async function verifySMS(mobile, country_code, otp) {
 
 async function login(req, res) {
     try {
-        console.log("login body param", req.body);
+        console.log("login");
         logger.info('login called')
         const { mobile, country_code = '+91' } = req.body;
 
@@ -155,9 +155,9 @@ async function login(req, res) {
             return res.status(400).json({ success: false, message: 'Oops! Your account is inactive right now. Please contact support.' });
         }
         let newMobile = mobile
-        if (mobile.length == 12 && country_code == "+91") {
-            newMobile = mobile.slice(2);
-        }
+        // if (mobile.length == 12 && country_code == "+91") {
+        //     newMobile = mobile.slice(2);
+        // }
         if (mobile != '1999999999') {
             const setting = await db('settings').select('otp_provider').first();
             if (setting?.otp_provider == 'bulksms') {
@@ -197,9 +197,9 @@ async function verifyOtp(req, res) {
 
         //remove extra 91
         console.log("mobile.length", mobile.length);
-        if (mobile.length == 12 && country_code == "+91") {
-            mobile = mobile.slice(2);
-        }
+        // if (mobile.length == 12 && country_code == "+91") {
+        //     mobile = mobile.slice(2);
+        // }
         console.log("new mobile", mobile);
         if (mobile != '1999999999') {
             const setting = await db('settings').select('otp_provider').first();
