@@ -154,17 +154,17 @@ async function login(req, res) {
         if (user && user?.status == 'inactive') {
             return res.status(400).json({ success: false, message: 'Oops! Your account is inactive right now. Please contact support.' });
         }
+        let newMobile = mobile
+        if (mobile.length == 12 && country_code == "+91") {
+            newMobile = mobile.slice(2);
+        }
         if (mobile != '1999999999') {
             const setting = await db('settings').select('otp_provider').first();
             if (setting?.otp_provider == 'bulksms') {
-                let newMobile = mobile
-                if (mobile.length == 12 && country_code == "+91") {
-                    newMobile = mobile.slice(2);
-                }
                 const response = await sendSMS(newMobile, country_code)
                 if (!response.return) return res.status(400).json({ success: false, message: response?.message });
             } else {
-                const url = `http://pro.trinityservices.co.in/generateOtp.jsp?userid=${process.env.OTP_USERNAME}&key=${process.env.OTP_KEY}&mobileno=${mobile}&timetoalive=600&sms=%7Botp%7D%20is%20the%20one%20time%20password%20for%20Astroguruji%20Application.%20AstrotalkGuruji`
+                const url = `http://pro.trinityservices.co.in/generateOtp.jsp?userid=${process.env.OTP_USERNAME}&key=${process.env.OTP_KEY}&mobileno=${newMobile}&timetoalive=600&sms=%7Botp%7D%20is%20the%20one%20time%20password%20for%20Astroguruji%20Application.%20AstrotalkGuruji`
                 let otpResponse;
                 try {
                     otpResponse = await axios.get(url);
