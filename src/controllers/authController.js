@@ -155,9 +155,11 @@ async function login(req, res) {
             return res.status(400).json({ success: false, message: 'Oops! Your account is inactive right now. Please contact support.' });
         }
         let newMobile = mobile
+        console.log("mobile.length", mobile.length);
         if (mobile.length == 12 && country_code == "+91") {
             newMobile = mobile.slice(2);
         }
+        console.log("newMobile", newMobile);
         if (mobile != '1999999999') {
             const setting = await db('settings').select('otp_provider').first();
             if (setting?.otp_provider == 'bulksms') {
@@ -188,6 +190,7 @@ function isNumber(str) {
 
 async function verifyOtp(req, res) {
     try {
+        console.log("verifyOtp req.body", req.body);
         let { mobile, country_code = '+91', otp, ad_set_id, utm_source, ad_id, type, version, referrer } = req.body;
         if (!mobile || !otp || !country_code) return res.status(400).json({ success: false, message: 'Mobile number and otp required.' });
 
@@ -195,10 +198,11 @@ async function verifyOtp(req, res) {
         if (!isValid) return res.status(400).json({ success: false, message: 'Enter valid mobile number.' });
 
         //remove extra 91
+        console.log("mobile.length", mobile.length);
         if (mobile.length == 12 && country_code == "+91") {
             mobile = mobile.slice(2);
         }
-
+        console.log("new mobile", mobile);
         if (mobile != '1999999999') {
             const setting = await db('settings').select('otp_provider').first();
             if (setting?.otp_provider == 'bulksms') {
