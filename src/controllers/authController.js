@@ -188,6 +188,7 @@ function isNumber(str) {
 
 async function verifyOtp(req, res) {
     try {
+        console.log("verifyOtp req.body", req.body);
         let { mobile, country_code = '+91', otp, ad_set_id, utm_source, ad_id, type, version, referrer } = req.body;
         if (!mobile || !otp || !country_code) return res.status(400).json({ success: false, message: 'Mobile number and otp required.' });
 
