@@ -196,10 +196,11 @@ async function verifyOtp(req, res) {
         if (!isValid) return res.status(400).json({ success: false, message: 'Enter valid mobile number.' });
 
         //remove extra 91
+        console.log("mobile.length", mobile.length);
         if (mobile.length == 12 && country_code == "+91") {
             mobile = mobile.slice(2);
         }
-
+        console.log("new mobile", mobile);
         if (mobile != '1999999999') {
             const setting = await db('settings').select('otp_provider').first();
             if (setting?.otp_provider == 'bulksms') {
