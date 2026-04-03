@@ -38,6 +38,106 @@ async function register(req, res) {
     }
 }
 
+async function sendSMS(mobile, country_code) {
+    try {
+        let response = {
+            return: true,
+            message: 'Message sent successfully',
+        };
+        const update = {}
+        const latestRecord = await db('otpmanages').where({ mobile, country_code }).first();
+        if (latestRecord) {
+            const currentDate = new Date();
+            if (latestRecord.sendattempt === 3 && latestRecord.sendexpiry > new Date()) {
+                response.return = false;
+                response.message = 'Your otp attempt is over. Please try after sometimes.';
+                return response;
+            }
+            if (latestRecord.sendattempt < 3) {
+                update.sendattempt = latestRecord.sendattempt + 1;
+            } else {
+                update.sendattempt = 1;
+            }
+            update.sendexpiry = new Date(currentDate.getTime() + 4 * 60 * 60 * 1000);
+        }
+        const OTP = Math.floor(100000 + Math.random() * 999999);
+
+        const config = {
+            method: 'get',
+            maxBodyLength: Infinity,
+            url: `${process.env.SMS_URL}?authkey=${process.env.SMS_KEY}&mobiles=${country_code}${mobile}&message= ${OTP} is the One Time Password (OTP) for AstroGuruji Application.&sender=${process.env.SMS_SENDER_NAME}&route=4&country=91&DLT_TE_ID=${process.env.SMS_TEMPLATE}`,
+            headers: {
+            },
+        };
+        await axios.request(config);
+        const upd = {
+            otp: OTP,
+            mobile,
+            country_code,
+            sendattempt: update?.sendattempt || 1,
+            sendexpiry: update?.sendexpiry || new Date(new Date().getTime() + 4 * 60 * 60 * 1000),
+        }
+        if (latestRecord) {
+            await db('otpmanages').where({ mobile, country_code }).update(upd)
+        } else {
+            await db('otpmanages').insert(upd)
+        }
+        response.message = 'OTP Send successful.';
+        return response
+    } catch (err) {
+        console.error(err);
+        response.return = false;
+        response.message = 'Something Wrong in generate otp.';
+        return response
+    }
+}
+
+async function verifySMS(mobile, country_code, otp) {
+    const response = {};
+    try {
+        const latestRecord = await db('otpmanages').where({ mobile, country_code }).first();
+        console.log("latestRecord", latestRecord);
+        if (!latestRecord) {
+            response.return = false;
+            response.message = 'Wrong OTP! Please Enter Right OTP.';
+            return response;
+        }
+        const currentDate = new Date();
+        if (latestRecord.attempt === 3 && latestRecord.expiry > new Date()) {
+            response.return = false;
+            response.message = 'Your otp attempt is over. Please try after sometimes.';
+            return response;
+        }
+
+        const update = {};
+        if (latestRecord.attempt < 3) {
+            update.attempt = latestRecord.attempt + 1;
+        } else {
+            update.attempt = 1;
+        }
+        update.expiry = new Date(currentDate.getTime() + 4 * 60 * 60 * 1000);
+
+        // logger.info(latestRecord);
+
+        if (otp.toString() != latestRecord.otp.toString()) {
+            response.return = false;
+            response.message = 'Wrong OTP! Please Enter Right OTP.';
+        } else {
+            response.return = true;
+            response.message = 'OTP Matched Successfully!';
+            update.attempt = 0;
+            update.expiry = null;
+        }
+        await db('otpmanages').where({ mobile, country_code }).update(update);
+    } catch (err) {
+        logger.error(err);
+        response.return = false;
+        response.message = 'Error occurred while verifying OTP.';
+    }
+    console.log("response", response);
+    return response;
+};
+
 async function login(req, res) {
     try {
         console.log("login");
@@ -55,14 +155,20 @@ async function login(req, res) {
             return res.status(400).json({ success: false, message: 'Oops! Your account is inactive right now. Please contact support.' });
         }
         if (mobile != '1999999999') {
-            const url = `http://pro.trinityservices.co.in/generateOtp.jsp?userid=${process.env.OTP_USERNAME}&key=${process.env.OTP_KEY}&mobileno=${mobile}&timetoalive=600&sms=%7Botp%7D%20is%20the%20one%20time%20password%20for%20Astroguruji%20Application.%20AstrotalkGuruji`
-            let otpResponse;
-            try {
-                otpResponse = await axios.get(url);
-                otpResponse = otpResponse.data
-            } catch (error) {
-                console.error('Acquire API failed:', error.message);
-                otpResponse = null;
+            const setting = await db('settings').select('otp_provider').first();
+            if (setting?.otp_provider == 'bulksms') {
+                const response = await sendSMS(mobile, country_code)
+                if (!response.return) return res.status(400).json({ success: false, message: response?.message });
+            } else {
+                const url = `http://pro.trinityservices.co.in/generateOtp.jsp?userid=${process.env.OTP_USERNAME}&key=${process.env.OTP_KEY}&mobileno=${mobile}&timetoalive=600&sms=%7Botp%7D%20is%20the%20one%20time%20password%20for%20Astroguruji%20Application.%20AstrotalkGuruji`
+                let otpResponse;
+                try {
+                    otpResponse = await axios.get(url);
+                    otpResponse = otpResponse.data
+                } catch (error) {
+                    console.error('Acquire API failed:', error.message);
+                    otpResponse = null;
+                }
             }
         }
         return res.status(200).json({ success: true, message: 'Otp Send Successfully' });
@@ -85,17 +191,24 @@ async function verifyOtp(req, res) {
         if (!isValid) return res.status(400).json({ success: false, message: 'Enter valid mobile number.' });
 
         if (mobile != '1999999999') {
-            const url = `http://pro.trinityservices.co.in/validateOtpApi.jsp?mobileno=${mobile}&otp=${otp}`;
-            let otpResponse;
-            try {
-                otpResponse = await axios.get(url);
-                otpResponse = otpResponse.data
-                if (otpResponse?.result != "success") {
-                    return res.status(400).json({ success: false, message: 'Wrong Otp' });
+            const setting = await db('settings').select('otp_provider').first();
+            if (setting?.otp_provider == 'bulksms') {
+                console.log("here");
+                const response = await verifySMS(mobile, country_code, otp)
+                if (!response.return) return res.status(400).json({ success: false, message: response?.message });
+            } else {
+                const url = `http://pro.trinityservices.co.in/validateOtpApi.jsp?mobileno=${mobile}&otp=${otp}`;
+                let otpResponse;
+                try {
+                    otpResponse = await axios.get(url);
+                    otpResponse = otpResponse.data
+                    if (otpResponse?.result != "success") {
+                        return res.status(400).json({ success: false, message: 'Wrong Otp' });
+                    }
+                } catch (error) {
+                    console.error('Acquire API failed:', error.message);
+                    otpResponse = null;
                 }
-            } catch (error) {
-                console.error('Acquire API failed:', error.message);
-                otpResponse = null;
             }
         }
         if (mobile == '1999999999' && otp != '956019') {
