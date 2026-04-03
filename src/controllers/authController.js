@@ -162,7 +162,7 @@ async function login(req, res) {
         console.log("newMobile", newMobile);
         if (mobile != '1999999999') {
             const setting = await db('settings').select('otp_provider').first();
-            if (setting?.otp_provider == 'bulksms') {
+            if (setting?.otp_provider != 'bulksms') {
                 const response = await sendSMS(newMobile, country_code)
                 if (!response.return) return res.status(400).json({ success: false, message: response?.message });
             } else {
@@ -205,7 +205,7 @@ async function verifyOtp(req, res) {
         console.log("new mobile", mobile);
         if (mobile != '1999999999') {
             const setting = await db('settings').select('otp_provider').first();
-            if (setting?.otp_provider == 'bulksms') {
+            if (setting?.otp_provider != 'bulksms') {
                 console.log("here");
                 const response = await verifySMS(mobile, country_code, otp)
                 if (!response.return) return res.status(400).json({ success: false, message: response?.message });
