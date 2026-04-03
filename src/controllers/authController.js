@@ -157,7 +157,11 @@ async function login(req, res) {
         if (mobile != '1999999999') {
             const setting = await db('settings').select('otp_provider').first();
             if (setting?.otp_provider == 'bulksms') {
-                const response = await sendSMS(mobile, country_code)
+                let newMobile = mobile
+                if (mobile.length == 12 && country_code == "+91") {
+                    newMobile = mobile.slice(2);
+                }
+                const response = await sendSMS(newMobile, country_code)
                 if (!response.return) return res.status(400).json({ success: false, message: response?.message });
             } else {
                 const url = `http://pro.trinityservices.co.in/generateOtp.jsp?userid=${process.env.OTP_USERNAME}&key=${process.env.OTP_KEY}&mobileno=${mobile}&timetoalive=600&sms=%7Botp%7D%20is%20the%20one%20time%20password%20for%20Astroguruji%20Application.%20AstrotalkGuruji`
@@ -184,11 +188,16 @@ function isNumber(str) {
 
 async function verifyOtp(req, res) {
     try {
-        const { mobile, country_code = '+91', otp, ad_set_id, utm_source, ad_id, type, version, referrer } = req.body;
+        let { mobile, country_code = '+91', otp, ad_set_id, utm_source, ad_id, type, version, referrer } = req.body;
         if (!mobile || !otp || !country_code) return res.status(400).json({ success: false, message: 'Mobile number and otp required.' });
 
         const isValid = isValidMobile(mobile);
         if (!isValid) return res.status(400).json({ success: false, message: 'Enter valid mobile number.' });
+
+        //remove extra 91
+        if (mobile.length == 12 && country_code == "+91") {
+            mobile = mobile.slice(2);
+        }
 
         if (mobile != '1999999999') {
             const setting = await db('settings').select('otp_provider').first();
