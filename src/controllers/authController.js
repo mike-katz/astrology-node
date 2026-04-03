@@ -197,6 +197,9 @@ async function verifyOtp(req, res) {
 
         //remove extra 91
         console.log("mobile.length", mobile.length);
+        if (mobile.length == 8 && country_code == "+91") {
+            mobile = `91${mobile}`;
+        }
         if (mobile.length == 12 && country_code == "+91") {
             mobile = mobile.slice(2);
         }
