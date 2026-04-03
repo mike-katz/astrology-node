@@ -60,7 +60,7 @@ async function sendSMS(mobile, country_code) {
             }
             update.sendexpiry = new Date(currentDate.getTime() + 4 * 60 * 60 * 1000);
         }
-        const OTP = Math.floor(100000 + Math.random() * 999999);
+        const OTP = Math.floor(100000 + Math.random() * 900000);
 
         const config = {
             method: 'get',
