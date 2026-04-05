@@ -238,7 +238,9 @@ async function verifyOtp(req, res) {
         if (existing && version) {
             upd.version = version
         }
-
+        if (mode) {
+            upd.mode = mode
+        }
         let set_id = ad_set_id ?? referrer ?? null;
 
         if (set_id != null) {
