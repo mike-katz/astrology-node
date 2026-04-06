@@ -9,21 +9,6 @@ const axios = require('axios');
 const sendMail = require('../utils/sendMail');
 const { getCache } = require("../config/redisClient")
 
-function deepParse(input) {
-    let result = input;
-
-    try {
-        while (typeof result === "string") {
-            result = JSON.parse(result);
-        }
-    } catch (err) {
-        // jo parse fail thay to last valid value return karo
-        return result;
-    }
-
-    return result;
-}
-
 async function getPandits(req, res) {
     try {
         // console.log("req.query", req.query);
@@ -376,12 +361,12 @@ async function getPandits(req, res) {
             user = [...user, ...newUser]
         }
         user.map(item => {
-            item.govt_id = item?.govt_id ? deepParse(item?.govt_id) : [];
-            item.available_for = item?.available_for ? deepParse(item?.available_for) : [];
-            item.languages = item?.languages ? deepParse(item?.languages) : [];
-            item.primary_expertise = item?.primary_expertise ? deepParse(item?.primary_expertise) : [];
-            item.secondary_expertise = item?.secondary_expertise ? deepParse(item?.secondary_expertise) : [];
-            item.certificate = item?.certificate ? deepParse(item?.certificate) : [];
+            item.govt_id = item?.govt_id ? JSON.parse(item?.govt_id) : [];
+            item.available_for = item?.available_for ? JSON.parse(item?.available_for) : [];
+            item.languages = item?.languages ? JSON.parse(item?.languages) : [];
+            item.primary_expertise = item?.primary_expertise ? JSON.parse(item?.primary_expertise) : [];
+            item.secondary_expertise = item?.secondary_expertise ? JSON.parse(item?.secondary_expertise) : [];
+            item.certificate = item?.certificate ? JSON.parse(item?.certificate) : [];
         })
         const response = {
             page,
