@@ -55,5 +55,21 @@ const socketParseEventData = (message) => {
 
 const isValidMobile = (mobile) => /^[0-9]{8,12}$/.test(mobile);
 
-module.exports = { decodeJWT, checkOrders, socketParseEventData, isValidMobile };
+
+function deepParse(input) {
+    let result = input;
+
+    try {
+        while (typeof result === "string") {
+            result = JSON.parse(result);
+        }
+    } catch (err) {
+        // jo parse fail thay to last valid value return karo
+        return result;
+    }
+
+    return result;
+}
+
+module.exports = { decodeJWT, checkOrders, socketParseEventData, isValidMobile, deepParse };
 

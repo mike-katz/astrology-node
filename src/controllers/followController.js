@@ -1,6 +1,7 @@
 const db = require('../db');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const { deepParse } = require('../utils/decodeJWT');
 require('dotenv').config();
 
 async function addFollow(req, res) {
@@ -71,8 +72,8 @@ async function getFollow(req, res) {
         .offset(offset);
 
     user?.map(item => {
-        item.languages = JSON.parse(item?.languages)
-        item.primary_expertise = JSON.parse(item?.primary_expertise)
+        item.languages = deepParse(item?.languages)
+        item.primary_expertise = deepParse(item?.primary_expertise)
     })
 
     const [{ count }] = await db('follows')

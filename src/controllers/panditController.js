@@ -1,6 +1,6 @@
 const db = require('../db');
 const { decrypt, encrypt } = require('../utils/crypto');
-const { decodeJWT } = require('../utils/decodeJWT');
+const { decodeJWT, deepParse } = require('../utils/decodeJWT');
 require('dotenv').config();
 const { uploadImageTos3, deleteFileFroms3 } = require('./uploader');
 const jwt = require('jsonwebtoken');
@@ -8,21 +8,6 @@ const { isValidMobile } = require('../utils/decodeJWT');
 const axios = require('axios');
 const sendMail = require('../utils/sendMail');
 const { getCache } = require("../config/redisClient")
-
-function deepParse(input) {
-    let result = input;
-
-    try {
-        while (typeof result === "string") {
-            result = JSON.parse(result);
-        }
-    } catch (err) {
-        // jo parse fail thay to last valid value return karo
-        return result;
-    }
-
-    return result;
-}
 
 async function getPandits(req, res) {
     try {
@@ -70,7 +55,7 @@ async function getPandits(req, res) {
                         if (isFree) {
                             const userData = await db('users').select('language').where({ id: Number(username) }).first();
                             if (userData) {
-                                language = userData?.language ? JSON.parse(userData?.language) : [] || []
+                                language = userData?.language ? deepParse(userData?.language) : [] || []
                             }
                         }
                     }
@@ -419,14 +404,14 @@ async function getPanditDetail(req, res) {
     const response = {
         id: user?.id,
         name: user?.display_name,
-        languages: user?.languages ? JSON.parse(user?.languages) : [],
-        primary_expertise: user?.primary_expertise ? JSON.parse(user?.primary_expertise) : [],
+        languages: user?.languages ? deepParse(user?.languages) : [],
+        primary_expertise: user?.primary_expertise ? deepParse(user?.primary_expertise) : [],
         experience: user?.experience,
         profile: user?.profile,
         waiting_time: user?.waiting_time,
         online: user?.online,
         chat_call_rate: user?.chat_call_rate,
-        available_for: user?.available_for ? JSON.parse(user?.available_for) : [],
+        available_for: user?.available_for ? deepParse(user?.available_for) : [],
         discounted_chat_call_rate: user?.discounted_chat_call_rate,
         final_chat_call_rate: user?.final_chat_call_rate,
         unlimited_free_calls_chats: user?.unlimited_free_calls_chats,
@@ -584,24 +569,24 @@ async function verifyOtp(req, res) {
                 gender: gender || "",
                 dob: dob || "",
                 country_code: country_code || "", email: email || "", city: city || "", country: country || "", experience: experience || "",
-                primary_expertise: primary_expertise ? JSON.parse(primary_expertise) : [],
-                secondary_expertise: secondary_expertise ? JSON.parse(secondary_expertise) : [],
+                primary_expertise: primary_expertise ? deepParse(primary_expertise) : [],
+                secondary_expertise: secondary_expertise ? deepParse(secondary_expertise) : [],
                 other_working_text: other_working_text || "",
-                other_working: other_working ? JSON.parse(other_working) : []
+                other_working: other_working ? deepParse(other_working) : []
             },
             "step2": {
-                languages: languages ? JSON.parse(languages) : [],
-                available_for: available_for ? JSON.parse(available_for) : [],
+                languages: languages ? deepParse(languages) : [],
+                available_for: available_for ? deepParse(available_for) : [],
                 chat_call_rate: chat_call_rate || "",
                 training_type: training_type || "",
                 guru_name: guru_name || "",
-                certificate: certificate ? JSON.parse(certificate) : [],
+                certificate: certificate ? deepParse(certificate) : [],
                 // response_time: response_time || ""
             },
             "step3": {
-                govt_id: govt_id ? JSON.parse(govt_id) : [],
+                govt_id: govt_id ? deepParse(govt_id) : [],
                 about: about || "", achievement_url: achievement_url || "",
-                address: address ? JSON.parse(address) : [],
+                address: address ? deepParse(address) : [],
                 selfie: selfie || "", achievement_file: achievement_file || ""
             },
             "step4": {
@@ -1148,7 +1133,7 @@ async function uploadImage(req, res) {
             // Check and remove from certificate array (stringified array of URLs)
             if (onboarding.certificate) {
                 try {
-                    const certificateArray = JSON.parse(onboarding.certificate);
+                    const certificateArray = deepParse(onboarding.certificate);
                     const result = certificateArray.filter(item => item !== file);
                     if (result?.length == 0) {
                         updateData.certificate = null
@@ -1162,7 +1147,7 @@ async function uploadImage(req, res) {
 
             // Check and remove from govt_id array (array of objects with URL)
             if (onboarding.govt_id) {
-                const govt_id = JSON.parse(onboarding.govt_id);
+                const govt_id = deepParse(onboarding.govt_id);
                 const returns = removeMatchedUrl(govt_id, file)
                 updateData.govt_id = JSON.stringify(returns);
 
@@ -1203,7 +1188,7 @@ async function submitOnboard(req, res) {
         // Step 1 required fields - parse JSON string for primary_expertise
         let primary_expertise = [];
         try {
-            primary_expertise = user?.primary_expertise ? JSON.parse(user.primary_expertise) : [];
+            primary_expertise = user?.primary_expertise ? deepParse(user.primary_expertise) : [];
         } catch (e) {
             console.error('Error parsing primary_expertise:', e);
         }
@@ -1217,9 +1202,9 @@ async function submitOnboard(req, res) {
         let available_for = [];
         let certificate = [];
         try {
-            languages = user?.languages ? JSON.parse(user.languages) : [];
-            available_for = user?.available_for ? JSON.parse(user.available_for) : [];
-            certificate = user?.certificate ? JSON.parse(user.certificate) : [];
+            languages = user?.languages ? deepParse(user.languages) : [];
+            available_for = user?.available_for ? deepParse(user.available_for) : [];
+            certificate = user?.certificate ? deepParse(user.certificate) : [];
         } catch (e) {
             console.error('Error parsing JSON fields:', e);
         }
@@ -1231,7 +1216,7 @@ async function submitOnboard(req, res) {
         // Step 3 required fields - parse JSON string to check if it's empty
         let govt_id = [];
         try {
-            govt_id = user?.govt_id ? JSON.parse(user.govt_id) : [];
+            govt_id = user?.govt_id ? deepParse(user.govt_id) : [];
         } catch (e) {
             console.error('Error parsing govt_id:', e);
         }
