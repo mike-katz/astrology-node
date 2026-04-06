@@ -141,7 +141,7 @@ async function verifySMS(mobile, country_code, otp) {
 async function login(req, res) {
     try {
         console.log("login");
-        logger.info('login called')
+        logger.info('login called', req.body)
         const { mobile, country_code = '+91' } = req.body;
 
         if (!mobile || !country_code) return res.status(400).json({ success: false, message: 'Mobile number required.' });
