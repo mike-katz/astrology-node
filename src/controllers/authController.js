@@ -140,8 +140,8 @@ async function verifySMS(mobile, country_code, otp) {
 
 async function login(req, res) {
     try {
-        console.log("login");
-        logger.info('login called', req.body)
+        console.log("login body param", req.body);
+        logger.info('login called')
         const { mobile, country_code = '+91' } = req.body;
 
         if (!mobile || !country_code) return res.status(400).json({ success: false, message: 'Mobile number required.' });
@@ -199,6 +199,9 @@ async function verifyOtp(req, res) {
 
         //remove extra 91
         console.log("mobile.length", mobile.length);
+        if (mobile.length == 8 && country_code == "+91") {
+            mobile = `91${mobile}`;
+        }
         if (mobile.length == 12 && country_code == "+91") {
             mobile = mobile.slice(2);
         }
