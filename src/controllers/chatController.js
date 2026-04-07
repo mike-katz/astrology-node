@@ -867,7 +867,9 @@ async function newCreateOrder(req, res) {
             deduction = 0;
             rate = settings?.free_chat_amount_per_minute || 1;
         } else {
-            const minTime = settings?.min_minutes_required_balance || 5
+            const minTime = Number(settings?.min_minutes_required_balance) || 5
+            console.log("user?.balance", user?.balance);
+            console.log("minTime", minTime);
             if (user?.balance < minTime) {
                 logger.info('order_create fail', { userId: req.userId, message: 'Please recharge your wallet.' });
                 return res.status(400).json({ success: false, message: 'Please recharge your wallet.' });
