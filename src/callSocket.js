@@ -264,7 +264,7 @@ function emitCallDurationUpdate(callId, durationInSeconds) {
     console.log("durationInSeconds", durationInSeconds);
     callSocketEvent('call_duration_update', {
         call_id: callId,
-        duration: String(durationInSeconds),
+        duration: String(30),
     });
 }
 
