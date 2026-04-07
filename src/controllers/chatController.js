@@ -437,7 +437,7 @@ function getDuration(start_time, end_time) {
 }
 
 async function balanceCut(user_id, order, end_time, place) {
-    logger.info('balancecut called', { user_id, orderId: order?.order_id });
+    logger.info('balancecut called', { user_id, orderId: order?.order_id, place, order });
     try {
         const transaction = await db('balancelogs').where({ order_id: order?.order_id }).first();
         if (transaction) {
