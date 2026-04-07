@@ -861,17 +861,18 @@ async function newCreateOrder(req, res) {
         let duration = Math.floor(Number(Number(user?.balance)) / Number(pandit?.final_chat_call_rate));
         let deduction = Number(duration) * Number(pandit?.final_chat_call_rate)
         let rate = pandit?.final_chat_call_rate;
+        const settings = await db('settings').first();
         if (count == 0) {
-            const settings = await db('settings').first();
             duration = Number(settings?.free_chat_minutes) || 0;
             deduction = 0;
             rate = settings?.free_chat_amount_per_minute || 1;
         } else {
-            if (user?.balance < 5) {
+            const minTime = settings?.min_minutes_required_balance || 5
+            if (user?.balance < minTime) {
                 logger.info('order_create fail', { userId: req.userId, message: 'Please recharge your wallet.' });
                 return res.status(400).json({ success: false, message: 'Please recharge your wallet.' });
             }
-            if (duration < 5) {
+            if (duration < minTime) {
                 logger.info('order_create fail', { userId: req.userId, message: 'Min. 5 min balance required.' });
                 return res.status(400).json({ success: false, message: 'Min. 5 min balance required.' });
             }
@@ -932,9 +933,9 @@ async function newCreateOrder(req, res) {
 
         const profile = await db('userprofiles').where({ id: Number(profile_id) }).first();
 
-        if (count == 0) {
-            sendAutoMessage(profile, req.userId, orderId, panditId);
-        }
+        // if (count == 0 && type == "chat") {
+        //     sendAutoMessage(profile, req.userId, orderId, panditId);
+        // }
         callEvent("emit_to_user_for_register", {
             key: `user_${req?.userId}`,
             payload: [{ ...saved, name: pandit?.display_name, profile: pandit?.profile, profile_name: profile?.name }]
