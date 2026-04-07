@@ -1238,6 +1238,7 @@ async function orderAccept(req, res) {
 
         const startTime = new Date()
         const endTime = new Date(Date.now() + `${duration}` * 60 * 1000);
+        logger.info('order_acceptOrder update', { orderId, status: "continue", duration, deduction, start_time: startTime, end_time: endTime });
         await db('orders').where({ id: order?.id }).update({ status: "continue", duration, deduction, start_time: startTime, end_time: endTime });
         await db('pandits').where({ id: order?.pandit_id }).update({ waiting_time: endTime });
 
@@ -1346,7 +1347,7 @@ Marital Status: ${formatValue(profile?.marital_status)} \n`;
             payload: { pandit_id: order?.pandit_id }
         });
 
-        logger.info('order_acceptOrder success', { userId: req.userId, orderId });
+        logger.info('order_acceptOrder success', { userId: req.userId, orderId, startTime, endTime });
         return res.status(200).json({ success: true, data: { startTime, endTime, orderId }, message: 'Order accept Successfully' });
     } catch (err) {
         logger.error('order_acceptOrder error', { userId: req.userId, orderId, err: err?.message });
