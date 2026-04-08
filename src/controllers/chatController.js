@@ -439,6 +439,10 @@ function getDuration(start_time, end_time) {
 async function balanceCut(user_id, order, end_time, place) {
     logger.info('balancecut called', { user_id, orderId: order?.order_id, place, order });
     try {
+        if (order.status != 'continue') {
+            logger.log('balanceCut skip: order already completed', { order_id: order.order_id });
+            return;
+        }
         const transaction = await db('balancelogs').where({ order_id: order?.order_id }).first();
         if (transaction) {
             logger.info('balancecut fail', { user_id, orderId: order?.order_id, message: "already order completed" });
@@ -1791,7 +1795,7 @@ async function completedAgoraCall(req, res) {
             logger.info('completedAgoraCall fail', { userId: req.userId, order_id, message: 'order is pending.' });
             return res.status(400).json({ success: false, message: 'order is pending.' });
         }
-        if (order.status == 'cancel') {
+        if (['cancel', 'rejected'].includes(order.status)) {
             logger.info('completedAgoraCall fail', { userId: req.userId, order_id, message: 'order is rejected.' });
             return res.status(400).json({ success: false, message: 'order is rejected.' });
         }
