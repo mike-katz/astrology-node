@@ -126,6 +126,7 @@ async function verifySMS(mobile, country_code, otp) {
             response.return = true;
             response.message = 'OTP Matched Successfully!';
             update.attempt = 0;
+            update.sendattempt = 0;
             update.expiry = null;
         }
         await db('otpmanages').where({ mobile, country_code }).update(update);
