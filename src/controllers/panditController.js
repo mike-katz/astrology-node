@@ -177,7 +177,16 @@ async function getPandits(req, res) {
                 });
             }
         }
-
+        if (isFree) {
+            query.andWhere(function () {
+                this.where('p.chat', true)
+                    .orWhere('p.call', true);
+            });
+            countQuery.andWhere(function () {
+                this.where('p.chat', true)
+                    .orWhere('p.call', true);
+            });
+        }
         if (secondary_expertise && secondary_expertise != 'all') {
             query.andWhere('p.secondary_expertise', 'ILIKE', `%${secondary_expertise.trim()}%`);
             countQuery.andWhere('p.secondary_expertise', 'ILIKE', `%${secondary_expertise.trim()}%`);
@@ -360,6 +369,12 @@ async function getPandits(req, res) {
                 query.andWhere(function () {
                     this.where('p.unlimited_free_calls_chats', true)
                         .orWhere('p.chat', true)
+                        .orWhere('p.call', true);
+                });
+            }
+            if (isFree) {
+                query.andWhere(function () {
+                    this.where('p.chat', true)
                         .orWhere('p.call', true);
                 });
             }
