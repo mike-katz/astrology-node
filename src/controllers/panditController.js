@@ -377,6 +377,9 @@ async function getPandits(req, res) {
             item.primary_expertise = item?.primary_expertise ? deepParse(item?.primary_expertise) : [];
             item.secondary_expertise = item?.secondary_expertise ? deepParse(item?.secondary_expertise) : [];
             item.certificate = item?.certificate ? deepParse(item?.certificate) : [];
+            if (item?.unlimited_free_calls_chats) {
+                item.chat = true
+            }
         })
         const response = {
             page,
@@ -444,6 +447,9 @@ async function getPanditDetail(req, res) {
         // reviews: review,
         isFollow: false,
         gallery
+    }
+    if (user?.unlimited_free_calls_chats) {
+        user.chat = true
     }
     const authHeader = req.headers.authorization;
     // console.log("authHeader", authHeader);
