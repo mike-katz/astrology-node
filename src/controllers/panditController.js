@@ -323,6 +323,9 @@ async function getPandits(req, res) {
             if (isFree) {
                 filter.unlimited_free_calls_chats = true
             }
+            const ids = [];
+            user?.map(item => ids.push(item?.id))
+            console.log("ids", ids);
             const query = db('pandits as p')
                 //.distinctOn('p.id')
                 .select(
@@ -360,7 +363,10 @@ async function getPandits(req, res) {
                         .orWhere('p.call', true);
                 });
             }
+            query.whereNotIn("p.id", ids)
             query.orderByRaw('RANDOM()');
+            console.log("sd", query.toQuery());
+
             const newUser = await query;
             user = [...user, ...newUser]
         }
