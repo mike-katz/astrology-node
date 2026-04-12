@@ -367,8 +367,7 @@ async function getPandits(req, res) {
                 .limit(newLimit)
             if (!isFree) {
                 query.andWhere(function () {
-                    this.where('p.unlimited_free_calls_chats', true)
-                        .orWhere('p.chat', true)
+                    this.where('p.chat', true)
                         .orWhere('p.call', true);
                 });
             }
