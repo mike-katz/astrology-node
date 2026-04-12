@@ -43,7 +43,7 @@ async function getPandits(req, res) {
                 if (decryptToken) {
                     const verified = jwt.verify(decryptToken, process.env.JWT_SECRET);
                     const username = verified?.userId;
-                    const redisKey = `beta_user_${username}`;
+                    const redisKey = `user_${username}`;
                     const redisToken = await getCache(redisKey);
 
                     if (!redisToken || redisToken == token) {
