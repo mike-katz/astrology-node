@@ -115,6 +115,7 @@ async function getPandits(req, res) {
                 return item && item.column !== undefined && item.order !== undefined && item.column !== null && item.order !== null;
             });
         }
+        console.log("isFree", isFree);
         if (isFree) {
             filter['p.unlimited_free_calls_chats'] = true
         }
@@ -325,65 +326,65 @@ async function getPandits(req, res) {
         const total = 100
         const totalPages = Math.ceil(total / limit);
 
-        if (user?.length < 100) {
-            console.log("inside if");
-            const newLimit = 100 - user?.length
-            console.log("newLimit", newLimit);
-            if (isFree) {
-                filter.unlimited_free_calls_chats = true
-            }
-            const ids = [];
-            user?.map(item => ids.push(item?.id))
-            console.log("ids", ids);
-            const query = db('pandits as p')
-                //.distinctOn('p.id')
-                .select(
-                    'p.display_name as name',
-                    'p.id',
-                    'p.languages',
-                    'p.experience',
-                    'p.profile',
-                    'p.available_for',
-                    'p.total_chat_minutes',
-                    'p.total_call_minutes',
-                    'p.primary_expertise',
-                    'p.secondary_expertise',
-                    'p.discounted_chat_call_rate',
-                    'p.final_chat_call_rate',
-                    'p.waiting_time',
-                    'p.unlimited_free_calls_chats',
-                    'p.chat',
-                    'p.call',
-                    'p.online',
-                    'p.rating_1',
-                    'p.rating_2',
-                    'p.rating_3',
-                    'p.rating_5',
-                    'p.rating_4',
-                    'p.total_orders',
-                    'p.tag',
-                    'p.chat_call_rate',
-                ).where(filter)
-                .limit(newLimit)
-            if (!isFree) {
-                query.andWhere(function () {
-                    this.where('p.chat', true)
-                        .orWhere('p.call', true);
-                });
-            }
-            if (isFree) {
-                query.andWhere(function () {
-                    this.where('p.chat', true)
-                        .orWhere('p.call', true);
-                });
-            }
-            query.whereNotIn("p.id", ids)
-            query.orderByRaw('RANDOM()');
-            console.log("sd", query.toQuery());
+        // if (user?.length < 100) {
+        //     console.log("inside if");
+        //     const newLimit = 100 - user?.length
+        //     console.log("newLimit", newLimit);
+        //     if (isFree) {
+        //         filter.unlimited_free_calls_chats = true
+        //     }
+        //     const ids = [];
+        //     user?.map(item => ids.push(item?.id))
+        //     console.log("ids", ids);
+        //     const query = db('pandits as p')
+        //         //.distinctOn('p.id')
+        //         .select(
+        //             'p.display_name as name',
+        //             'p.id',
+        //             'p.languages',
+        //             'p.experience',
+        //             'p.profile',
+        //             'p.available_for',
+        //             'p.total_chat_minutes',
+        //             'p.total_call_minutes',
+        //             'p.primary_expertise',
+        //             'p.secondary_expertise',
+        //             'p.discounted_chat_call_rate',
+        //             'p.final_chat_call_rate',
+        //             'p.waiting_time',
+        //             'p.unlimited_free_calls_chats',
+        //             'p.chat',
+        //             'p.call',
+        //             'p.online',
+        //             'p.rating_1',
+        //             'p.rating_2',
+        //             'p.rating_3',
+        //             'p.rating_5',
+        //             'p.rating_4',
+        //             'p.total_orders',
+        //             'p.tag',
+        //             'p.chat_call_rate',
+        //         ).where(filter)
+        //         .limit(newLimit)
+        //     if (!isFree) {
+        //         query.andWhere(function () {
+        //             this.where('p.chat', true)
+        //                 .orWhere('p.call', true);
+        //         });
+        //     }
+        //     if (isFree) {
+        //         query.andWhere(function () {
+        //             this.where('p.chat', true)
+        //                 .orWhere('p.call', true);
+        //         });
+        //     }
+        //     query.whereNotIn("p.id", ids)
+        //     query.orderByRaw('RANDOM()');
+        //     console.log("sd", query.toQuery());
 
-            const newUser = await query;
-            user = [...user, ...newUser]
-        }
+        //     const newUser = await query;
+        //     user = [...user, ...newUser]
+        // }
         user.map(item => {
             item.govt_id = item?.govt_id ? deepParse(item?.govt_id) : [];
             item.available_for = item?.available_for ? deepParse(item?.available_for) : [];
