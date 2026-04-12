@@ -115,7 +115,9 @@ async function getPandits(req, res) {
                 return item && item.column !== undefined && item.order !== undefined && item.column !== null && item.order !== null;
             });
         }
-
+        if (isFree) {
+            filter['p.unlimited_free_calls_chats'] = true
+        }
         // console.log("sort_by", sorting);
         let query = db('pandits as p')
             //.distinctOn('p.id')
@@ -156,22 +158,24 @@ async function getPandits(req, res) {
             query.andWhere('p.display_name', 'ilike', `%${search.trim()}%`);
             countQuery.andWhere('p.display_name', 'ilike', `%${search.trim()}%`);
         } else {
-            query.andWhere(function () {
-                if (type === 'call') {
-                    this.where('p.call', true);
-                }
-                if (type === 'chat') {
-                    this.where('p.chat', true);
-                }
-            });
-            countQuery.andWhere(function () {
-                if (type === 'call') {
-                    this.where('p.call', true);
-                }
-                if (type === 'chat') {
-                    this.where('p.chat', true);
-                }
-            });
+            if (!isFree) {
+                query.andWhere(function () {
+                    if (type === 'call') {
+                        this.where('p.call', true);
+                    }
+                    if (type === 'chat') {
+                        this.where('p.chat', true);
+                    }
+                });
+                countQuery.andWhere(function () {
+                    if (type === 'call') {
+                        this.where('p.call', true);
+                    }
+                    if (type === 'chat') {
+                        this.where('p.chat', true);
+                    }
+                });
+            }
         }
 
         if (secondary_expertise && secondary_expertise != 'all') {
