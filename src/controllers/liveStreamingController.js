@@ -218,7 +218,7 @@ async function joinLive(req, res) {
         const { token, expire_at } = buildToken(channel_id, uid, RtcRole.SUBSCRIBER);
 
         const viewer_count = await RedisCache.incr(LIVE_VIEWER_KEY(channel_id));
-        emitLiveViewerCount(live.pandit_id, channel_id, viewer_count);
+        emitLiveViewerCount(live.pandit_id, channel_id, viewer_count, u.id);
         emitLiveViewerJoined(live.pandit_id, {
             channel_id,
             rtc_uid: uid,
