@@ -207,7 +207,7 @@ async function joinLive(req, res) {
         const u = await db('users').where({ id: Number(bodyUserId) }).first();
         if (u) {
             joinedUserId = Number(u.id);
-            joinedUserName = u.name || u.display_name || null;
+            joinedUserName = u.name || null;
         }
 
         const uid = randomViewerUid();
@@ -227,11 +227,11 @@ async function joinLive(req, res) {
 
         callEvent("emit_to_live_user_joined", {
             key: `pandit_${live?.pandit_id}`,
-            payload: { user_id: u.id, username: u.username, profile: u.profile }
+            payload: { user_id: u.id, username: u.name, profile: u.profile, avatar: u.avatar }
         });
         callEvent("emit_to_live_user_joined", {
             key: `user_${u.id}`,
-            payload: { user_id: u.id, username: u.username, profile: u.profile }
+            payload: { user_id: u.id, username: u.name, profile: u.profile, avatar: u.avatar }
         });
         return res.status(200).json({
             success: true,
