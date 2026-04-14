@@ -14,10 +14,14 @@ const RESERVED_RECORDING_UID = 999999;
 
 const LIVE_VIEWER_KEY = (channelId) => `live_stream:viewers:${channelId}`;
 
-function emitLiveViewerCount(panditId, channel_id, viewer_count) {
+function emitLiveViewerCount(panditId, channel_id, viewer_count, user_id) {
     try {
         callEvent('emit_to_live_viewer_count', {
             key: `pandit_${panditId}`,
+            payload: { channel_id, viewer_count, pandit_id: panditId },
+        });
+        callEvent('emit_to_live_viewer_count', {
+            key: `user_${user_id}`,
             payload: { channel_id, viewer_count, pandit_id: panditId },
         });
     } catch (e) {
