@@ -229,6 +229,10 @@ async function joinLive(req, res) {
             key: `pandit_${live?.pandit_id}`,
             payload: { user_id: u.id, username: u.username, profile: u.profile }
         });
+        callEvent("emit_to_live_user_joined", {
+            key: `user_${u.id}`,
+            payload: { user_id: u.id, username: u.username, profile: u.profile }
+        });
         return res.status(200).json({
             success: true,
             data: {
