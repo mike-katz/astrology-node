@@ -23,14 +23,28 @@ async function uploadToAzure(buffer, fileName) {
 }
 
 async function deleteFileFromAzure(filePath = '') {
-    new Promise(async (resolve, reject) => {
+    return new Promise(async (resolve, reject) => {
         try {
-            const match = filePath.match(/\.blob\.core\.windows\.net\/[^/]+\/(.+)$/);
-            if (!match || !match[1]) {
-                reject(new Error('Invalid Azure blob URL'));
-                return;
+            let blobName = '';
+
+            // Azure Blob URL support
+            const azureMatch = filePath.match(/\.blob\.core\.windows\.net\/[^/]+\/(.+)$/);
+
+            // CDN Base URL support
+            const cdnBaseUrl = process.env.AZURE_STORAGE_BASE_URL;
+
+            if (azureMatch && azureMatch[1]) {
+                blobName = decodeURIComponent(azureMatch[1]);
+            } else if (filePath.startsWith(cdnBaseUrl)) {
+                blobName = decodeURIComponent(
+                    filePath.replace(cdnBaseUrl, '')
+                );
             }
-            const blobName = decodeURIComponent(match[1]);
+
+            if (!blobName) {
+                return reject(new Error('Invalid Azure blob/CDN URL'));
+            }
+
             const containerClient = getContainerClient();
             const blockBlobClient = containerClient.getBlockBlobClient(blobName);
             const result = await blockBlobClient.deleteIfExists();

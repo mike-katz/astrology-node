@@ -3,10 +3,9 @@ const db = require('../db');
 const axios = require('axios');
 
 require('dotenv').config();
-const { deleteFileFroms3 } = require('./uploader');
 
 const { deleteKey } = require('../config/redisClient');
-const { uploadImageToAzure } = require('../utils/azureUploader');
+const { uploadImageToAzure, deleteFileFromAzure } = require('../utils/azureUploader');
 
 async function makeAvtarString(user, gender) {
     if (!user || !gender) return null;
@@ -225,7 +224,7 @@ async function profileUpdate(req, res) {
             update.profile = `${process.env.AZURE_STORAGE_BASE_URL}${image?.data?.key}`;
         }
         if (order?.profile?.length > 0) {
-            const dd = await deleteFileFroms3(decodeURIComponent(order?.profile))
+            const dd = await deleteFileFromAzure(decodeURIComponent(order?.profile))
             // console.log("dd", dd);
         }
         await db('users').where({ id: req.userId }).update(update);

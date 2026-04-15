@@ -2,13 +2,12 @@ const db = require('../db');
 const { decrypt, encrypt } = require('../utils/crypto');
 const { decodeJWT, deepParse } = require('../utils/decodeJWT');
 require('dotenv').config();
-const { deleteFileFroms3 } = require('./uploader');
 const jwt = require('jsonwebtoken');
 const { isValidMobile } = require('../utils/decodeJWT');
 const axios = require('axios');
 const sendMail = require('../utils/sendMail');
 const { getCache } = require("../config/redisClient");
-const { uploadImageToAzure } = require('../utils/azureUploader');
+const { uploadImageToAzure, deleteFileFromAzure } = require('../utils/azureUploader');
 
 async function getPandits(req, res) {
     try {
@@ -1167,7 +1166,7 @@ async function uploadImage(req, res) {
             }
 
             // Delete file from S3
-            const dd = await deleteFileFroms3(decodedUrl);
+            const dd = await deleteFileFromAzure(decodedUrl);
             // console.log("dd", dd);
         }
         return res.status(200).json({ success: true, data: url, message: `Image ${type} Successfully` });
