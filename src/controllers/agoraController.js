@@ -29,7 +29,7 @@ const RECORDING_AZURE_ACCOUNT = process.env.AZURE_STORAGE_ACCOUNT_NAME || proces
 function getRecordingFileUrl(fileName) {
     if (!fileName) return '';
     if (RECORDING_AZURE_ACCOUNT && RECORDING_BUCKET) {
-        return `${AZURE_STORAGE_BASE_URL}/${fileName}`;
+        return `${process.env.AZURE_STORAGE_BASE_URL}/${fileName}`;
     }
 }
 
