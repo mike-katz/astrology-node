@@ -7,7 +7,7 @@ const axios = require('axios');
 const { callEvent } = require("../socket");
 const { channelLeave, geneateToken } = require('./agoraController');
 const { sendBulkPush } = require('./reviewController');
-const { uploadImageTos3 } = require('./uploader');
+const { uploadImageToAzure } = require('../utils/azureUploader');
 const { emitCallDurationUpdate } = require('../callSocket');
 const { replaceTemplate } = require('../utils/replaceTemplate');
 const admin = require('../config/firebase');
@@ -251,7 +251,7 @@ async function sendMessage(req, res) {
         let response = [];
         if (files?.length > 0) {
             for (const file of files) {
-                const image = await uploadImageTos3('message', file, 'chat');
+                const image = await uploadImageToAzure('message', file, 'chat');
                 // console.log("image", image.data.Location);
                 const [saved] = await db('chats').insert({
                     sender_type: "user",
@@ -259,7 +259,7 @@ async function sendMessage(req, res) {
                     receiver_type: "pandit",
                     order_id: orderId,
                     receiver_id: Number(order?.pandit_id),
-                    message: image.data.Location,
+                    message: `${process.env.AZURE_STORAGE_BASE_URL}${image?.data?.key}`,
                     status: "send",
                     type
                 }).returning('*');

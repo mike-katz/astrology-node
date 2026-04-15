@@ -42,4 +42,46 @@ async function deleteFileFromAzure(filePath = '') {
     });
 }
 
-module.exports = { uploadToAzure, deleteFileFromAzure }
+async function uploadImageToAzure(directoryPath, image, type) {
+    new Promise(async (resolve, reject) => {
+        try {
+            const containerClient = getContainerClient();
+            const file = image.buffer;
+            const originalFileName = image.originalname;
+            const splitedFileName = originalFileName.split('.');
+            const fileName = `${Date.now().toString()}@$!${splitedFileName[0]}.${splitedFileName[splitedFileName.length - 1]}`;
+
+            const folderName =
+                type === 'chat' ? process.env.CHAT_FOLDER_NAME
+                    : type === 'pandit' ? process.env.PANDIT_FOLDER_NAME
+                        : type === 'document' ? process.env.DOCUMENT_FOLDER_NAME
+                            : type === 'upload' ? 'upload'
+                                : type === 'support' ? (process.env.SUPPORT_FOLDER_NAME || 'support')
+                                    : process.env.CHAT_FOLDER_NAME || '';
+
+            const blobName = folderName ? `${folderName}/${fileName}` : fileName;
+            const blockBlobClient = containerClient.getBlockBlobClient(blobName);
+
+            await blockBlobClient.uploadData(file, {
+                blobHTTPHeaders: {
+                    blobContentType: image.mimetype || 'application/octet-stream',
+                },
+            });
+
+            const url = blockBlobClient.url;
+            resolve({
+                data: {
+                    Location: url,
+                    key: blobName,
+                    url,
+                    blobName,
+                },
+            });
+        } catch (err) {
+            console.error('Azure upload error:', err);
+            reject(err);
+        }
+    });
+}
+
+module.exports = { uploadToAzure, deleteFileFromAzure, uploadImageToAzure }
