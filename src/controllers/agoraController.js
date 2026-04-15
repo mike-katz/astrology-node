@@ -14,11 +14,24 @@ const APP_CERT = process.env.AGORA_APP_CERTIFICATE;
 const CUSTOMER_KEY = process.env.AGORA_CUSTOMER_KEY;
 const CUSTOMER_SECRET = process.env.AGORA_CUSTOMER_SECRET;
 
-// AWS S3 (Agora vendor 4)
-const S3_BUCKET = process.env.S3_RECORDING_BUCKET || process.env.AWS_BUCKET_NAME;
-const S3_ACCESS_KEY = process.env.AWS_ACCESS_KEY;
-const S3_SECRET_KEY = process.env.AWS_SECRET_KEY;
-const S3_REGION = process.env.AWS_REGION || 'ap-south-1';  // e.g. ap-south-1 for Mumbai
+
+const RECORDING_BUCKET = process.env.AZURE_STORAGE_CONTAINER_NAME;
+const RECORDING_ACCESS_KEY = process.env.AZURE_STORAGE_ACCOUNT_NAME;   // Azure: account name
+const RECORDING_SECRET_KEY = process.env.AZURE_STORAGE_ACCOUNT_KEY;   // Azure: account key
+// Agora region ID (number): 0=US_EAST_1, 14=AP_SOUTH_1 (India), etc.
+const RECORDING_REGION = parseInt(process.env.AGORA_RECORDING_REGION, 10);
+const RECORDING_REGION_ID = Number.isInteger(RECORDING_REGION) ? RECORDING_REGION : 14;
+// Blob URL: use AZURE_STORAGE_ACCOUNT_NAME (fallback: AGORA_RECORDING_AZURE_ACCOUNT)
+const RECORDING_AZURE_ACCOUNT = process.env.AZURE_STORAGE_ACCOUNT_NAME || process.env.AGORA_RECORDING_AZURE_ACCOUNT;
+
+
+/** Build public URL for a recording file based on storage vendor (used in webhook). */
+function getRecordingFileUrl(fileName) {
+    if (!fileName) return '';
+    if (RECORDING_AZURE_ACCOUNT && RECORDING_BUCKET) {
+        return `${AZURE_STORAGE_BASE_URL}/${fileName}`;
+    }
+}
 
 /* ================= CONSTANT ================= */
 // 🔑 Dedicated recording bot UID
@@ -209,6 +222,11 @@ async function getRtcToken(req, res) {
     }
 }
 
+/* ================= RECORDING STORAGE VALIDATION ================= */
+function isRecordingStorageConfigured() {
+    return !!(RECORDING_BUCKET && RECORDING_ACCESS_KEY && RECORDING_SECRET_KEY);
+}
+
 /* ================= RECORDING REQUEST BODY ================= */
 const recordingStartBody = (channelName, recordingToken) => ({
     cname: channelName,
@@ -227,13 +245,22 @@ const recordingStartBody = (channelName, recordingToken) => ({
             avFileType: ['hls']
         },
         storageConfig: {
-            vendor: 1,           // 4 = AWS S3
-            region: 14,
-            bucket: S3_BUCKET,
-            accessKey: S3_ACCESS_KEY,
-            secretKey: S3_SECRET_KEY,
+            vendor: 5,
+            region: 0,
+            bucket: RECORDING_BUCKET,
+            accessKey: RECORDING_ACCESS_KEY,
+            secretKey: RECORDING_SECRET_KEY,
             fileNamePrefix: ['recordings', channelName]
         },
+
+        // storageConfig: {
+        //     vendor: 1,           // 4 = AWS S3
+        //     region: 14,
+        //     bucket: S3_BUCKET,
+        //     accessKey: S3_ACCESS_KEY,
+        //     secretKey: S3_SECRET_KEY,
+        //     fileNamePrefix: ['recordings', channelName]
+        // },
         async_stop: false
     }
 });
@@ -514,8 +541,8 @@ async function recordingWebhook(req, res) {
 
             const order = await db('orders').where({ order_id: cname }).first();
             console.log("order", order);
-            if (order) {
-                const bucketName = process.env.AWS_BUCKET_NAME;
+            if (order && fileList.length > 0) {
+                const recordingUrl = getRecordingFileUrl(fileList[0].fileName);
                 console.log("fileList[0].fileName", fileList[0].fileName);
                 const [saved] = await db('chats').insert({
                     sender_type: "pandit",
@@ -524,7 +551,7 @@ async function recordingWebhook(req, res) {
                     receiver_type: "user",
                     order_id: cname,
                     receiver_id: Number(order?.user_id),
-                    message: `https://${bucketName}.s3.amazonaws.com/${fileList[0].fileName}`,
+                    message: recordingUrl,
                     status: "send",
                     type: "call_recording"
                 }).returning('*');
