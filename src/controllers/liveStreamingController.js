@@ -451,11 +451,105 @@ async function listLiveChat(req, res) {
     }
 }
 
+/**
+ * Same billing / DB rules as POST /order/create, but type must be `audio` or `video`.
+ * No socket (callEvent), no push notification, no auto chat messages.
+ */
+async function createMediaOrder(req, res) {
+    const { channel, type, profile_id } = req.body;
+    logger.info('order_createMedia', { userId: req.userId, channel, type, profile_id });
+    if (!channel || !profile_id || !type) {
+        logger.info('order_createMedia fail', { userId: req.userId, message: 'Missing params' });
+        return res.status(400).json({ success: false, message: 'Missing params' });
+    }
+    if (type !== 'audio' && type !== 'video') {
+        logger.info('order_createMedia fail', { userId: req.userId, type, message: 'type must be audio or video' });
+        return res.status(400).json({ success: false, message: 'type must be audio or video' });
+    }
+    try {
+        const user = await db('users').where({ id: req.userId }).first();
+
+        const live = await db('live_streams').where({ channel_id: channel, status: 'live' }).first();
+        if (!live) {
+            return res.status(404).json({ success: false, message: 'Live not found or ended.' });
+        }
+
+        const continueOrder = await db('orders').where({ user_id: req.userId }).whereIn('status', ['continue', 'pending']).first();
+        if (continueOrder?.status === 'continue') {
+            logger.info('order_createMedia fail', { userId: req.userId, message: `Please complete your ongoing ${type}.` });
+            return res.status(400).json({ success: false, message: `Please complete your ongoing ${type}.` });
+        }
+        if (continueOrder?.status === 'pending') {
+            logger.info('order_createMedia fail', { userId: req.userId, message: `Please reject your pending ${type}.` });
+            return res.status(400).json({ success: false, message: `Please reject your pending ${type}.` });
+        }
+
+        let duration = Math.floor(Number(Number(user?.balance)) / Number(pandit?.final_chat_call_rate));
+        let deduction = Number(duration) * Number(pandit?.final_chat_call_rate);
+        let rate = pandit?.final_chat_call_rate;
+
+        if (user?.balance < 1) {
+            logger.info('order_createMedia fail', { userId: req.userId, message: 'Please recharge your wallet.' });
+            return res.status(400).json({ success: false, message: 'Please recharge your wallet.' });
+        }
+        if (duration < 5) {
+            logger.info('order_createMedia fail', { userId: req.userId, message: 'Min. 5 min balance required.' });
+            return res.status(400).json({ success: false, message: 'Min. 5 min balance required.' });
+        }
+        if (Number(user?.balance) < deduction) {
+            logger.info('order_createMedia fail', { userId: req.userId, message: 'Min. 5 min balance required.' });
+            return res.status(400).json({ success: false, message: 'Min. 5 min balance required.' });
+        }
+
+        const orderId = `${new Date().getTime().toString()}${Math.floor(100000 + Math.random() * 900000).toString()}`;
+        if (!Number.isFinite(duration)) {
+            logger.info('order_createMedia fail', { userId: req.userId, message: 'Min. 5 min balance required.' });
+            return res.status(400).json({ success: false, message: 'Min. 5 min balance required.' });
+        }
+        if (isNaN(deduction)) {
+            logger.info('order_createMedia fail', { userId: req.userId, message: 'Balance could not be NaN.' });
+            return res.status(400).json({ success: false, message: 'Balance could not be NaN.' });
+        }
+
+        const ins = {
+            pandit_id: live?.pandit_id,
+            user_id: req.userId,
+            order_id: orderId,
+            status: 'pending',
+            rate,
+            duration,
+            deduction,
+            type,
+            profile_id,
+            is_free: false,
+        };
+        const upd = { is_free_order: 'paid' };
+        await db('users').where({ id: Number(req.userId) }).update(upd);
+        await db('orders').insert(ins).returning('*');
+        callEvent('emit_to_live_call_receive', {
+            key: `pandit_${live?.pandit_id}`,
+            payload: { channel_id: channel, type, user_id: req.userId, username: user?.name, profile: user?.profile, avatar: user?.avatar },
+        });
+
+        const response = await generateToken(order_id);
+        if (!response?.success) {
+            return res.status(400).json({ success: false, message: response?.message });
+        }
+        logger.info('order_createMedia success', { userId: req.userId, orderId, channel, type });
+        return res.status(200).json({ success: true, data: { order_id, ...response?.data }, message: 'Order created successfully' });
+    } catch (err) {
+        logger.error('order_createMedia error', { userId: req.userId, err: err?.message });
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
 module.exports = {
     listLive,
     joinLive,
     viewerLeave,
     sendLiveChatUser,
     sendLiveHeart,
-    listLiveChat
+    listLiveChat,
+    createMediaOrder
 };
