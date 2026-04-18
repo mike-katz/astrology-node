@@ -235,7 +235,7 @@ async function joinLive(req, res) {
     try {
         const live = await db('live_streams').where({ channel_id, status: 'live' }).first();
         if (!live) {
-            return res.status(404).json({ success: false, message: 'Live not found or ended.' });
+            return res.status(400).json({ success: false, message: 'Live not found or ended.' });
         }
 
         let joinedUserId = null;
@@ -309,7 +309,7 @@ async function viewerLeave(req, res) {
     try {
         const live = await db('live_streams').where({ channel_id, status: 'live' }).first();
         if (!live) {
-            return res.status(404).json({ success: false, message: 'Live not found or ended.' });
+            return res.status(400).json({ success: false, message: 'Live not found or ended.' });
         }
 
         const key = LIVE_VIEWER_KEY(channel_id);
@@ -370,7 +370,7 @@ async function sendLiveChatUser(req, res) {
     try {
         const live = await assertLiveChannelActive(channel_id);
         if (!live) {
-            return res.status(404).json({ success: false, message: 'Live not found or ended.' });
+            return res.status(400).json({ success: false, message: 'Live not found or ended.' });
         }
 
         let sender_id = null;
@@ -420,7 +420,7 @@ async function sendLiveHeart(req, res) {
     try {
         const live = await assertLiveChannelActive(channel_id);
         if (!live) {
-            return res.status(404).json({ success: false, message: 'Live not found or ended.' });
+            return res.status(400).json({ success: false, message: 'Live not found or ended.' });
         }
 
         const total_hearts = await RedisCache.incr(LIVE_HEARTS_KEY(channel_id));
@@ -457,7 +457,7 @@ async function listLiveChat(req, res) {
     try {
         const stream = await db('live_streams').where({ channel_id }).first();
         if (!stream) {
-            return res.status(404).json({ success: false, message: 'Channel not found.' });
+            return res.status(400).json({ success: false, message: 'Channel not found.' });
         }
 
         const [{ count }] = await db('live_stream_chats').count('* as count').where({ channel_id });
@@ -516,7 +516,7 @@ async function createMediaOrder(req, res) {
 
         const live = await db('live_streams').where({ channel_id: channel, status: 'live' }).first();
         if (!live) {
-            return res.status(404).json({ success: false, message: 'Live not found or ended.' });
+            return res.status(400).json({ success: false, message: 'Live not found or ended.' });
         }
 
         const continueOrder = await db('orders').where({ user_id: req.userId }).whereIn('status', ['continue', 'pending']).first();
