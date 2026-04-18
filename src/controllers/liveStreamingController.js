@@ -332,12 +332,11 @@ async function sendLiveChatUser(req, res) {
 
         let sender_id = null;
         let sender_name = 'Guest';
-        if (bodyUserId != null && bodyUserId !== '') {
-            const u = await db('users').where({ id: Number(bodyUserId) }).first();
-            if (u) {
-                sender_id = Number(u.id);
-                sender_name = u.name || u.display_name || 'User';
-            }
+
+        const u = await db('users').where({ id: Number(bodyUserId) }).first();
+        if (u) {
+            sender_id = Number(u.id);
+            sender_name = u.name || u.display_name || 'User';
         }
 
         const [saved] = await db('live_stream_chats')
