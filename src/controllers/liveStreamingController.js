@@ -15,6 +15,7 @@ const TOKEN_EXPIRE_SECONDS = parseInt(process.env.AGORA_LIVE_TOKEN_EXPIRE_SECOND
 const RESERVED_RECORDING_UID = 999999;
 
 const LIVE_VIEWER_KEY = (channelId) => `live_stream:viewers:${channelId}`;
+const LIVE_JOINED_USER_IDS_KEY = (channelId) => `live_stream:joined_user_ids:${channelId}`;
 
 function emitLiveViewerCount(panditId, channel_id, viewer_count, user_id) {
     try {
@@ -22,10 +23,13 @@ function emitLiveViewerCount(panditId, channel_id, viewer_count, user_id) {
             key: `pandit_${panditId}`,
             payload: { channel_id, viewer_count, pandit_id: panditId },
         });
-        callEvent('emit_to_live_viewer_count', {
-            key: `user_${user_id}`,
-            payload: { channel_id, viewer_count, pandit_id: panditId },
-        });
+        const uid = user_id != null && Number.isFinite(Number(user_id)) ? Number(user_id) : null;
+        if (uid != null) {
+            callEvent('emit_to_live_viewer_count', {
+                key: `user_${uid}`,
+                payload: { channel_id, viewer_count, pandit_id: panditId },
+            });
+        }
     } catch (e) {
         logger.error('emitLiveViewerCount failed', e?.message, { channel_id, viewer_count });
     }
@@ -46,6 +50,32 @@ async function readViewerCount(channel_id) {
     const raw = await RedisCache.getCache(LIVE_VIEWER_KEY(channel_id));
     const n = parseInt(raw, 10);
     return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
+async function readJoinedUserIds(channel_id) {
+    const members = await RedisCache.smembers(LIVE_JOINED_USER_IDS_KEY(channel_id));
+    if (!members?.length) return [];
+    const nums = members.map((m) => Number(m)).filter((n) => Number.isFinite(n));
+    return [...new Set(nums)].sort((a, b) => a - b);
+}
+
+/** `emit_to_live_user_joined` — pandit + one socket per joined user id (line by line). */
+function emitLiveUserJoinedToEachUser(panditId, channel_id, payload) {
+    const base = { pandit_id: panditId, channel_id, ...payload };
+    try {
+        callEvent('emit_to_live_user_joined', { key: `pandit_${panditId}`, payload: base });
+        const ids = Array.isArray(payload.joined_user_ids) ? payload.joined_user_ids : [];
+        for (let i = 0; i < ids.length; i += 1) {
+            const id = ids[i];
+            if (!Number.isFinite(Number(id))) continue;
+            callEvent('emit_to_live_user_joined', {
+                key: `user_${Number(id)}`,
+                payload: base,
+            });
+        }
+    } catch (e) {
+        logger.error('emitLiveUserJoinedToEachUser failed', e?.message, { channel_id, panditId });
+    }
 }
 
 function assertAgoraConfig() {
@@ -220,7 +250,12 @@ async function joinLive(req, res) {
         const { token, expire_at } = buildToken(channel_id, uid, RtcRole.SUBSCRIBER);
 
         const viewer_count = await RedisCache.incr(LIVE_VIEWER_KEY(channel_id));
-        emitLiveViewerCount(live.pandit_id, channel_id, viewer_count, u.id);
+        if (joinedUserId) {
+            await RedisCache.sadd(LIVE_JOINED_USER_IDS_KEY(channel_id), String(joinedUserId));
+        }
+        const joined_user_ids = await readJoinedUserIds(channel_id);
+
+        emitLiveViewerCount(live.pandit_id, channel_id, viewer_count, joinedUserId);
         emitLiveViewerJoined(live.pandit_id, {
             channel_id,
             rtc_uid: uid,
@@ -231,13 +266,14 @@ async function joinLive(req, res) {
 
         logger.log('joinLive success', { channel_id, rtc_uid: uid, viewer_count, user_id: joinedUserId });
 
-        callEvent("emit_to_live_user_joined", {
-            key: `pandit_${live?.pandit_id}`,
-            payload: { user_id: u.id, username: u.name, profile: u.profile, avatar: u.avatar }
-        });
-        callEvent("emit_to_live_user_joined", {
-            key: `user_${u.id}`,
-            payload: { user_id: u.id, username: u.name, profile: u.profile, avatar: u.avatar }
+        emitLiveUserJoinedToEachUser(live.pandit_id, channel_id, {
+            user_id: joinedUserId,
+            username: joinedUserName ?? u?.name ?? null,
+            profile: u?.profile ?? null,
+            avatar: u?.avatar ?? null,
+            joined_user_ids,
+            viewer_count,
+            rtc_uid: uid,
         });
         return res.status(200).json({
             success: true,
@@ -250,6 +286,7 @@ async function joinLive(req, res) {
                 viewer_count,
                 user_id: joinedUserId,
                 user_name: joinedUserName,
+                joined_user_ids,
             },
             message: 'Join token created.',
         });
@@ -290,8 +327,14 @@ async function viewerLeave(req, res) {
             await RedisCache.deleteKey(key);
             viewer_count = 0;
         }
+
+        const leftUid = Number(req?.userId);
+        if (Number.isFinite(leftUid)) {
+            await RedisCache.srem(LIVE_JOINED_USER_IDS_KEY(channel_id), String(leftUid));
+        }
         if (viewer_count === 0) {
             await RedisCache.deleteKey(key);
+            await RedisCache.deleteKey(LIVE_JOINED_USER_IDS_KEY(channel_id));
         }
 
         emitLiveViewerCount(live.pandit_id, channel_id, viewer_count);
