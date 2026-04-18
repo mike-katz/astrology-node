@@ -4,6 +4,8 @@ const RedisCache = require('../config/redisClient');
 const { callEvent } = require('../socket');
 const logger = require('../utils/logger').getLogger('liveStreamingController');
 const { RtcTokenBuilder, RtcRole } = require('agora-access-token');
+const { channelLeave } = require('./agoraController');
+const { balanceCut } = require('./chatController');
 
 require('dotenv').config();
 
@@ -544,6 +546,67 @@ async function createMediaOrder(req, res) {
     }
 }
 
+async function completeOrder(req, res) {
+    const { order_id } = req.body || {};
+    logger.info('chat_completeOrder', { userId: req.userId, order_id });
+    if (!order_id) {
+        logger.info('chat_completeOrder fail', { userId: req.userId, message: 'Missing params.' });
+        return res.status(400).json({ success: false, message: 'Missing params.' });
+    }
+    try {
+        const order = await db('orders').where({ user_id: req.userId, order_id: order_id }).first();
+        if (!order) {
+            logger.info('chat_completeOrder fail', { userId: req.userId, order_id, message: 'Wrong order. Please enter correct' });
+            return res.status(400).json({ success: false, message: 'Wrong order. Please enter correct' });
+        }
+        // const diffMinutes = getDuration(order.start_time, new Date());
+        const diffMs = Math.abs(new Date() - new Date(order.start_time));
+        const totalSeconds = Math.floor(diffMs / 1000);
+        const setting = await db('settings').first();
+        console.log("totalSeconds", totalSeconds);
+        const minSec = setting?.chat_end_min_minutes * 60
+        console.log("minSec required", minSec);
+
+        if (order.status == 'pending') {
+            logger.info('chat_completeOrder fail', { userId: req.userId, order_id, message: 'order is pending.' });
+            return res.status(400).json({ success: false, message: 'order is pending.' });
+        }
+        if (['cancel', 'rejected'].includes(order.status)) {
+            logger.info('chat_completeOrder fail', { userId: req.userId, order_id, message: 'order is rejected.' });
+            return res.status(400).json({ success: false, message: 'order is rejected.' });
+        }
+        if (order.status == 'completed') {
+            logger.info('chat_completeOrder fail', { userId: req.userId, order_id, message: 'order is already completed.' });
+            return res.status(200).json({ success: false, message: 'order is already completed.' });
+        }
+
+        await channelLeave(order_id)
+        let now = new Date();
+        if (order.end_time) {
+            const orderEndTime = new Date(order.end_time);
+            if (now > orderEndTime) {
+                now = order.end_time
+            }
+        }
+        const result = await balanceCut(req.userId, order, now, "user -> live end");
+        if (!result) {
+            logger.info('chat_completeOrder fail', { userId: req.userId, order_id, message: 'Something went wrong.' });
+            return res.status(400).json({ success: false, message: 'Something went wrong.' });
+        }
+
+        callEvent("emit_to_live_call_end", {
+            key: `pandit_${order?.pandit_id}`,
+            payload: { order_id: order?.order_id }
+        });
+        logger.info('chat_completeOrder success', { userId: req.userId, order_id });
+        return res.status(200).json({ success: true, data: null, message: 'End chat successfully.' });
+    } catch (err) {
+        logger.error('chat_completeOrder error', { userId: req.userId, order_id, err: err?.message });
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
 module.exports = {
     listLive,
     joinLive,
@@ -551,5 +614,6 @@ module.exports = {
     sendLiveChatUser,
     sendLiveHeart,
     listLiveChat,
-    createMediaOrder
+    createMediaOrder,
+    completeOrder
 };

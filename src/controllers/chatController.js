@@ -477,10 +477,10 @@ async function balanceCut(user_id, order, end_time, place) {
             return false
         }
         const upd = { total_orders: 1, }
-        if (order.type == 'call') {
-            upd.total_call_minutes = Number(diffMinutes)
-        } else {
+        if (order.type == 'chat') {
             upd.total_chat_minutes = Number(diffMinutes)
+        } else {
+            upd.total_call_minutes = Number(diffMinutes)
         }
         if (order.type == 'chat') {
             let [saved] = await db('chats').insert({
@@ -547,10 +547,12 @@ async function balanceCut(user_id, order, end_time, place) {
                 payload: { pandit_id: order?.pandit_id }
             });
         }
-        callEvent("emit_to_order_completed", {
-            key: `user_${order?.user_id}`,
-            payload: { order_id: order?.order_id }
-        });
+        if (['chat', 'call'].includes(order.type)) {
+            callEvent("emit_to_order_completed", {
+                key: `user_${order?.user_id}`,
+                payload: { order_id: order?.order_id }
+            });
+        }
 
         if (!isFree) {
             await db('users').where({ id: user_id }).update({ balance: newBalance });
@@ -1831,5 +1833,5 @@ async function completedAgoraCall(req, res) {
 
 module.exports = {
     getRoom, getMessage, sendMessage, getDetail, getOrderDetail, endChat, forceEndChat, readMessage, deleteChat, getOrderChat,
-    newCreateOrder, orderAccept, orderCancel, orderReject, newOrderDetail, endOrder, createCall, rejectCall, initAgoraCall, callRemove, callEndAgora, callRejectAgora, rejectAgoraCall, completedAgoraCall
+    newCreateOrder, orderAccept, orderCancel, orderReject, newOrderDetail, endOrder, createCall, rejectCall, initAgoraCall, callRemove, callEndAgora, callRejectAgora, rejectAgoraCall, completedAgoraCall, balanceCut
 };
