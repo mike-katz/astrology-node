@@ -350,12 +350,13 @@ async function sendLiveChatUser(req, res) {
             })
             .returning('*');
 
-        const [enriched] = await enrichLiveChatMessages([saved]);
-        emitLiveChatMessage(live.pandit_id, channel_id, { chat: enriched });
+        saved.profile = u?.profile
+        saved.avatar = u?.avatar
+        emitLiveChatMessage(live.pandit_id, channel_id, { chat: saved });
 
         return res.status(200).json({
             success: true,
-            data: enriched,
+            data: saved,
             message: 'Message sent.',
         });
     } catch (err) {
