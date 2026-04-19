@@ -695,6 +695,29 @@ async function reportUser(req, res) {
     }
 }
 
+async function stopLive(req, res) {
+    const { channel_id } = req.body
+    try {
+        const active = await db('live_streams').where({ channel_id, status: 'live' }).first();
+        if (!active) {
+            return res.status(200).json({ success: false, message: 'No active live to stop.' });
+        }
+
+        await db('live_streams')
+            .where({ channel_id, status: 'live' })
+            .update({ status: 'ended', ended_at: db.fn.now() });
+
+        await RedisCache.deleteKey(LIVE_VIEWER_KEY(active.channel_id));
+        await RedisCache.deleteKey(LIVE_JOINED_USER_IDS_KEY(active.channel_id));
+
+        logger.log('stopLive success', { channel_id, channel_id: active.channel_id });
+        return res.status(200).json({ success: true, data: null, message: 'Live ended.' });
+    } catch (err) {
+        logger.error('stopLive error', err?.message, { channel_id });
+        console.error(err);
+        return res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
 module.exports = {
     listLive,
     joinLive,
@@ -705,5 +728,6 @@ module.exports = {
     createMediaOrder,
     completeOrder,
     rejectOrder,
-    reportUser
+    reportUser,
+    stopLive
 };

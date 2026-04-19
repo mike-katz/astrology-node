@@ -13,4 +13,7 @@ router.get('/chat/list', live.listLiveChat);
 router.post('/call/create', live.createMediaOrder);
 router.post('/call/reject', live.rejectOrder);
 router.post('/call/end', live.completeOrder);
+router.post('/report', auth, live.reportUser);
+router.post('/stop', auth, live.stopLive);
+
 module.exports = router;
