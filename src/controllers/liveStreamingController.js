@@ -537,7 +537,7 @@ async function createMediaOrder(req, res) {
         }
 
         const ins = {
-            pandit_id: pandit?.pandit_id,
+            pandit_id: pandit?.id,
             user_id: req.userId,
             order_id: orderId,
             status: 'pending',
@@ -552,7 +552,7 @@ async function createMediaOrder(req, res) {
         await db('users').where({ id: Number(req.userId) }).update(upd);
         await db('orders').insert(ins).returning('*');
         callEvent('emit_to_live_call_receive', {
-            key: `pandit_${pandit?.pandit_id}`,
+            key: `pandit_${pandit?.id}`,
             payload: { type, user_id: req.userId, username: user?.name, profile: user?.profile, avatar: user?.avatar },
         });
 
