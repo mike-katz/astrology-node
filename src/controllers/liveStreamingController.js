@@ -56,14 +56,12 @@ function emitLiveUserJoinedToEachUser(panditId, channel_id, payload) {
     const base = { pandit_id: panditId, channel_id, ...payload };
     try {
         callEvent('emit_to_live_user_joined', { key: `pandit_${panditId}`, payload: base });
-        const ids = Array.isArray(payload.joined_user_ids) ? payload.joined_user_ids : [];
-        for (let i = 0; i < ids.length; i += 1) {
-            const id = ids[i];
-            if (!Number.isFinite(Number(id))) continue;
-            callEvent('emit_to_live_user_joined', {
-                key: `user_${Number(id)}`,
-                payload: base,
-            });
+        const updatedArr = payload.joined_user_ids.filter(item => item !== userId);
+        for (const user_id of updatedArr) {
+            const uid = user_id != null && Number.isFinite(Number(user_id)) ? Number(user_id) : null;
+            if (uid != null) {
+                callEvent('emit_to_live_user_joined', { key: `user_${uid}`, payload: base });
+            }
         }
     } catch (e) {
         logger.error('emitLiveUserJoinedToEachUser failed', e?.message, { channel_id, panditId });
@@ -92,11 +90,18 @@ function buildToken(channelId, uid, role) {
 }
 
 /** Real-time: host (pandit room) + viewers (channel room) — same payload as IG live */
-function emitLiveChatMessage(panditId, channel_id, payload) {
+function emitLiveChatMessage(panditId, channel_id, payload, userId, joinedUsers) {
     const base = { pandit_id: panditId, channel_id, ...payload };
     try {
         callEvent('emit_to_live_chat_message', { key: `pandit_${panditId}`, payload: base });
-        callEvent('emit_to_live_chat_message', { key: `live_channel_${channel_id}`, payload: base });
+
+        const updatedArr = joinedUsers.filter(item => item !== userId);
+        for (const user_id of updatedArr) {
+            const uid = user_id != null && Number.isFinite(Number(user_id)) ? Number(user_id) : null;
+            if (uid != null) {
+                callEvent('emit_to_live_chat_message', { key: `user_${uid}`, payload: base });
+            }
+        }
     } catch (e) {
         logger.error('emitLiveChatMessage failed', e?.message, payload);
     }
@@ -377,7 +382,9 @@ async function sendLiveChatUser(req, res) {
 
         saved.profile = u?.profile
         saved.avatar = u?.avatar
-        emitLiveChatMessage(live.pandit_id, channel_id, { chat: saved });
+
+        const joined_user_ids = await readJoinedUserIds(channel_id);
+        emitLiveChatMessage(live.pandit_id, channel_id, { chat: saved }, bodyUserId, joined_user_ids);
 
         return res.status(200).json({
             success: true,
