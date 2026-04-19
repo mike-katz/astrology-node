@@ -4,7 +4,7 @@ const RedisCache = require('../config/redisClient');
 const { callEvent } = require('../socket');
 const logger = require('../utils/logger').getLogger('liveStreamingController');
 const { RtcTokenBuilder, RtcRole } = require('agora-access-token');
-const { channelLeave } = require('./agoraController');
+const { channelLeave, geneateToken } = require('./agoraController');
 const { balanceCut } = require('./chatController');
 
 require('dotenv').config();
@@ -486,9 +486,9 @@ async function listLiveChat(req, res) {
  * No socket (callEvent), no push notification, no auto chat messages.
  */
 async function createMediaOrder(req, res) {
-    const { channel, type, profile_id } = req.body;
-    logger.info('order_createMedia', { userId: req.userId, channel, type, profile_id });
-    if (!channel || !profile_id || !type) {
+    const { type, profile_id, pandit_id } = req.body;
+    logger.info('order_createMedia', { userId: req.userId, type, profile_id });
+    if (!profile_id || !type || !pandit_id) {
         logger.info('order_createMedia fail', { userId: req.userId, message: 'Missing params' });
         return res.status(400).json({ success: false, message: 'Missing params' });
     }
@@ -498,12 +498,6 @@ async function createMediaOrder(req, res) {
     }
     try {
         const user = await db('users').where({ id: req.userId }).first();
-
-        const live = await db('live_streams').where({ channel_id: channel, status: 'live' }).first();
-        if (!live) {
-            return res.status(400).json({ success: false, message: 'Live not found or ended.' });
-        }
-
         const continueOrder = await db('orders').where({ user_id: req.userId }).whereIn('status', ['continue', 'pending']).first();
         if (continueOrder?.status === 'continue') {
             logger.info('order_createMedia fail', { userId: req.userId, message: `Please complete your ongoing ${type}.` });
@@ -514,6 +508,7 @@ async function createMediaOrder(req, res) {
             return res.status(400).json({ success: false, message: `Please reject your pending ${type}.` });
         }
 
+        const pandit = await db('pandits').where({ id: Number(pandit_id) }).first();
         let duration = Math.floor(Number(Number(user?.balance)) / Number(pandit?.final_chat_call_rate));
         let deduction = Number(duration) * Number(pandit?.final_chat_call_rate);
         let rate = pandit?.final_chat_call_rate;
@@ -542,7 +537,7 @@ async function createMediaOrder(req, res) {
         }
 
         const ins = {
-            pandit_id: live?.pandit_id,
+            pandit_id: pandit?.pandit_id,
             user_id: req.userId,
             order_id: orderId,
             status: 'pending',
@@ -557,16 +552,16 @@ async function createMediaOrder(req, res) {
         await db('users').where({ id: Number(req.userId) }).update(upd);
         await db('orders').insert(ins).returning('*');
         callEvent('emit_to_live_call_receive', {
-            key: `pandit_${live?.pandit_id}`,
-            payload: { channel_id: channel, type, user_id: req.userId, username: user?.name, profile: user?.profile, avatar: user?.avatar },
+            key: `pandit_${pandit?.pandit_id}`,
+            payload: { type, user_id: req.userId, username: user?.name, profile: user?.profile, avatar: user?.avatar },
         });
 
-        const response = await generateToken(order_id);
+        const response = await geneateToken(orderId);
         if (!response?.success) {
             return res.status(400).json({ success: false, message: response?.message });
         }
-        logger.info('order_createMedia success', { userId: req.userId, orderId, channel, type });
-        return res.status(200).json({ success: true, data: { order_id, ...response?.data }, message: 'Order created successfully' });
+        logger.info('order_createMedia success', { userId: req.userId, orderId, type });
+        return res.status(200).json({ success: true, data: { order_id: orderId, ...response?.data }, message: 'Order created successfully' });
     } catch (err) {
         logger.error('order_createMedia error', { userId: req.userId, err: err?.message });
         console.error(err);
