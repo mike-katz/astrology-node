@@ -17,32 +17,24 @@ const RESERVED_RECORDING_UID = 999999;
 const LIVE_VIEWER_KEY = (channelId) => `live_stream:viewers:${channelId}`;
 const LIVE_JOINED_USER_IDS_KEY = (channelId) => `live_stream:joined_user_ids:${channelId}`;
 
-function emitLiveViewerCount(panditId, channel_id, viewer_count, user_id) {
+function emitLiveViewerCount(panditId, channel_id, viewer_count, user_id, joined_user_ids) {
     try {
         callEvent('emit_to_live_viewer_count', {
             key: `pandit_${panditId}`,
             payload: { channel_id, viewer_count, pandit_id: panditId },
         });
-        const uid = user_id != null && Number.isFinite(Number(user_id)) ? Number(user_id) : null;
-        if (uid != null) {
-            callEvent('emit_to_live_viewer_count', {
-                key: `user_${uid}`,
-                payload: { channel_id, viewer_count, pandit_id: panditId },
-            });
+        const updatedArr = joined_user_ids.filter(item => item !== user_id);
+        for (const user_id of updatedArr) {
+            const uid = user_id != null && Number.isFinite(Number(user_id)) ? Number(user_id) : null;
+            if (uid != null) {
+                callEvent('emit_to_live_viewer_count', {
+                    key: `user_${uid}`,
+                    payload: { channel_id, viewer_count, pandit_id: panditId },
+                });
+            }
         }
     } catch (e) {
         logger.error('emitLiveViewerCount failed', e?.message, { channel_id, viewer_count });
-    }
-}
-
-function emitLiveViewerJoined(panditId, payload) {
-    try {
-        callEvent('emit_to_live_viewer_joined', {
-            key: `pandit_${panditId}`,
-            payload: { pandit_id: panditId, ...payload },
-        });
-    } catch (e) {
-        logger.error('emitLiveViewerJoined failed', e?.message, payload);
     }
 }
 
@@ -254,18 +246,9 @@ async function joinLive(req, res) {
             await RedisCache.sadd(LIVE_JOINED_USER_IDS_KEY(channel_id), String(joinedUserId));
         }
         const joined_user_ids = await readJoinedUserIds(channel_id);
-
-        emitLiveViewerCount(live.pandit_id, channel_id, viewer_count, joinedUserId);
-        emitLiveViewerJoined(live.pandit_id, {
-            channel_id,
-            rtc_uid: uid,
-            user_id: joinedUserId,
-            user_name: joinedUserName,
-            viewer_count,
-        });
-
+        console.log("joined_user_ids", joined_user_ids);
+        emitLiveViewerCount(live.pandit_id, channel_id, viewer_count, joinedUserId, joined_user_ids);
         logger.log('joinLive success', { channel_id, rtc_uid: uid, viewer_count, user_id: joinedUserId });
-
         emitLiveUserJoinedToEachUser(live.pandit_id, channel_id, {
             user_id: joinedUserId,
             username: joinedUserName ?? u?.name ?? null,
