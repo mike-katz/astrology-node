@@ -161,7 +161,7 @@ const MAX_LIVE_CHAT_LEN = Math.min(Math.max(parseInt(process.env.LIVE_CHAT_MAX_C
 /**
  * GET /live-stream/list — active lives + pandit detail + channel_id
  */
-async function listLive(_req, res) {
+async function listLive(req, res) {
     try {
         const rows = await db('live_streams')
             .join('pandits', 'live_streams.pandit_id', 'pandits.id')
@@ -184,24 +184,32 @@ async function listLive(_req, res) {
             )
             .orderBy('live_streams.created_at', 'desc');
 
+        const pandits = [];
+        rows?.map(item => pandits.push(item?.pandit_id));
+        const followData = await db('follows').where({ user_id: req.userId }).whereIn('pandit_id', pandits)
+
         const data = await Promise.all(
-            rows.map(async (r) => ({
-                channel_id: r.channel_id,
-                title: r.title,
-                started_at: r.created_at,
-                viewer_count: await readViewerCount(r.channel_id),
-                pandit: {
-                    id: r.pandit_id,
-                    display_name: r.display_name,
-                    name: r.name,
-                    profile: r.profile,
-                    mobile: r.mobile,
-                    country_code: r.country_code,
-                    chat: r.chat,
-                    call: r.call,
-                    online: r.online,
-                },
-            }))
+            rows.map(async (r) => {
+                const isFollow = followData.find(i => i.pandit_id == r.pandit_id);
+                return {
+                    channel_id: r.channel_id,
+                    title: r.title,
+                    started_at: r.created_at,
+                    viewer_count: await readViewerCount(r.channel_id),
+                    pandit: {
+                        id: r.pandit_id,
+                        display_name: r.display_name,
+                        name: r.name,
+                        profile: r.profile,
+                        mobile: r.mobile,
+                        country_code: r.country_code,
+                        chat: r.chat,
+                        call: r.call,
+                        online: r.online,
+                        isFollow: !!isFollow
+                    }
+                };
+            })
         );
 
         return res.status(200).json({
