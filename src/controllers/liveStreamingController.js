@@ -630,6 +630,43 @@ async function completeOrder(req, res) {
     }
 }
 
+async function rejectOrder(req, res) {
+    const { order_id } = req.body || {};
+    logger.info('order_rejectOrder', { userId: req.userId, order_id });
+    try {
+        if (!order_id) {
+            logger.info('order_rejectOrder fail', { userId: req.userId, message: 'Order id required.' });
+            return res.status(400).json({ success: false, message: 'Order id required.' });
+        }
+        const order = await db('orders').where({ order_id: order_id, user_id: req.userId, status: "pending" }).first();
+        if (!order) {
+            logger.info('order_rejectOrder fail', { userId: req.userId, order_id, message: 'You can not cancel this order.' });
+            return res.status(400).json({ success: false, message: 'You can not cancel this order.' });
+        }
+        const upd = {}
+        let status = 'rejected';
+        // if (!order?.is_accept) {
+        //     upd.canceled_at = new Date()
+        // }
+        // if (order?.is_accept) {
+        //     status = 'rejected'
+        // }
+        upd.status = status
+        await db('orders').where({ id: order?.id }).update(upd);
+
+        callEvent("emit_to_live_call_reject", {
+            key: `pandit_${order?.pandit_id}`,
+            order_id: order?.order_id,
+        });
+        logger.info('order_rejectOrder success', { userId: req.userId, order_id });
+        return res.status(200).json({ success: true, message: 'Order cancel Successfully' });
+    } catch (err) {
+        logger.error('order_rejectOrder error', { userId: req.userId, order_id, err: err?.message });
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
 module.exports = {
     listLive,
     joinLive,
@@ -638,5 +675,6 @@ module.exports = {
     sendLiveHeart,
     listLiveChat,
     createMediaOrder,
-    completeOrder
+    completeOrder,
+    rejectOrder
 };

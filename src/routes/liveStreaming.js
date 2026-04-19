@@ -11,5 +11,6 @@ router.post('/leave', live.viewerLeave);
 router.post('/sendMessage', live.sendLiveChatUser);
 router.get('/chat/list', live.listLiveChat);
 router.post('/call/create', live.createMediaOrder);
+router.post('/call/reject', live.rejectOrder);
 router.post('/call/end', live.completeOrder);
 module.exports = router;
