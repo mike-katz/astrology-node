@@ -26,6 +26,7 @@ function emitLiveViewerCount(panditId, channel_id, viewer_count, user_id, joined
         const updatedArr = joined_user_ids.filter(item => item !== user_id);
         for (const user_id of updatedArr) {
             const uid = user_id != null && Number.isFinite(Number(user_id)) ? Number(user_id) : null;
+
             if (uid != null) {
                 callEvent('emit_to_live_viewer_count', {
                     key: `user_${uid}`,
@@ -52,11 +53,12 @@ async function readJoinedUserIds(channel_id) {
 }
 
 /** `emit_to_live_user_joined` — pandit + one socket per joined user id (line by line). */
-function emitLiveUserJoinedToEachUser(panditId, channel_id, payload) {
+function emitLiveUserJoinedToEachUser(panditId, channel_id, payload, userId) {
     const base = { pandit_id: panditId, channel_id, ...payload };
     try {
         callEvent('emit_to_live_user_joined', { key: `pandit_${panditId}`, payload: base });
         const updatedArr = payload.joined_user_ids.filter(item => item !== userId);
+        console.log("updatedArr", updatedArr);
         for (const user_id of updatedArr) {
             const uid = user_id != null && Number.isFinite(Number(user_id)) ? Number(user_id) : null;
             if (uid != null) {
@@ -262,7 +264,7 @@ async function joinLive(req, res) {
             joined_user_ids,
             viewer_count,
             rtc_uid: uid,
-        });
+        }, joinedUserId);
         return res.status(200).json({
             success: true,
             data: {
