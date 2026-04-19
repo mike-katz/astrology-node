@@ -553,7 +553,7 @@ async function createMediaOrder(req, res) {
         await db('orders').insert(ins).returning('*');
         callEvent('emit_to_live_call_receive', {
             key: `pandit_${pandit?.id}`,
-            payload: { type, user_id: req.userId, username: user?.name, profile: user?.profile, avatar: user?.avatar },
+            payload: { order_id: orderId, type, user_id: req.userId, username: user?.name, profile: user?.profile, avatar: user?.avatar },
         });
 
         const response = await geneateToken(orderId);
