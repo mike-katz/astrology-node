@@ -327,13 +327,6 @@ async function viewerLeave(req, res) {
             await RedisCache.deleteKey(LIVE_JOINED_USER_IDS_KEY(channel_id));
         }
 
-        emitLiveViewerCount(live.pandit_id, channel_id, viewer_count);
-        logger.log('viewerLeave', { channel_id, viewer_count });
-
-        callEvent("emit_to_live_user_left", {
-            key: `pandit_${live?.pandit_id}`,
-            payload: { user_id: req?.userId, channel_id }
-        });
         return res.status(200).json({
             success: true,
             data: { channel_id, viewer_count },
