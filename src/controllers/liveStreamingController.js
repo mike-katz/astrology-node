@@ -667,6 +667,34 @@ async function rejectOrder(req, res) {
     }
 }
 
+async function reportUser(req, res) {
+    try {
+        const { pandit_id, type, reason } = req.body || {};
+        if (!pandit_id || !type || !reason) {
+            return res.status(400).json({ success: false, message: 'Order id required.' });
+        }
+        let order = await db('live_reports')
+            .where({ pandit_id: pandit_id, type, user_id: req.userId })
+            .first();
+        if (order) {
+            return res.status(400).json({ success: false, message: 'You already reported this user.' });
+        }
+        await db('live_reports').insert({
+            pandit_id, type, user_id: req.userId, reason
+        })
+
+        return res.status(200).json({
+            success: true,
+            data: null,
+            message: 'User report Successfully',
+        });
+    } catch (err) {
+        logger.error('acceptAvOrder error', err?.message, { userId: req.userId });
+        console.error(err);
+        return res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
 module.exports = {
     listLive,
     joinLive,
@@ -676,5 +704,6 @@ module.exports = {
     listLiveChat,
     createMediaOrder,
     completeOrder,
-    rejectOrder
+    rejectOrder,
+    reportUser
 };
