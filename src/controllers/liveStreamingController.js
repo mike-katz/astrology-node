@@ -109,6 +109,23 @@ function emitLiveChatMessage(panditId, channel_id, payload, userId, joinedUsers)
     }
 }
 
+function emitcallEnd(panditId, channel_id, userId, joinedUsers) {
+    const base = { pandit_id: panditId, channel_id };
+    try {
+        callEvent('emit_to_private_call_ended', { key: `pandit_${panditId}`, payload: base });
+
+        const updatedArr = joinedUsers.filter(item => item !== userId);
+        for (const user_id of updatedArr) {
+            const uid = user_id != null && Number.isFinite(Number(user_id)) ? Number(user_id) : null;
+            if (uid != null) {
+                callEvent('emit_to_private_call_ended', { key: `user_${uid}`, payload: base });
+            }
+        }
+    } catch (e) {
+        logger.error('emitcallEnd failed', e?.message, payload);
+    }
+}
+
 function emitLiveHeart(panditId, channel_id, payload) {
     const base = { pandit_id: panditId, channel_id, ...payload };
     try {
@@ -368,6 +385,7 @@ async function sendLiveChatUser(req, res) {
         let sender_name = 'Guest';
 
         const u = await db('users').where({ id: Number(bodyUserId) }).first();
+        const profile_id = await db('userprofiles').select('id').where({ user_id: Number(bodyUserId), is_first: true }).first();
         if (u) {
             sender_id = Number(u.id);
             sender_name = u.name || u.display_name || 'User';
@@ -385,6 +403,7 @@ async function sendLiveChatUser(req, res) {
 
         saved.profile = u?.profile
         saved.avatar = u?.avatar
+        saved.profile_id = profile_id?.id
 
         const joined_user_ids = await readJoinedUserIds(channel_id);
         emitLiveChatMessage(live.pandit_id, channel_id, { chat: saved }, bodyUserId, joined_user_ids);
@@ -629,6 +648,12 @@ async function completeOrder(req, res) {
             key: `pandit_${order?.pandit_id}`,
             payload: { order_id: order?.order_id }
         });
+        //send notify to live 
+        const live = await db('live_streams').where({ pandit_id: order?.pandit_id, status: 'live' }).first();
+        if (live) {
+            const joined_user_ids = await readJoinedUserIds(live?.channel_id);
+            emitcallEnd(live.pandit_id, live?.channel_id, req.userId, joined_user_ids);
+        }
         logger.info('chat_completeOrder success', { userId: req.userId, order_id });
         return res.status(200).json({ success: true, data: null, message: 'End chat successfully.' });
     } catch (err) {
