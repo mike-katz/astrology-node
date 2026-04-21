@@ -191,9 +191,7 @@ async function listLive(req, res) {
                 'live_streams.host_uid',
                 'pandits.id as pandit_id',
                 'pandits.display_name',
-                'pandits.discounted_chat_call_rate',
                 'pandits.final_chat_call_rate',
-                'pandits.chat_call_rate',
                 'pandits.profile',
                 'pandits.mobile',
                 'pandits.country_code',
@@ -218,14 +216,14 @@ async function listLive(req, res) {
                     pandit: {
                         id: r.pandit_id,
                         display_name: r.display_name,
-                        name: r.name,
                         profile: r.profile,
                         mobile: r.mobile,
                         country_code: r.country_code,
                         chat: r.chat,
                         call: r.call,
                         online: r.online,
-                        isFollow: !!isFollow
+                        isFollow: !!isFollow,
+                        final_chat_call_rate: r.final_chat_call_rate
                     }
                 };
             })
