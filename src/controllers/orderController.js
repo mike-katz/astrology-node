@@ -974,7 +974,7 @@ async function sendGift(req, res) {
         if (is_live) {
             callEvent("emit_to_live_gift_send", {
                 key: `pandit_${pandit_id}`,
-                payload: { name, user_id: req.userId, username: user?.username, avatar: user?.avatar, profile: user?.profile, amount, qty, is_live },
+                payload: { name, user_id: req.userId, username: user?.name, avatar: user?.avatar, profile: user?.profile, amount, qty, is_live },
             });
         }
         return res.status(200).json({ success: true, message: 'Order cancel Successfully' });
