@@ -17,11 +17,11 @@ const RESERVED_RECORDING_UID = 999999;
 const LIVE_VIEWER_KEY = (channelId) => `live_stream:viewers:${channelId}`;
 const LIVE_JOINED_USER_IDS_KEY = (channelId) => `live_stream:joined_user_ids:${channelId}`;
 
-function emitLiveViewerCount(panditId, channel_id, viewer_count, user_id, joined_user_ids) {
+function emitLiveViewerCount(panditId, channel_id, viewer_count, user_id, joined_user_ids, profile_id) {
     try {
         callEvent('emit_to_live_viewer_count', {
             key: `pandit_${panditId}`,
-            payload: { channel_id, viewer_count, pandit_id: panditId },
+            payload: { channel_id, viewer_count, pandit_id: panditId, profile_id },
         });
         const updatedArr = joined_user_ids.filter(item => item !== user_id);
         for (const user_id of updatedArr) {
@@ -30,7 +30,7 @@ function emitLiveViewerCount(panditId, channel_id, viewer_count, user_id, joined
             if (uid != null) {
                 callEvent('emit_to_live_viewer_count', {
                     key: `user_${uid}`,
-                    payload: { channel_id, viewer_count, pandit_id: panditId },
+                    payload: { channel_id, viewer_count, pandit_id: panditId, profile_id },
                 });
             }
         }
@@ -269,7 +269,7 @@ async function joinLive(req, res) {
             joinedUserId = Number(u.id);
             joinedUserName = u.name || null;
         }
-
+        const userProfile = await db('userprofiles').where({ user_id: Number(bodyUserId) }).first()
         const uid = randomViewerUid();
         const { token, expire_at } = buildToken(channel_id, uid, RtcRole.SUBSCRIBER);
 
@@ -279,7 +279,7 @@ async function joinLive(req, res) {
         }
         const joined_user_ids = await readJoinedUserIds(channel_id);
         console.log("joined_user_ids", joined_user_ids);
-        emitLiveViewerCount(live.pandit_id, channel_id, viewer_count, joinedUserId, joined_user_ids);
+        emitLiveViewerCount(live.pandit_id, channel_id, viewer_count, joinedUserId, joined_user_ids, userProfile?.id);
         logger.log('joinLive success', { channel_id, rtc_uid: uid, viewer_count, user_id: joinedUserId });
         emitLiveUserJoinedToEachUser(live.pandit_id, channel_id, {
             user_id: joinedUserId,
@@ -289,6 +289,7 @@ async function joinLive(req, res) {
             joined_user_ids,
             viewer_count,
             rtc_uid: uid,
+            profile_id: userProfile?.id
         }, joinedUserId);
         return res.status(200).json({
             success: true,
