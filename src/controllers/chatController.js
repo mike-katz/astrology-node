@@ -1012,7 +1012,7 @@ async function sendNotification(token, username, chat_call_rate, panditId, type,
         })
         logger.info("messages", messages);
         if (token) {
-            const profileUrl = profile ? profile : `https://astroguruji2026.s3.ap-south-1.amazonaws.com/avatars/${avatar}.png`
+            const profileUrl = profile ? profile : `https://astroguruji-cdn-fdezcxeab6ghfgh8.z01.azurefd.net/avatars/${avatar}.png`
             console.log("profileUrl", profileUrl);
             // console.log("start push notification");
             // const messages = `new ${type} request from ${username} (Rs ${chat_call_rate}/min).`
@@ -1701,7 +1701,7 @@ async function initAgoraCall(req, res) {
     const userData = await db('users').where({ id: Number(req.userId) }).select("profile", "avatar", 'name').first();
     let profile = userData?.profile;
     if (!profile) {
-        profile = `https://astroguruji2026.s3.ap-south-1.amazonaws.com/avatars/${userData?.avatar}.png`
+        profile = `https://astroguruji-cdn-fdezcxeab6ghfgh8.z01.azurefd.net/avatars/${userData?.avatar}.png`
     }
 
     console.log("{ order_id, username: userData?.name, profile }", { order_id, username: userData?.name, profile });

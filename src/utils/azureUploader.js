@@ -98,4 +98,28 @@ async function uploadImageToAzure(directoryPath, image, type) {
     });
 }
 
+exports.uploadBufferToAzure = (buffer, filename, contentType, type = 'exports') =>
+    new Promise(async (resolve, reject) => {
+        try {
+            const containerClient = getContainerClient();
+            const folderName = type === 'exports' ? 'exports' : type || 'exports';
+            const blobName = folderName ? `${folderName}/${filename}` : filename;
+            const blockBlobClient = containerClient.getBlockBlobClient(blobName);
+
+            await blockBlobClient.uploadData(buffer, {
+                blobHTTPHeaders: {
+                    blobContentType: contentType || 'application/octet-stream',
+                },
+            });
+
+            resolve({
+                url: `${process.env.AZURE_STORAGE_BASE_URL}${blobName}`,
+                blobName,
+            });
+        } catch (err) {
+            console.error('Azure buffer upload error:', err);
+            reject(err);
+        }
+    });
+
 module.exports = { uploadToAzure, deleteFileFromAzure, uploadImageToAzure }

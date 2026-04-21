@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const puppeteer = require('puppeteer');
 const AWS = require('aws-sdk');
+const { uploadBufferToAzure } = require('./azureUploader');
 // const imgPath = `file://${path.resolve(__dirname, 'logo.svg')}`;
 
 require('dotenv').config();
@@ -136,42 +137,17 @@ async function generateInvoicePDF(data) {
 
     await browser.close();
 
-    // const options = {
-    //     format: "A4",
-    //     border: "10mm",
-    //     timeout: 30000,
-    // };
-
-    // await new Promise((resolve, reject) => {
-    //     pdf.create(html, options).toFile(outputPath, (err, res) => {
-    //         if (err) return reject(err);
-    //         resolve(res);
-    //     });
-    // });
-
-    const s3 = new AWS.S3({
-        accessKeyId: process.env.AWS_ACCESS_KEY,
-        secretAccessKey: process.env.AWS_SECRET_KEY,
-        signatureVersion: "v4",
-    });
-
     const fileContent = fs.readFileSync(outputPath);
-    const bucketName = process.env.AWS_BUCKET_NAME;
-    const Key = `invoice/${transaction_id}.pdf`;
-
-    await s3.putObject({
-        Bucket: bucketName,
-        Key,
-        Body: fileContent,
-        ContentType: 'application/pdf'
-    }).promise();
+    const { url: fileUrl } = await uploadBufferToAzure(
+        fileContent,
+        `${invoice_id}.pdf`,
+        'application/pdf',
+        'panditInvoice'
+    );
 
     fs.unlinkSync(outputPath);
 
-    const s3FileUrl = `https://${bucketName}.s3.amazonaws.com/${Key}`;
-
-    return s3FileUrl; // ✅ ACTUAL RESPONSE
-
+    return fileUrl;
 
 
 
