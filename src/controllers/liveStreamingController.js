@@ -385,7 +385,7 @@ async function sendLiveChatUser(req, res) {
         let sender_name = 'Guest';
 
         const u = await db('users').where({ id: Number(bodyUserId) }).first();
-        const profile_id = await db('userprofiles').select('id').where({ user_id: Number(bodyUserId), is_first: true }).first();
+        const profile_id = await db('userprofiles').select('id').where({ user_id: Number(bodyUserId) }).first();
         if (u) {
             sender_id = Number(u.id);
             sender_name = u.name || u.display_name || 'User';
@@ -404,7 +404,7 @@ async function sendLiveChatUser(req, res) {
         saved.profile = u?.profile
         saved.avatar = u?.avatar
         saved.profile_id = profile_id?.id
-
+        console.log("saved", saved);
         const joined_user_ids = await readJoinedUserIds(channel_id);
         emitLiveChatMessage(live.pandit_id, channel_id, { chat: saved }, bodyUserId, joined_user_ids);
 
