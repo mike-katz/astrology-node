@@ -194,7 +194,6 @@ async function listLive(req, res) {
                 'pandits.discounted_chat_call_rate',
                 'pandits.final_chat_call_rate',
                 'pandits.chat_call_rate',
-                'pandits.name',
                 'pandits.profile',
                 'pandits.mobile',
                 'pandits.country_code',
