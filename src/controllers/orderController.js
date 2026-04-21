@@ -930,7 +930,7 @@ async function deleteOrder(req, res) {
 }
 
 async function sendGift(req, res) {
-    const { name, pandit_id, amount, qty } = req.body || {};
+    const { name, pandit_id, amount, qty, is_live } = req.body || {};
     logger.info('order_sendGift', { userId: req.userId, pandit_id, amount, qty });
     try {
         if (!pandit_id || !amount || !qty) {
