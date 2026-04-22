@@ -930,7 +930,7 @@ async function deleteOrder(req, res) {
 }
 
 async function sendGift(req, res) {
-    const { name, pandit_id, amount, qty } = req.body || {};
+    const { name, pandit_id, amount, qty, is_live } = req.body || {};
     logger.info('order_sendGift', { userId: req.userId, pandit_id, amount, qty });
     try {
         if (!pandit_id || !amount || !qty) {
@@ -970,6 +970,13 @@ async function sendGift(req, res) {
         const pandit_new_balance = Number(pandit.balance) + Number(panditAmount)
         await db('balancelogs').insert({ pandit_old_balance: Number(pandit?.balance), pandit_new_balance, user_old_balance: Number(user.balance), user_new_balance: Number(newBalance), user_id: req.userId, message: `Send gift to ${pandit?.display_name} (${name}) - ${qty}`, pandit_id: pandit?.id, pandit_message: `Receive gift from ${user?.name} (${name}) - ${qty}`, pandit_amount: panditAmount, amount: - final });
         logger.info('order_sendGift success', { userId: req.userId, pandit_id, amount: final });
+
+        if (is_live) {
+            callEvent("emit_to_live_gift_send", {
+                key: `pandit_${pandit_id}`,
+                payload: { name, user_id: req.userId, username: user?.name, avatar: user?.avatar, profile: user?.profile, amount, qty, is_live },
+            });
+        }
         return res.status(200).json({ success: true, message: 'Order cancel Successfully' });
     } catch (err) {
         logger.error('order_sendGift error', { userId: req.userId, err: err?.message });

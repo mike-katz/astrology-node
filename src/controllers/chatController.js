@@ -7,7 +7,7 @@ const axios = require('axios');
 const { callEvent } = require("../socket");
 const { channelLeave, geneateToken } = require('./agoraController');
 const { sendBulkPush } = require('./reviewController');
-const { uploadImageTos3 } = require('./uploader');
+const { uploadImageToAzure } = require('../utils/azureUploader');
 const { emitCallDurationUpdate } = require('../callSocket');
 const { replaceTemplate } = require('../utils/replaceTemplate');
 const admin = require('../config/firebase');
@@ -251,7 +251,7 @@ async function sendMessage(req, res) {
         let response = [];
         if (files?.length > 0) {
             for (const file of files) {
-                const image = await uploadImageTos3('message', file, 'chat');
+                const image = await uploadImageToAzure('message', file, 'chat');
                 // console.log("image", image.data.Location);
                 const [saved] = await db('chats').insert({
                     sender_type: "user",
@@ -259,7 +259,7 @@ async function sendMessage(req, res) {
                     receiver_type: "pandit",
                     order_id: orderId,
                     receiver_id: Number(order?.pandit_id),
-                    message: image.data.Location,
+                    message: `${process.env.AZURE_STORAGE_BASE_URL}${image?.data?.key}`,
                     status: "send",
                     type
                 }).returning('*');
@@ -477,10 +477,10 @@ async function balanceCut(user_id, order, end_time, place) {
             return false
         }
         const upd = { total_orders: 1, }
-        if (order.type == 'call') {
-            upd.total_call_minutes = Number(diffMinutes)
-        } else {
+        if (order.type == 'chat') {
             upd.total_chat_minutes = Number(diffMinutes)
+        } else {
+            upd.total_call_minutes = Number(diffMinutes)
         }
         if (order.type == 'chat') {
             let [saved] = await db('chats').insert({
@@ -547,10 +547,12 @@ async function balanceCut(user_id, order, end_time, place) {
                 payload: { pandit_id: order?.pandit_id }
             });
         }
-        callEvent("emit_to_order_completed", {
-            key: `user_${order?.user_id}`,
-            payload: { order_id: order?.order_id }
-        });
+        if (['chat', 'call'].includes(order.type)) {
+            callEvent("emit_to_order_completed", {
+                key: `user_${order?.user_id}`,
+                payload: { order_id: order?.order_id }
+            });
+        }
 
         if (!isFree) {
             await db('users').where({ id: user_id }).update({ balance: newBalance });
@@ -1010,7 +1012,7 @@ async function sendNotification(token, username, chat_call_rate, panditId, type,
         })
         logger.info("messages", messages);
         if (token) {
-            const profileUrl = profile ? profile : `https://astroguruji2026.s3.ap-south-1.amazonaws.com/avatars/${avatar}.png`
+            const profileUrl = profile ? profile : `https://astroguruji-cdn-fdezcxeab6ghfgh8.z01.azurefd.net/avatars/${avatar}.png`
             console.log("profileUrl", profileUrl);
             // console.log("start push notification");
             // const messages = `new ${type} request from ${username} (Rs ${chat_call_rate}/min).`
@@ -1699,7 +1701,7 @@ async function initAgoraCall(req, res) {
     const userData = await db('users').where({ id: Number(req.userId) }).select("profile", "avatar", 'name').first();
     let profile = userData?.profile;
     if (!profile) {
-        profile = `https://astroguruji2026.s3.ap-south-1.amazonaws.com/avatars/${userData?.avatar}.png`
+        profile = `https://astroguruji-cdn-fdezcxeab6ghfgh8.z01.azurefd.net/avatars/${userData?.avatar}.png`
     }
 
     console.log("{ order_id, username: userData?.name, profile }", { order_id, username: userData?.name, profile });
@@ -1831,5 +1833,5 @@ async function completedAgoraCall(req, res) {
 
 module.exports = {
     getRoom, getMessage, sendMessage, getDetail, getOrderDetail, endChat, forceEndChat, readMessage, deleteChat, getOrderChat,
-    newCreateOrder, orderAccept, orderCancel, orderReject, newOrderDetail, endOrder, createCall, rejectCall, initAgoraCall, callRemove, callEndAgora, callRejectAgora, rejectAgoraCall, completedAgoraCall
+    newCreateOrder, orderAccept, orderCancel, orderReject, newOrderDetail, endOrder, createCall, rejectCall, initAgoraCall, callRemove, callEndAgora, callRejectAgora, rejectAgoraCall, completedAgoraCall, balanceCut
 };

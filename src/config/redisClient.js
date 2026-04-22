@@ -24,6 +24,12 @@ exports.getCache = (key) => client.get(key);
 
 exports.deleteKey = (key) => client.del(key);
 
+exports.sadd = (key, member) => client.sadd(key, String(member));
+
+exports.srem = (key, member) => client.srem(key, String(member));
+
+exports.smembers = (key) => client.smembers(key);
+
 exports.setHashCache = (hashKey, key, value) => {
   client.hset(hashKey, key, value);
 };

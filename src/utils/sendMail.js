@@ -81,7 +81,7 @@ async function sendMailActual(toEmail, subject, templateName, variables = {}) {
             socialIcons.push(`
                 <td style="padding-left:8px;">
                     <a href="${url}" target="_blank" style="text-decoration:none;">
-                        <img src="https://astroguruji2026.s3.ap-south-1.amazonaws.com/avatars/${icon}" width="28" alt="${alt}">
+                        <img src="https://astroguruji-cdn-fdezcxeab6ghfgh8.z01.azurefd.net/avatars/${icon}" width="28" alt="${alt}">
                     </a>
                 </td>
             `);

@@ -318,7 +318,7 @@ async function socialUrl(req, res) {
 
 async function getSettings(req, res) {
     try {
-        const setting = await db('settings').select('facebook', 'x', 'instagram', 'youtube', 'linkedin', 'ios_version', 'android_version', 'agora_app_id', 'agora_certificate', 'google_map_key', 'pandit_app_url', 'upload_base_url', 'user_response_time', 'call_type', 'map_api_key').first();
+        const setting = await db('settings').select('facebook', 'x', 'instagram', 'youtube', 'linkedin', 'ios_version', 'android_version', 'agora_app_id', 'agora_certificate', 'google_map_key', 'pandit_app_url', 'upload_base_url', 'user_response_time', 'call_type', 'map_api_key', 'is_live_enabled').first();
         return res.status(200).json({ success: true, data: setting, message: 'get config Successfully' });
     } catch (err) {
         console.error(err);

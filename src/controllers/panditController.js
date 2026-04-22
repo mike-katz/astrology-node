@@ -2,12 +2,12 @@ const db = require('../db');
 const { decrypt, encrypt } = require('../utils/crypto');
 const { decodeJWT, deepParse } = require('../utils/decodeJWT');
 require('dotenv').config();
-const { uploadImageTos3, deleteFileFroms3 } = require('./uploader');
 const jwt = require('jsonwebtoken');
 const { isValidMobile } = require('../utils/decodeJWT');
 const axios = require('axios');
 const sendMail = require('../utils/sendMail');
-const { getCache } = require("../config/redisClient")
+const { getCache } = require("../config/redisClient");
+const { uploadImageToAzure, deleteFileFromAzure } = require('../utils/azureUploader');
 
 async function getPandits(req, res) {
     try {
@@ -666,8 +666,8 @@ async function basicOnboard(req, res) {
         if (!is18OrAbove(dob)) return res.status(400).json({ success: false, message: 'Enter DOB above 18+ year.' });
 
         if (files?.profile?.length > 0) {
-            const image = await uploadImageTos3('profile', files?.profile[0], 'pandit');
-            ins.profile = image.data.Location;
+            const image = await uploadImageToAzure('profile', files?.profile[0], 'pandit');
+            ins.profile = `${process.env.AZURE_STORAGE_BASE_URL}${image?.data?.key}`;
         }
         if (languages) {
             ins.languages = JSON.stringify(languages)
@@ -937,39 +937,13 @@ async function onboard(req, res) {
         // }
 
         if (files?.profile?.length > 0) {
-            const image = await uploadImageTos3('profile', files?.profile[0], 'pandit');
-            ins.profile = image.data.Location;
+            const image = await uploadImageToAzure('profile', files?.profile[0], 'pandit');
+            ins.profile = `${process.env.AZURE_STORAGE_BASE_URL}${image?.data?.key}`;
         }
         if (files?.selfie?.length > 0) {
-            const image = await uploadImageTos3('selfie', files?.selfie[0], 'document');
-            ins.selfie = image.data.Location;
+            const image = await uploadImageToAzure('selfie', files?.selfie[0], 'document');
+            ins.selfie = `${process.env.AZURE_STORAGE_BASE_URL}${image?.data?.key}`;
         }
-
-        // if (files?.achievement?.length > 0) {
-        //     const image = await uploadImageTos3('achievement', files?.achievement[0], 'document');
-        //     ins.achievement_file = image.data.Location;
-        // }
-
-        // if (files?.certificate?.length > 0) {
-        //     const certificates = await Promise.all(
-        //         files.certificate.map(file =>
-        //             uploadImageTos3('certificate', file, 'document')
-        //                 .then(res => res.data.Location)
-        //         )
-        //     );
-        //     ins.certificate = JSON.stringify(certificates);
-        // }
-
-        // if (files?.address?.length > 0) {
-        //     const addresss = await Promise.all(
-        //         files.address.map(file =>
-        //             uploadImageTos3('address', file, 'document')
-        //                 .then(res => res.data.Location)
-        //         )
-        //     );
-        //     console.log("addresss", addresss);
-        //     ins.address = JSON.stringify(addresss);
-        // }
 
         // console.log("ins", ins);
         await db('onboardings').where({ id: user?.id }).update(ins);
@@ -1136,8 +1110,8 @@ async function uploadImage(req, res) {
 
         if (type == 'upload') {
             if (files?.file?.length > 0) {
-                const image = await uploadImageTos3('file', files?.file[0], 'upload');
-                url = image.data.Location;
+                const image = await uploadImageToAzure('file', files?.file[0], 'upload');
+                url = `${process.env.AZURE_STORAGE_BASE_URL}${image?.data?.key}`;
             }
         }
         // console.log("type", type);
@@ -1192,7 +1166,7 @@ async function uploadImage(req, res) {
             }
 
             // Delete file from S3
-            const dd = await deleteFileFroms3(decodedUrl);
+            const dd = await deleteFileFromAzure(decodedUrl);
             // console.log("dd", dd);
         }
         return res.status(200).json({ success: true, data: url, message: `Image ${type} Successfully` });
