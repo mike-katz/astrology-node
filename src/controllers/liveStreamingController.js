@@ -763,5 +763,7 @@ module.exports = {
     completeOrder,
     rejectOrder,
     reportUser,
-    stopLive
+    stopLive,
+    readJoinedUserIds,
+    emitLiveChatMessage
 };

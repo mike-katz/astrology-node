@@ -8,6 +8,7 @@ const axios = require('axios');
 const { callEvent } = require("../socket");
 const { channelLeave } = require('./agoraController');
 const { replaceTemplate } = require('../utils/replaceTemplate');
+const { readJoinedUserIds, emitLiveChatMessage } = require('./liveStreamingController');
 
 async function sendAutoMessage(profile, userId, orderId, panditId) {
     const panditIdNum = panditId != null && panditId !== '' ? Number(panditId) : null;
@@ -976,6 +977,22 @@ async function sendGift(req, res) {
                 key: `pandit_${pandit_id}`,
                 payload: { name, user_id: req.userId, username: user?.name, avatar: user?.avatar, profile: user?.profile, amount, qty, is_live },
             });
+
+            const channel = await db('live_streams').select('channel_id').where({ pandit_id: Number(pandit.id), status: "live" }).first();
+            const profile = await db('userprofiles').select('id').where({ user_id: Number(req.userId) }).first();
+            const payload = {
+                channel_id: channel?.channel_id || null,
+                sender_type: 'user',
+                sender_id: req.userId,
+                sender_name: user?.name,
+                message: `send gift worth rs(${amount})`,
+                profile: user?.profile,
+                avatar: user?.avatar,
+                profile_id: profile?.id
+            }
+            const joined_user_ids = await readJoinedUserIds(payload?.channel_id);
+            emitLiveChatMessage(0, payload?.channel_id, { chat: payload }, req.userId, joined_user_ids);
+
         }
         return res.status(200).json({ success: true, message: 'Order cancel Successfully' });
     } catch (err) {
