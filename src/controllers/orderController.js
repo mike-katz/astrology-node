@@ -979,20 +979,24 @@ async function sendGift(req, res) {
             });
 
             const channel = await db('live_streams').select('channel_id').where({ pandit_id: Number(pandit.id), status: "live" }).first();
-            const profile = await db('userprofiles').select('id').where({ user_id: Number(req.userId) }).first();
             const payload = {
-                channel_id: channel?.channel_id || null,
-                sender_type: 'user',
-                sender_id: req.userId,
-                sender_name: user?.name,
-                message: `${user?.name} sent ₹${amount} ${name} to ${pandit?.name} ✨`,
+                username: user?.name,
                 profile: user?.profile,
                 avatar: user?.avatar,
-                profile_id: profile?.id
+                gift_name: name,
+                amount
             }
-            const joined_user_ids = await readJoinedUserIds(payload?.channel_id);
-            emitLiveChatMessage(0, payload?.channel_id, { chat: payload }, req.userId, joined_user_ids);
+            if (channel?.channel_id) {
+                const joined_user_ids = await readJoinedUserIds(channel?.channel_id);
 
+                const base = payload;
+                for (const user_id of joined_user_ids) {
+                    const uid = user_id != null && Number.isFinite(Number(user_id)) ? Number(user_id) : null;
+                    if (uid != null) {
+                        callEvent('emit_to_user_send_gift', { key: `user_${uid}`, payload: base });
+                    }
+                }
+            }
         }
         return res.status(200).json({ success: true, message: 'Order cancel Successfully' });
     } catch (err) {
