@@ -985,7 +985,7 @@ async function sendGift(req, res) {
                 sender_type: 'user',
                 sender_id: req.userId,
                 sender_name: user?.name,
-                message: `send gift worth rs(${amount})`,
+                message: `${user?.name} sent ₹${amount} ${name} to ${pandit?.name}`,
                 profile: user?.profile,
                 avatar: user?.avatar,
                 profile_id: profile?.id
