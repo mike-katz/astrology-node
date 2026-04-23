@@ -4,6 +4,17 @@ const blobServiceClient = BlobServiceClient.fromConnectionString(
     process.env.AZURE_STORAGE_CONNECTION_STRING
 );
 
+function getContainerClient() {
+    const connectionString = process.env.AZURE_STORAGE_CONNECTION_STRING;
+    const containerName = process.env.AZURE_STORAGE_CONTAINER_NAME;
+    if (!connectionString || !containerName) {
+        throw new Error('AZURE_STORAGE_CONNECTION_STRING and AZURE_STORAGE_CONTAINER_NAME are required');
+    }
+    const blobServiceClient = BlobServiceClient.fromConnectionString(connectionString);
+    return blobServiceClient.getContainerClient(containerName);
+}
+
+
 async function uploadToAzure(buffer, fileName) {
     const containerClient = blobServiceClient.getContainerClient(
         process.env.AZURE_STORAGE_CONTAINER_NAME
@@ -57,13 +68,13 @@ async function deleteFileFromAzure(filePath = '') {
 }
 
 async function uploadImageToAzure(directoryPath, image, type) {
-    new Promise(async (resolve, reject) => {
+    return new Promise(async (resolve, reject) => {
         try {
             const containerClient = getContainerClient();
             const file = image.buffer;
             const originalFileName = image.originalname;
             const splitedFileName = originalFileName.split('.');
-            const fileName = `${Date.now().toString()}@$!${splitedFileName[0]}.${splitedFileName[splitedFileName.length - 1]}`;
+            const fileName = `${Date.now()}@$!${splitedFileName[0]}.${splitedFileName[splitedFileName.length - 1]}`;
 
             const folderName =
                 type === 'chat' ? process.env.CHAT_FOLDER_NAME
@@ -71,7 +82,7 @@ async function uploadImageToAzure(directoryPath, image, type) {
                         : type === 'document' ? process.env.DOCUMENT_FOLDER_NAME
                             : type === 'upload' ? 'upload'
                                 : type === 'support' ? (process.env.SUPPORT_FOLDER_NAME || 'support')
-                                    : process.env.CHAT_FOLDER_NAME || '';
+                                    : process.env.CHAT_FOLDER_NAME || 'extra';
 
             const blobName = folderName ? `${folderName}/${fileName}` : fileName;
             const blockBlobClient = containerClient.getBlockBlobClient(blobName);
