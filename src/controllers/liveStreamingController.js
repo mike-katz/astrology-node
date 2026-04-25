@@ -752,6 +752,22 @@ async function stopLive(req, res) {
         return res.status(500).json({ success: false, message: 'Server error' });
     }
 }
+
+async function checkLive(req, res) {
+    const { pandit_id } = req.body
+    try {
+        const active = await db('orders').where({ pandit_id, status: "continue" }).first();
+        if (!active) {
+            return res.status(200).json({ success: false, data: null, message: 'No any active call.' });
+        }
+        return res.status(200).json({ success: true, data: { pandit_id, order_id: active?.order_id, end_time: active?.end_time }, message: 'Live found successful.' });
+    } catch (err) {
+        logger.error('checkLive error', err?.message);
+        console.error(err);
+        return res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
 module.exports = {
     listLive,
     joinLive,
@@ -765,5 +781,6 @@ module.exports = {
     reportUser,
     stopLive,
     readJoinedUserIds,
-    emitLiveChatMessage
+    emitLiveChatMessage,
+    checkLive
 };

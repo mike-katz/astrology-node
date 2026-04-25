@@ -15,5 +15,6 @@ router.post('/call/reject', live.rejectOrder);
 router.post('/call/end', live.completeOrder);
 router.post('/report', auth, live.reportUser);
 router.post('/stop', auth, live.stopLive);
+router.post('/check-live', auth, live.checkLive);
 
 module.exports = router;
