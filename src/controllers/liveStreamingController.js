@@ -296,6 +296,7 @@ async function joinLive(req, res) {
             username: joinedUserName ?? u?.name ?? null,
             profile: u?.profile ?? null,
             avatar: u?.avatar ?? null,
+            balance: u?.balance ?? 0,
             joined_user_ids,
             viewer_count,
             rtc_uid: uid,
@@ -414,6 +415,7 @@ async function sendLiveChatUser(req, res) {
 
         saved.profile = u?.profile
         saved.avatar = u?.avatar
+        saved.balance = u?.balance
         saved.profile_id = profile_id?.id
         console.log("saved", saved);
         const joined_user_ids = await readJoinedUserIds(channel_id);
