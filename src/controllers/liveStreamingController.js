@@ -197,7 +197,12 @@ async function listLive(req, res) {
                 'pandits.country_code',
                 'pandits.chat',
                 'pandits.call',
-                'pandits.online'
+                'pandits.online',
+                'pandits.rating_1',
+                'pandits.rating_2',
+                'pandits.rating_3',
+                'pandits.rating_5',
+                'pandits.rating_4',
             )
             .orderBy('live_streams.created_at', 'desc');
 
