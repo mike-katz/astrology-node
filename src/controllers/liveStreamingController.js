@@ -228,7 +228,12 @@ async function listLive(req, res) {
                         call: r.call,
                         online: r.online,
                         isFollow: !!isFollow,
-                        final_chat_call_rate: r.final_chat_call_rate
+                        rating_1: r.rating_1,
+                        rating_2: r.rating_2,
+                        rating_3: r.rating_3,
+                        rating_4: r.rating_4,
+                        rating_5: r.rating_5,
+                        final_chat_call_rate: r.final_chat_call_rate,
                     }
                 };
             })
