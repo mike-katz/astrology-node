@@ -984,7 +984,8 @@ async function sendGift(req, res) {
                 profile: user?.profile,
                 avatar: user?.avatar,
                 gift_name: name,
-                amount
+                amount,
+                channel_id: channel?.channel_id
             }
             if (channel?.channel_id) {
                 const joined_user_ids = await readJoinedUserIds(channel?.channel_id);
