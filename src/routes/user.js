@@ -35,6 +35,7 @@ router.delete('/', user.deleteMyAccount);
 router.get('/recharge', user.getRecharge);
 router.get('/rechargeBanner', user.getRechargeBanner);
 router.get('/cookie', user.getCookie);
+router.get('/recommendation', user.getRecommendations);
 
 router.post('/profileUpdate',
     upload.fields([
