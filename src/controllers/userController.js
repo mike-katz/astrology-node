@@ -425,9 +425,6 @@ async function getRecommendations(req, res) {
 
         const total = parseInt(count);
         const totalPages = Math.ceil(total / limit);
-        blogs.map(item => {
-            item.hash_tag = JSON.parse(item?.hash_tag)
-        })
         const response = {
             page,
             limit,
