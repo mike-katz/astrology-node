@@ -8,6 +8,7 @@ const axios = require('axios');
 const sendMail = require('../utils/sendMail');
 const { getCache } = require("../config/redisClient");
 const { uploadImageToAzure, deleteFileFromAzure } = require('../utils/azureUploader');
+const { sendSMS, verifySMS } = require('./authController');
 
 async function getPandits(req, res) {
     try {
@@ -503,17 +504,23 @@ async function signup(req, res) {
             return res.status(400).json({ success: false, message: 'Your account is blocked.' });
         }
 
-        const url = `http://pro.trinityservices.co.in/generateOtp.jsp?userid=${process.env.OTP_USERNAME}&key=${process.env.OTP_KEY}&mobileno=${mobile}&timetoalive=600&sms=%7Botp%7D%20is%20the%20one%20time%20password%20for%20Astroguruji%20Application.%20AstrotalkGuruji`
-        let otpResponse;
-        try {
-            otpResponse = await axios.get(url);
-            otpResponse = otpResponse.data
-        } catch (error) {
-            console.error('Acquire API failed:', error.message);
-            otpResponse = null;
-        }
-        if (!user) {
-            await db('otpmanages').insert({ mobile, country_code, otp: otpResponse?.otpId });
+        const setting = await db('settings').select('otp_provider').first();
+        if (setting?.otp_provider == 'bulksms') {
+            const response = await sendSMS(mobile, country_code)
+            if (!response.return) return res.status(400).json({ success: false, message: response?.message });
+        } else {
+            const url = `http://pro.trinityservices.co.in/generateOtp.jsp?userid=${process.env.OTP_USERNAME}&key=${process.env.OTP_KEY}&mobileno=${mobile}&timetoalive=600&sms=%7Botp%7D%20is%20the%20one%20time%20password%20for%20Astroguruji%20Application.%20AstrotalkGuruji`
+            let otpResponse;
+            try {
+                otpResponse = await axios.get(url);
+                otpResponse = otpResponse.data
+            } catch (error) {
+                console.error('Acquire API failed:', error.message);
+                otpResponse = null;
+            }
+            if (!user) {
+                await db('otpmanages').insert({ mobile, country_code, otp: otpResponse?.otpId });
+            }
         }
         return res.status(200).json({ success: true, message: 'Otp Send Successfully' });
     } catch (err) {
@@ -546,23 +553,30 @@ async function verifyOtp(req, res) {
             update.attempt = 1;
         }
 
-        const url = `http://pro.trinityservices.co.in/validateOtpApi.jsp?mobileno=${mobile}&otp=${otp}`;
-        let otpResponse;
-        try {
-            otpResponse = await axios.get(url);
-            otpResponse = otpResponse.data
-            if (otpResponse?.result != "success") {
-                update.expiry = new Date(currentDate.getTime() + 4 * 60 * 60 * 1000);
-                await db('otpmanages')
-                    .where('id', latestRecord?.id)
-                    .update(update);
-                return res.status(400).json({ success: false, data: null, message: 'Wrong otp' });
-            }
-        } catch (error) {
-            console.error('Acquire API failed:', error.message);
-            otpResponse = null;
-        }
 
+        const setting = await db('settings').select('otp_provider').first();
+        if (setting?.otp_provider == 'bulksms') {
+            console.log("here");
+            const response = await verifySMS(mobile, country_code, otp)
+            if (!response.return) return res.status(400).json({ success: false, message: response?.message });
+        } else {
+            const url = `http://pro.trinityservices.co.in/validateOtpApi.jsp?mobileno=${mobile}&otp=${otp}`;
+            let otpResponse;
+            try {
+                otpResponse = await axios.get(url);
+                otpResponse = otpResponse.data
+                if (otpResponse?.result != "success") {
+                    update.expiry = new Date(currentDate.getTime() + 4 * 60 * 60 * 1000);
+                    await db('otpmanages')
+                        .where('id', latestRecord?.id)
+                        .update(update);
+                    return res.status(400).json({ success: false, data: null, message: 'Wrong otp' });
+                }
+            } catch (error) {
+                console.error('Acquire API failed:', error.message);
+                otpResponse = null;
+            }
+        }
 
         update.attempt = 0;
         update.expiry = null;
