@@ -370,4 +370,4 @@ async function test(req, res) {
 }
 
 
-module.exports = { register, login, verifyOtp, socialUrl, getSettings, sendCall, test };
+module.exports = { register, login, verifyOtp, socialUrl, getSettings, sendCall, test, sendSMS, verifySMS };

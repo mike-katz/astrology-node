@@ -389,4 +389,58 @@ async function getCookie(req, res) {
     return res.status(200).json({ success: true, data: response?.data?.data?.prediction, message: 'Recharge list success' });
 }
 
-module.exports = { updateProfile, getProfile, getBalance, updateToken, profileUpdate, makeAvtarString, deleteMyAccount, getRecharge, getRechargeBanner, getCookie };
+async function getRecommendations(req, res) {
+    try {
+        let page = parseInt(req.query.page) || 1;
+        let limit = parseInt(req.query.limit) || 20;
+        const { category_id, title, category } = req.query;
+
+        if (page < 1) page = 1;
+        if (limit < 1) limit = 20;
+        const offset = (page - 1) * limit;
+
+        const filter = { user_id: req.userId };
+
+        // Filter by category if provided
+
+
+        let query = db('recommendations as b')
+            .where(filter);
+
+        let countQuery = db('recommendations as b')
+            .leftJoin('pandits as c', 'c.id', 'b.pandit_id')
+            .where(filter);
+
+        // Filter by title if provided
+
+
+        const blogs = await query
+            .leftJoin('pandits as c', 'c.id', 'b.pandit_id')
+            .select('b.id', 'b.title', 'b.main_price', 'b.price', 'b.created_at', 'b.review', 'b.url', 'c.display_name as name', 'c.profile', 'b.pandit_id')
+            .orderBy('b.id', 'desc')
+            .limit(limit)
+            .offset(offset);
+
+        const [{ count }] = await countQuery.count('* as count');
+
+        const total = parseInt(count);
+        const totalPages = Math.ceil(total / limit);
+        const response = {
+            page,
+            limit,
+            total,
+            totalPages,
+            results: blogs
+        };
+
+        return res.status(200).json({
+            success: true,
+            data: response,
+            message: 'recommendation list fetched successfully'
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+module.exports = { updateProfile, getProfile, getBalance, updateToken, profileUpdate, makeAvtarString, deleteMyAccount, getRecharge, getRechargeBanner, getCookie, getRecommendations };
