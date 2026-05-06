@@ -999,23 +999,28 @@ async function reSendOtp(req, res) {
             update.sendexpiry = new Date(currentDate.getTime() + 4 * 60 * 60 * 1000);
         }
         // const OTP = Math.floor(1000 + Math.random() * 9000);
-        const OTP = Math.floor(1000 + Math.random() * 9000);
 
-        const url = `http://pro.trinityservices.co.in/generateOtp.jsp?userid=${process.env.OTP_USERNAME}&key=${process.env.OTP_KEY}&mobileno=${mobile}&timetoalive=600&sms=%7Botp%7D%20is%20the%20one%20time%20password%20for%20Astroguruji%20Application.%20AstrotalkGuruji`
-        let otpResponse;
-        try {
-            otpResponse = await axios.get(url);
-            otpResponse = otpResponse.data
-        } catch (error) {
-            console.error('Acquire API failed:', error.message);
-            otpResponse = null;
+        if (setting?.otp_provider == 'bulksms') {
+            const response = await sendSMS(mobile, country_code)
+            if (!response.return) return res.status(400).json({ success: false, message: response?.message });
+        } else {
+            const url = `http://pro.trinityservices.co.in/generateOtp.jsp?userid=${process.env.OTP_USERNAME}&key=${process.env.OTP_KEY}&mobileno=${mobile}&timetoalive=600&sms=%7Botp%7D%20is%20the%20one%20time%20password%20for%20Astroguruji%20Application.%20AstrotalkGuruji`
+            let otpResponse;
+            try {
+                otpResponse = await axios.get(url);
+                otpResponse = otpResponse.data
+            } catch (error) {
+                console.error('Acquire API failed:', error.message);
+                otpResponse = null;
+            }
+            await db('otpmanages').where('mobile', mobile).where('country_code', country_code).del();
+            await db('otpmanages').insert({
+                'mobile': mobile, country_code: country_code, otp: otpResponse?.otpId, sendattempt: update.sendattempt || 1,
+                sendexpiry: update.sendexpiry || new Date(new Date().getTime() + 4 * 60 * 60 * 1000)
+            })
         }
 
-        await db('otpmanages').where('mobile', mobile).where('country_code', country_code).del();
-        await db('otpmanages').insert({
-            'mobile': mobile, country_code: country_code, otp: otpResponse?.otpId, sendattempt: update.sendattempt || 1,
-            sendexpiry: update.sendexpiry || new Date(new Date().getTime() + 4 * 60 * 60 * 1000)
-        })
+
         response.return = true;
         response.message = 'OTP Send successful.';
         // });
