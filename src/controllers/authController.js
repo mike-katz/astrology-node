@@ -341,13 +341,17 @@ async function sendCall(req, res) {
         });
         const response = await axios({
             method: 'post',
-            url: "https://voicecallconnect.com/ctc/external/create-call",
+            url: "https://obdivr.in/api/ctc/initiate-call",
             headers: { Authorization: "Bearer 669B2JB1EKFF9aa0jUpwMvk4cel6ie47TyF3ZZJSxgjHGvKkHsbm9k6c9GQ0g669" },
             data: {
-                source: `+91${from}`,
-                destination: `+91${to}`,
+                apartyno: `+91${from}`,
+                bpartyno: `+91${to}`,
                 // did: "+911413231099",//["+911413231091", "+911413231099"]
-                did
+                cli: did,
+                "reference_id": "1",
+                "channelflag": 0,
+                "dtmfflag": 0,
+                "recordingflag": 0
             }
         });
         console.log("response,response", response?.data);
