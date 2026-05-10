@@ -553,6 +553,7 @@ async function recordingWebhook(req, res) {
                     receiver_id: Number(order?.user_id),
                     message: recordingUrl,
                     status: "send",
+                    convertion_id: `${order?.user_id}-${order?.pandit_id}`,
                     type: "call_recording"
                 }).returning('*');
                 console.log("saved", saved);

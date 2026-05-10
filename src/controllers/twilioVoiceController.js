@@ -128,6 +128,7 @@ async function recording(req, res) {
             order_id,
             receiver_id: Number(order?.user_id),
             message: fileName,
+            convertion_id: `${order?.user_id}-${order?.pandit_id}`,
             status: "send",
             type: "call_recording"
         }).returning('*');
