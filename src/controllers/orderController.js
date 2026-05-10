@@ -49,7 +49,7 @@ async function sendAutoMessage(profile, userId, orderId, panditId) {
         receiver_id: panditIdNum,
         message: message,
         status: "send",
-        convertion_id: `${userId}-${panditIdNum}`,
+        conversion_id: `${userId}-${panditIdNum}`,
         type: "text"
     }).returning('*');
     if (panditIdNum != null) {
@@ -76,7 +76,7 @@ async function sendAutoMessage(profile, userId, orderId, panditId) {
         receiver_id: Number(userId),
         message: "Welcome to AstroGuruji!",
         status: "send",
-        convertion_id: `${userId}-${panditIdNum}`,
+        conversion_id: `${userId}-${panditIdNum}`,
         is_system_generate: true,
         type: "text"
     }).returning('*');
@@ -91,7 +91,7 @@ async function sendAutoMessage(profile, userId, orderId, panditId) {
         receiver_type: "user",
         order_id: orderId,
         receiver_id: Number(userId),
-        convertion_id: `${userId}-${panditIdNum}`,
+        conversion_id: `${userId}-${panditIdNum}`,
         message: "Astrologer will join within 10 seconds",
         status: "send",
         is_system_generate: true,
@@ -108,7 +108,7 @@ async function sendAutoMessage(profile, userId, orderId, panditId) {
         receiver_type: "user",
         order_id: orderId,
         receiver_id: Number(userId),
-        convertion_id: `${userId}-${panditIdNum}`,
+        conversion_id: `${userId}-${panditIdNum}`,
         message: "Please share your question in the meanwhile",
         status: "send",
         is_system_generate: true,
@@ -785,7 +785,7 @@ async function acceptOrder(req, res) {
                 order_id: orderId,
                 receiver_id: Number(order?.pandit_id),
                 message: message,
-                convertion_id: `${order?.user_id}-${order?.pandit_id}`,
+                conversion_id: `${order?.user_id}-${order?.pandit_id}`,
                 status: "send",
                 type: "text"
             }).returning('*');
@@ -810,7 +810,7 @@ async function acceptOrder(req, res) {
                 receiver_id: Number(order?.pandit_id),
                 message: "This is an automated message to confirm that chat has started.",
                 status: "send",
-                convertion_id: `${order?.user_id}-${order?.pandit_id}`,
+                conversion_id: `${order?.user_id}-${order?.pandit_id}`,
                 is_system_generate: true,
                 type: "text"
             }).returning('*');

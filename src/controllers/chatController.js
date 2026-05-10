@@ -262,7 +262,7 @@ async function sendMessage(req, res) {
                     message: `${process.env.AZURE_STORAGE_BASE_URL}${image?.data?.key}`,
                     status: "send",
                     type,
-                    convertion_id: `${order?.user_id}-${order?.pandit_id}`
+                    conversion_id: `${order?.user_id}-${order?.pandit_id}`
                 }).returning('*');
                 response.push(saved)
                 if (pandit?.token) {
@@ -285,7 +285,7 @@ async function sendMessage(req, res) {
                 message,
                 status: "send",
                 type,
-                convertion_id: `${order?.user_id}-${order?.pandit_id}`
+                conversion_id: `${order?.user_id}-${order?.pandit_id}`
             }).returning('*');
             response = saved
             if (pandit?.token) {
@@ -494,7 +494,7 @@ async function balanceCut(user_id, order, end_time, place) {
                 message: `${user?.name} ended the chat`,
                 status: "send",
                 type: "text",
-                convertion_id: `${order?.user_id}-${order?.pandit_id}`,
+                conversion_id: `${order?.user_id}-${order?.pandit_id}`,
                 is_system_generate: true
             }).returning('*');
             callEvent("emit_to_user", {
@@ -520,7 +520,7 @@ async function balanceCut(user_id, order, end_time, place) {
                     message: `There is more to see in your chart. Please recharge to continue and connect via call or chat for further guidance.\n\nआपकी कुंडली में और भी बहुत कुछ देखने योग्य है। कृपया आगे बढ़ने के लिए रिचार्ज करें और अधिक मार्गदर्शन के लिए कॉल या चैट के माध्यम से जुड़ें।`,
                     status: "send",
                     type: "text",
-                    convertion_id: `${order?.user_id}-${order?.pandit_id}`
+                    conversion_id: `${order?.user_id}-${order?.pandit_id}`
                 }).returning('*');
                 callEvent("emit_to_user", {
                     toType: "pandit",
@@ -1291,7 +1291,7 @@ Marital Status: ${formatValue(profile?.marital_status)} \n`;
                 message: message,
                 status: "send",
                 type: "text",
-                convertion_id: `${order?.user_id}-${order?.pandit_id}`
+                conversion_id: `${order?.user_id}-${order?.pandit_id}`
             }).returning('*');
             callEvent("emit_to_user", {
                 toType: "pandit",
@@ -1315,7 +1315,7 @@ Marital Status: ${formatValue(profile?.marital_status)} \n`;
                 message: "This is an automated message to confirm that chat has started.",
                 status: "send",
                 is_system_generate: true,
-                convertion_id: `${order?.user_id}-${order?.pandit_id}`,
+                conversion_id: `${order?.user_id}-${order?.pandit_id}`,
                 type: "text"
             }).returning('*');
 
