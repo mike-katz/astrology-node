@@ -494,7 +494,7 @@ async function balanceCut(user_id, order, end_time, place) {
                 message: `${user?.name} ended the chat`,
                 status: "send",
                 type: "text",
-                conversion_id: `${order?.user_id}-${order?.pandit_id}`,
+                conversion_id: `${Number(user_id)}-${Number(order?.pandit_id)}`,
                 is_system_generate: true
             }).returning('*');
             callEvent("emit_to_user", {
