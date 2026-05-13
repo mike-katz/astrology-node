@@ -432,9 +432,15 @@ async function getOrderDetail(req, res) {
 }
 
 function getDuration(start_time, end_time) {
-    const diffMinutes = Math.ceil(
-        Math.abs(new Date(end_time) - new Date(start_time)) / (1000 * 60)
+    const diffMs = Math.abs(
+        new Date(end_time) - new Date(start_time)
     );
+    const minutes = Math.floor(diffMs / (1000 * 60));
+    const extraSeconds = diffMs % (1000 * 60);
+
+    const diffMinutes = extraSeconds > 1000
+        ? minutes + 1
+        : minutes;
     return diffMinutes
 }
 
