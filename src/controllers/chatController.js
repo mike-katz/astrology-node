@@ -153,20 +153,7 @@ async function getMessage(req, res) {
         //     .countDistinct('order_id as count');
 
         const messages = await db('chats')
-            .andWhere(function () {
-                this.where({
-                    sender_type: 'user',
-                    sender_id: req.userId,
-                    receiver_type: 'pandit',
-                    receiver_id: panditId
-                })
-                    .orWhere({
-                        sender_type: 'pandit',
-                        sender_id: panditId,
-                        receiver_type: 'user',
-                        receiver_id: req.userId
-                    });
-            })
+            .where('conversion_id', `${req.userId}-${panditId}`)
             .orderBy('id', 'desc')
             .limit(limit)
             .offset(offset);
@@ -174,20 +161,7 @@ async function getMessage(req, res) {
         const [{ count }] = await db('chats')
             .count('* as count')
             .whereNull('deleted_at')
-            .andWhere(function () {
-                this.where({
-                    sender_type: 'user',
-                    sender_id: req.userId,
-                    receiver_type: 'pandit',
-                    receiver_id: panditId
-                })
-                    .orWhere({
-                        sender_type: 'pandit',
-                        sender_id: panditId,
-                        receiver_type: 'user',
-                        receiver_id: req.userId
-                    });
-            });
+            .where('conversion_id', `${req.userId}-${panditId}`);
         const total = parseInt(count);
         const totalPages = Math.ceil(total / limit);
 
