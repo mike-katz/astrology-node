@@ -278,7 +278,7 @@ async function verifyOtp(req, res) {
 
         // Store token in Redis with key user_username (or user_mobile if username doesn't exist)
         const username = existing.id;
-        const redisKey = `user_${username}`;
+        const redisKey = `beta_user_${username}`;
         // Set TTL to match JWT expiration (1 hour = 3600 seconds)
         const jwtExpiry = process.env.JWT_EXPIRES_IN || '1h';
         let ttlSeconds = 3600; // default 1 hour
@@ -373,5 +373,208 @@ async function test(req, res) {
     }
 }
 
+function parseGoogleClientIds() {
+    const raw = process.env.GOOGLE_CLIENT_IDS || process.env.GOOGLE_CLIENT_ID || '';
+    return raw.split(',').map((s) => s.trim()).filter(Boolean);
+}
 
-module.exports = { register, login, verifyOtp, socialUrl, getSettings, sendCall, test, sendSMS, verifySMS };
+/**
+ * Verifies a Google ID token (from mobile/web Google Sign-In) and returns the same session shape as verifyOtp.
+ * Configure GOOGLE_CLIENT_IDS (comma-separated) or GOOGLE_CLIENT_ID with your OAuth client IDs (Web, iOS, Android).
+ */
+async function googleLogin(req, res) {
+    try {
+        const idToken = req.body.token;
+        if (!idToken) {
+            return res.status(400).json({ success: false, message: 'id_token or idToken is required' });
+        }
+
+        const clientIds = parseGoogleClientIds();
+        if (!clientIds.length) {
+            logger.warn('googleLogin: GOOGLE_CLIENT_IDS / GOOGLE_CLIENT_ID not set');
+            return res.status(503).json({ success: false, message: 'Google login is not configured' });
+        }
+
+        let tokenPayload;
+        try {
+            const tokenRes = await axios.get('https://oauth2.googleapis.com/tokeninfo', {
+                params: { id_token: idToken },
+                timeout: 15000,
+            });
+            tokenPayload = tokenRes.data;
+        } catch (e) {
+            if (e.response?.status === 400) {
+                return res.status(401).json({ success: false, message: 'Invalid or expired Google token' });
+            }
+            logger.error(e);
+            return res.status(502).json({ success: false, message: 'Could not verify Google token' });
+        }
+
+        if (tokenPayload.error) {
+            return res.status(401).json({
+                success: false,
+                message: tokenPayload.error_description || tokenPayload.error || 'Invalid Google token',
+            });
+        }
+
+        if (!clientIds.includes(tokenPayload.aud)) {
+            return res.status(401).json({ success: false, message: 'Invalid token audience' });
+        }
+
+        if (tokenPayload.email && tokenPayload.email_verified !== 'true') {
+            return res.status(400).json({ success: false, message: 'Google account email is not verified' });
+        }
+
+        const sub = tokenPayload.sub;
+        const email = tokenPayload.email || null;
+        const name = tokenPayload.name || (email ? email.split('@')[0] : null) || 'User';
+        const picture = tokenPayload.picture || null;
+
+        let existing = await db('users').whereNull('deleted_at').where({ google_id: sub }).first();
+
+        if (!existing && email) {
+            existing = await db('users').whereNull('deleted_at').where({ email }).first();
+            if (existing) {
+                if (existing.google_id && existing.google_id !== sub) {
+                    return res.status(409).json({
+                        success: false,
+                        message: 'This email is already linked to a different Google account',
+                    });
+                }
+            }
+        }
+
+        if (existing?.status === 'block') {
+            return res.status(400).json({ success: false, message: 'Your account is blocked.' });
+        }
+        if (existing?.status === 'inactive') {
+            return res.status(400).json({
+                success: false,
+                message: 'Oops! Your account is inactive right now. Please contact support.',
+            });
+        }
+
+        let { ad_set_id, utm_source, ad_id, type, version, referrer } = req.body;
+        const mode = type ? type : 'APP';
+        const upd = {};
+        if (existing && version) {
+            upd.version = version;
+        }
+        if (mode) {
+            upd.mode = mode;
+        }
+
+        let set_id = ad_set_id ?? referrer ?? null;
+        if (set_id != null) {
+            const numOk = isNumber(set_id);
+            if (!numOk) {
+                set_id = null;
+                if (existing) {
+                    upd.ad_set_id = null;
+                }
+            } else if (existing) {
+                upd.ad_set_id = Number(set_id);
+            }
+        }
+
+        if (!existing) {
+            const insertRow = {
+                google_id: sub,
+                email,
+                name,
+                avatar: picture,
+                country_code: '+91',
+                status: 'active',
+                balance: 0,
+                mobile: null,
+                mode,
+                version: version || null,
+                utm_source: utm_source || null,
+                ad_id: ad_id || null,
+                ad_set_id: set_id != null && isNumber(set_id) ? Number(set_id) : null,
+            };
+            [existing] = await db('users').insert(insertRow).returning([
+                'id',
+                'mobile',
+                'avatar',
+                'country_code',
+                'otp',
+                'name',
+                'profile',
+                'email',
+                'google_id',
+            ]);
+        } else {
+            const linkUpd = { ...upd };
+            if (!existing.google_id) {
+                linkUpd.google_id = sub;
+            }
+            if (email) {
+                linkUpd.email = email;
+            }
+            if (picture) {
+                linkUpd.avatar = picture;
+            }
+            if (name && !existing.name) {
+                linkUpd.name = name;
+            }
+            if (Object.keys(linkUpd).length > 0) {
+                await db('users').where({ id: Number(existing.id) }).update(linkUpd);
+            }
+            existing = await db('users').where({ id: existing.id }).first();
+        }
+
+        const token = jwt.sign(
+            { userId: existing.id, username: existing.name, mobile: existing.mobile },
+            process.env.JWT_SECRET,
+            { expiresIn: process.env.JWT_EXPIRES_IN || '1h' },
+        );
+        const encryptToken = encrypt(token);
+
+        const username = existing.id;
+        const redisKey = `beta_user_${username}`;
+        const jwtExpiry = process.env.JWT_EXPIRES_IN || '1h';
+        let ttlSeconds = 3600;
+        if (jwtExpiry.includes('h')) {
+            ttlSeconds = parseInt(jwtExpiry.replace('h', ''), 10) * 3600;
+        }
+        await setCache(redisKey, encryptToken, ttlSeconds);
+
+        const [{ count }] = await db('orders')
+            .count('* as count')
+            .where({ user_id: existing.id })
+            .whereIn('status', ['continue', 'completed', 'pending']);
+        const is_free = count == 0;
+
+        return res.status(200).json({
+            success: true,
+            data: {
+                id: existing?.id,
+                name: existing?.name,
+                profile: existing?.profile,
+                avatar: existing?.avatar,
+                mobile: existing?.mobile,
+                country_code: existing?.country_code,
+                token: encryptToken,
+                is_free,
+            },
+            message: 'Google sign-in successful',
+        });
+    } catch (err) {
+        logger.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
+module.exports = {
+    register,
+    login,
+    verifyOtp,
+    socialUrl,
+    getSettings,
+    sendCall,
+    test,
+    sendSMS,
+    verifySMS,
+    googleLogin,
+};

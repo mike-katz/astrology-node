@@ -29,7 +29,7 @@ module.exports = async function (req, res, next) {
         // Get user from database to get username
         // Check if token exists in Redis
         const username = verified?.userId;
-        const redisKey = `user_${username}`;
+        const redisKey = `beta_user_${username}`;
         let redisToken;
         try {
             redisToken = await getCache(redisKey);
