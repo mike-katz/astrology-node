@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const db = require('../db');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
@@ -566,6 +567,232 @@ async function googleLogin(req, res) {
     }
 }
 
+const APPLE_ISSUER = 'https://appleid.apple.com';
+const APPLE_JWKS_URL = 'https://appleid.apple.com/auth/keys';
+let appleJwksCache = { keys: null, fetchedAt: 0 };
+const APPLE_JWKS_TTL_MS = 60 * 60 * 1000;
+
+async function getAppleSigningKeys() {
+    const now = Date.now();
+    if (appleJwksCache.keys && now - appleJwksCache.fetchedAt < APPLE_JWKS_TTL_MS) {
+        return appleJwksCache.keys;
+    }
+    const { data } = await axios.get(APPLE_JWKS_URL, { timeout: 15000 });
+    if (!data.keys || !Array.isArray(data.keys)) {
+        throw new Error('Invalid Apple JWKS response');
+    }
+    appleJwksCache = { keys: data.keys, fetchedAt: now };
+    return data.keys;
+}
+
+function bustAppleJwksCache() {
+    appleJwksCache = { keys: null, fetchedAt: 0 };
+}
+
+function parseAppleAudiences() {
+    const raw = process.env.APPLE_CLIENT_IDS || process.env.APPLE_CLIENT_ID || '';
+    return raw.split(',').map((s) => s.trim()).filter(Boolean);
+}
+
+/**
+ * Verify Sign in with Apple identity token (JWT from ASAuthorizationAppleIDCredential).
+ * @param {string} identityToken
+ * @param {string[]} audiences Bundle ID(s) and/or Services ID(s) from Apple Developer
+ */
+async function verifyAppleIdentityToken(identityToken, audiences) {
+    const decoded = jwt.decode(identityToken, { complete: true });
+    if (!decoded || typeof decoded !== 'object' || !decoded.header?.kid) {
+        throw new Error('Invalid Apple identity token');
+    }
+    let keys = await getAppleSigningKeys();
+    let jwk = keys.find((k) => k.kid === decoded.header.kid);
+    if (!jwk) {
+        bustAppleJwksCache();
+        keys = await getAppleSigningKeys();
+        jwk = keys.find((k) => k.kid === decoded.header.kid);
+    }
+    if (!jwk) {
+        throw new Error('Apple signing key not found');
+    }
+    const pubKey = crypto.createPublicKey({ key: jwk, format: 'jwk' });
+    const pem = pubKey.export({ type: 'spki', format: 'pem' });
+    return jwt.verify(identityToken, pem, {
+        algorithms: ['RS256'],
+        issuer: APPLE_ISSUER,
+        audience: audiences,
+    });
+}
+
+/**
+ * Same session contract as googleLogin / verifyOtP — iOS Sign in with Apple.
+ * Body (after decrypt): token | identity_token | identityToken (Apple identity JWT).
+ * Optional: name or userName (Apple only sends full name once on device — pass from iOS if you have it).
+ * Optional: type, version, ad_set_id, utm_source, ad_id, referrer
+ * Env: APPLE_CLIENT_IDS (comma-separated) or APPLE_CLIENT_ID (Bundle ID, or Services ID for web).
+ */
+async function appleLogin(req, res) {
+    try {
+        const identityToken = req.body.token || req.body.identity_token || req.body.identityToken;
+        if (!identityToken) {
+            return res.status(400).json({
+                success: false,
+                message: 'token, identity_token, or identityToken is required',
+            });
+        }
+
+        const audiences = parseAppleAudiences();
+        if (!audiences.length) {
+            logger.warn('appleLogin: APPLE_CLIENT_IDS / APPLE_CLIENT_ID not set');
+            return res.status(503).json({ success: false, message: 'Apple login is not configured' });
+        }
+
+        let tokenPayload;
+        try {
+            tokenPayload = await verifyAppleIdentityToken(identityToken, audiences);
+        } catch (e) {
+            logger.warn(e.message || e);
+            return res.status(401).json({ success: false, message: 'Invalid or expired Apple token' });
+        }
+
+        const sub = tokenPayload.sub;
+        const email = tokenPayload.email || null;
+        const clientName = req.body.name || req.body.userName;
+        const name =
+            (typeof clientName === 'string' && clientName.trim()) ||
+            (email ? email.split('@')[0] : null) ||
+            'User';
+
+        let existing = await db('users').whereNull('deleted_at').where({ apple_id: sub }).first();
+
+        if (!existing && email) {
+            existing = await db('users').whereNull('deleted_at').where({ email }).first();
+            if (existing) {
+                if (existing.apple_id && existing.apple_id !== sub) {
+                    return res.status(409).json({
+                        success: false,
+                        message: 'This email is already linked to a different Apple account',
+                    });
+                }
+            }
+        }
+
+        if (existing?.status === 'block') {
+            return res.status(400).json({ success: false, message: 'Your account is blocked.' });
+        }
+        if (existing?.status === 'inactive') {
+            return res.status(400).json({
+                success: false,
+                message: 'Oops! Your account is inactive right now. Please contact support.',
+            });
+        }
+
+        let { ad_set_id, utm_source, ad_id, type, version, referrer } = req.body;
+        const mode = type ? type : 'APP';
+        const upd = {};
+        if (existing && version) {
+            upd.version = version;
+        }
+        if (mode) {
+            upd.mode = mode;
+        }
+
+        let set_id = ad_set_id ?? referrer ?? null;
+        if (set_id != null) {
+            const numOk = isNumber(set_id);
+            if (!numOk) {
+                set_id = null;
+                if (existing) {
+                    upd.ad_set_id = null;
+                }
+            } else if (existing) {
+                upd.ad_set_id = Number(set_id);
+            }
+        }
+
+        if (!existing) {
+            const insertRow = {
+                apple_id: sub,
+                email,
+                name,
+                country_code: '+91',
+                status: 'active',
+                balance: 0,
+                mobile: null,
+                mode,
+                version: version || null,
+                utm_source: utm_source || null,
+                ad_id: ad_id || null,
+                ad_set_id: set_id != null && isNumber(set_id) ? Number(set_id) : null,
+            };
+            [existing] = await db('users').insert(insertRow).returning([
+                'id',
+                'mobile',
+                'avatar',
+                'country_code',
+                'otp',
+                'name',
+                'profile',
+                'email',
+                'apple_id',
+            ]);
+        } else {
+            const linkUpd = { ...upd };
+            if (!existing.apple_id) {
+                linkUpd.apple_id = sub;
+            }
+            if (email) {
+                linkUpd.email = email;
+            }
+            if (name && !existing.name) {
+                linkUpd.name = name;
+            }
+            if (Object.keys(linkUpd).length > 0) {
+                await db('users').where({ id: Number(existing.id) }).update(linkUpd);
+            }
+            existing = await db('users').where({ id: existing.id }).first();
+        }
+
+        const token = jwt.sign(
+            { userId: existing.id, username: existing.name, mobile: existing.mobile },
+            process.env.JWT_SECRET,
+            { expiresIn: process.env.JWT_EXPIRES_IN || '1h' },
+        );
+        const encryptToken = encrypt(token);
+
+        const redisKey = `beta_user_${existing.id}`;
+        const jwtExpiry = process.env.JWT_EXPIRES_IN || '1h';
+        let ttlSeconds = 3600;
+        if (jwtExpiry.includes('h')) {
+            ttlSeconds = parseInt(jwtExpiry.replace('h', ''), 10) * 3600;
+        }
+        await setCache(redisKey, encryptToken, ttlSeconds);
+
+        const [{ count }] = await db('orders')
+            .count('* as count')
+            .where({ user_id: existing.id })
+            .whereIn('status', ['continue', 'completed', 'pending']);
+        const is_free = count == 0;
+
+        return res.status(200).json({
+            success: true,
+            data: {
+                id: existing?.id,
+                name: existing?.name,
+                profile: existing?.profile,
+                avatar: existing?.avatar,
+                mobile: existing?.mobile,
+                country_code: existing?.country_code,
+                token: encryptToken,
+                is_free,
+            },
+            message: 'Apple sign-in successful',
+        });
+    } catch (err) {
+        logger.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
 module.exports = {
     register,
     login,
@@ -577,4 +804,5 @@ module.exports = {
     sendSMS,
     verifySMS,
     googleLogin,
+    appleLogin,
 };
