@@ -109,8 +109,8 @@ async function uploadImageToAzure(directoryPath, image, type) {
     });
 }
 
-exports.uploadBufferToAzure = (buffer, filename, contentType, type = 'exports') =>
-    new Promise(async (resolve, reject) => {
+function uploadBufferToAzure(buffer, filename, contentType, type = 'exports') {
+    return new Promise(async (resolve, reject) => {
         try {
             const containerClient = getContainerClient();
             const folderName = type === 'exports' ? 'exports' : type || 'exports';
@@ -132,5 +132,11 @@ exports.uploadBufferToAzure = (buffer, filename, contentType, type = 'exports') 
             reject(err);
         }
     });
+}
 
-module.exports = { uploadToAzure, deleteFileFromAzure, uploadImageToAzure }
+module.exports = {
+    uploadToAzure,
+    deleteFileFromAzure,
+    uploadImageToAzure,
+    uploadBufferToAzure,
+};

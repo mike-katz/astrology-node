@@ -140,7 +140,7 @@ async function generateInvoicePDF(data) {
     const fileContent = fs.readFileSync(outputPath);
     const { url: fileUrl } = await uploadBufferToAzure(
         fileContent,
-        `${invoice_id}.pdf`,
+        `${transaction_id}.pdf`,
         'application/pdf',
         'panditInvoice'
     );
