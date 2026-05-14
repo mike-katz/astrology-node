@@ -386,65 +386,53 @@ function parseGoogleClientIds() {
 async function googleLogin(req, res) {
     console.log("req.body", req.query);
     try {
-        const idToken = req.query.token;
-        if (!idToken) {
-            return res.status(400).json({ success: false, message: 'id_token or idToken is required' });
-        }
+        // const idToken = req.query.token;
+        // if (!idToken) {
+        //     return res.status(400).json({ success: false, message: 'id_token or idToken is required' });
+        // }
 
-        const clientIds = parseGoogleClientIds();
-        if (!clientIds.length) {
-            logger.warn('googleLogin: GOOGLE_CLIENT_IDS / GOOGLE_CLIENT_ID not set');
-            return res.status(503).json({ success: false, message: 'Google login is not configured' });
-        }
+        // const clientIds = parseGoogleClientIds();
+        // if (!clientIds.length) {
+        //     logger.warn('googleLogin: GOOGLE_CLIENT_IDS / GOOGLE_CLIENT_ID not set');
+        //     return res.status(503).json({ success: false, message: 'Google login is not configured' });
+        // }
 
-        let tokenPayload;
-        try {
-            const tokenRes = await axios.get('https://oauth2.googleapis.com/tokeninfo', {
-                params: { id_token: idToken },
-                timeout: 15000,
-            });
-            tokenPayload = tokenRes.data;
-        } catch (e) {
-            if (e.response?.status === 400) {
-                return res.status(401).json({ success: false, message: 'Invalid or expired Google token' });
-            }
-            logger.error(e);
-            return res.status(502).json({ success: false, message: 'Could not verify Google token' });
-        }
+        // let tokenPayload;
+        // try {
+        //     const tokenRes = await axios.get('https://oauth2.googleapis.com/tokeninfo', {
+        //         params: { id_token: idToken },
+        //         timeout: 15000,
+        //     });
+        //     tokenPayload = tokenRes.data;
+        // } catch (e) {
+        //     if (e.response?.status === 400) {
+        //         return res.status(401).json({ success: false, message: 'Invalid or expired Google token' });
+        //     }
+        //     logger.error(e);
+        //     return res.status(502).json({ success: false, message: 'Could not verify Google token' });
+        // }
 
-        if (tokenPayload.error) {
-            return res.status(401).json({
-                success: false,
-                message: tokenPayload.error_description || tokenPayload.error || 'Invalid Google token',
-            });
-        }
+        // if (tokenPayload.error) {
+        //     return res.status(401).json({
+        //         success: false,
+        //         message: tokenPayload.error_description || tokenPayload.error || 'Invalid Google token',
+        //     });
+        // }
 
-        if (!clientIds.includes(tokenPayload.aud)) {
-            return res.status(401).json({ success: false, message: 'Invalid token audience' });
-        }
+        // if (!clientIds.includes(tokenPayload.aud)) {
+        //     return res.status(401).json({ success: false, message: 'Invalid token audience' });
+        // }
 
-        if (tokenPayload.email && tokenPayload.email_verified !== 'true') {
-            return res.status(400).json({ success: false, message: 'Google account email is not verified' });
-        }
+        // if (tokenPayload.email && tokenPayload.email_verified !== 'true') {
+        //     return res.status(400).json({ success: false, message: 'Google account email is not verified' });
+        // }
 
-        const sub = tokenPayload.sub;
-        const email = tokenPayload.email || null;
-        const name = tokenPayload.name || (email ? email.split('@')[0] : null) || 'User';
-        const picture = tokenPayload.picture || null;
-
-        let existing = await db('users').whereNull('deleted_at').where({ google_id: sub }).first();
-
-        if (!existing && email) {
-            existing = await db('users').whereNull('deleted_at').where({ email }).first();
-            if (existing) {
-                if (existing.google_id && existing.google_id !== sub) {
-                    return res.status(409).json({
-                        success: false,
-                        message: 'This email is already linked to a different Google account',
-                    });
-                }
-            }
-        }
+        // const sub = tokenPayload.sub;
+        // const email = tokenPayload.email || null;
+        // const name = tokenPayload.name || (email ? email.split('@')[0] : null) || 'User';
+        // const picture = tokenPayload.picture || null;
+        let { ad_set_id, utm_source, ad_id, type, version, referrer, email } = req.query;
+        let existing = await db('users').whereNull('deleted_at').where({ email }).first();
 
         if (existing?.status === 'block') {
             return res.status(400).json({ success: false, message: 'Your account is blocked.' });
@@ -456,7 +444,6 @@ async function googleLogin(req, res) {
             });
         }
 
-        let { ad_set_id, utm_source, ad_id, type, version, referrer } = req.query;
         const mode = type ? type : 'APP';
         const upd = {};
         if (existing && version) {
@@ -481,10 +468,10 @@ async function googleLogin(req, res) {
 
         if (!existing) {
             const insertRow = {
-                google_id: sub,
+                // google_id: sub,
                 email,
-                name,
-                avatar: picture,
+                name: email,
+                // avatar: picture,
                 country_code: '+91',
                 status: 'active',
                 balance: 0,
@@ -504,22 +491,22 @@ async function googleLogin(req, res) {
                 'name',
                 'profile',
                 'email',
-                'google_id',
+                // 'google_id',
             ]);
         } else {
             const linkUpd = { ...upd };
-            if (!existing.google_id) {
-                linkUpd.google_id = sub;
-            }
+            // if (!existing.google_id) {
+            //     linkUpd.google_id = sub;
+            // }
             if (email) {
                 linkUpd.email = email;
             }
-            if (picture) {
-                linkUpd.avatar = picture;
-            }
-            if (name && !existing.name) {
-                linkUpd.name = name;
-            }
+            // if (picture) {
+            //     linkUpd.avatar = picture;
+            // }
+            // if (name && !existing.name) {
+            //     linkUpd.name = name;
+            // }
             if (Object.keys(linkUpd).length > 0) {
                 await db('users').where({ id: Number(existing.id) }).update(linkUpd);
             }
@@ -544,7 +531,7 @@ async function googleLogin(req, res) {
 
         const [{ count }] = await db('orders')
             .count('* as count')
-            .where({ user_id: existing.id })
+            .where({ user_id: existing?.id })
             .whereIn('status', ['continue', 'completed', 'pending']);
         const is_free = count == 0;
 
