@@ -384,9 +384,9 @@ function parseGoogleClientIds() {
  * Configure GOOGLE_CLIENT_IDS (comma-separated) or GOOGLE_CLIENT_ID with your OAuth client IDs (Web, iOS, Android).
  */
 async function googleLogin(req, res) {
-    console.log("req.body", req.body);
+    console.log("req.body", req.query);
     try {
-        const idToken = req.body.token;
+        const idToken = req.query.token;
         if (!idToken) {
             return res.status(400).json({ success: false, message: 'id_token or idToken is required' });
         }
@@ -456,7 +456,7 @@ async function googleLogin(req, res) {
             });
         }
 
-        let { ad_set_id, utm_source, ad_id, type, version, referrer } = req.body;
+        let { ad_set_id, utm_source, ad_id, type, version, referrer } = req.query;
         const mode = type ? type : 'APP';
         const upd = {};
         if (existing && version) {
