@@ -470,7 +470,7 @@ async function googleLogin(req, res) {
             const insertRow = {
                 // google_id: sub,
                 email,
-                name: email,
+                // name: email,
                 // avatar: picture,
                 country_code: '+91',
                 status: 'active',
