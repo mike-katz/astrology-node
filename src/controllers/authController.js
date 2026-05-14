@@ -384,6 +384,7 @@ function parseGoogleClientIds() {
  * Configure GOOGLE_CLIENT_IDS (comma-separated) or GOOGLE_CLIENT_ID with your OAuth client IDs (Web, iOS, Android).
  */
 async function googleLogin(req, res) {
+    console.log("req.body", req.body);
     try {
         const idToken = req.body.token;
         if (!idToken) {

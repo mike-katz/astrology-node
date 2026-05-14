@@ -5,6 +5,7 @@ const { getCache } = require("../config/redisClient")
 
 
 module.exports = async function (req, res, next) {
+    console.log("req.body", req.body);
     const authHeader = req.headers.authorization;
     // console.log("authHeader", authHeader);
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
