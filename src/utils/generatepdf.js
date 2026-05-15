@@ -61,7 +61,8 @@ async function generateInvoicePDF(data) {
     data.place = stateCode || ''
     const browser = await puppeteer.launch({
         headless: 'new',
-        executablePath: '/snap/bin/chromium',
+        // executablePath: '/snap/bin/chromium',
+        executablePath: '/usr/bin/google-chrome',
         // executablePath: '/snap/chromium/3390/usr/lib/chromium-browser/chrome',
         args: [
             '--no-sandbox',
