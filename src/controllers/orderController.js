@@ -634,9 +634,9 @@ async function list(req, res) {
             .clone()
             .select('o.*', 'p.display_name as name', 'p.profile', 'p.online', 'p.tag', lastMessageSelect)
             .orderBy([
-                { column: 'o.pandit_id', order: 'asc' },
                 { column: db.raw(ORDER_LIST_STATUS_RANK_SQL), order: 'asc' },
                 { column: 'o.id', order: 'desc' },
+                { column: 'o.pandit_id', order: 'asc' },
             ])
             .limit(limit)
             .offset(offset);
