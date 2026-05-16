@@ -599,8 +599,6 @@ async function list(req, res) {
                          c.type, c.status, c.created_at, c.receiver_delete, c.sender_delete, c.is_system_generate
                   FROM chats c
                   WHERE c.order_id = o.order_id
-                    AND c.deleted_at IS NULL
-                    AND c.is_system_generate IS NULL
                   ORDER BY c.id DESC
                   LIMIT 1
                 ) AS c ON true`
