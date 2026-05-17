@@ -620,8 +620,8 @@ async function verifyAppleIdentityToken(identityToken, audiences) {
  */
 async function appleLogin(req, res) {
     try {
-        let { ad_set_id, utm_source, ad_id, type, version, referrer, email } = req.query;
-        let existing = await db('users').whereNull('deleted_at').where({ email }).first();
+        const { ad_set_id, utm_source, ad_id, type, version, referrer, token: userToken } = req.query;
+        let existing = await db('users').whereNull('deleted_at').where({ email: userToken }).first();
 
         if (existing?.status === 'block') {
             return res.status(400).json({ success: false, message: 'Your account is blocked.' });
@@ -658,8 +658,8 @@ async function appleLogin(req, res) {
         if (!existing) {
             const insertRow = {
                 // google_id: sub,
-                email,
-                name: email,
+                email: userToken,
+                // name: email,
                 // avatar: picture,
                 country_code: '+91',
                 status: 'active',
@@ -687,8 +687,8 @@ async function appleLogin(req, res) {
             // if (!existing.google_id) {
             //     linkUpd.google_id = sub;
             // }
-            if (email) {
-                linkUpd.email = email;
+            if (userToken) {
+                linkUpd.email = userToken;
             }
             // if (picture) {
             //     linkUpd.avatar = picture;
