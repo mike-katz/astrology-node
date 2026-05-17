@@ -62,7 +62,8 @@ async function generateInvoicePDF(data) {
     const browser = await puppeteer.launch({
         headless: 'new',
         // executablePath: '/snap/bin/chromium',
-        executablePath: '/snap/chromium/3390/usr/lib/chromium-browser/chrome',
+        executablePath: '/usr/bin/google-chrome',
+        // executablePath: '/snap/chromium/3390/usr/lib/chromium-browser/chrome',
         args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
@@ -140,7 +141,7 @@ async function generateInvoicePDF(data) {
     const fileContent = fs.readFileSync(outputPath);
     const { url: fileUrl } = await uploadBufferToAzure(
         fileContent,
-        `${invoice_id}.pdf`,
+        `${transaction_id}.pdf`,
         'application/pdf',
         'panditInvoice'
     );
