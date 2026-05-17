@@ -549,21 +549,32 @@ async function createMediaOrder(req, res) {
         }
 
         const pandit = await db('pandits').where({ id: Number(pandit_id) }).first();
+        const [{ count }] = await db('orders')
+            .count('* as count')
+            .where({ user_id: req.userId })
+            .whereIn('status', ['continue', 'completed', 'pending']);
         let duration = Math.floor(Number(Number(user?.balance)) / Number(pandit?.final_chat_call_rate));
-        let deduction = Number(duration) * Number(pandit?.final_chat_call_rate);
+        let deduction = Number(duration) * Number(pandit?.final_chat_call_rate)
         let rate = pandit?.final_chat_call_rate;
-
-        if (user?.balance < 1) {
-            logger.info('order_createMedia fail', { userId: req.userId, message: 'Please recharge your wallet.' });
-            return res.status(400).json({ success: false, message: 'Please recharge your wallet.' });
-        }
-        if (duration < 5) {
-            logger.info('order_createMedia fail', { userId: req.userId, message: 'Min. 5 min balance required.' });
-            return res.status(400).json({ success: false, message: 'Min. 5 min balance required.' });
-        }
-        if (Number(user?.balance) < deduction) {
-            logger.info('order_createMedia fail', { userId: req.userId, message: 'Min. 5 min balance required.' });
-            return res.status(400).json({ success: false, message: 'Min. 5 min balance required.' });
+        const settings = await db('settings').first();
+        if (count == 0) {
+            duration = Number(settings?.free_chat_minutes) || 0;
+            deduction = 0;
+            rate = settings?.free_chat_amount_per_minute || 1;
+        } else {
+            const minTime = Number(settings?.min_minutes_required_balance) || 5
+            if (user?.balance < minTime) {
+                logger.info('order_create fail', { userId: req.userId, message: 'Please recharge your wallet.' });
+                return res.status(400).json({ success: false, message: 'Please recharge your wallet.' });
+            }
+            if (duration < minTime) {
+                logger.info('order_create fail', { userId: req.userId, message: 'Min. 5 min balance required.' });
+                return res.status(400).json({ success: false, message: 'Min. 5 min balance required.' });
+            }
+            if (Number(user?.balance) < deduction) {
+                logger.info('order_create fail', { userId: req.userId, message: 'Min. 5 min balance required.' });
+                return res.status(400).json({ success: false, message: 'Min. 5 min balance required.' });
+            }
         }
 
         const orderId = `${new Date().getTime().toString()}${Math.floor(100000 + Math.random() * 900000).toString()}`;
@@ -589,6 +600,10 @@ async function createMediaOrder(req, res) {
             is_free: false,
         };
         const upd = { is_free_order: 'paid' };
+        if (count == 0) {
+            ins.is_free = true
+            upd.is_free_order = "free"
+        }
         await db('users').where({ id: Number(req.userId) }).update(upd);
         await db('orders').insert(ins).returning('*');
         callEvent('emit_to_live_call_receive', {
