@@ -620,49 +620,8 @@ async function verifyAppleIdentityToken(identityToken, audiences) {
  */
 async function appleLogin(req, res) {
     try {
-        const identityToken = req.body.token || req.body.identity_token || req.body.identityToken;
-        if (!identityToken) {
-            return res.status(400).json({
-                success: false,
-                message: 'token, identity_token, or identityToken is required',
-            });
-        }
-
-        const audiences = parseAppleAudiences();
-        if (!audiences.length) {
-            logger.warn('appleLogin: APPLE_CLIENT_IDS / APPLE_CLIENT_ID not set');
-            return res.status(503).json({ success: false, message: 'Apple login is not configured' });
-        }
-
-        let tokenPayload;
-        try {
-            tokenPayload = await verifyAppleIdentityToken(identityToken, audiences);
-        } catch (e) {
-            logger.warn(e.message || e);
-            return res.status(401).json({ success: false, message: 'Invalid or expired Apple token' });
-        }
-
-        const sub = tokenPayload.sub;
-        const email = tokenPayload.email || null;
-        const clientName = req.body.name || req.body.userName;
-        const name =
-            (typeof clientName === 'string' && clientName.trim()) ||
-            (email ? email.split('@')[0] : null) ||
-            'User';
-
-        let existing = await db('users').whereNull('deleted_at').where({ apple_id: sub }).first();
-
-        if (!existing && email) {
-            existing = await db('users').whereNull('deleted_at').where({ email }).first();
-            if (existing) {
-                if (existing.apple_id && existing.apple_id !== sub) {
-                    return res.status(409).json({
-                        success: false,
-                        message: 'This email is already linked to a different Apple account',
-                    });
-                }
-            }
-        }
+        let { ad_set_id, utm_source, ad_id, type, version, referrer, email } = req.query;
+        let existing = await db('users').whereNull('deleted_at').where({ email }).first();
 
         if (existing?.status === 'block') {
             return res.status(400).json({ success: false, message: 'Your account is blocked.' });
@@ -674,7 +633,6 @@ async function appleLogin(req, res) {
             });
         }
 
-        let { ad_set_id, utm_source, ad_id, type, version, referrer } = req.body;
         const mode = type ? type : 'APP';
         const upd = {};
         if (existing && version) {
@@ -699,9 +657,10 @@ async function appleLogin(req, res) {
 
         if (!existing) {
             const insertRow = {
-                apple_id: sub,
+                // google_id: sub,
                 email,
-                name,
+                name: email,
+                // avatar: picture,
                 country_code: '+91',
                 status: 'active',
                 balance: 0,
@@ -721,19 +680,22 @@ async function appleLogin(req, res) {
                 'name',
                 'profile',
                 'email',
-                'apple_id',
+                // 'google_id',
             ]);
         } else {
             const linkUpd = { ...upd };
-            if (!existing.apple_id) {
-                linkUpd.apple_id = sub;
-            }
+            // if (!existing.google_id) {
+            //     linkUpd.google_id = sub;
+            // }
             if (email) {
                 linkUpd.email = email;
             }
-            if (name && !existing.name) {
-                linkUpd.name = name;
-            }
+            // if (picture) {
+            //     linkUpd.avatar = picture;
+            // }
+            // if (name && !existing.name) {
+            //     linkUpd.name = name;
+            // }
             if (Object.keys(linkUpd).length > 0) {
                 await db('users').where({ id: Number(existing.id) }).update(linkUpd);
             }
@@ -747,7 +709,8 @@ async function appleLogin(req, res) {
         );
         const encryptToken = encrypt(token);
 
-        const redisKey = `user_${existing.id}`;
+        const username = existing.id;
+        const redisKey = `user_${username}`;
         const jwtExpiry = process.env.JWT_EXPIRES_IN || '1h';
         let ttlSeconds = 3600;
         if (jwtExpiry.includes('h')) {
@@ -757,7 +720,7 @@ async function appleLogin(req, res) {
 
         const [{ count }] = await db('orders')
             .count('* as count')
-            .where({ user_id: existing.id })
+            .where({ user_id: existing?.id })
             .whereIn('status', ['continue', 'completed', 'pending']);
         const is_free = count == 0;
 
