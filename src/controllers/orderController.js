@@ -555,7 +555,8 @@ const ORDER_LIST_MAX_LIMIT = 100;
 /**
  * Order list: one row per pandit, last chat per order.
  * Perf: subquery DISTINCT ON first (no full chats denormalized join on every order row);
- * LATERAL limits chat work to final page rows; count + list in parallel.
+ * last chat is hydrated after the page query because Citus cannot run the LATERAL join
+ * against this distributed derived subquery.
  * DB: indexes on orders (user_id, pandit_id, …) and chats (order_id, id) help a lot — add in your DB if missing.
  * Optional: ?skip_last_message=1 — faster list if client does not need last_message JSON.
  */
@@ -592,49 +593,9 @@ async function list(req, res) {
 
         let listQb = db.from(oneOrderPerPandit.as('o')).leftJoin('pandits as p', 'p.id', 'o.pandit_id');
 
-        if (!skipLastMessage) {
-            // chats.conversion_id is the Citus distribution key (format: "<user_id>-<pandit_id>").
-            // Filter on it FIRST so the lookup routes to a single shard, then narrow to this order.
-            listQb = listQb.joinRaw(
-                `LEFT JOIN LATERAL (
-                  SELECT c.id, c.message, c.sender_type, c.sender_id, c.receiver_type, c.receiver_id,
-                         c.type, c.status, c.created_at, c.receiver_delete, c.sender_delete, c.is_system_generate
-                  FROM chats c
-                  WHERE c.conversion_id = (?::text || '-' || o.pandit_id::text)
-                    AND c.order_id = o.order_id
-                  ORDER BY c.id DESC
-                  LIMIT 1
-                ) AS c ON true`,
-                [String(req.userId)]
-            );
-        }
-
-        const lastMessageSelect = skipLastMessage
-            ? db.raw('NULL::json as last_message')
-            : db.raw(`
-                CASE
-                    WHEN c.id IS NOT NULL THEN
-                        json_build_object(
-                            'id', c.id,
-                            'message', c.message,
-                            'sender_type', c.sender_type,
-                            'sender_id', c.sender_id,
-                            'receiver_type', c.receiver_type,
-                            'receiver_id', c.receiver_id,
-                            'type', c.type,
-                            'status', c.status,
-                            'created_at', c.created_at,
-                            'receiver_delete', c.receiver_delete,
-                            'sender_delete', c.sender_delete,
-                            'is_system_generate', c.is_system_generate
-                        )
-                    ELSE NULL
-                END as last_message
-            `);
-
         const listPromise = listQb
             .clone()
-            .select('o.*', 'p.display_name as name', 'p.profile', 'p.online', 'p.tag', lastMessageSelect)
+            .select('o.*', 'p.display_name as name', 'p.profile', 'p.online', 'p.tag', db.raw('NULL::json as last_message'))
             .orderBy([
                 { column: db.raw(ORDER_LIST_STATUS_RANK_SQL), order: 'asc' },
                 { column: 'o.id', order: 'desc' },
@@ -648,7 +609,38 @@ async function list(req, res) {
             .whereNot('o.status', 'cancel')
             .countDistinct('o.pandit_id as count');
 
-        const [order, countRows] = await Promise.all([listPromise, countPromise]);
+        let [order, countRows] = await Promise.all([listPromise, countPromise]);
+
+        if (!skipLastMessage && order.length > 0) {
+            const lastMessages = await Promise.all(
+                order.map((item) => {
+                    const conversionId = `${req.userId}-${item.pandit_id}`;
+                    return db('chats as c')
+                        .select(
+                            'c.id',
+                            'c.message',
+                            'c.sender_type',
+                            'c.sender_id',
+                            'c.receiver_type',
+                            'c.receiver_id',
+                            'c.type',
+                            'c.status',
+                            'c.created_at',
+                            'c.receiver_delete',
+                            'c.sender_delete',
+                            'c.is_system_generate'
+                        )
+                        .where({ 'c.conversion_id': conversionId, 'c.order_id': item.order_id })
+                        .orderBy('c.id', 'desc')
+                        .first();
+                })
+            );
+
+            order = order.map((item, idx) => ({
+                ...item,
+                last_message: lastMessages[idx] || null,
+            }));
+        }
 
         const count = countRows[0]?.count ?? 0;
         const total = parseInt(count, 10);
