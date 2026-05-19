@@ -70,7 +70,8 @@ async function sendSMS(mobile, country_code) {
             headers: {
             },
         };
-        await axios.request(config);
+        const data = await axios.request(config);
+        console.log("otp response data", data);
         const upd = {
             otp: OTP,
             mobile,
@@ -172,6 +173,7 @@ async function login(req, res) {
                 let otpResponse;
                 try {
                     otpResponse = await axios.get(url);
+                    console.log("otpResponse", otpResponse);
                     otpResponse = otpResponse.data
                 } catch (error) {
                     console.error('Acquire API failed:', error.message);
