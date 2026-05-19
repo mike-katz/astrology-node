@@ -593,15 +593,19 @@ async function list(req, res) {
         let listQb = db.from(oneOrderPerPandit.as('o')).leftJoin('pandits as p', 'p.id', 'o.pandit_id');
 
         if (!skipLastMessage) {
+            // chats.conversion_id is the Citus distribution key (format: "<user_id>-<pandit_id>").
+            // Filter on it FIRST so the lookup routes to a single shard, then narrow to this order.
             listQb = listQb.joinRaw(
                 `LEFT JOIN LATERAL (
                   SELECT c.id, c.message, c.sender_type, c.sender_id, c.receiver_type, c.receiver_id,
                          c.type, c.status, c.created_at, c.receiver_delete, c.sender_delete, c.is_system_generate
                   FROM chats c
-                  WHERE c.order_id = o.order_id
+                  WHERE c.conversion_id = (?::text || '-' || o.pandit_id::text)
+                    AND c.order_id = o.order_id
                   ORDER BY c.id DESC
                   LIMIT 1
-                ) AS c ON true`
+                ) AS c ON true`,
+                [String(req.userId)]
             );
         }
 
