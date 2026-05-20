@@ -527,6 +527,7 @@ async function listLiveChat(req, res) {
  */
 async function createMediaOrder(req, res) {
     const { type, profile_id, pandit_id } = req.body;
+    return res.status(400).json({ success: false, message: 'Chat & Call services are temporarily under maintenance and will be available again by 6:00 AM today.' });
     logger.info('order_createMedia', { userId: req.userId, type, profile_id });
     if (!profile_id || !type || !pandit_id) {
         logger.info('order_createMedia fail', { userId: req.userId, message: 'Missing params' });
