@@ -820,8 +820,6 @@ async function getOrderChat(req, res) {
 
 async function newCreateOrder(req, res) {
     const { panditId, type, profile_id } = req.body;
-    return res.status(400).json({ success: false, message: 'Chat & Call services are temporarily under maintenance and will be available again by 6:00 AM today.' });
-
     logger.info('order_create', { userId: req.userId, panditId, type, profile_id });
     if (!panditId || !profile_id) {
         logger.info('order_create fail', { userId: req.userId, message: 'Missing params' });
