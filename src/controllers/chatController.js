@@ -421,6 +421,12 @@ function getDuration(start_time, end_time) {
 async function balanceCut(user_id, order, end_time, place) {
     logger.info('balancecut called', { user_id, orderId: order?.order_id, place, order });
     try {
+        if (order.status === 'completed') {
+            logger.log('balanceCut skip: order already completed', { order_id: lockedOrder.order_id });
+            duplicateSkip = true;
+            return;
+        }
+
         if (order.status != 'continue') {
             logger.log('balanceCut skip: order already completed', { order_id: order.order_id });
             return;
@@ -1369,6 +1375,7 @@ async function orderCancel(req, res) {
         // }
         upd.status = status
         await db('orders').where({ id: order?.id }).update(upd);
+        await db('pandits').where({ id: order.pandit_id }).update({ waiting_time: null });
 
         callEvent("emit_to_pending_order", {
             key: `pandit_${order?.pandit_id}`,
@@ -1418,7 +1425,7 @@ async function orderReject(req, res) {
         // }
         upd.status = status
         await db('orders').where({ id: order?.id }).update(upd);
-
+        await db('pandits').where({ id: order.pandit_id }).update({ waiting_time: null });
         callEvent("emit_to_pending_order", {
             key: `pandit_${order?.pandit_id}`,
             payload: { pandit_id: order?.pandit_id }
