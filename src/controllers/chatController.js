@@ -1759,7 +1759,7 @@ async function rejectAgoraCall(req, res) {
         logger.info('rejectAgoraCall fail', { userId: req.userId, message: 'Missing params.' });
         return res.status(400).json({ success: false, message: 'Missing params.' });
     }
-    const order = await db('orders').where({ order_id }).select("pandit_id", "status").first();
+    const order = await db('orders').where({ order_id, status: "pending" }).select("pandit_id", "status").first();
     if (!order) return res.status(400).json({ success: false, message: 'Missing params.' });
 
     await db('orders').where({ order_id }).update({ status: "rejected" });

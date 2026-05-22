@@ -272,6 +272,12 @@ async function joinLive(req, res) {
             return res.status(400).json({ success: false, message: 'Live not found or ended.' });
         }
 
+        let order = await db('live_reports')
+            .where({ pandit_id: live?.pandit_id, user_id: req.userId })
+            .first();
+        if (order) {
+            return res.status(400).json({ success: false, message: 'Live not found or ended.' });
+        }
         let joinedUserId = null;
         let joinedUserName = null;
         const u = await db('users').where({ id: Number(bodyUserId) }).first();
