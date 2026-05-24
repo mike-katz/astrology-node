@@ -431,7 +431,7 @@ async function balanceCut(user_id, order, end_time, place) {
         let cutCompleted = false;
         let isFreeOrder = false;      // transaction bahaar use mate
 
-        await db.transaction({ isolationLevel: 'repeatable read' }, async (trx) => {
+        await db.transaction(async (trx) => {
 
             // FIX 1: User FIRST lock — consistent order
             const user = await trx('users')
@@ -493,14 +493,14 @@ async function balanceCut(user_id, order, end_time, place) {
             const diffMinutes = getDuration(lockedOrder.start_time, end_time);
             isFreeOrder = lockedOrder.is_free === true;
 
-            let deduction, newBalance, panditAmount;
+            let deduction = 0;
+            let newBalance = Number(user.balance);
+            let panditAmount = 0;
 
             if (isFreeOrder) {
                 const settings = await trx('settings').first();
                 const freeChatPerMinute = Number(settings?.free_chat_amount_per_minute) || 0;
                 panditAmount = Number(diffMinutes) * freeChatPerMinute;
-                deduction = 0;
-                newBalance = Number(user.balance);
             } else {
                 const perMinute = Number(lockedOrder?.rate);
                 deduction = Number(diffMinutes) * Number(perMinute);
@@ -528,16 +528,8 @@ async function balanceCut(user_id, order, end_time, place) {
             }
 
             // 7. User balance cut — only if paid
-            if (!isFree) {
+            if (!isFreeOrder) {
                 await trx('users').where({ id: user_id }).update({ balance: newBalance });
-            }
-
-            // 8. Pandit stats update
-            const upd = { total_orders: 1 };
-            if (lockedOrder.type == 'chat') {
-                upd.total_chat_minutes = Number(diffMinutes);
-            } else {
-                upd.total_call_minutes = Number(diffMinutes);
             }
 
             // 9. Chat system messages — transaction ANDAR
@@ -577,11 +569,34 @@ async function balanceCut(user_id, order, end_time, place) {
             }
 
             // 10. Pandit balance + stats increment
-            upd.balance = panditAmount;
             await trx('pandits')
                 .where({ id: lockedOrder.pandit_id })
-                .increment(upd)
-                .update({ waiting_time: null });
+                .update({
+                    waiting_time: null,
+
+                    balance: trx.raw(
+                        'balance + ?',
+                        [panditAmount]
+                    ),
+
+                    total_orders: trx.raw(
+                        'total_orders + 1'
+                    ),
+
+                    ...(lockedOrder.type === 'chat'
+                        ? {
+                            total_chat_minutes: trx.raw(
+                                'total_chat_minutes + ?',
+                                [Number(diffMinutes)]
+                            )
+                        }
+                        : {
+                            total_call_minutes: trx.raw(
+                                'total_call_minutes + ?',
+                                [Number(diffMinutes)]
+                            )
+                        })
+                });
 
             // 11. Balance log
             const pandit_new_balance = Number(panditDetail?.balance) + Number(panditAmount);
@@ -593,13 +608,13 @@ async function balanceCut(user_id, order, end_time, place) {
                 user_id,
                 pandit_old_balance: Number(panditDetail?.balance),
                 pandit_new_balance,
-                user_old_balance: Number(user.balance),
+                user_old_balance: Number(user?.balance),
                 user_new_balance: Number(newBalance),
                 message: `${type} with ${panditDetail?.display_name} for ${diffMinutes} minutes`,
                 pandit_id: panditDetail?.id,
                 pandit_message: `${type} with ${user?.name} for ${diffMinutes} minutes`,
                 pandit_amount: panditAmount,
-                amount: isFree ? 0 : -deduction
+                amount: isFreeOrder ? 0 : -deduction
             });
 
             logger.log('balanceCut success', {
@@ -607,7 +622,7 @@ async function balanceCut(user_id, order, end_time, place) {
                 user_id,
                 pandit_id: lockedOrder?.pandit_id,
                 diffMinutes,
-                deduction: isFree ? 0 : deduction,
+                deduction: isFreeOrder ? 0 : deduction,
                 place
             });
 
