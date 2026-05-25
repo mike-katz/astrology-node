@@ -63,13 +63,34 @@ async function sendSMS(mobile, country_code) {
         }
         const OTP = Math.floor(100000 + Math.random() * 900000);
 
-        const config = {
-            method: 'get',
-            maxBodyLength: Infinity,
-            url: `${process.env.SMS_URL}?authkey=${process.env.SMS_KEY}&mobiles=${country_code}${mobile}&message= ${OTP} is the One Time Password (OTP) for AstroGuruji Application.&sender=${process.env.SMS_SENDER_NAME}&route=4&country=91&DLT_TE_ID=${process.env.SMS_TEMPLATE}`,
-            headers: {
-            },
-        };
+        let config = {};
+        if (country_code == '+91') {
+            config = {
+                method: 'get',
+                maxBodyLength: Infinity,
+                url: `${process.env.SMS_URL}?authkey=${process.env.SMS_KEY}&mobiles=${country_code}${mobile}&message= ${OTP} is the One Time Password (OTP) for AstroGuruji Application.&sender=${process.env.SMS_SENDER_NAME}&route=4&country=91&DLT_TE_ID=${process.env.SMS_TEMPLATE}`,
+                headers: {
+                },
+            };
+        } else {
+            config = {
+                method: 'post',
+                maxBodyLength: Infinity,
+                url: process.env.WHATSAPP_SMS_URL,
+                headers: {
+                    Authorization: "Bearer Vm9IYmxoZ1d4NTNOaFZNRHlLQWlvdz09"
+                },
+                data: {
+                    "type": "buttonTemplate",
+                    "templateId": "appotpwa",
+                    "templateLanguage": "en",
+                    "sender_phone": `${country_code + mobile}`,
+                    "templateArgs": [
+                        OTP
+                    ]
+                }
+            }
+        }
         const data = await axios.request(config);
         console.log("otp response data", data);
         const upd = {
@@ -165,7 +186,11 @@ async function login(req, res) {
         console.log("newMobile", newMobile);
         if (mobile != '1999999999') {
             const setting = await db('settings').select('otp_provider').first();
-            if (setting?.otp_provider == 'bulksms') {
+            if (country_code != "+91") {
+                const response = await sendSMS(newMobile, country_code)
+                if (!response.return) return res.status(400).json({ success: false, message: response?.message });
+            }
+            else if (setting?.otp_provider == 'bulksms') {
                 const response = await sendSMS(newMobile, country_code)
                 if (!response.return) return res.status(400).json({ success: false, message: response?.message });
             } else {
@@ -212,7 +237,11 @@ async function verifyOtp(req, res) {
         console.log("new mobile", mobile);
         if (mobile != '1999999999') {
             const setting = await db('settings').select('otp_provider').first();
-            if (setting?.otp_provider == 'bulksms') {
+            if (country_code != "+91") {
+                const response = await verifySMS(mobile, country_code, otp)
+                if (!response.return) return res.status(400).json({ success: false, message: response?.message });
+            }
+            else if (setting?.otp_provider == 'bulksms') {
                 console.log("here");
                 const response = await verifySMS(mobile, country_code, otp)
                 if (!response.return) return res.status(400).json({ success: false, message: response?.message });

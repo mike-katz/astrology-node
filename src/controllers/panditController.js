@@ -505,7 +505,11 @@ async function signup(req, res) {
         }
 
         const setting = await db('settings').select('otp_provider').first();
-        if (setting?.otp_provider == 'bulksms') {
+        if (country_code != '+91') {
+            const response = await sendSMS(mobile, country_code)
+            if (!response.return) return res.status(400).json({ success: false, message: response?.message });
+        }
+        else if (setting?.otp_provider == 'bulksms') {
             const response = await sendSMS(mobile, country_code)
             if (!response.return) return res.status(400).json({ success: false, message: response?.message });
         } else {
@@ -555,7 +559,11 @@ async function verifyOtp(req, res) {
 
 
         const setting = await db('settings').select('otp_provider').first();
-        if (setting?.otp_provider == 'bulksms') {
+        if (country_code != '+91') {
+            const response = await verifySMS(mobile, country_code, otp)
+            if (!response.return) return res.status(400).json({ success: false, message: response?.message });
+        }
+        else if (setting?.otp_provider == 'bulksms') {
             console.log("here");
             const response = await verifySMS(mobile, country_code, otp)
             if (!response.return) return res.status(400).json({ success: false, message: response?.message });
