@@ -419,148 +419,247 @@ function getDuration(start_time, end_time) {
 }
 
 async function balanceCut(user_id, order, end_time, place) {
-    logger.info('balancecut called', { user_id, orderId: order?.order_id, place, order });
     try {
-        if (order.status === 'completed') {
-            logger.log('balanceCut skip: order already completed', { order_id: lockedOrder.order_id });
-            duplicateSkip = true;
-            return;
+        if (!order?.order_id) {
+            logger.error('balanceCut missing order_id', { place, user_id });
+            return false;
         }
 
-        if (order.status != 'continue') {
-            logger.log('balanceCut skip: order already completed', { order_id: order.order_id });
-            return;
-        }
-        const transaction = await db('balancelogs').where({ order_id: order?.order_id }).first();
-        if (transaction) {
-            logger.info('balancecut fail', { user_id, orderId: order?.order_id, message: "already order completed" });
-            return
-        };
-        const user = await db('users').where({ id: user_id }).first();
-        const diffMinutes = getDuration(order.start_time, end_time)
-        // console.log("diffMinutes", diffMinutes);
-        const isFree = order.is_free === true;
-        let deduction;
-        let newBalance;
-        let panditAmount;
-        const panditDetail = await db('pandits').where({ id: order.pandit_id }).first();
+        let savedChatRow = null;
+        let savedFreeMsg = null;      // free message row
+        let duplicateSkip = false;
+        let cutCompleted = false;
+        let isFreeOrder = false;      // transaction bahaar use mate
 
-        if (isFree) {
-            const settings = await db('settings').first();
-            const freeChatPerMinute = Number(settings?.free_chat_amount_per_minute) || 0;
-            panditAmount = Number(diffMinutes) * freeChatPerMinute;
-            deduction = 0;
-            newBalance = Number(user.balance);
-        } else {
-            const perMinute = Number(order?.rate);
-            deduction = Number(diffMinutes) * Number(perMinute);
-            newBalance = user.balance - deduction;
-            panditAmount = (Number(deduction) * Number(panditDetail?.chat_call_share)) / 100;
-        }
+        await db.transaction(async (trx) => {
 
-        logger.info('balancecut function -> user ', { user_id, newBalance, oldBalance: user?.balance });
-        logger.info('balancecut function -> pandit ', { pandit_id: order?.pandit_id, panditAmount });
+            // FIX 1: User FIRST lock — consistent order
+            const user = await trx('users')
+                .where({ id: user_id })
+                .forUpdate()
+                .first();
+            if (!user) throw new Error('USER_NOT_FOUND');
 
-        if (newBalance < 0) {
-            return false
-        }
-        const upd = { total_orders: 1, }
-        if (order.type == 'chat') {
-            upd.total_chat_minutes = Number(diffMinutes)
-        } else {
-            upd.total_call_minutes = Number(diffMinutes)
-        }
-        if (order.type == 'chat') {
-            let [saved] = await db('chats').insert({
-                sender_type: "user",
-                sender_id: Number(user_id),
-                receiver_type: "pandit",
-                order_id: order?.order_id,
-                receiver_id: Number(order?.pandit_id),
-                message: `${user?.name} ended the chat`,
-                status: "send",
-                type: "text",
-                conversion_id: `${Number(user_id)}-${Number(order?.pandit_id)}`,
-                is_system_generate: true
-            }).returning('*');
-            callEvent("emit_to_user", {
-                toType: "pandit",
-                toId: order?.pandit_id,
-                orderId: order?.order_id,
-                payload: saved,
-            });
-            callEvent("emit_to_user", {
-                toType: "user",
-                toId: order?.user_id,
-                orderId: order?.order_id,
-                payload: saved,
-            });
+            // FIX 2: Order lock SECOND
+            let orderQuery = trx('orders').forUpdate();
+            if (order.id) {
+                orderQuery = orderQuery.where({ id: order.id });
+            } else {
+                orderQuery = orderQuery.where({ order_id: order.order_id });
+            }
+            const lockedOrder = await orderQuery.first();
 
-            if (order?.is_free) {
-                [saved] = await db('chats').insert({
-                    sender_type: "pandit",
-                    sender_id: Number(order?.pandit_id),
-                    receiver_type: "user",
-                    order_id: order?.order_id,
-                    receiver_id: Number(user_id),
-                    message: `There is more to see in your chart. Please recharge to continue and connect via call or chat for further guidance.\n\nआपकी कुंडली में और भी बहुत कुछ देखने योग्य है। कृपया आगे बढ़ने के लिए रिचार्ज करें और अधिक मार्गदर्शन के लिए कॉल या चैट के माध्यम से जुड़ें।`,
+            if (!lockedOrder) {
+                logger.log('balanceCut skip: order not found', { order_id: order.order_id, place });
+                return;
+            }
+            if (lockedOrder.status === 'completed') {
+                logger.log('balanceCut skip: already completed', { order_id: lockedOrder.order_id, place });
+                duplicateSkip = true;
+                return;
+            }
+            if (lockedOrder.status !== 'continue') {
+                logger.log('balanceCut skip: not in continue', { order_id: lockedOrder.order_id, status: lockedOrder.status, place });
+                duplicateSkip = true;
+                return;
+            }
+
+            // FIX 3: existingLog check — double cut prevent
+            const existingLog = await trx('balancelogs')
+                .where({ order_id: lockedOrder.order_id })
+                .whereNotNull('pandit_id')
+                .first();
+            if (existingLog) {
+                logger.log('balanceCut repair: log exists', { order_id: lockedOrder.order_id, place });
+                await trx('orders')
+                    .where({ id: lockedOrder.id, status: 'continue' })
+                    .update({
+                        status: 'completed',
+                        end_time: lockedOrder.end_time
+                            ? new Date(lockedOrder.end_time)
+                            : new Date(end_time),
+                    });
+                cutCompleted = true;
+                return;
+            }
+
+            // 4. Pandit lock
+            const panditDetail = await trx('pandits')
+                .where({ id: lockedOrder.pandit_id })
+                .forUpdate()
+                .first();
+            if (!panditDetail) throw new Error('PANDIT_NOT_FOUND');
+
+            const diffMinutes = getDuration(lockedOrder.start_time, end_time);
+            isFreeOrder = lockedOrder.is_free === true;
+
+            let deduction = 0;
+            let newBalance = Number(user.balance);
+            let panditAmount = 0;
+
+            if (isFreeOrder) {
+                const settings = await trx('settings').first();
+                const freeChatPerMinute = Number(settings?.free_chat_amount_per_minute) || 0;
+                panditAmount = Number(diffMinutes) * freeChatPerMinute;
+            } else {
+                const perMinute = Number(lockedOrder?.rate);
+                deduction = Number(diffMinutes) * Number(perMinute);
+                newBalance = Number(user.balance) - deduction;
+                panditAmount = (Number(deduction) * Number(panditDetail?.chat_call_share)) / 100;
+            }
+
+            if (newBalance < 0) throw new Error('INSUFFICIENT_BALANCE');
+
+            // 5. Key guard — only 1 request pass thase
+            const rowsUpdated = await trx('orders')
+                .where({ id: lockedOrder.id, status: 'continue' })
+                .update({
+                    status: 'completed',
+                    deduction,
+                    duration: diffMinutes,
+                    end_time: new Date(end_time),
+                });
+
+            // 6. rowsUpdated = 0 → second request → skip
+            if (!rowsUpdated) {
+                logger.log('balanceCut skip: order already claimed', { order_id: lockedOrder.order_id, place });
+                duplicateSkip = true;
+                return;
+            }
+
+            // 7. User balance cut — only if paid
+            if (!isFreeOrder) {
+                await trx('users').where({ id: user_id }).update({ balance: newBalance });
+            }
+
+            // 9. Chat system messages — transaction ANDAR
+            let chatSystemMessage = null;
+            if (lockedOrder.type == 'chat') {
+
+                // User ended the chat message
+                const [saved] = await trx('chats').insert({
+                    sender_type: "user",
+                    sender_id: Number(user_id),
+                    receiver_type: "pandit",
+                    order_id: lockedOrder?.order_id,
+                    receiver_id: Number(lockedOrder?.pandit_id),
+                    message: `${user?.name} ended the chat`,
+                    conversion_id: `${user_id}-${lockedOrder?.pandit_id}`,
                     status: "send",
                     type: "text",
-                    conversion_id: `${Number(user_id)}-${Number(order?.pandit_id)}`
+                    is_system_generate: true
                 }).returning('*');
-                callEvent("emit_to_user", {
-                    toType: "pandit",
-                    toId: order?.pandit_id,
-                    orderId: order?.order_id,
-                    payload: saved,
-                });
-                callEvent("emit_to_user", {
-                    toType: "user",
-                    toId: order?.user_id,
-                    orderId: order?.order_id,
-                    payload: saved,
-                });
+                chatSystemMessage = saved;
+
+                // Free order — recharge message transaction ANDAR
+                if (isFreeOrder) {
+                    const [freeMsg] = await trx('chats').insert({
+                        sender_type: "pandit",
+                        sender_id: Number(lockedOrder?.pandit_id),
+                        receiver_type: "user",
+                        order_id: lockedOrder?.order_id,
+                        receiver_id: Number(user_id),
+                        message: `There is more to see in your chart. Please recharge to continue and connect via call or chat for further guidance.\n\nआपकी कुंडली में और भी बहुत कुछ देखने योग्य है। कृपया आगे बढ़ने के लिए रिचार्ज करें और अधिक मार्गदर्शन के लिए कॉल या चैट के माध्यम से जुड़ें।`,
+                        status: "send",
+                        type: "text",
+                        conversion_id: `${Number(user_id)}-${Number(lockedOrder?.pandit_id)}`
+                    }).returning('*');
+                    savedFreeMsg = freeMsg; // outer variable update
+                }
             }
-            callEvent("emit_to_chat_end", {
-                toType: "pandit",
-                toId: order?.pandit_id,
-                orderId: order?.order_id,
-            });
-            callEvent("emit_to_chat_order_completed", {
-                toType: "pandit",
-                toId: order?.pandit_id,
-                orderId: order?.order_id,
+
+            // 10. Pandit balance + stats increment
+            await trx('pandits')
+                .where({ id: lockedOrder.pandit_id })
+                .update({
+                    waiting_time: null,
+
+                    balance: trx.raw(
+                        'balance + ?',
+                        [panditAmount]
+                    ),
+
+                    total_orders: trx.raw(
+                        'total_orders + 1'
+                    ),
+
+                    ...(lockedOrder.type === 'chat'
+                        ? {
+                            total_chat_minutes: trx.raw(
+                                'total_chat_minutes + ?',
+                                [Number(diffMinutes)]
+                            )
+                        }
+                        : {
+                            total_call_minutes: trx.raw(
+                                'total_call_minutes + ?',
+                                [Number(diffMinutes)]
+                            )
+                        })
+                });
+
+            // 11. Balance log
+            const pandit_new_balance = Number(panditDetail?.balance) + Number(panditAmount);
+            const type = lockedOrder.type.charAt(0).toUpperCase() + lockedOrder.type.slice(1);
+
+            await trx('balancelogs').insert({
+                place,
+                order_id: lockedOrder?.order_id,
+                user_id,
+                pandit_old_balance: Number(panditDetail?.balance),
+                pandit_new_balance,
+                user_old_balance: Number(user?.balance),
+                user_new_balance: Number(newBalance),
+                message: `${type} with ${panditDetail?.display_name} for ${diffMinutes} minutes`,
+                pandit_id: panditDetail?.id,
+                pandit_message: `${type} with ${user?.name} for ${diffMinutes} minutes`,
+                pandit_amount: panditAmount,
+                amount: isFreeOrder ? 0 : -deduction
             });
 
-            callEvent("emit_to_pending_order", {
-                key: `pandit_${order?.pandit_id}`,
-                payload: { pandit_id: order?.pandit_id }
+            logger.log('balanceCut success', {
+                order_id: lockedOrder?.order_id,
+                user_id,
+                pandit_id: lockedOrder?.pandit_id,
+                diffMinutes,
+                deduction: isFreeOrder ? 0 : deduction,
+                place
             });
-        }
-        if (['chat', 'call'].includes(order.type)) {
-            callEvent("emit_to_order_completed", {
-                key: `user_${order?.user_id}`,
-                payload: { order_id: order?.order_id }
-            });
+
+            savedChatRow = chatSystemMessage;
+            cutCompleted = true;
+        }); // ── transaction end ──
+
+        // ── Events — DB commit pachhi ─────────────────────────────
+
+        if (duplicateSkip) return true;
+        if (!cutCompleted) return false;
+
+        // Chat end message — user + pandit
+        if (order.type === 'chat' && savedChatRow) {
+            callEvent("emit_to_user", { toType: "pandit", toId: order?.pandit_id, orderId: order?.order_id, payload: savedChatRow });
+            callEvent("emit_to_user", { toType: "user", toId: order?.user_id, orderId: order?.order_id, payload: savedChatRow });
         }
 
-        if (!isFree) {
-            await db('users').where({ id: user_id }).update({ balance: newBalance });
+        // Free recharge message emit — transaction ma insert thyu 6e
+        if (isFreeOrder && order.type === 'chat' && savedFreeMsg) {
+            callEvent("emit_to_user", { toType: "pandit", toId: order?.pandit_id, orderId: order?.order_id, payload: savedFreeMsg });
+            callEvent("emit_to_user", { toType: "user", toId: order?.user_id, orderId: order?.order_id, payload: savedFreeMsg });
         }
-        await db('orders').where({ id: order.id }).update({ status: "completed", deduction, duration: diffMinutes, end_time: new Date(end_time) });
-        upd.balance = panditAmount
-        logger.info('balancecut function -> pandit update param', { ...upd, pandit_id: order.pandit_id })
-        await db('pandits').where({ id: order.pandit_id }).increment(upd).update({ waiting_time: null });
-        const pandit_new_balance = Number(panditDetail?.balance) + Number(panditAmount)
-        const type = order.type.charAt(0).toUpperCase() + order.type.slice(1);
-        await db('balancelogs').insert({ place, order_id: order?.order_id, user_id, pandit_old_balance: Number(panditDetail?.balance), pandit_new_balance, user_old_balance: Number(user.balance), user_new_balance: Number(newBalance), message: `${type} with ${panditDetail?.display_name} for ${diffMinutes} minutes Rate(${order?.rate})`, pandit_id: panditDetail?.id, pandit_message: `${type} with ${user?.name} for ${diffMinutes} minutes. Rate(${order?.rate})`, pandit_amount: panditAmount, amount: isFree ? 0 : -deduction });
-        // console.log("user", dd);
-        // console.log("order", dds);
-        return true
+        if (order.type === 'chat') {
+            callEvent("emit_to_chat_end", { toType: "user", toId: order?.user_id, orderId: order?.order_id });
+            callEvent("emit_to_chat_order_completed", { toType: "user", toId: order?.user_id, orderId: order?.order_id });
+        }
+        // Pending order + order completed
+        callEvent("emit_to_pending_order", { key: `pandit_${order?.pandit_id}`, payload: { pandit_id: order?.pandit_id } });
+        callEvent("emit_to_order_completed", { key: `user_${order?.user_id}`, payload: { order_id: order?.order_id } });
+
+        return true;
+
     } catch (err) {
-        // console.log("err", err);
-        logger.info('balancecut function -> fail', { user_id, orderId: order?.order_id, err: err?.message })
-        return false
+        if (err?.message === 'INSUFFICIENT_BALANCE') return false;
+        logger.error('balanceCut error', err?.message, { order_id: order?.order_id, place, code: err?.code });
+        return false;
     }
 }
 
