@@ -1045,7 +1045,7 @@ async function newCreateOrder(req, res) {
         const token = pandit?.token || false;
         if (token) {
             const waiting_time = pandit?.waiting_time == null ? true : false
-            await sendNotification(token, user?.name, pandit?.final_chat_call_rate, panditId, type, waiting_time, orderId, user?.id, user?.profile, user?.avatar)
+            await sendNotification(token, user?.name, rate, panditId, type, waiting_time, orderId, user?.id, user?.profile, user?.avatar)
         }
         // socket.emit("emit_to_user_for_register", {
         //     key: `user_${req?.userId}`,
