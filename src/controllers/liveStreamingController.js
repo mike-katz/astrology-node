@@ -423,7 +423,7 @@ async function sendLiveChatUser(req, res) {
         saved.avatar = u?.avatar
         saved.balance = u?.balance
         saved.profile_id = profile_id?.id
-        console.log("saved", saved);
+        // console.log("saved", saved);
         const joined_user_ids = await readJoinedUserIds(channel_id);
         emitLiveChatMessage(live.pandit_id, channel_id, { chat: saved }, bodyUserId, joined_user_ids);
 

@@ -320,7 +320,7 @@ async function getPandits(req, res) {
         //     query.orderBy('p.total_orders', 'desc').orderByRaw(ratingRatioRaw + ' DESC');
         // }
         query.orderByRaw('RANDOM()');
-        console.log("sd", query.toQuery());
+        // console.log("sd", query.toQuery());
         let user = await query;
         // const [{ count }] = await countQuery
         // const total = parseInt(count);

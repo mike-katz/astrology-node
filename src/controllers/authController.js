@@ -198,7 +198,7 @@ async function login(req, res) {
                 let otpResponse;
                 try {
                     otpResponse = await axios.get(url);
-                    console.log("otpResponse", otpResponse);
+                    // console.log("otpResponse", otpResponse);
                     otpResponse = otpResponse.data
                 } catch (error) {
                     console.error('Acquire API failed:', error.message);
