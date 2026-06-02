@@ -762,6 +762,19 @@ async function reportUser(req, res) {
     }
 }
 
+function getDuration(start_time, end_time) {
+    const diffMs = Math.abs(
+        new Date(end_time) - new Date(start_time)
+    );
+    const minutes = Math.floor(diffMs / (1000 * 60));
+    const extraSeconds = diffMs % (1000 * 60);
+
+    const diffMinutes = extraSeconds > 1000
+        ? minutes + 1
+        : minutes;
+    return diffMinutes
+}
+
 async function stopLive(req, res) {
     const { channel_id } = req.body
     try {
@@ -774,6 +787,11 @@ async function stopLive(req, res) {
             .where({ channel_id, status: 'live' })
             .update({ status: 'ended', ended_at: db.fn.now() });
 
+        const log = await db('panditlogins').where({ pandit_id: active.pandit_id, type: "live", status: "pending" }).first();
+        if (log) {
+            const duration = getDuration(log?.start_time, new Date());
+            await db('panditlogins').where({ id: Number(log?.id) }).update({ end_time: new Date(), status: "success", minutes: duration })
+        }
         await RedisCache.deleteKey(LIVE_VIEWER_KEY(active.channel_id));
         await RedisCache.deleteKey(LIVE_JOINED_USER_IDS_KEY(active.channel_id));
 
