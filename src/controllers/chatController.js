@@ -1473,6 +1473,8 @@ async function orderCancel(req, res) {
         //     status = 'rejected'
         // }
         upd.status = status
+        upd.order_action = "user -> order canceled";
+        upd.canceled_at = new Date()
         await db('orders').where({ id: order?.id }).update(upd);
         await db('pandits').where({ id: order.pandit_id }).update({ waiting_time: null });
 
@@ -1523,6 +1525,8 @@ async function orderReject(req, res) {
         //     status = 'rejected'
         // }
         upd.status = status
+        upd.order_action = "user -> order rejected";
+        upd.canceled_at = new Date()
         await db('orders').where({ id: order?.id }).update(upd);
         await db('pandits').where({ id: order.pandit_id }).update({ waiting_time: null });
         callEvent("emit_to_pending_order", {
