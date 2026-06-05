@@ -216,9 +216,9 @@ async function sendMessage(req, res) {
             logger.info('chat_sendMessage fail', { userId: req.userId, orderId, message: 'Order is completed.' });
             return res.status(400).json({ success: false, message: 'Order is completed.' });
         }
-        if (order?.status == "pending") {
-            logger.info('chat_sendMessage fail', { userId: req.userId, orderId, message: 'Order is pending.' });
-            return res.status(400).json({ success: false, message: 'Order is pending.' });
+        if (["pending", "cancel"].includes(order?.status)) {
+            logger.log('chat_sendMessage fail: order status', { orderId, status: order?.status, userId: req.userId });
+            return res.status(400).json({ success: false, message: `Order is ${order?.status}.` });
         }
         const pandit = await db('pandits').where({ id: Number(order?.pandit_id) }).first();
         const { files } = req
