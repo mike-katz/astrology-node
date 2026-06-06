@@ -1080,6 +1080,7 @@ async function getReviewList(req, res) {
                 "u.profile"
             )
             .where(reviewWhere)
+            .orderBy('r.id', 'desc')
             .limit(limit)
             .offset(offset);
 
