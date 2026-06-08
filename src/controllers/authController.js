@@ -40,11 +40,11 @@ async function register(req, res) {
 }
 
 async function sendSMS(mobile, country_code) {
+    let response = {
+        return: true,
+        message: 'Message sent successfully',
+    };
     try {
-        let response = {
-            return: true,
-            message: 'Message sent successfully',
-        };
         const update = {}
         const latestRecord = await db('otpmanages').where({ mobile, country_code }).first();
         if (latestRecord) {
@@ -76,18 +76,27 @@ async function sendSMS(mobile, country_code) {
             config = {
                 method: 'post',
                 maxBodyLength: Infinity,
-                url: process.env.WHATSAPP_SMS_URL,
+                // url: process.env.WHATSAPP_SMS_URL,
+                url: "https://api.verifyway.com/api/v1/",
                 headers: {
-                    Authorization: "Bearer Vm9IYmxoZ1d4NTNOaFZNRHlLQWlvdz09"
+                    Authorization: "Bearer 2593$iKTikmAQxk3oHxWeI66keOGDu4nsw7inaMhH"
                 },
+                // data: {
+                //     "type": "buttonTemplate",
+                //     "templateId": "appotpwa",
+                //     "templateLanguage": "en",
+                //     "sender_phone": `${country_code + mobile}`,
+                //     "templateArgs": [
+                //         OTP
+                //     ]
+                // }
                 data: {
-                    "type": "buttonTemplate",
-                    "templateId": "appotpwa",
-                    "templateLanguage": "en",
-                    "sender_phone": `${country_code + mobile}`,
-                    "templateArgs": [
-                        OTP
-                    ]
+                    "recipient": `${country_code + mobile}`,
+                    "type": "otp",
+                    "channel": "whatsapp",
+                    "fallback": "yes",
+                    "code": OTP,
+                    "lang": "en"
                 }
             }
         }
@@ -108,7 +117,7 @@ async function sendSMS(mobile, country_code) {
         response.message = 'OTP Send successful.';
         return response
     } catch (err) {
-        console.error(err);
+        console.log(err?.response?.data || err?.message);
         response.return = false;
         response.message = 'Something Wrong in generate otp.';
         return response
