@@ -430,6 +430,8 @@ async function getPanditDetail(req, res) {
     //     .limit(3);
 
     const gallery = await db('panditgallery').where({ pandit_id: user?.id }).orderBy('order', 'asc');
+    const isLive = await db('live_streams').where({ pandit_id: user?.id }).first();
+
     const response = {
         id: user?.id,
         name: user?.display_name,
@@ -462,7 +464,8 @@ async function getPanditDetail(req, res) {
         video_intro: user?.video_intro,
         // reviews: review,
         isFollow: false,
-        gallery
+        gallery,
+        is_live: isLive ? true : false
     }
     if (user?.unlimited_free_calls_chats) {
         user.chat = true
