@@ -76,28 +76,30 @@ async function sendSMS(mobile, country_code) {
             config = {
                 method: 'post',
                 maxBodyLength: Infinity,
-                // url: process.env.WHATSAPP_SMS_URL,
-                url: "https://api.verifyway.com/api/v1/",
+                url: process.env.WHATSAPP_SMS_URL,
+                // url: "https://api.verifyway.com/api/v1/",
                 headers: {
-                    Authorization: "Bearer 2593$iKTikmAQxk3oHxWeI66keOGDu4nsw7inaMhH"
+                    // Authorization: "Bearer 2593$iKTikmAQxk3oHxWeI66keOGDu4nsw7inaMhH"
+                    Authorization: "Bearer 2593$SjlOUEN6ZllXbzE1QUpOK09DVFU2dz09"
                 },
-                // data: {
-                //     "type": "buttonTemplate",
-                //     "templateId": "appotpwa",
-                //     "templateLanguage": "en",
-                //     "sender_phone": `${country_code + mobile}`,
-                //     "templateArgs": [
-                //         OTP
-                //     ]
-                // }
                 data: {
-                    "recipient": `${country_code + mobile}`,
-                    "type": "otp",
-                    "channel": "whatsapp",
-                    "fallback": "yes",
-                    "code": OTP,
-                    "lang": "en"
+                    "type": "buttonTemplate",
+                    // "templateId": "appotpwa",
+                    "templateId": "appotp",
+                    "templateLanguage": "en",
+                    "sender_phone": `${country_code + mobile}`,
+                    "templateArgs": [
+                        OTP
+                    ]
                 }
+                // data: {
+                //     "recipient": `${country_code + mobile}`,
+                //     "type": "otp",
+                //     "channel": "whatsapp",
+                //     "fallback": "yes",
+                //     "code": OTP,
+                //     "lang": "en"
+                // }
             }
         }
         const data = await axios.request(config);
