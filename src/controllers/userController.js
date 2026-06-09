@@ -550,7 +550,7 @@ async function getUserStats(req, res) {
             last_consultation_date: '2026-06-09',
             total_order_count: 0,
             recommend_remedy_count: 0,
-            recommend_remedy: remedies || [],
+            recommend_remedy: "",
             send_gift_count: 0,
         };
 
