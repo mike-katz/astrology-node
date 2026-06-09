@@ -310,7 +310,7 @@ async function verifyOtp(req, res) {
         }
 
         if (!existing) {
-            [existing] = await db('users').insert({ mobile, country_code, status: "active", balance: 0, ad_set_id: set_id, utm_source, ad_id, mode, version }).returning(['id', 'mobile', 'avatar', 'country_code', 'otp']);
+            [existing] = await db('users').insert({ mobile, country_code, status: "active", balance: 0, ad_set_id: set_id, utm_source, ad_id, mode, version }).returning(['id', 'mobile', 'avatar', 'country_code', 'otp', 'is_free_order']);
         }
         if (Object.keys(upd).length > 0) {
             await db('users').where({ id: Number(existing?.id) }).update(upd)
@@ -334,7 +334,7 @@ async function verifyOtp(req, res) {
             .count('* as count')
             .where({ user_id: existing.id })
             .whereIn('status', ['continue', 'completed', 'pending']);
-        const is_free = count == 0 ? true : false
+        const is_free = count == 0 || existing?.is_free_order == "" ? true : false
         return res.status(200).json({ success: true, data: { id: existing?.id, name: existing?.name, profile: existing?.profile, avatar: existing?.avatar, mobile: existing?.mobile, country_code: existing?.country_code, token: encryptToken, is_free }, message: 'Otp Verify Successfully' });
     } catch (err) {
         console.error(err);

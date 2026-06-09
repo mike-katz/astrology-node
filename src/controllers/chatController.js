@@ -957,7 +957,7 @@ async function newCreateOrder(req, res) {
         let deduction = Number(duration) * Number(pandit?.final_chat_call_rate)
         let rate = pandit?.final_chat_call_rate;
         const settings = await db('settings').first();
-        if (count == 0) {
+        if (count == 0 || user?.is_free_order == "") {
             duration = Number(settings?.free_chat_minutes) || 0;
             deduction = 0;
             rate = settings?.free_chat_amount_per_minute || 1;
@@ -1010,12 +1010,12 @@ async function newCreateOrder(req, res) {
             profile_id,
             is_free: false
         }
-        if (count == 0) {
+        if (count == 0 || user?.is_free_order == "") {
             ins.is_free = true
         }
 
         const upd = { is_free_order: "paid" }
-        if (count == 0) {
+        if (count == 0 || user?.is_free_order == "") {
             ins.is_free = true
             upd.is_free_order = "free"
         }
