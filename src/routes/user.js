@@ -37,6 +37,7 @@ router.get('/rechargeBanner', user.getRechargeBanner);
 router.get('/cookie', user.getCookie);
 router.get('/recommendation', user.getRecommendations);
 router.get('/check-is-free', user.findIsFree);
+router.get('/statistics-count', user.getUserStats);
 
 router.post('/profileUpdate',
     upload.fields([

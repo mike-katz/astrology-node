@@ -461,4 +461,96 @@ async function findIsFree(req, res) {
     }
 }
 
-module.exports = { updateProfile, getProfile, getBalance, updateToken, profileUpdate, makeAvtarString, deleteMyAccount, getRecharge, getRechargeBanner, getCookie, getRecommendations, findIsFree };
+/** Logged-in user dashboard counts / summary */
+async function getUserStats(req, res) {
+    try {
+        const userId = req.userId;
+
+        const rechargeBase = db('payments')
+            .where({ user_id: userId, status: 'success', type: 'recharge' })
+            .whereNull('deleted_at');
+
+        const [
+            rechargeAgg,
+            favouriteAgg,
+            orderAgg,
+            lastConsultation,
+            remedyCountRow,
+            remedies,
+            giftCountRow,
+        ] = await Promise.all([
+            rechargeBase
+                .clone()
+                .select(
+                    db.raw('COUNT(*)::int as recharge_count'),
+                    db.raw('COALESCE(SUM(amount), 0) as total_recharge_amount'),
+                    db.raw('MAX(COALESCE(updated_at, created_at)) as last_recharge_date'),
+                )
+                .first(),
+            db('follows')
+                .where({ user_id: userId, type: 'user' })
+                .count('* as count')
+                .first(),
+            db('orders')
+                .where({ user_id: userId })
+                .whereNull('deleted_at')
+                .whereNot('status', 'cancel')
+                .count('* as count')
+                .first(),
+            db('orders')
+                .where({ user_id: userId, status: 'completed' })
+                .whereNull('deleted_at')
+                .select(db.raw('MAX(COALESCE(end_time, updated_at, created_at)) as last_consultation_date'))
+                .first(),
+            db('recommendations')
+                .where({ user_id: userId })
+                .count('* as count')
+                .first(),
+            db('recommendations as b')
+                .leftJoin('pandits as c', 'c.id', 'b.pandit_id')
+                .where({ 'b.user_id': userId })
+                .select(
+                    'b.id',
+                    'b.title',
+                    'b.main_price',
+                    'b.price',
+                    'b.created_at',
+                    'b.review',
+                    'b.url',
+                    'b.pandit_id',
+                    'c.display_name as name',
+                    'c.profile',
+                )
+                .orderBy('b.id', 'desc'),
+            db('balancelogs')
+                .where({ user_id: userId })
+                .whereNull('deleted_at')
+                .where('message', 'like', 'Send gift%')
+                .count('* as count')
+                .first(),
+        ]);
+
+        const data = {
+            recharge_count: Number(rechargeAgg?.recharge_count || 0),
+            total_recharge_amount: Number(rechargeAgg?.total_recharge_amount || 0),
+            last_recharge_date: rechargeAgg?.last_recharge_date || null,
+            total_favourite_astrologers: Number(favouriteAgg?.count || 0),
+            last_consultation_date: lastConsultation?.last_consultation_date || null,
+            total_order_count: Number(orderAgg?.count || 0),
+            recommend_remedy_count: Number(remedyCountRow?.count || 0),
+            recommend_remedy: remedies || [],
+            send_gift_count: Number(giftCountRow?.count || 0),
+        };
+
+        return res.status(200).json({
+            success: true,
+            data,
+            message: 'User stats fetched successfully',
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
+module.exports = { updateProfile, getProfile, getBalance, updateToken, profileUpdate, makeAvtarString, deleteMyAccount, getRecharge, getRechargeBanner, getCookie, getRecommendations, findIsFree, getUserStats };
