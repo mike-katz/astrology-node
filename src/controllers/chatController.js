@@ -528,9 +528,11 @@ async function balanceCut(user_id, order, end_time, place) {
             }
 
             // 7. User balance cut — only if paid
+            const updUser = { is_free_order_available: false }
             if (!isFreeOrder) {
-                await trx('users').where({ id: user_id }).update({ balance: newBalance });
+                updUser.balance = newBalance
             }
+            await trx('users').where({ id: user_id }).update({ balance: newBalance, });
 
             // 9. Chat system messages — transaction ANDAR
             let chatSystemMessage = null;
@@ -1010,13 +1012,13 @@ async function newCreateOrder(req, res) {
             profile_id,
             is_free: false
         }
-        if (count == 0 || user?.is_free_order == "") {
+
+        const upd = { is_free_order: "paid" }
+        if (count == 0 || user?.is_free_order_available) {
             ins.is_free = true
         }
 
-        const upd = { is_free_order: "paid", is_free_order_available: false }
-        if (count == 0 || user?.is_free_order == "") {
-            ins.is_free = true
+        if (count == 0) {
             upd.is_free_order = "free"
         }
         await db('users').where({ id: Number(req.userId) }).update(upd);

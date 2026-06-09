@@ -563,7 +563,7 @@ async function createMediaOrder(req, res) {
         let deduction = Number(duration) * Number(pandit?.final_chat_call_rate)
         let rate = pandit?.final_chat_call_rate;
         const settings = await db('settings').first();
-        if (count == 0) {
+        if (count == 0 || user?.is_free_order_available) {
             duration = Number(settings?.free_chat_minutes) || 0;
             deduction = 0;
             rate = settings?.free_chat_amount_per_minute || 1;
@@ -606,8 +606,10 @@ async function createMediaOrder(req, res) {
             is_free: false,
         };
         const upd = { is_free_order: 'paid' };
-        if (count == 0) {
+        if (count == 0 || user?.is_free_order_available) {
             ins.is_free = true
+        }
+        if (count == 0) {
             upd.is_free_order = "free"
         }
         await db('users').where({ id: Number(req.userId) }).update(upd);
