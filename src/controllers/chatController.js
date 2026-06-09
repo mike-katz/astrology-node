@@ -532,7 +532,7 @@ async function balanceCut(user_id, order, end_time, place) {
             if (!isFreeOrder) {
                 updUser.balance = newBalance
             }
-            await trx('users').where({ id: user_id }).update({ balance: newBalance, });
+            await trx('users').where({ id: user_id }).update(updUser);
 
             // 9. Chat system messages — transaction ANDAR
             let chatSystemMessage = null;
