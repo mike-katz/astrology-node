@@ -443,4 +443,16 @@ async function getRecommendations(req, res) {
         res.status(500).json({ success: false, message: 'Server error' });
     }
 }
-module.exports = { updateProfile, getProfile, getBalance, updateToken, profileUpdate, makeAvtarString, deleteMyAccount, getRecharge, getRechargeBanner, getCookie, getRecommendations };
+
+async function findIsFree(req, res) {
+    try {
+        const isFree = await db('users').where({ id: req.userId }).select('is_free_order_available').first();
+        return res.status(200).json({ success: true, data: { is_free: isFree }, message: 'Get successfully' });
+    }
+    catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
+module.exports = { updateProfile, getProfile, getBalance, updateToken, profileUpdate, makeAvtarString, deleteMyAccount, getRecharge, getRechargeBanner, getCookie, getRecommendations, findIsFree };
