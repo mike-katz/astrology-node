@@ -430,7 +430,7 @@ async function getPanditDetail(req, res) {
     //     .limit(3);
 
     const gallery = await db('panditgallery').where({ pandit_id: user?.id }).orderBy('order', 'asc');
-    const isLive = await db('live_streams').where({ pandit_id: user?.id }).first();
+    const isLive = await db('live_streams').where({ pandit_id: user?.id, status: "live" }).first();
 
     const response = {
         id: user?.id,
