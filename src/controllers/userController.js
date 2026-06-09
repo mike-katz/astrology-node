@@ -447,7 +447,7 @@ async function getRecommendations(req, res) {
 async function findIsFree(req, res) {
     try {
         const isFree = await db('users').where({ id: req.userId }).select('is_free_order_available').first();
-        return res.status(200).json({ success: true, data: { is_free: isFree }, message: 'Get successfully' });
+        return res.status(200).json({ success: true, data: { is_free: isFree?.is_free_order_available || false }, message: 'Get successfully' });
     }
     catch (err) {
         console.error(err);
