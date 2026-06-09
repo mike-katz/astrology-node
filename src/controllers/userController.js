@@ -446,8 +446,14 @@ async function getRecommendations(req, res) {
 
 async function findIsFree(req, res) {
     try {
-        const isFree = await db('users').where({ id: req.userId }).select('is_free_order_available').first();
-        return res.status(200).json({ success: true, data: { is_free: isFree?.is_free_order_available || false }, message: 'Get successfully' });
+        const existing = await db('users').where({ id: req.userId }).select('is_free_order_available', 'id').first();
+
+        const [{ count }] = await db('orders')
+            .count('* as count')
+            .where({ user_id: existing.id })
+            .whereIn('status', ['continue', 'completed', 'pending']);
+        const is_free = count == 0 || existing?.is_free_order_available ? true : false
+        return res.status(200).json({ success: true, data: { is_free }, message: 'Get successfully' });
     }
     catch (err) {
         console.error(err);
