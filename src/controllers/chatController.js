@@ -1143,7 +1143,7 @@ async function sendNotification(token, username, chat_call_rate, panditId, type,
                     // 🔔 Android
                     android: {
                         notification: {
-                            sound: "default"
+                            sound: 'default'
                         }
                     },
 
@@ -1151,7 +1151,7 @@ async function sendNotification(token, username, chat_call_rate, panditId, type,
                     apns: {
                         payload: {
                             aps: {
-                                sound: "default"
+                                sound: 'default'
                             }
                         }
                     },
