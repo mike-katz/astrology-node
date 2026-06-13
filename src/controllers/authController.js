@@ -7,10 +7,14 @@ const { validationResult } = require('express-validator');
 const { encrypt } = require("../utils/crypto")
 const { checkOrders, isValidMobile } = require('../utils/decodeJWT');
 const axios = require('axios');
+const { sendTwilioSMS } = require('../utils/twilioSms');
 const { setCache } = require('../config/redisClient');
 const sendMail = require('../utils/sendMail');
 const SALT_ROUNDS = parseInt(process.env.BCRYPT_SALT_ROUNDS || '12', 10);
 const logger = require('../utils/logger').getLogger('authController');
+const geoip = require('geoip-lite');
+const { getClientIp } = require('../utils/getClientIp');
+const { getCurrencyByCountry } = require('../utils/countryCurrencyMap');
 
 async function register(req, res) {
     try {
@@ -63,47 +67,55 @@ async function sendSMS(mobile, country_code) {
         }
         const OTP = Math.floor(100000 + Math.random() * 900000);
 
-        let config = {};
         if (country_code == '+91') {
-            config = {
+            const config = {
                 method: 'get',
                 maxBodyLength: Infinity,
                 url: `${process.env.SMS_URL}?authkey=${process.env.SMS_KEY}&mobiles=${country_code}${mobile}&message= ${OTP} is the One Time Password (OTP) for AstroGuruji Application.&sender=${process.env.SMS_SENDER_NAME}&route=4&country=91&DLT_TE_ID=${process.env.SMS_TEMPLATE}`,
-                headers: {
-                },
+                headers: {},
             };
+            const data = await axios.request(config);
+            console.log("otp response data", data);
         } else {
-            config = {
+            const otpMessage = `${OTP} is the One Time Password (OTP) for AstroGuruji Application.`;
+            const phone = `${country_code}${mobile}`;
+
+            const whatsappConfig = {
                 method: 'post',
                 maxBodyLength: Infinity,
                 url: process.env.WHATSAPP_SMS_URL,
-                // url: "https://api.verifyway.com/api/v1/",
                 headers: {
-                    // Authorization: "Bearer 2593$iKTikmAQxk3oHxWeI66keOGDu4nsw7inaMhH"
                     Authorization: "Bearer 2593$SjlOUEN6ZllXbzE1QUpOK09DVFU2dz09"
                 },
                 data: {
-                    "type": "buttonTemplate",
-                    // "templateId": "appotpwa",
-                    "templateId": "appotp",
-                    "templateLanguage": "en",
-                    "sender_phone": `${country_code + mobile}`,
-                    "templateArgs": [
-                        OTP
-                    ]
+                    type: "buttonTemplate",
+                    templateId: "appotp",
+                    templateLanguage: "en",
+                    sender_phone: phone,
+                    templateArgs: [OTP]
                 }
-                // data: {
-                //     "recipient": `${country_code + mobile}`,
-                //     "type": "otp",
-                //     "channel": "whatsapp",
-                //     "fallback": "yes",
-                //     "code": OTP,
-                //     "lang": "en"
-                // }
+            };
+
+            const [whatsappResult, twilioResult] = await Promise.allSettled([
+                axios.request(whatsappConfig),
+                sendTwilioSMS(phone, otpMessage),
+            ]);
+
+            if (whatsappResult.status === 'rejected') {
+                console.log('WhatsApp OTP failed:', whatsappResult.reason?.response?.data || whatsappResult.reason?.message);
             }
+            if (twilioResult.status === 'rejected') {
+                console.log('Twilio OTP failed:', twilioResult.reason?.message);
+            }
+            if (whatsappResult.status === 'rejected' && twilioResult.status === 'rejected') {
+                response.return = false;
+                response.message = 'Something Wrong in generate otp.';
+                return response;
+            }
+
+            console.log("otp response whatsapp", whatsappResult.status === 'fulfilled' ? whatsappResult.value?.data : null);
+            console.log("otp response twilio", twilioResult.status === 'fulfilled' ? twilioResult.value?.sid : null);
         }
-        const data = await axios.request(config);
-        console.log("otp response data", data);
         const upd = {
             otp: OTP,
             mobile,
@@ -309,13 +321,24 @@ async function verifyOtp(req, res) {
             }
         }
 
+        const ip = getClientIp(req);
+        let currency;
+        if (ip) {
+            const geo = geoip.lookup(ip);
+            const country = geo ? geo.country : 'IN';
+            currency = getCurrencyByCountry(country);
+            currency = currency?.currency
+            console.log("currency", currency?.currency);
+            upd?.currency = currency
+        }
+
         if (!existing) {
-            [existing] = await db('users').insert({ mobile, country_code, status: "active", balance: 0, ad_set_id: set_id, utm_source, ad_id, mode, version, is_free_order_available: true }).returning(['id', 'mobile', 'avatar', 'country_code', 'otp', 'is_free_order_available']);
+            [existing] = await db('users').insert({ mobile, country_code, status: "active", balance: 0, ad_set_id: set_id, utm_source, ad_id, mode, version, is_free_order_available: true, currency }).returning(['id', 'mobile', 'avatar', 'country_code', 'otp', 'is_free_order_available', 'currency']);
         }
         if (Object.keys(upd).length > 0) {
             await db('users').where({ id: Number(existing?.id) }).update(upd)
         }
-        const token = jwt.sign({ userId: existing.id, username: existing.name, mobile: existing.mobile }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '1h' });
+        const token = jwt.sign({ userId: existing.id, username: existing.name, mobile: existing.mobile, currency }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '1h' });
         // hide password
         const encryptToken = encrypt(token);
 
