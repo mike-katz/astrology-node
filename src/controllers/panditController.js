@@ -402,7 +402,8 @@ async function getPandits(req, res) {
         // }
 
         user.map(item => {
-            item.chat_call_rate = convertCurrency(item.chat_call_rate, (currencyData?.inr_rate || 1));
+            currency,
+                item.chat_call_rate = convertCurrency(item.chat_call_rate, (currencyData?.inr_rate || 1));
             item.discounted_chat_call_rate = convertCurrency(item.discounted_chat_call_rate, (currencyData?.inr_rate || 1));
             item.final_chat_call_rate = convertCurrency(item.final_chat_call_rate, (currencyData?.inr_rate || 1));
             item.govt_id = item?.govt_id ? deepParse(item?.govt_id) : [];
@@ -492,6 +493,7 @@ async function getPanditDetail(req, res) {
         // reviews: review,
         isFollow: false,
         gallery,
+        currency,
         is_live: isLive ? true : false
     }
     if (user?.unlimited_free_calls_chats) {

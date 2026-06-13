@@ -72,7 +72,7 @@ function deepParse(input) {
 }
 
 function convertCurrency(amount, rate) {
-    return Number(amount) / Number(rate)
+    return Number((Number(amount) / Number(rate)).toFixed(2));
 }
 
 module.exports = { decodeJWT, checkOrders, socketParseEventData, isValidMobile, deepParse, convertCurrency };
