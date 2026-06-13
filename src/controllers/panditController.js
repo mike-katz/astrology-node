@@ -400,10 +400,10 @@ async function getPandits(req, res) {
         //     const newUser = await query;
         //     user = [...user, ...newUser]
         // }
-
+        console.log("currency", currency);
         user.map(item => {
-            currency,
-                item.chat_call_rate = convertCurrency(item.chat_call_rate, (currencyData?.inr_rate || 1));
+            item.currency = currency;
+            item.chat_call_rate = convertCurrency(item.chat_call_rate, (currencyData?.inr_rate || 1));
             item.discounted_chat_call_rate = convertCurrency(item.discounted_chat_call_rate, (currencyData?.inr_rate || 1));
             item.final_chat_call_rate = convertCurrency(item.final_chat_call_rate, (currencyData?.inr_rate || 1));
             item.govt_id = item?.govt_id ? deepParse(item?.govt_id) : [];

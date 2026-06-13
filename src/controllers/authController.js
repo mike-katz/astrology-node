@@ -5,7 +5,7 @@ const jwt = require('jsonwebtoken');
 require('dotenv').config();
 const { validationResult } = require('express-validator');
 const { encrypt } = require("../utils/crypto")
-const { checkOrders, isValidMobile } = require('../utils/decodeJWT');
+const { checkOrders, isValidMobile, generateLoginResponse } = require('../utils/decodeJWT');
 const axios = require('axios');
 const { sendTwilioSMS } = require('../utils/twilioSms');
 const { setCache } = require('../config/redisClient');
@@ -336,27 +336,8 @@ async function verifyOtp(req, res) {
         if (Object.keys(upd).length > 0) {
             await db('users').where({ id: Number(existing?.id) }).update(upd)
         }
-        const token = jwt.sign({ userId: existing.id, username: existing.name, mobile: existing.mobile, currency }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '1h' });
-        // hide password
-        const encryptToken = encrypt(token);
-
-        // Store token in Redis with key user_username (or user_mobile if username doesn't exist)
-        const username = existing.id;
-        const redisKey = `user_${username}`;
-        // Set TTL to match JWT expiration (1 hour = 3600 seconds)
-        const jwtExpiry = process.env.JWT_EXPIRES_IN || '1h';
-        let ttlSeconds = 3600; // default 1 hour
-        if (jwtExpiry.includes('h')) {
-            ttlSeconds = parseInt(jwtExpiry.replace('h', '')) * 3600;
-        }
-        await setCache(redisKey, encryptToken, ttlSeconds);
-
-        const [{ count }] = await db('orders')
-            .count('* as count')
-            .where({ user_id: existing.id })
-            .whereIn('status', ['continue', 'completed', 'pending']);
-        const is_free = count == 0 || existing?.is_free_order_available ? true : false
-        return res.status(200).json({ success: true, data: { id: existing?.id, name: existing?.name, profile: existing?.profile, avatar: existing?.avatar, mobile: existing?.mobile, country_code: existing?.country_code, token: encryptToken, is_free }, message: 'Otp Verify Successfully' });
+        const response = await generateLoginResponse(existing)
+        return res.status(200).json(response);
     } catch (err) {
         console.error(err);
         res.status(500).json({ success: false, message: 'Server error' });
@@ -528,6 +509,14 @@ async function googleLogin(req, res) {
                 upd.ad_set_id = Number(set_id);
             }
         }
+        const ip = getClientIp(req);
+        let currency;
+        if (ip) {
+            const geo = geoip.lookup(ip);
+            const country = geo ? geo.country : 'IN';
+            currency = getCurrencyByCountry(country);
+            currency = currency?.currency
+        }
 
         if (!existing) {
             const insertRow = {
@@ -543,6 +532,8 @@ async function googleLogin(req, res) {
                 version: version || null,
                 utm_source: utm_source || null,
                 ad_id: ad_id || null,
+                permanent_currency: currency,
+                default_currency: currency,
                 ad_set_id: set_id != null && isNumber(set_id) ? Number(set_id) : null,
             };
             [existing] = await db('users').insert(insertRow).returning([
@@ -554,6 +545,8 @@ async function googleLogin(req, res) {
                 'name',
                 'profile',
                 'email',
+                'permanent_currency',
+                'default_currency'
                 // 'google_id',
             ]);
         } else {
@@ -575,43 +568,8 @@ async function googleLogin(req, res) {
             }
             existing = await db('users').where({ id: existing.id }).first();
         }
-
-        const token = jwt.sign(
-            { userId: existing.id, username: existing.name, mobile: existing.mobile },
-            process.env.JWT_SECRET,
-            { expiresIn: process.env.JWT_EXPIRES_IN || '1h' },
-        );
-        const encryptToken = encrypt(token);
-
-        const username = existing.id;
-        const redisKey = `user_${username}`;
-        const jwtExpiry = process.env.JWT_EXPIRES_IN || '1h';
-        let ttlSeconds = 3600;
-        if (jwtExpiry.includes('h')) {
-            ttlSeconds = parseInt(jwtExpiry.replace('h', ''), 10) * 3600;
-        }
-        await setCache(redisKey, encryptToken, ttlSeconds);
-
-        const [{ count }] = await db('orders')
-            .count('* as count')
-            .where({ user_id: existing?.id })
-            .whereIn('status', ['continue', 'completed', 'pending']);
-        const is_free = count == 0;
-
-        return res.status(200).json({
-            success: true,
-            data: {
-                id: existing?.id,
-                name: existing?.name,
-                profile: existing?.profile,
-                avatar: existing?.avatar,
-                mobile: existing?.mobile,
-                country_code: existing?.country_code,
-                token: encryptToken,
-                is_free,
-            },
-            message: 'Google sign-in successful',
-        });
+        const response = await generateLoginResponse(existing)
+        return res.status(200).json(response);
     } catch (err) {
         logger.error(err);
         res.status(500).json({ success: false, message: 'Server error' });
@@ -718,6 +676,15 @@ async function appleLogin(req, res) {
             }
         }
 
+        const ip = getClientIp(req);
+        let currency;
+        if (ip) {
+            const geo = geoip.lookup(ip);
+            const country = geo ? geo.country : 'IN';
+            currency = getCurrencyByCountry(country);
+            currency = currency?.currency
+        }
+
         if (!existing) {
             const insertRow = {
                 // google_id: sub,
@@ -731,6 +698,8 @@ async function appleLogin(req, res) {
                 mode,
                 version: version || null,
                 utm_source: utm_source || null,
+                permanent_currency: currency,
+                default_currency: currency,
                 ad_id: ad_id || null,
                 ad_set_id: set_id != null && isNumber(set_id) ? Number(set_id) : null,
             };
@@ -743,6 +712,8 @@ async function appleLogin(req, res) {
                 'name',
                 'profile',
                 'email',
+                'permanent_currency',
+                'default_currency'
                 // 'google_id',
             ]);
         } else {
