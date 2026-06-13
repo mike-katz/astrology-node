@@ -71,5 +71,9 @@ function deepParse(input) {
     return result;
 }
 
-module.exports = { decodeJWT, checkOrders, socketParseEventData, isValidMobile, deepParse };
+function convertCurrency(amount, rate) {
+    return Number(amount) / Number(rate)
+}
+
+module.exports = { decodeJWT, checkOrders, socketParseEventData, isValidMobile, deepParse, convertCurrency };
 

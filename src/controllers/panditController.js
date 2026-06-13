@@ -9,9 +9,19 @@ const sendMail = require('../utils/sendMail');
 const { getCache } = require("../config/redisClient");
 const { uploadImageToAzure, deleteFileFromAzure } = require('../utils/azureUploader');
 const { sendSMS, verifySMS } = require('./authController');
+const { getClientIp } = require('../utils/getClientIp');
+const { getCurrencyByCountry } = require('../utils/countryCurrencyMap');
 
 async function getPandits(req, res) {
     try {
+        const ip = getClientIp(req);
+        let currency = "INR";
+        if (ip) {
+            const geo = geoip.lookup(ip);
+            const country = geo ? geo.country : 'IN';
+            currency = getCurrencyByCountry(country);
+            currency = currency?.currency
+        }
         // console.log("req.query", req.query);
         const reqPage = parseInt(req.query.page) || 1;
         if (reqPage != 1) {
@@ -54,9 +64,10 @@ async function getPandits(req, res) {
                             .whereIn('status', ['continue', 'completed', 'pending']);
                         isFree = count == 0 ? true : false;
                         if (isFree) {
-                            const userData = await db('users').select('language').where({ id: Number(username) }).first();
+                            const userData = await db('users').select('language', 'default_currency').where({ id: Number(username) }).first();
                             if (userData) {
                                 language = userData?.language ? deepParse(userData?.language) : [] || []
+                                currency = userData?.default_currency
                             }
                         }
                     }
@@ -66,6 +77,8 @@ async function getPandits(req, res) {
         let sort
         let orderBy
         let sorting = []
+        const currencyData = await db('currency').select('currency_name', 'inr_rate').where({ currency_name: currency }).first();
+
         if (sort_by) {
             if (sort_by == 'popularity') {
                 sort = 'tag'
@@ -386,7 +399,11 @@ async function getPandits(req, res) {
         //     const newUser = await query;
         //     user = [...user, ...newUser]
         // }
+
         user.map(item => {
+            item.chat_call_rate = convertCurrency(item.chat_call_rate, (currencyData?.inr_rate || 1));
+            item.discounted_chat_call_rate = convertCurrency(item.discounted_chat_call_rate, (currencyData?.inr_rate || 1));
+            item.final_chat_call_rate = convertCurrency(item.final_chat_call_rate, (currencyData?.inr_rate || 1));
             item.govt_id = item?.govt_id ? deepParse(item?.govt_id) : [];
             item.available_for = item?.available_for ? deepParse(item?.available_for) : [];
             item.languages = item?.languages ? deepParse(item?.languages) : [];
@@ -431,6 +448,15 @@ async function getPanditDetail(req, res) {
 
     const gallery = await db('panditgallery').where({ pandit_id: user?.id }).orderBy('order', 'asc');
     const isLive = await db('live_streams').where({ pandit_id: user?.id, status: "live" }).first();
+
+    const ip = getClientIp(req);
+    let currency = "INR";
+    if (ip) {
+        const geo = geoip.lookup(ip);
+        const country = geo ? geo.country : 'IN';
+        currency = getCurrencyByCountry(country);
+        currency = currency?.currency
+    }
 
     const response = {
         id: user?.id,
@@ -479,6 +505,8 @@ async function getPanditDetail(req, res) {
         // console.log("verified", verified);
         if (verified?.userId) {
             const follow = await db('follows').where({ 'pandit_id': user?.id, 'user_id': verified?.userId }).first();
+            const userDetail = await db('users').where({ 'id': Number(verified?.userId) }).select('default_currency').first();
+            currency = userDetail?.default_currency
             // console.log("user", user);
             if (follow) {
                 response.isFollow = true
@@ -486,6 +514,12 @@ async function getPanditDetail(req, res) {
         }
     }
 
+    const currencyData = await db('currency').select('currency_name', 'inr_rate').where({ currency_name: currency }).first();
+    if (currencyData) {
+        response.chat_call_rate = convertCurrency(user.chat_call_rate, (currencyData?.inr_rate || 1));
+        response.discounted_chat_call_rate = convertCurrency(user.discounted_chat_call_rate, (currencyData?.inr_rate || 1));
+        response.final_chat_call_rate = convertCurrency(user.final_chat_call_rate, (currencyData?.inr_rate || 1));
+    }
     return res.status(200).json({ success: true, data: response, message: 'Detail success' });
 }
 
