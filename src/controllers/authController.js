@@ -329,7 +329,7 @@ async function verifyOtp(req, res) {
             currency = getCurrencyByCountry(country);
             currency = currency?.currency
             console.log("currency", currency?.currency);
-            upd?.currency = currency
+            upd.currency = currency
         }
 
         if (!existing) {
