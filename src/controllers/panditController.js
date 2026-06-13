@@ -1,6 +1,6 @@
 const db = require('../db');
 const { decrypt, encrypt } = require('../utils/crypto');
-const { decodeJWT, deepParse } = require('../utils/decodeJWT');
+const { decodeJWT, deepParse, convertCurrency } = require('../utils/decodeJWT');
 require('dotenv').config();
 const jwt = require('jsonwebtoken');
 const { isValidMobile } = require('../utils/decodeJWT');
