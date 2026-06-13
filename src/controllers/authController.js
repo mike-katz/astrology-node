@@ -329,6 +329,7 @@ async function verifyOtp(req, res) {
             currency = getCurrencyByCountry(country);
             currency = currency?.currency
         }
+        currency = existing?.default_currency || 'INR';
 
         if (!existing) {
             [existing] = await db('users').insert({ mobile, country_code, status: "active", balance: 0, ad_set_id: set_id, utm_source, ad_id, mode, version, is_free_order_available: true, default_currency: currency, permanent_currency: currency }).returning(['id', 'mobile', 'avatar', 'country_code', 'otp', 'is_free_order_available', 'permanent_currency', 'default_currency']);
@@ -336,7 +337,7 @@ async function verifyOtp(req, res) {
         if (Object.keys(upd).length > 0) {
             await db('users').where({ id: Number(existing?.id) }).update(upd)
         }
-        const response = await generateLoginResponse(existing)
+        const response = await generateLoginResponse(existing, currency)
         return res.status(200).json(response);
     } catch (err) {
         console.error(err);
@@ -517,6 +518,7 @@ async function googleLogin(req, res) {
             currency = getCurrencyByCountry(country);
             currency = currency?.currency
         }
+        currency = existing?.default_currency || 'INR';
 
         if (!existing) {
             const insertRow = {
@@ -568,7 +570,7 @@ async function googleLogin(req, res) {
             }
             existing = await db('users').where({ id: existing.id }).first();
         }
-        const response = await generateLoginResponse(existing)
+        const response = await generateLoginResponse(existing, currency)
         return res.status(200).json(response);
     } catch (err) {
         logger.error(err);
@@ -684,6 +686,7 @@ async function appleLogin(req, res) {
             currency = getCurrencyByCountry(country);
             currency = currency?.currency
         }
+        currency = existing?.default_currency || 'INR';
 
         if (!existing) {
             const insertRow = {
@@ -735,43 +738,45 @@ async function appleLogin(req, res) {
             }
             existing = await db('users').where({ id: existing.id }).first();
         }
+        const response = await generateLoginResponse(existing, currency)
+        return res.status(200).json(response);
 
-        const token = jwt.sign(
-            { userId: existing.id, username: existing.name, mobile: existing.mobile },
-            process.env.JWT_SECRET,
-            { expiresIn: process.env.JWT_EXPIRES_IN || '1h' },
-        );
-        const encryptToken = encrypt(token);
+        // const token = jwt.sign(
+        //     { userId: existing.id, username: existing.name, mobile: existing.mobile },
+        //     process.env.JWT_SECRET,
+        //     { expiresIn: process.env.JWT_EXPIRES_IN || '1h' },
+        // );
+        // const encryptToken = encrypt(token);
 
-        const username = existing.id;
-        const redisKey = `user_${username}`;
-        const jwtExpiry = process.env.JWT_EXPIRES_IN || '1h';
-        let ttlSeconds = 3600;
-        if (jwtExpiry.includes('h')) {
-            ttlSeconds = parseInt(jwtExpiry.replace('h', ''), 10) * 3600;
-        }
-        await setCache(redisKey, encryptToken, ttlSeconds);
+        // const username = existing.id;
+        // const redisKey = `user_${username}`;
+        // const jwtExpiry = process.env.JWT_EXPIRES_IN || '1h';
+        // let ttlSeconds = 3600;
+        // if (jwtExpiry.includes('h')) {
+        //     ttlSeconds = parseInt(jwtExpiry.replace('h', ''), 10) * 3600;
+        // }
+        // await setCache(redisKey, encryptToken, ttlSeconds);
 
-        const [{ count }] = await db('orders')
-            .count('* as count')
-            .where({ user_id: existing?.id })
-            .whereIn('status', ['continue', 'completed', 'pending']);
-        const is_free = count == 0;
+        // const [{ count }] = await db('orders')
+        //     .count('* as count')
+        //     .where({ user_id: existing?.id })
+        //     .whereIn('status', ['continue', 'completed', 'pending']);
+        // const is_free = count == 0;
 
-        return res.status(200).json({
-            success: true,
-            data: {
-                id: existing?.id,
-                name: existing?.name,
-                profile: existing?.profile,
-                avatar: existing?.avatar,
-                mobile: existing?.mobile,
-                country_code: existing?.country_code,
-                token: encryptToken,
-                is_free,
-            },
-            message: 'Apple sign-in successful',
-        });
+        // return res.status(200).json({
+        //     success: true,
+        //     data: {
+        //         id: existing?.id,
+        //         name: existing?.name,
+        //         profile: existing?.profile,
+        //         avatar: existing?.avatar,
+        //         mobile: existing?.mobile,
+        //         country_code: existing?.country_code,
+        //         token: encryptToken,
+        //         is_free,
+        //     },
+        //     message: 'Apple sign-in successful',
+        // });
     } catch (err) {
         logger.error(err);
         res.status(500).json({ success: false, message: 'Server error' });

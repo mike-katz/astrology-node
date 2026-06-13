@@ -76,7 +76,7 @@ function convertCurrency(amount, rate) {
     return Number((Number(amount) / Number(rate)).toFixed(2));
 }
 
-const generateLoginResponse = async (userId) => {
+const generateLoginResponse = async (existing, currency) => {
     const token = jwt.sign({ userId: existing.id, username: existing.name, mobile: existing.mobile, currency }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '1h' });
     // hide password
     const encryptToken = encrypt(token);

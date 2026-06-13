@@ -565,4 +565,23 @@ async function getUserStats(req, res) {
     }
 }
 
-module.exports = { updateProfile, getProfile, getBalance, updateToken, profileUpdate, makeAvtarString, deleteMyAccount, getRecharge, getRechargeBanner, getCookie, getRecommendations, findIsFree, getUserStats };
+async function getCurrencyList(req, res) {
+    try {
+        const authHeader = req.headers.authorization;
+        const tokenData = decodeJWT(authHeader);
+        const result = tokenData?.currency !== 'INR'
+            ? await db('currency').select('*')
+            : [];
+
+        return res.status(200).json({
+            success: true,
+            data: result,
+            message: 'Currency successful',
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
+module.exports = { updateProfile, getProfile, getBalance, updateToken, profileUpdate, makeAvtarString, deleteMyAccount, getRecharge, getRechargeBanner, getCookie, getRecommendations, findIsFree, getUserStats, getCurrencyList };
