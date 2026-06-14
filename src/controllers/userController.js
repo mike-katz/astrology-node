@@ -1,12 +1,13 @@
 const FormData = require('form-data');
 const db = require('../db');
 const axios = require('axios');
-const { decodeJWT } = require('../utils/decodeJWT');
+const { decodeJWT, convertCurrency } = require('../utils/decodeJWT');
 
 require('dotenv').config();
 
 const { deleteKey } = require('../config/redisClient');
 const { uploadImageToAzure, deleteFileFromAzure } = require('../utils/azureUploader');
+const { getCurrencySymbolByCurrency } = require('../utils/countryCurrencyMap');
 
 async function makeAvtarString(user, gender) {
     if (!user || !gender) return null;
@@ -188,9 +189,17 @@ async function updateProfile(req, res) {
 async function getBalance(req, res) {
     const user = await db('users')
         .where('id', req?.userId)
-        .select('balance')
+        .select('balance', 'default_currency')
         .first();
     if (!user) return res.status(400).json({ success: false, message: 'Please enter correct user.' });
+    const currency = user?.default_currency
+    const currencyData = await db('currency').select('currency_name', 'inr_rate').where({ currency_name: currency }).first();
+
+    const balance = await convertCurrency(user?.balance, (currencyData?.inr_rate || 1));
+    user?.balance = balance;
+    const symbol = getCurrencySymbolByCurrency(currency)
+    user?.currency = symbol;
+
     return res.status(200).json({ success: true, data: user, message: 'Profile get Successfully' });
 }
 
