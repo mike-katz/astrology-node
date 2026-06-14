@@ -209,7 +209,7 @@ async function razorpay(req, res) {
             transaction_id: razorpayPaymentId,
             status: 'success',
         });
-        await db('users').where({ id: user.id }).increment({ balance: Number(Number(paymentRow?.amount) + Number(extra)) });
+        await db('users').where({ id: user.id }).increment({ balance: Number(Number(paymentRow?.amount) + Number(extra)), offer_amount: Number(offer_amount) });
 
         if (extra > 0) {
             await db('balancelogs').insert({

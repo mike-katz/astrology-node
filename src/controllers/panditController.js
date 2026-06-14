@@ -10,7 +10,7 @@ const { getCache } = require("../config/redisClient");
 const { uploadImageToAzure, deleteFileFromAzure } = require('../utils/azureUploader');
 const { sendSMS, verifySMS } = require('./authController');
 const { getClientIp } = require('../utils/getClientIp');
-const { getCurrencyByCountry } = require('../utils/countryCurrencyMap');
+const { getCurrencyByCountry, getCurrencySymbolByCurrency } = require('../utils/countryCurrencyMap');
 const geoip = require('geoip-lite');
 
 async function getPandits(req, res) {
@@ -401,8 +401,9 @@ async function getPandits(req, res) {
         //     user = [...user, ...newUser]
         // }
         console.log("currency", currency);
+        const symbol = getCurrencySymbolByCurrency(currency)
         user.map(item => {
-            item.currency = currency;
+            item.currency = symbol;
             item.chat_call_rate = convertCurrency(item.chat_call_rate, (currencyData?.inr_rate || 1));
             item.discounted_chat_call_rate = convertCurrency(item.discounted_chat_call_rate, (currencyData?.inr_rate || 1));
             item.final_chat_call_rate = convertCurrency(item.final_chat_call_rate, (currencyData?.inr_rate || 1));
@@ -523,6 +524,8 @@ async function getPanditDetail(req, res) {
         response.discounted_chat_call_rate = convertCurrency(user.discounted_chat_call_rate, (currencyData?.inr_rate || 1));
         response.final_chat_call_rate = convertCurrency(user.final_chat_call_rate, (currencyData?.inr_rate || 1));
     }
+    const symbol = getCurrencySymbolByCurrency(currency)
+    response.currency = symbol;
     return res.status(200).json({ success: true, data: response, message: 'Detail success' });
 }
 

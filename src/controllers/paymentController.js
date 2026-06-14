@@ -117,8 +117,18 @@ async function createRazorpayOrder(req, res) {
             notes: { user_id: String(req.userId) },
         });
         // console.log("order", order);
-
-        await db('payments').insert({ user_id: req?.userId, order_id: order.id, gst, amount: base, status: "pending", type: "recharge" });
+        let offer_amount = 0;
+        const payment = await db('payments').where({ user_id: req?.userId, }).first();
+        if (!payment) {
+            const setting = await db('settings').select('currency_amount').first();
+            console.log("setting", setting);
+            setting?.currency_amount?.map(item => {
+                if (item?.currency == user?.default_currency || "INR") {
+                    offer_amount = item?.offer_amount
+                }
+            })
+        }
+        await db('payments').insert({ user_id: req?.userId, order_id: order.id, gst, amount: base, status: "pending", type: "recharge", offer_amount });
         logger.info('payment_createRazorpayOrder success', { userId: req.userId, orderId: order.id, amount });
         return res.status(200).json({
             success: true,

@@ -92,11 +92,12 @@ const generateLoginResponse = async (existing, currency) => {
     }
     await setCache(redisKey, encryptToken, ttlSeconds);
 
-    const [{ count }] = await db('orders')
-        .count('* as count')
-        .where({ user_id: existing.id })
-        .whereIn('status', ['continue', 'completed', 'pending']);
-    const is_free = count == 0 || existing?.is_free_order_available ? true : false
+    // const [{ count }] = await db('orders')
+    //     .count('* as count')
+    //     .where({ user_id: existing.id })
+    //     .whereIn('status', ['continue', 'completed', 'pending']);
+    // const is_free = count == 0 || existing?.is_free_order_available ? true : false
+    const is_free = existing?.is_free_order_available || false
     return {
         success: true,
         data: {
