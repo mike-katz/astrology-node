@@ -1,6 +1,7 @@
 const FormData = require('form-data');
 const db = require('../db');
 const axios = require('axios');
+const { decodeJWT } = require('../utils/decodeJWT');
 
 require('dotenv').config();
 
@@ -446,14 +447,20 @@ async function getRecommendations(req, res) {
 
 async function findIsFree(req, res) {
     try {
-        const existing = await db('users').where({ id: req.userId }).select('is_free_order_available', 'id').first();
+        const existing = await db('users').where({ id: req.userId }).select('is_free_order_available', 'id', 'default_currency').first();
+        const is_free = existing?.is_free_order_available || false;
+        const response = { is_free, is_offer: false, offer_detail: {} }
+        if (is_free) {
+            const setting = await db('settings').select('currency_amount').first();
 
-        const [{ count }] = await db('orders')
-            .count('* as count')
-            .where({ user_id: existing.id })
-            .whereIn('status', ['continue', 'completed', 'pending']);
-        const is_free = count == 0 || existing?.is_free_order_available ? true : false
-        return res.status(200).json({ success: true, data: { is_free }, message: 'Get successfully' });
+            setting?.currency_amount?.map(item => {
+                if (item?.currency == existing?.default_currency || "INR") {
+                    response.is_offer = true
+                    response.offer_detail = item
+                }
+            })
+        }
+        return res.status(200).json({ success: true, data: response, message: 'Get successfully' });
     }
     catch (err) {
         console.error(err);
