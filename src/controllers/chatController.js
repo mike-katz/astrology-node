@@ -1149,6 +1149,9 @@ async function sendNotification(token, username, chat_call_rate, panditId, type,
 
                     // 🔔 iOS
                     apns: {
+                        headers: {
+                            "apns-priority": "10"
+                        },
                         payload: {
                             aps: {
                                 sound: 'default'
