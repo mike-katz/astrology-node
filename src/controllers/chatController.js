@@ -1152,7 +1152,6 @@ async function sendNotification(token, username, chat_call_rate, panditId, type,
                         headers: {
                             "apns-priority": "10"
                         },
-
                         payload: {
                             aps: {
                                 sound: 'default'
