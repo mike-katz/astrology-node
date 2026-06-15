@@ -193,9 +193,9 @@ async function getBalance(req, res) {
         .first();
     if (!user) return res.status(400).json({ success: false, message: 'Please enter correct user.' });
     const currency = user?.default_currency
-    const currencyData = await db('currency').select('currency_name', 'inr_rate').where({ currency_name: currency }).first();
+    const currencyData = await db('currency').select('currency_name', 'user_inr_rate').where({ currency_name: currency }).first();
 
-    const balance = await convertCurrency(user?.balance, (currencyData?.inr_rate || 1));
+    const balance = await convertCurrency(user?.balance, (currencyData?.user_inr_rate || 1));
     user.balance = balance;
     const symbol = getCurrencySymbolByCurrency(currency)
     user.currency = symbol;
