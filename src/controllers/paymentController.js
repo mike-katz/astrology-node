@@ -102,11 +102,12 @@ async function createRazorpayOrder(req, res) {
         }
 
         const instance = new Razorpay({ key_id: keyId, key_secret: keySecret });
+        const currencyRate = await db('currency').where('currency_name', (user?.default_currency || 'INR')).first();
+        const finalAmount = Number(amount) * Number(currencyRate?.user_inr_rate || 1)
+        const base = (Number(finalAmount) * 100) / (Number(118)) //add gst 18 +100
 
-        const base = (Number(amount) * 100) / (Number(118)) //add gst 18 +100
-
-        const gst = Number(amount) - Number(base)
-        const with_tax_amount = Number(amount).toFixed(2);
+        const gst = Number(finalAmount) - Number(base)
+        const with_tax_amount = Number(finalAmount).toFixed(2);
 
         const amountPaise = Math.round(Number(with_tax_amount) * 100);
         const receipt = `rcpt_${req.userId}_${Date.now()}`;

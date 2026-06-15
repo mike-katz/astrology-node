@@ -596,9 +596,28 @@ async function getCurrencyList(req, res) {
             message: 'Currency successful',
         });
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ success: false, message: 'Server error' });
-    }
-}
+        async function updateCurrency(req, res) {
+            try {
+                const { currency } = req.body
+                const user = await db('users')
+                    .where('id', Number(req?.userId))
+                    .first();
+                if (!user) return res.status(400).json({ success: false, message: 'Please enter correct user.' });
+                const currencyData = await db('currency').where({ currency_name: currency }).whereNull('deleted_at').first();
+                if (!currencyData) return res.status(400).json({ success: false, message: 'Please enter correct currency.' });
 
-module.exports = { updateProfile, getProfile, getBalance, updateToken, profileUpdate, makeAvtarString, deleteMyAccount, getRecharge, getRechargeBanner, getCookie, getRecommendations, findIsFree, getUserStats, getCurrencyList };
+                await db('users').where({ id: Number(req?.userId) }).update({ default_currency: currency })
+
+                return res.status(200).json({
+                    success: true,
+                    data: null,
+                    message: 'User currency successfully',
+                });
+            }
+            catch (err) {
+                console.error(err);
+                res.status(500).json({ success: false, message: 'Server error' });
+            }
+        }
+
+        module.exports = { updateProfile, getProfile, getBalance, updateToken, profileUpdate, makeAvtarString, deleteMyAccount, getRecharge, getRechargeBanner, getCookie, getRecommendations, findIsFree, getUserStats, getCurrencyList, updateCurrency };

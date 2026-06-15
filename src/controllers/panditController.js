@@ -78,7 +78,7 @@ async function getPandits(req, res) {
         let sort
         let orderBy
         let sorting = []
-        const currencyData = await db('currency').select('currency_name', 'inr_rate').where({ currency_name: currency }).first();
+        const currencyData = await db('currency').select('currency_name', 'pandit_inr_rate').where({ currency_name: currency }).first();
 
         if (sort_by) {
             if (sort_by == 'popularity') {
@@ -404,9 +404,9 @@ async function getPandits(req, res) {
         const symbol = getCurrencySymbolByCurrency(currency)
         user.map(item => {
             item.currency = symbol;
-            item.chat_call_rate = convertCurrency(item.chat_call_rate, (currencyData?.inr_rate || 1));
-            item.discounted_chat_call_rate = convertCurrency(item.discounted_chat_call_rate, (currencyData?.inr_rate || 1));
-            item.final_chat_call_rate = convertCurrency(item.final_chat_call_rate, (currencyData?.inr_rate || 1));
+            item.chat_call_rate = convertCurrency(item.chat_call_rate, (currencyData?.pandit_inr_rate || 1));
+            item.discounted_chat_call_rate = convertCurrency(item.discounted_chat_call_rate, (currencyData?.pandit_inr_rate || 1));
+            item.final_chat_call_rate = convertCurrency(item.final_chat_call_rate, (currencyData?.pandit_inr_rate || 1));
             item.govt_id = item?.govt_id ? deepParse(item?.govt_id) : [];
             item.available_for = item?.available_for ? deepParse(item?.available_for) : [];
             item.languages = item?.languages ? deepParse(item?.languages) : [];
@@ -518,11 +518,11 @@ async function getPanditDetail(req, res) {
         }
     }
 
-    const currencyData = await db('currency').select('currency_name', 'inr_rate').where({ currency_name: currency }).first();
+    const currencyData = await db('currency').select('currency_name', 'pandit_inr_rate').where({ currency_name: currency }).first();
     if (currencyData) {
-        response.chat_call_rate = convertCurrency(user.chat_call_rate, (currencyData?.inr_rate || 1));
-        response.discounted_chat_call_rate = convertCurrency(user.discounted_chat_call_rate, (currencyData?.inr_rate || 1));
-        response.final_chat_call_rate = convertCurrency(user.final_chat_call_rate, (currencyData?.inr_rate || 1));
+        response.chat_call_rate = convertCurrency(user.chat_call_rate, (currencyData?.pandit_inr_rate || 1));
+        response.discounted_chat_call_rate = convertCurrency(user.discounted_chat_call_rate, (currencyData?.pandit_inr_rate || 1));
+        response.final_chat_call_rate = convertCurrency(user.final_chat_call_rate, (currencyData?.pandit_inr_rate || 1));
     }
     const symbol = getCurrencySymbolByCurrency(currency)
     response.currency = symbol;
