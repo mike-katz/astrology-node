@@ -268,7 +268,8 @@ async function getRecharge(req, res) {
                 message: 'Recharge list success'
             });
         }
-        const amounts = matchedRecharge?.amounts || [];
+        const userDetail = await db('users').where({ id: Number(id) }).first();
+        const amounts = matchedRecharge?.amounts[userDetail?.default_currency || 'INR'] || [];
         return res.status(200).json({ success: true, data: amounts, message: 'Recharge list success' });
     }
     catch (err) {
