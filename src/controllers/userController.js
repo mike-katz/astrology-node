@@ -282,10 +282,12 @@ async function getRecharge(req, res) {
         const amounts = matchedRecharge?.amounts[userDetail?.default_currency || 'INR'] || [];
         const symbol = getCurrencySymbolByCurrency(userDetail?.default_currency || 'INR')
         let gst = 18
+        let taxDetail = 'GST'
         if (userDetail?.default_currency != 'INR') {
             gst = 0
+            taxDetail = ''
         }
-        return res.status(200).json({ success: true, data: { amounts, currency: symbol, gst }, message: 'Recharge list success' });
+        return res.status(200).json({ success: true, data: { amounts, currency: symbol, gst, taxDetail }, message: 'Recharge list success' });
     }
     catch (err) {
         console.error(err);
