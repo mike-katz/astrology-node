@@ -939,6 +939,7 @@ async function newCreateOrder(req, res) {
             logger.info('order_create fail', { userId: req.userId, panditId, message: 'Pandit not active.' });
             return res.status(400).json({ success: false, message: 'Astrologer unavailable. Please try another.' });
         }
+        logger.info('order_create pandit status', { userId: req.userId, panditId, type: pandit[type] });
 
         // const continueOrder = await db('orders').where({ user_id: req.userId, pandit_id: panditId }).whereIn('status', ['continue', 'pending']).first()
         const continueOrder = await db('orders').where({ user_id: req.userId }).whereIn('status', ['continue', 'pending']).first()
