@@ -949,8 +949,9 @@ async function sendGift(req, res) {
             logger.info('order_sendGift fail', { userId: req.userId, message: 'please finish your continue order.' });
             return res.status(400).json({ success: false, message: 'please finish your continue order.' });
         }
-
-        const final = qty * amount
+        const currencyRate = await db('currency').where('currency_name', (user?.default_currency || 'INR')).first();
+        const finalAmount = Number(amount) * Number(currencyRate?.user_inr_rate || 1);
+        const final = qty * finalAmount
         if (user?.balance < Number(final)) {
             logger.info('order_sendGift fail', { userId: req.userId, message: 'Insufficient balance.' });
             return res.status(400).json({ success: false, message: 'Insufficient balance.' });
