@@ -281,10 +281,11 @@ async function getRecharge(req, res) {
         const userDetail = await db('users').where({ id: Number(req.userId) }).first();
         const amounts = matchedRecharge?.amounts[userDetail?.default_currency || 'INR'] || [];
         const symbol = getCurrencySymbolByCurrency(userDetail?.default_currency || 'INR')
-        let gst = 18
+
+        const currencyDetail = await db('currency').where({ currency_name: userDetail?.default_currency || 'INR' }).first();
+        let gst = Number(currencyDetail?.user_tax_percentage || 18)
         let taxDetail = 'GST'
         if (userDetail?.default_currency != 'INR') {
-            gst = 2
             taxDetail = 'VAT'
         }
         return res.status(200).json({ success: true, data: { amounts, currency: symbol, gst, taxDetail }, message: 'Recharge list success' });

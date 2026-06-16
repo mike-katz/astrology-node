@@ -103,8 +103,9 @@ async function createRazorpayOrder(req, res) {
 
         const instance = new Razorpay({ key_id: keyId, key_secret: keySecret });
         const currencyRate = await db('currency').where('currency_name', (user?.default_currency || 'INR')).first();
-        const finalAmount = Number(amount) * Number(currencyRate?.user_inr_rate || 1)
-        const base = (Number(finalAmount) * 100) / (Number(118)) //add gst 18 +100
+        const finalAmount = Number(amount) * Number(currencyRate?.user_inr_rate || 1);
+        const currencyTax = Number(currencyRate?.user_tax_percentage || 0) + 100
+        const base = (Number(finalAmount) * 100) / (Number(currencyTax)) //add gst 18 +100
 
         const gst = Number(finalAmount) - Number(base)
         const with_tax_amount = Number(finalAmount).toFixed(2);
@@ -129,7 +130,7 @@ async function createRazorpayOrder(req, res) {
                 }
             })
         }
-        await db('payments').insert({ user_id: req?.userId, order_id: order.id, gst, amount: base, status: "pending", type: "recharge", offer_amount });
+        await db('payments').insert({ user_id: req?.userId, order_id: order.id, gst, amount: base, status: "pending", currency: currencyRate?.currency_name, type: "recharge", offer_amount });
         logger.info('payment_createRazorpayOrder success', { userId: req.userId, orderId: order.id, amount });
         return res.status(200).json({
             success: true,
