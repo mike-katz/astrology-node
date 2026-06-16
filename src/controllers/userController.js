@@ -284,8 +284,8 @@ async function getRecharge(req, res) {
         let gst = 18
         let taxDetail = 'GST'
         if (userDetail?.default_currency != 'INR') {
-            gst = 0
-            taxDetail = ''
+            gst = 2
+            taxDetail = 'VAT'
         }
         return res.status(200).json({ success: true, data: { amounts, currency: symbol, gst, taxDetail }, message: 'Recharge list success' });
     }
