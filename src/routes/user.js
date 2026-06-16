@@ -31,7 +31,6 @@ router.get('/', user.getProfile);
 router.get('/balance', user.getBalance);
 router.post('/update', user.updateProfile);
 router.post('/updateToken', user.updateToken);
-router.post('/change_currency', user.updateCurrency);
 router.delete('/', user.deleteMyAccount);
 router.get('/recharge', user.getRecharge);
 router.get('/rechargeBanner', user.getRechargeBanner);
