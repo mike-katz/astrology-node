@@ -51,25 +51,26 @@ async function getPandits(req, res) {
         if (authHeader) {
             const token = authHeader?.split(' ')[1];
             if (token) {
-                const decryptToken = decrypt(token);
-                if (decryptToken) {
-                    const verified = jwt.verify(decryptToken, process.env.JWT_SECRET);
-                    const username = verified?.userId;
-                    const redisKey = `user_${username}`;
+                console.log("token", token);
+                const tokenData = decodeJWT(authHeader)
+                if (tokenData?.success || tokenData?.data?.userId) {
+                    const redisKey = `beta_user_${tokenData?.data?.userId}`;
                     const redisToken = await getCache(redisKey);
-
-                    if (!redisToken || redisToken == token) {
+                    if (redisToken == token) {
+                        const userId = tokenData?.data?.userId
+                        console.log("inside token");
                         const [{ count }] = await db('orders')
                             .count('* as count')
-                            .where({ user_id: username })
+                            .where({ user_id: Number(userId) })
                             .whereIn('status', ['continue', 'completed', 'pending']);
                         isFree = count == 0 ? true : false;
+                        const userData = await db('users').select('language', 'default_currency').where({ id: Number(userId) }).first();
+                        console.log("userData", userData?.default_currency);
+                        if (userData) {
+                            currency = userData?.default_currency
+                        }
                         if (isFree) {
-                            const userData = await db('users').select('language', 'default_currency').where({ id: Number(username) }).first();
-                            if (userData) {
-                                language = userData?.language ? deepParse(userData?.language) : [] || []
-                                currency = userData?.default_currency
-                            }
+                            language = userData?.language ? deepParse(userData?.language) : [] || []
                         }
                     }
                 }
