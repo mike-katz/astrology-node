@@ -280,7 +280,12 @@ async function getRecharge(req, res) {
         }
         const userDetail = await db('users').where({ id: Number(req.userId) }).first();
         const amounts = matchedRecharge?.amounts[userDetail?.default_currency || 'INR'] || [];
-        return res.status(200).json({ success: true, data: amounts, message: 'Recharge list success' });
+        const symbol = getCurrencySymbolByCurrency(userDetail?.default_currency || 'INR')
+        let gst = 18
+        if (userDetail?.default_currency != 'INR') {
+            gst = 0
+        }
+        return res.status(200).json({ success: true, data: { amounts, currency: symbol, gst }, message: 'Recharge list success' });
     }
     catch (err) {
         console.error(err);
