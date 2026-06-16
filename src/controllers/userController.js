@@ -283,7 +283,7 @@ async function getRecharge(req, res) {
         const symbol = getCurrencySymbolByCurrency(userDetail?.default_currency || 'INR')
 
         const currencyDetail = await db('currency').where({ currency_name: userDetail?.default_currency || 'INR' }).first();
-        let gst = Number(currencyDetail?.user_tax_percentage || 18)
+        let gst = Number(currencyDetail?.user_tax_percentage || 0)
         let taxDetail = 'GST'
         if (userDetail?.default_currency != 'INR') {
             taxDetail = 'VAT'
