@@ -638,15 +638,17 @@ async function getGiftList(req, res) {
     try {
         const userDetail = await db('users').where({ id: Number(req.userId) }).select('default_currency').first();
         const currency = userDetail?.default_currency || 'INR'
-
-        let result = await db('gifts').where({ currency }).whereNull('deleted_at')
+        let result = await db('gifts')
+            .whereRaw("(amount::jsonb)->>? IS NOT NULL", [currency])
+            .whereNull('deleted_at')
         if (result?.length > 0) {
             const symbol = getCurrencySymbolByCurrency(currency);
             const rate = await db('currency').where({ currency_name: currency }).select('user_inr_rate').first();
             result.map(item => {
-                item.amount = Number(item?.amount)
+                const amount = JSON.parse(item?.amount);
+                item.amount = Number(amount[currency])
                 item.currency = symbol
-                item.inr_amount = Number(item?.amount) * Number(rate?.user_inr_rate || 1)
+                item.inr_amount = Number(amount[currency]) * Number(rate?.user_inr_rate || 1)
             })
         }
         return res.status(200).json({
