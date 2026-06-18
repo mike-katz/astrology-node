@@ -636,14 +636,17 @@ async function updateCurrency(req, res) {
 
 async function getGiftList(req, res) {
     try {
-        const authHeader = req.headers.authorization;
-        const tokenData = decodeJWT(authHeader);
-        const currency = tokenData?.data?.currency || 'INR'
+        const userDetail = await db('users').where({ id: Number(req.userId) }).select('default_currency').first();
+        const currency = userDetail?.default_currency || 'INR'
+
         let result = await db('gifts').where({ currency }).whereNull('deleted_at')
         if (result?.length > 0) {
-            const symbol = getCurrencySymbolByCurrency(currency)
+            const symbol = getCurrencySymbolByCurrency(currency);
+            const rate = await db('currency').where({ currency_name: currency }).select('user_inr_rate').first();
             result.map(item => {
+                item.amount = Number(item?.amount)
                 item.currency = symbol
+                item.inr_amount = Number(item?.amount) * Number(rate?.user_inr_rate || 1)
             })
         }
         return res.status(200).json({
