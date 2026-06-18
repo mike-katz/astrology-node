@@ -634,4 +634,30 @@ async function updateCurrency(req, res) {
     }
 }
 
-module.exports = { updateProfile, getProfile, getBalance, updateToken, profileUpdate, makeAvtarString, deleteMyAccount, getRecharge, getRechargeBanner, getCookie, getRecommendations, findIsFree, getUserStats, getCurrencyList, updateCurrency };
+async function getGiftList(req, res) {
+    try {
+        const authHeader = req.headers.authorization;
+        const tokenData = decodeJWT(authHeader);
+        const currency = tokenData?.data?.currency || 'INR'
+        let result = await db('gifts').where({ currency }).whereNull('deleted_at')
+        if (result?.length > 0) {
+            const symbol = getCurrencySymbolByCurrency(currency)
+            result.map(item => {
+                item.currency = symbol
+            })
+        }
+        return res.status(200).json({
+            success: true,
+            data: result,
+            message: 'gift successful',
+        });
+    }
+    catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
+
+
+module.exports = { updateProfile, getProfile, getBalance, updateToken, profileUpdate, makeAvtarString, deleteMyAccount, getRecharge, getRechargeBanner, getCookie, getRecommendations, findIsFree, getUserStats, getCurrencyList, updateCurrency, getGiftList };

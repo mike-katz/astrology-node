@@ -40,7 +40,7 @@ router.get('/recommendation', user.getRecommendations);
 router.get('/check-is-free', user.findIsFree);
 router.get('/statistics-count', user.getUserStats);
 router.get('/currency-list', user.getCurrencyList);
-
+router.get('/gift', user.getGiftList);
 router.post('/profileUpdate',
     upload.fields([
         { name: 'profile', maxCount: 1 },
