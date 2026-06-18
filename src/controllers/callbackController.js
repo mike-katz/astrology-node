@@ -267,5 +267,9 @@ async function razorpay(req, res) {
     }
 }
 
+async function xpay(req, res) {
+    console.log("req", req.body);
+    console.log("req query", req.query);
+}
 
-module.exports = { razorpay };
+module.exports = { razorpay, xpay };

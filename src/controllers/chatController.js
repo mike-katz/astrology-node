@@ -955,9 +955,14 @@ async function newCreateOrder(req, res) {
             .count('* as count')
             .where({ user_id: req.userId })
             .whereIn('status', ['continue', 'completed', 'pending']);
-        let duration = Math.floor(Number(Number(user?.balance)) / Number(pandit?.final_chat_call_rate));
+
+        const currencyData = await db('currency').select('currency_name', 'pandit_inr_rate').where({ currency_name: user?.default_currency }).first();
+        const panditRate = convertCurrency(pandit?.final_chat_call_rate, (currencyData?.pandit_inr_rate || 1));
+        const userBalance = convertCurrency(user?.balance, (currencyData?.pandit_inr_rate || 1));
+
+        let duration = Math.floor(Number(Number(userBalance)) / Number(panditRate));
         let deduction = Number(duration) * Number(pandit?.final_chat_call_rate)
-        let rate = pandit?.final_chat_call_rate;
+        let rate = panditRate;
         const settings = await db('settings').first();
         if (count == 0 || user?.is_free_order_available) {
             duration = Number(settings?.free_chat_minutes) || 0;
@@ -1010,6 +1015,7 @@ async function newCreateOrder(req, res) {
             deduction,
             type,
             profile_id,
+            currency: user?.default_currency,
             is_free: false
         }
 
@@ -1047,7 +1053,9 @@ async function newCreateOrder(req, res) {
         const token = pandit?.token || false;
         if (token) {
             const waiting_time = pandit?.waiting_time == null ? true : false
-            await sendNotification(token, user?.name, rate, panditId, type, waiting_time, orderId, user?.id, user?.profile, user?.avatar)
+            const finalRate = ins.is_free ? rate : panditRate;
+            const currency = ins.is_free ? 'INR' : user?.default_currency;
+            await sendNotification(token, user?.name, finalRate, panditId, type, waiting_time, orderId, user?.id, user?.profile, user?.avatar, currency)
         }
         // socket.emit("emit_to_user_for_register", {
         //     key: `user_${req?.userId}`,
@@ -1078,6 +1086,7 @@ async function sendNotification(token, username, chat_call_rate, panditId, type,
     // console.log("is_available", is_available);
     console.log("order_id, user_id", order_id, user_id);
     try {
+        const symbol = getCurrencySymbolByCurrency(currency)
         const filter = {
             type: 'pandit', status: 'active'
         }
@@ -1099,7 +1108,8 @@ async function sendNotification(token, username, chat_call_rate, panditId, type,
 
         const messages = replaceTemplate(template?.title, {
             user_name: username,
-            pandit_rate: chat_call_rate
+            pandit_rate: chat_call_rate,
+            currency: symbol
         })
         logger.info("messages", messages);
         if (token) {
