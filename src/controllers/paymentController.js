@@ -538,6 +538,23 @@ async function deleteAllTransaction(req, res) {
     }
 }
 
+async function getPaymentStatus(req, res) {
+    const { xpay_intent_id } = req.body;
+    logger.info('payment_getPaymentStatus', { userId: req.userId, xpay_intent_id });
+    try {
+        const data = await db('payments').select('status').where({
+            'user_id': req?.userId,
+            'order_id': xpay_intent_id
+        }).first();
+        logger.info('payment_getPaymentStatus success', { userId: req.userId });
+        return res.status(200).json({ success: true, data, message: 'get Successfully' });
+    } catch (err) {
+        logger.error('payment_getPaymentStatus error', { userId: req.userId, err: err?.message });
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
 module.exports = {
     addPayment,
     getPayment,
@@ -547,5 +564,6 @@ module.exports = {
     deleteAllPayment,
     deleteAllTransaction,
     createRazorpayOrder,
-    verifyRazorpayPayment
+    verifyRazorpayPayment,
+    getPaymentStatus
 };
