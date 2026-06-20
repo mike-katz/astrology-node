@@ -1014,7 +1014,7 @@ async function newCreateOrder(req, res) {
             user_id: req.userId,
             order_id: orderId,
             status: "pending",
-            rate,
+            rate: pandit?.final_chat_call_rate,
             duration,
             deduction,
             type,
@@ -1026,6 +1026,7 @@ async function newCreateOrder(req, res) {
         const upd = { is_free_order: "paid" }
         if (count == 0 || user?.is_free_order_available) {
             ins.is_free = true
+            ins.rate = settings?.free_chat_amount_per_minute
         }
 
         if (count == 0) {
