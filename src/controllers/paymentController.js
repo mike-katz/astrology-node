@@ -7,6 +7,8 @@ require('dotenv').config();
 const generateInvoicePDF = require('../utils/generatepdf');
 const Razorpay = require('razorpay');
 const axios = require('axios');
+const { convertCurrency } = require('../utils/decodeJWT');
+const { getCurrencySymbolByCurrency } = require('../utils/countryCurrencyMap');
 
 function numberToIndianWords(amount) {
     if (amount === undefined || amount === null) return '';
@@ -450,6 +452,20 @@ async function getTransactions(req, res) {
         const total = parseInt(count);
         const totalPages = Math.ceil(total / limit);
 
+        const currencyArr = ['INR'];
+        if (log?.length > 0) {
+            log?.map(item => currencyArr.push(item?.currency))
+
+            const currencyData = await db('currency').whereIn('currency_name', currencyArr);
+            log?.map((item) => {
+                const currency = currencyData.find(i => i.currency_name == (item?.currency || "INR"))
+                const amount = convertCurrency(item.amount, currency?.user_inr_rate)
+                const icon = getCurrencySymbolByCurrency(item?.currency || 'INR')
+
+                item.amount = amount
+                item.currency = icon
+            });
+        }
         const response = {
             page,
             limit,
