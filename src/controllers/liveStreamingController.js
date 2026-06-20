@@ -559,11 +559,17 @@ async function createMediaOrder(req, res) {
             .count('* as count')
             .where({ user_id: req.userId })
             .whereIn('status', ['continue', 'completed', 'pending']);
-        let duration = Math.floor(Number(Number(user?.balance)) / Number(pandit?.final_chat_call_rate));
+
+        const currencyData = await db('currency').select('currency_name', 'pandit_inr_rate').where({ currency_name: user?.default_currency }).first();
+        const panditRate = convertCurrency(pandit?.final_chat_call_rate, (currencyData?.pandit_inr_rate || 1));
+        const userBalance = convertCurrency(user?.balance, (currencyData?.pandit_inr_rate || 1));
+
+        let duration = Math.floor(Number(Number(userBalance)) / Number(panditRate));
         let deduction = Number(duration) * Number(pandit?.final_chat_call_rate)
-        let rate = pandit?.final_chat_call_rate;
+        let rate = panditRate;
         const settings = await db('settings').first();
-        if (count == 0 || user?.is_free_order_available) {
+        const isFreeOrderAvail = user?.is_free_order_available || false
+        if (count == 0 || isFreeOrderAvail) {
             duration = Number(settings?.free_chat_minutes) || 0;
             deduction = 0;
             rate = settings?.free_chat_amount_per_minute || 1;
@@ -594,20 +600,23 @@ async function createMediaOrder(req, res) {
         }
 
         const ins = {
-            pandit_id: pandit?.id,
+            pandit_id: panditId,
             user_id: req.userId,
             order_id: orderId,
-            status: 'pending',
-            rate,
+            status: "pending",
+            rate: pandit?.final_chat_call_rate,
             duration,
             deduction,
             type,
             profile_id,
+            currency: user?.default_currency,
             is_free: false,
-        };
-        const upd = { is_free_order: 'paid' };
+        }
+
+        const upd = { is_free_order: "paid" }
         if (count == 0 || user?.is_free_order_available) {
             ins.is_free = true
+            ins.rate = settings?.free_chat_amount_per_minute
         }
         if (count == 0) {
             upd.is_free_order = "free"
