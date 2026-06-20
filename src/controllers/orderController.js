@@ -949,9 +949,9 @@ async function sendGift(req, res) {
             logger.info('order_sendGift fail', { userId: req.userId, message: 'please finish your continue order.' });
             return res.status(400).json({ success: false, message: 'please finish your continue order.' });
         }
-        const currencyRate = await db('currency').where('currency_name', (user?.default_currency || 'INR')).first();
-        const finalAmount = Number(amount) * Number(currencyRate?.user_inr_rate || 1);
-        const final = qty * finalAmount
+        // const currencyRate = await db('currency').where('currency_name', (user?.default_currency || 'INR')).first();
+        // const finalAmount = Number(amount) * Number(currencyRate?.user_inr_rate || 1);
+        const final = amount
         if (user?.balance < Number(final)) {
             logger.info('order_sendGift fail', { userId: req.userId, message: 'Insufficient balance.' });
             return res.status(400).json({ success: false, message: 'Insufficient balance.' });
@@ -970,7 +970,7 @@ async function sendGift(req, res) {
         await db('users').where({ id: user?.id }).increment({ balance: -Number(final) });
         const newBalance = Number(user.balance) - Number(final)
         const pandit_new_balance = Number(pandit.balance) + Number(panditAmount)
-        await db('balancelogs').insert({ currency: user?.default_currency, pandit_old_balance: Number(pandit?.balance), pandit_new_balance, user_old_balance: Number(user.balance), user_new_balance: Number(newBalance), user_id: req.userId, message: `Send gift to ${pandit?.display_name} (${name}) - ${qty}`, pandit_id: pandit?.id, pandit_message: `Receive gift from ${user?.name} (${name}) - ${qty}`, pandit_amount: panditAmount, amount: - final });
+        await db('balancelogs').insert({ currency: user?.default_currency, pandit_old_balance: Number(pandit?.balance), pandit_new_balance, user_old_balance: Number(user.balance), user_new_balance: Number(newBalance), user_id: req.userId, message: `Send gift to ${pandit?.display_name} (${name}) - ${qty}`, pandit_id: pandit?.id, pandit_message: `Receive gift from ${user?.name} (${name}) - ${qty}`, pandit_amount: panditAmount, amount: - final, currency: user?.default_currency });
         logger.info('order_sendGift success', { userId: req.userId, pandit_id, amount: final });
 
         if (is_live) {
