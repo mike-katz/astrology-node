@@ -6,6 +6,8 @@ const logger = require('../utils/logger').getLogger('liveStreamingController');
 const { RtcTokenBuilder, RtcRole } = require('agora-access-token');
 const { channelLeave, geneateToken } = require('./agoraController');
 const { balanceCut } = require('./chatController');
+const { getCurrencySymbolByCurrency } = require('../utils/countryCurrencyMap');
+const { convertCurrency } = require('../utils/decodeJWT');
 
 require('dotenv').config();
 
@@ -213,6 +215,10 @@ async function listLive(req, res) {
         const data = await Promise.all(
             rows.map(async (r) => {
                 const isFollow = followData.find(i => i.pandit_id == r.pandit_id);
+                const userCurrency = await db('users').where({ id: Number(req.userId) }).select('default_currency').first();
+                const currency = await getCurrencySymbolByCurrency(userCurrency?.default_currency);
+                const currencyData = await db('currency').select('currency_name', 'pandit_inr_rate').where({ currency_name: userCurrency?.default_currency }).first();
+
                 return {
                     channel_id: r.channel_id,
                     title: r.title,
@@ -233,7 +239,9 @@ async function listLive(req, res) {
                         rating_3: r.rating_3,
                         rating_4: r.rating_4,
                         rating_5: r.rating_5,
-                        final_chat_call_rate: r.final_chat_call_rate,
+                        final_chat_call_rate: convertCurrency(r.final_chat_call_rate, (currencyData?.pandit_inr_rate || 1)),
+                        // final_chat_call_rate: r.final_chat_call_rate,
+                        currency
                     }
                 };
             })
