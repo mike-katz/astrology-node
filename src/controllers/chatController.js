@@ -3,6 +3,7 @@ require('dotenv').config();
 const path = require('path');
 const logger = require('log4js').getLogger(path.parse(__filename).name);
 const axios = require('axios');
+const { convertCurrency } = require('../utils/decodeJWT');
 
 const { callEvent } = require("../socket");
 const { channelLeave, geneateToken } = require('./agoraController');

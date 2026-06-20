@@ -53,11 +53,13 @@ async function getRechargeBonus(user, paymentRow) {
     const amountsList = Array.isArray(amounts) ? amounts : (typeof amounts === 'string' ? JSON.parse(amounts || '[]') : []);
     const currencyRate = await db('currency').where('currency_name', userCurrency).first();
     const inrRate = Number(currencyRate?.user_inr_rate || 1);
+    const taxPercent = Number(currencyRate?.user_tax_percentage || 0);
+    const currencyTax = taxPercent + 100;
 
     const matched = amountsList.find((a) => {
-        const rechargeInrAmount = Math.round(Number(a.amount) * inrRate * 100);
+        const rechargeBaseInr = Math.round(((Number(a.amount) * 100) / currencyTax) * inrRate * 100);
         const paymentInrAmount = Math.round(Number(paymentRow.amount) * 100);
-        return rechargeInrAmount === paymentInrAmount;
+        return rechargeBaseInr === paymentInrAmount;
     });
 
     if (!matched) return extra;

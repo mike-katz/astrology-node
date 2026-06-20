@@ -86,13 +86,13 @@ function buildRechargeAmounts(amount, currencyRate) {
     const currencyTax = taxPercent + 100;
     const gatewayCurrency = currencyRate?.currency_name || 'INR';
     const inrRate = Number(currencyRate?.user_inr_rate || 1);
-    const baseAmount = Number(amount);
+    const withTaxUserCurrency = Number(amount);
 
-    const dbAmount = baseAmount * inrRate;
-    const dbGst = (dbAmount * taxPercent) / 100;
-    const dbWithTax = dbAmount + dbGst;
+    const dbWithTax = withTaxUserCurrency * inrRate;
+    const dbAmount = (dbWithTax * 100) / currencyTax;
+    const dbGst = dbWithTax - dbAmount;
 
-    const gatewayWithTax = (baseAmount * currencyTax) / 100;
+    const gatewayWithTax = withTaxUserCurrency;
     const gatewayAmountMinor = Math.round(gatewayWithTax * 100);
 
     return {
