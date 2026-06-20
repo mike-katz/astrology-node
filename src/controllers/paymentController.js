@@ -168,12 +168,10 @@ async function initXpayPayment({ user, userId, amount, currencyRate }) {
     return {
         data: {
             type: 'xpay',
-            xIntentId: intent.xIntentId,
-            fwdUrl: intent.fwdUrl,
+            orderId: intent.xIntentId,
+            url: intent.fwdUrl,
             amount: intent.amount,
             currency: intent.currency,
-            status: intent.status,
-            receiptId,
         },
     };
 }
