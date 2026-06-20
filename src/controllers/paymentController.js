@@ -6,6 +6,7 @@ const { callEvent } = require('../socket');
 require('dotenv').config();
 const generateInvoicePDF = require('../utils/generatepdf');
 const Razorpay = require('razorpay');
+const axios = require('axios');
 
 function numberToIndianWords(amount) {
     if (amount === undefined || amount === null) return '';
@@ -76,76 +77,207 @@ function numberToIndianWords(amount) {
     return words + ' Only';
 }
 
-/** Create Razorpay order (no SMS/OTP – use Razorpay Checkout on frontend) */
+function getXpayBaseUrl() {
+    return (process.env.XPAY_URL || 'https://api.xpaycheckout.com').replace(/\/$/, '');
+}
+
+function buildRechargeAmounts(amount, currencyRate) {
+    const taxPercent = Number(currencyRate?.user_tax_percentage || 0);
+    const currencyTax = taxPercent + 100;
+    const gatewayCurrency = currencyRate?.currency_name || 'INR';
+    const inrRate = Number(currencyRate?.user_inr_rate || 1);
+    const baseAmount = Number(amount);
+
+    const dbAmount = baseAmount * inrRate;
+    const dbGst = (dbAmount * taxPercent) / 100;
+    const dbWithTax = dbAmount + dbGst;
+
+    const gatewayWithTax = (baseAmount * currencyTax) / 100;
+    const gatewayAmountMinor = Math.round(gatewayWithTax * 100);
+
+    return {
+        dbAmount,
+        dbGst,
+        dbCurrency: 'INR',
+        dbWithTax,
+        gatewayAmountMinor,
+        gatewayCurrency,
+        gatewayWithTax,
+    };
+}
+
+async function initXpayPayment({ user, userId, amount, currencyRate }) {
+    const publicKey = process.env.XPAY_PUBLIC_KEY;
+    const secretKey = process.env.XPAY_SECRET_KEY;
+    const callbackUrl = process.env.XPAY_CALLBACK_URL;
+    if (!publicKey || !secretKey) {
+        return { error: { status: 500, message: 'xPay is not configured.' } };
+    }
+    if (!callbackUrl) {
+        return { error: { status: 500, message: 'xPay callback URL is not configured.' } };
+    }
+
+    const { dbAmount, dbGst, dbCurrency, gatewayAmountMinor, gatewayCurrency } = buildRechargeAmounts(amount, currencyRate);
+    const receiptId = `rcpt_${userId}_${Date.now()}`;
+    const contactNumber = `${user.country_code || '+91'}${user.mobile}`;
+
+    const { data: intent } = await axios.post(
+        `${getXpayBaseUrl()}/payments/create-intent`,
+        {
+            amount: gatewayAmountMinor,
+            currency: gatewayCurrency,
+            receiptId,
+            callbackUrl,
+            cancelUrl: process.env.XPAY_CANCEL_URL || callbackUrl,
+            customerDetails: {
+                name: user.name || 'Customer',
+                email: user.email || `user${user.id}@astroguruji.com`,
+                contactNumber,
+            },
+            customerReferenceId: String(user.id),
+            description: 'Wallet recharge',
+            metadata: {
+                user_id: String(userId),
+                receipt_id: receiptId,
+            },
+        },
+        {
+            auth: {
+                username: publicKey,
+                password: secretKey,
+            },
+            headers: {
+                'Content-Type': 'application/json',
+                'Idempotency-Key': receiptId,
+            },
+        }
+    );
+
+    const offer_amount = await getFirstRechargeOfferAmount(user);
+    await db('payments').insert({
+        user_id: userId,
+        order_id: intent.xIntentId,
+        gst: dbGst,
+        amount: dbAmount,
+        status: 'pending',
+        currency: dbCurrency,
+        type: 'recharge',
+        offer_amount,
+    });
+
+    return {
+        data: {
+            type: 'xpay',
+            xIntentId: intent.xIntentId,
+            fwdUrl: intent.fwdUrl,
+            amount: intent.amount,
+            currency: intent.currency,
+            status: intent.status,
+            receiptId,
+        },
+    };
+}
+
+async function initRazorpayPayment({ user, userId, amount, currencyRate, gateway }) {
+    const keyId = gateway?.credentials?.key_id || "rzp_test_S9nToUfWEFILCz";
+    const keySecret = gateway?.credentials?.key_secret || "HTbBCXlFb7xEa2rVltcKIvNy";
+    if (!keyId || !keySecret) {
+        return { error: { status: 500, message: 'Razorpay is not configured.' } };
+    }
+
+    const { dbAmount, dbGst, dbCurrency, gatewayAmountMinor } = buildRechargeAmounts(amount, currencyRate);
+    const receipt = `rcpt_${userId}_${Date.now()}`;
+    const instance = new Razorpay({ key_id: keyId, key_secret: keySecret });
+    const order = await instance.orders.create({
+        amount: gatewayAmountMinor,
+        currency: 'INR',
+        receipt,
+        notes: { user_id: String(userId) },
+    });
+
+    const offer_amount = await getFirstRechargeOfferAmount(user);
+    await db('payments').insert({
+        user_id: userId,
+        order_id: order.id,
+        gst: dbGst,
+        amount: dbAmount,
+        status: 'pending',
+        currency: dbCurrency,
+        type: 'recharge',
+        offer_amount,
+    });
+
+    return {
+        data: {
+            type: 'razorpay',
+            orderId: order.id,
+            key: keyId,
+            amount: order.amount,
+            currency: order.currency,
+        },
+    };
+}
+
+async function getFirstRechargeOfferAmount(user) {
+    const payment = await db('payments').where({ user_id: user?.id }).first();
+    if (payment) return 0;
+
+    const setting = await db('settings').select('currency_amount').first();
+    let offer_amount = 0;
+    setting?.currency_amount?.map(item => {
+        if (item?.currency == user?.default_currency || "INR") {
+            offer_amount = item?.offer_amount;
+        }
+    });
+    return offer_amount || 0;
+}
+
+/** Create payment order – INR → Razorpay, other currency → xPay */
 async function createRazorpayOrder(req, res) {
     const { amount } = req.body || {};
-    logger.info('payment_createRazorpayOrder', { userId: req.userId, amount });
+    logger.info('payment_createOrder', { userId: req.userId, amount });
     try {
-        // amount frontend par thi aave (user/recharge API no amounts array mathi select)
         if (!Number.isFinite(Number(amount)) || Number(amount) < 0) {
-            logger.info('payment_createRazorpayOrder fail', { userId: req.userId, amount, message: 'Invalid amount.' });
+            logger.info('payment_createOrder fail', { userId: req.userId, amount, message: 'Invalid amount.' });
             return res.status(400).json({ success: false, message: 'Invalid amount.' });
         }
-        const gateway = await db('payment_gateways').where('status', true).first();
-        // { "key_id": "rzp_test_S9nToUfWEFILCz", "key_secret": "HTbBCXlFb7xEa2rVltcKIvNy", "merchant_id": "S5qAOpGWOEM7L9" }
 
-        const keyId = gateway?.credentials?.key_id || "rzp_test_S9nToUfWEFILCz";
-        const keySecret = gateway?.credentials?.key_secret || "HTbBCXlFb7xEa2rVltcKIvNy";
-        if (!keyId || !keySecret) {
-            logger.info('payment_createRazorpayOrder fail', { userId: req.userId, message: 'Razorpay is not configured.' });
-            return res.status(500).json({ success: false, message: 'Razorpay is not configured.' });
-        }
         const user = await db('users').where('id', req.userId).first();
         if (!user) {
-            logger.info('payment_createRazorpayOrder fail', { userId: req.userId, message: 'User not found.' });
+            logger.info('payment_createOrder fail', { userId: req.userId, message: 'User not found.' });
             return res.status(400).json({ success: false, message: 'User not found.' });
         }
 
-        const instance = new Razorpay({ key_id: keyId, key_secret: keySecret });
-        const currencyRate = await db('currency').where('currency_name', (user?.default_currency || 'INR')).first();
-        const finalAmount = Number(amount) * Number(currencyRate?.user_inr_rate || 1);
-        const currencyTax = Number(currencyRate?.user_tax_percentage || 0) + 100
-        const base = (Number(finalAmount) * 100) / (Number(currencyTax)) //add gst 18 +100
+        const userCurrency = user?.default_currency || 'INR';
+        const currencyRate = await db('currency').where('currency_name', userCurrency).first();
+        const gateway = await db('payment_gateways').where('status', true).first();
 
-        const gst = Number(finalAmount) - Number(base)
-        const with_tax_amount = Number(finalAmount).toFixed(2);
-
-        const amountPaise = Math.round(Number(with_tax_amount) * 100);
-        const receipt = `rcpt_${req.userId}_${Date.now()}`;
-        const order = await instance.orders.create({
-            amount: amountPaise,
-            currency: 'INR',
-            receipt,
-            notes: { user_id: String(req.userId) },
-        });
-        // console.log("order", order);
-        let offer_amount = 0;
-        const payment = await db('payments').where({ user_id: req?.userId, }).first();
-        if (!payment) {
-            const setting = await db('settings').select('currency_amount').first();
-            console.log("setting", setting);
-            setting?.currency_amount?.map(item => {
-                if (item?.currency == user?.default_currency || "INR") {
-                    offer_amount = item?.offer_amount
-                }
-            })
+        let result;
+        if (userCurrency !== 'INR') {
+            result = await initXpayPayment({ user, userId: req.userId, amount, currencyRate });
+        } else {
+            result = await initRazorpayPayment({ user, userId: req.userId, amount, currencyRate, gateway });
         }
-        await db('payments').insert({ user_id: req?.userId, order_id: order.id, gst, amount: base, status: "pending", currency: currencyRate?.currency_name, type: "recharge", offer_amount });
-        logger.info('payment_createRazorpayOrder success', { userId: req.userId, orderId: order.id, amount });
+
+        if (result?.error) {
+            logger.info('payment_createOrder fail', { userId: req.userId, message: result.error.message });
+            return res.status(result.error.status).json({ success: false, message: result.error.message });
+        }
+
+        logger.info('payment_createOrder success', { userId: req.userId, type: result.data.type, amount });
         return res.status(200).json({
             success: true,
-            data: {
-                orderId: order.id,
-                key: keyId,
-                amount: order.amount,
-                currency: order.currency,
-            },
+            data: result.data,
             message: 'Order created.',
         });
     } catch (err) {
-        logger.error('payment_createRazorpayOrder error', { userId: req.userId, err: err?.message });
-        console.error('createRazorpayOrder:', err);
-        res.status(500).json({ success: false, message: 'Server error' });
+        const xpayError = err?.response?.data;
+        logger.error('payment_createOrder error', { userId: req.userId, err: err?.message, xpayError });
+        console.error('createRazorpayOrder:', xpayError || err);
+        return res.status(err?.response?.status || 500).json({
+            success: false,
+            message: xpayError?.errorDescription || xpayError?.message || 'Server error',
+        });
     }
 }
 

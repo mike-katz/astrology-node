@@ -33,6 +33,49 @@ function numberToIndianWords(amount) {
     return words + ' Only';
 }
 
+async function getRechargeBonus(user, paymentRow) {
+    let extra = 0;
+    const [{ count }] = await db('payments')
+        .count('* as count')
+        .where({ user_id: paymentRow.user_id })
+        .whereIn('status', ['success']);
+    const rechargeNo = Number(count) + 1;
+    const recharges = await db('recharges')
+        .whereIn('recharge_number', [1111, rechargeNo])
+        .whereNull('deleted_at');
+    const matchedRecharge =
+        recharges.find(r => r.recharge_number === rechargeNo) ||
+        recharges.find(r => r.recharge_number === 1111);
+    if (!matchedRecharge) return extra;
+
+    const userCurrency = user?.default_currency || 'INR';
+    const amounts = matchedRecharge?.amounts?.[userCurrency] || matchedRecharge?.amounts || [];
+    const amountsList = Array.isArray(amounts) ? amounts : (typeof amounts === 'string' ? JSON.parse(amounts || '[]') : []);
+    const currencyRate = await db('currency').where('currency_name', userCurrency).first();
+    const inrRate = Number(currencyRate?.user_inr_rate || 1);
+
+    const matched = amountsList.find((a) => {
+        const rechargeInrAmount = Math.round(Number(a.amount) * inrRate * 100);
+        const paymentInrAmount = Math.round(Number(paymentRow.amount) * 100);
+        return rechargeInrAmount === paymentInrAmount;
+    });
+
+    if (!matched) return extra;
+
+    const d = matched.discount;
+    const dt = matched.discount_type;
+    if (d == null || d === '' || dt == null || dt === '') {
+        return 0;
+    }
+    if (String(dt).toLowerCase() === 'amount') {
+        return Number(d) * inrRate;
+    }
+    if (String(dt).toLowerCase() === 'percentage') {
+        return (Number(paymentRow.amount) * Number(d)) / 100;
+    }
+    return 0;
+}
+
 /**
  * Razorpay webhook: Step 1 – payment success/fail nu status set
  * Step 2 – DB ma jyare status "pending" hoy tyare j success/failed update karvu
@@ -146,37 +189,7 @@ async function razorpay(req, res) {
         const total_in_word = numberToIndianWords(Number(with_tax_amount).toFixed(2),);
 
         // user/recharge logic: amounts array ma amount match kari ne discount apply
-        let extra = 0;
-        const [{ count }] = await db('payments')
-            .count('* as count')
-            .where({ user_id: paymentRow.user_id })
-            .whereIn('status', ['success']);
-        logger.info('previous recharge count', count);
-        const rechargeNo = Number(count) + 1;
-        const recharges = await db('recharges')
-            .whereIn('recharge_number', [1111, rechargeNo])
-            .whereNull('deleted_at');
-        const matchedRecharge =
-            recharges.find(r => r.recharge_number === rechargeNo) ||
-            recharges.find(r => r.recharge_number === 1111);
-        if (matchedRecharge) {
-            const amounts = matchedRecharge.amounts || [];
-            const amountsList = Array.isArray(amounts) ? amounts : (typeof amounts === 'string' ? JSON.parse(amounts || '[]') : []);
-            const matched = amountsList.find(a => Number(a.amount) === Number(paymentRow.amount));
-            if (matched) {
-                const d = matched.discount;
-                const dt = matched.discount_type;
-                if (d == null || d === '' || dt == null || dt === '') {
-                    extra = 0;
-                } else if (String(dt).toLowerCase() === 'amount') {
-                    extra = Number(d) || 0;
-                } else if (String(dt).toLowerCase() === 'percentage') {
-                    extra = (Number(paymentRow.amount) * Number(d)) / 100;
-                } else {
-                    extra = 0;
-                }
-            }
-        }
+        const extra = await getRechargeBonus(user, paymentRow);
 
         logger.info(`bonus amount for ${user?.mobile} ${extra}`);
         logger.info(`payment amount for ${user?.mobile} ${paymentRow?.amount}`);
@@ -299,37 +312,7 @@ async function xpay(req, res) {
         const with_tax_amount = Number(Number(gst) + Number(paymentRow?.amount)).toFixed(2);
         const total_in_word = numberToIndianWords(Number(with_tax_amount).toFixed(2),);
 
-        // user/recharge logic: amounts array ma amount match kari ne discount apply
-        let extra = 0;
-        const [{ count }] = await db('payments')
-            .count('* as count')
-            .where({ user_id: paymentRow.user_id, status: "success" });
-        logger.info('previous recharge count', count);
-        const rechargeNo = Number(count) + 1;
-        const recharges = await db('recharges')
-            .whereIn('recharge_number', [1111, rechargeNo])
-            .whereNull('deleted_at');
-        const matchedRecharge =
-            recharges.find(r => r.recharge_number === rechargeNo) ||
-            recharges.find(r => r.recharge_number === 1111);
-        if (matchedRecharge) {
-            const amounts = matchedRecharge?.amounts[user?.default_currency || 'INR'] || [];
-            const amountsList = Array.isArray(amounts) ? amounts : (typeof amounts === 'string' ? JSON.parse(amounts || '[]') : []);
-            const matched = amountsList.find(a => Number(a.amount) === Number(paymentRow.amount));
-            if (matched) {
-                const d = matched.discount;
-                const dt = matched.discount_type;
-                if (d == null || d === '' || dt == null || dt === '') {
-                    extra = 0;
-                } else if (String(dt).toLowerCase() === 'amount') {
-                    extra = Number(d) || 0;
-                } else if (String(dt).toLowerCase() === 'percentage') {
-                    extra = (Number(paymentRow.amount) * Number(d)) / 100;
-                } else {
-                    extra = 0;
-                }
-            }
-        }
+        const extra = await getRechargeBonus(user, paymentRow);
 
         logger.info(`bonus amount for ${user?.mobile} ${extra}`);
         logger.info(`payment amount for ${user?.mobile} ${paymentRow?.amount}`);
