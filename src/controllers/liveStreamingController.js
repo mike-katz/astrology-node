@@ -568,9 +568,9 @@ async function createMediaOrder(req, res) {
             .where({ user_id: req.userId })
             .whereIn('status', ['continue', 'completed', 'pending']);
 
-        const currencyData = await db('currency').select('currency_name', 'pandit_inr_rate').where({ currency_name: user?.default_currency }).first();
-        const panditRate = convertCurrency(pandit?.final_chat_call_rate, (currencyData?.pandit_inr_rate || 1));
-        const userBalance = convertCurrency(user?.balance, (currencyData?.pandit_inr_rate || 1));
+        const currencyData = await db('currency').select('currency_name', 'user_inr_rate').where({ currency_name: user?.default_currency }).first();
+        const panditRate = convertCurrency(pandit?.final_chat_call_rate, (currencyData?.user_inr_rate || 1));
+        const userBalance = convertCurrency(user?.balance, (currencyData?.user_inr_rate || 1));
 
         let duration = Math.floor(Number(Number(userBalance)) / Number(panditRate));
         let deduction = Number(duration) * Number(pandit?.final_chat_call_rate)
