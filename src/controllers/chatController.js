@@ -618,7 +618,8 @@ async function balanceCut(user_id, order, end_time, place) {
                 pandit_id: panditDetail?.id,
                 pandit_message: `${type} with ${user?.name} for ${diffMinutes} minutes`,
                 pandit_amount: panditAmount,
-                amount: isFreeOrder ? 0 : -deduction
+                amount: isFreeOrder ? 0 : -deduction,
+                currency: lockedOrder?.currency || "INR"
             });
 
             logger.log('balanceCut success', {
