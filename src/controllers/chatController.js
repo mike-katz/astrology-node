@@ -959,9 +959,10 @@ async function newCreateOrder(req, res) {
             .where({ user_id: req.userId })
             .whereIn('status', ['continue', 'completed', 'pending']);
 
-        const currencyData = await db('currency').select('currency_name', 'user_inr_rate').where({ currency_name: user?.default_currency }).first();
-        const panditRate = convertCurrency(pandit?.final_chat_call_rate, (currencyData?.user_inr_rate || 1));
-        const userBalance = convertCurrency(user?.balance, (currencyData?.user_inr_rate || 1));
+        const currencyData = await db('currency').select('currency_name', 'user_inr_rate', 'pandit_inr_rate').where({ currency_name: user?.default_currency }).first();
+        let panditRate = convertCurrency(pandit?.final_chat_call_rate, (currencyData?.pandit_inr_rate || 1));
+        panditRate = Number(panditRate) * Number(currencyData?.user_inr_rate || 1)
+        const userBalance = user?.balance
 
         let duration = Math.floor(Number(Number(userBalance)) / Number(panditRate));
         let deduction = Number(duration) * Number(pandit?.final_chat_call_rate)
@@ -1014,7 +1015,7 @@ async function newCreateOrder(req, res) {
             user_id: req.userId,
             order_id: orderId,
             status: "pending",
-            rate: pandit?.final_chat_call_rate,
+            rate,
             duration,
             deduction,
             type,
@@ -1026,7 +1027,6 @@ async function newCreateOrder(req, res) {
         const upd = { is_free_order: "paid" }
         if (count == 0 || user?.is_free_order_available) {
             ins.is_free = true
-            ins.rate = settings?.free_chat_amount_per_minute
         }
 
         if (count == 0) {
