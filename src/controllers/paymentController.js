@@ -459,11 +459,13 @@ async function getTransactions(req, res) {
             const currencyData = await db('currency').whereIn('currency_name', currencyArr);
             log?.map((item) => {
                 const currency = currencyData.find(i => i.currency_name == (item?.currency || "INR"))
-                const amount = convertCurrency(item.amount, currency?.user_inr_rate)
+                const amount = convertCurrency(item.amount || 0, currency?.user_inr_rate || 1)
+                const gst = convertCurrency(item.gst || 0, currency?.user_inr_rate || 1)
                 const icon = getCurrencySymbolByCurrency(item?.currency || 'INR')
 
                 item.amount = amount
                 item.currency = icon
+                item.gst = gst
             });
         }
         const response = {
