@@ -967,7 +967,8 @@ async function newCreateOrder(req, res) {
         let deduction = Number(duration) * Number(pandit?.final_chat_call_rate)
         let rate = panditRate;
         const settings = await db('settings').first();
-        if (count == 0 || user?.is_free_order_available) {
+        const isFreeOrderAvail = user?.is_free_order_available || false
+        if (count == 0 || isFreeOrderAvail) {
             duration = Number(settings?.free_chat_minutes) || 0;
             deduction = 0;
             rate = settings?.free_chat_amount_per_minute || 1;
