@@ -1044,7 +1044,7 @@ async function newCreateOrder(req, res) {
         // if (count == 0 && type == "chat") {
         //     sendAutoMessage(profile, req.userId, orderId, panditId);
         // }
-        saved.rate = rate;
+        saved.rate = convertCurrency(rate, (currencyData?.user_inr_rate || 1));
         saved.currency = await getCurrencySymbolByCurrency(saved.currency || "INR")
         callEvent("emit_to_user_for_register", {
             key: `user_${req?.userId}`,
