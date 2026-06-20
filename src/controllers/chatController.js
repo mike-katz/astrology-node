@@ -1084,7 +1084,7 @@ async function newCreateOrder(req, res) {
     }
 }
 
-async function sendNotification(token, username, chat_call_rate, panditId, type, is_free = false, order_id, user_id, profile, avatar) {
+async function sendNotification(token, username, chat_call_rate, panditId, type, is_free = false, order_id, user_id, profile, avatar, currency) {
     // console.log("is_available", is_available);
     console.log("order_id, user_id", order_id, user_id);
     try {
