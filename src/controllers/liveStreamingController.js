@@ -608,7 +608,7 @@ async function createMediaOrder(req, res) {
         }
 
         const ins = {
-            pandit_id: panditId,
+            pandit_id,
             user_id: req.userId,
             order_id: orderId,
             status: "pending",
