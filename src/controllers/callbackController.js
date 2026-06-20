@@ -281,7 +281,8 @@ async function razorpay(req, res) {
 }
 
 async function xpay(req, res) {
-    logger.info('xpay callback start', req.body);
+    logger.info('xpay callback start body', req.body);
+    logger.info('xpay callback start query', req.query);
     const { eventType, intentId, status, receiptId } = req.body
     try {
         if (eventType != 'intent.success') {
