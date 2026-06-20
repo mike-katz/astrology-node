@@ -413,6 +413,23 @@ async function getPayment(req, res) {
         const total = parseInt(count);
         const totalPages = Math.ceil(total / limit);
 
+        const currencyArr = ['INR'];
+        if (log?.length > 0) {
+            log?.map(item => currencyArr.push(item?.currency))
+
+            const currencyData = await db('currency').whereIn('currency_name', currencyArr);
+            log?.map((item) => {
+                const currency = currencyData.find(i => i.currency_name == (item?.currency || "INR"))
+                const amount = convertCurrency(item.amount || 0, currency?.user_inr_rate || 1)
+                const gst = convertCurrency(item.gst || 0, currency?.user_inr_rate || 1)
+                const icon = getCurrencySymbolByCurrency(item?.currency || 'INR')
+
+                item.amount = amount
+                item.currency = icon
+                item.gst = gst
+            });
+        }
+
         const response = {
             page,
             limit,
