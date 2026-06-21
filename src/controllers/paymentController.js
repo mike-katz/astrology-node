@@ -100,7 +100,7 @@ function buildRechargeAmounts(amount, currencyRate) {
     return {
         dbAmount,
         dbGst,
-        dbCurrency: 'INR',
+        dbCurrency: currencyRate?.currency_name,
         dbWithTax,
         gatewayAmountMinor,
         gatewayCurrency,
@@ -122,7 +122,6 @@ async function initXpayPayment({ user, userId, amount, currencyRate }) {
     const { dbAmount, dbGst, dbCurrency, gatewayAmountMinor, gatewayCurrency } = buildRechargeAmounts(amount, currencyRate);
     const receiptId = `rcpt_${userId}_${Date.now()}`;
     const contactNumber = `${user.country_code || '+91'}${user.mobile}`;
-
     const { data: intent } = await axios.post(
         `${getXpayBaseUrl()}/payments/create-intent`,
         {
@@ -185,12 +184,12 @@ async function initRazorpayPayment({ user, userId, amount, currencyRate, gateway
         return { error: { status: 500, message: 'Razorpay is not configured.' } };
     }
 
-    const { dbAmount, dbGst, dbCurrency, gatewayAmountMinor } = buildRechargeAmounts(amount, currencyRate);
+    const { dbAmount, dbGst, dbCurrency, gatewayAmountMinor, gatewayCurrency } = buildRechargeAmounts(amount, currencyRate);
     const receipt = `rcpt_${userId}_${Date.now()}`;
     const instance = new Razorpay({ key_id: keyId, key_secret: keySecret });
     const order = await instance.orders.create({
         amount: gatewayAmountMinor,
-        currency: 'INR',
+        currency: gatewayCurrency,
         receipt,
         notes: { user_id: String(userId) },
     });
@@ -224,7 +223,9 @@ async function getFirstRechargeOfferAmount(user) {
 
     const setting = await db('settings').select('currency_amount').first();
     let offer_amount = 0;
-    setting?.currency_amount?.map(item => {
+
+    JSON.parse(setting?.currency_amount)?.map(item => {
+        console.log("item", item);
         if (item?.currency == user?.default_currency || "INR") {
             offer_amount = item?.offer_amount;
         }
