@@ -595,7 +595,7 @@ async function getCurrencyList(req, res) {
         const authHeader = req.headers.authorization;
         const tokenData = decodeJWT(authHeader);
         const result = tokenData?.currency !== 'INR'
-            ? await db('currency').select('*')
+            ? await db('currency').select('*').whereNull('deleted_at')
             : [];
 
         return res.status(200).json({
