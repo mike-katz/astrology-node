@@ -229,7 +229,8 @@ async function getFirstRechargeOfferAmount(user) {
     );
 
     if (currencyItem) {
-        offer_amount = currencyItem.offer_amount;
+        const currency = await db('currency').where({ "currency_name": currencyItem?.currency }).first();
+        offer_amount = Number(currencyItem.offer_amount) * Number(currency?.user_inr_rate);
     }
     return offer_amount || 0;
 }
