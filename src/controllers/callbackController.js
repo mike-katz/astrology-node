@@ -349,7 +349,9 @@ async function xpay(req, res) {
             transaction_id: receiptId,
             status: 'success',
         });
-        await db('users').where({ id: user.id }).increment({ balance: Number(Number(paymentRow?.amount) + Number(extra)), offer_amount: Number(paymentRow?.offer_amount || 0) });
+
+        const amount = paymentRow?.offer_amount > 0 ? paymentRow?.offer_amount : paymentRow?.amount
+        await db('users').where({ id: user.id }).increment({ balance: Number(Number(amount) + Number(extra)), offer_amount: Number(paymentRow?.offer_amount || 0) });
 
         if (extra > 0) {
             await db('balancelogs').insert({
@@ -358,6 +360,19 @@ async function xpay(req, res) {
                 user_id: user.id,
                 message: `Cashback Order(${orderId})`,
                 amount: extra,
+                currency: paymentRow?.currency,
+                gst: 0,
+                invoice: "",
+            });
+        }
+
+        if (paymentRow?.offer_amount > 0) {
+            await db('balancelogs').insert({
+                user_old_balance: Number(newBalance),
+                user_new_balance: Number(newBalance) + Number(extra || 0) + Number(paymentRow?.offer_amount),
+                user_id: user.id,
+                message: `Offer Bonus Order(${orderId})`,
+                amount: paymentRow?.offer_amount,
                 currency: paymentRow?.currency,
                 gst: 0,
                 invoice: "",
