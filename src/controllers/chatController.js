@@ -953,11 +953,15 @@ async function newCreateOrder(req, res) {
             logger.info('order_create fail', { userId: req.userId, message: `Please reject your pending ${type}.` });
             return res.status(400).json({ success: false, message: `Please reject your pending ${type}.` });
         }
+        let count = 1;
+        if (user?.offer_amount > 0) {
+            count = 0;
+        }
 
-        const [{ count }] = await db('orders')
-            .count('* as count')
-            .where({ user_id: req.userId })
-            .whereIn('status', ['continue', 'completed', 'pending']);
+        // const [{ count }] = await db('orders')
+        //     .count('* as count')
+        //     .where({ user_id: req.userId })
+        //     .whereIn('status', ['continue', 'completed', 'pending']);
 
         const currencyData = await db('currency').select('currency_name', 'user_inr_rate', 'pandit_inr_rate').where({ currency_name: user?.default_currency }).first();
         let panditRate = convertCurrency(pandit?.final_chat_call_rate, (currencyData?.pandit_inr_rate || 1));
@@ -1608,6 +1612,9 @@ async function newOrderDetail(req, res) {
         if (orderDetail?.pandit_id != null) {
             pandit = await db('pandits').where({ id: orderDetail?.pandit_id }).first();
         }
+        const user = await db('users').where({ id: Number(req.userId) }).first();
+        const currencyDetail = await db('currency').where({ currency_name: user?.default_currency }).select('pandit_inr_rate').first();
+        const finalAmount = Number(pandit?.final_chat_call_rate) / Number(currencyDetail?.pandit_inr_rate)
         const response = {
             id: orderDetail?.pandit_id, name: pandit?.display_name, status: pandit?.status, profile: pandit?.profile, isOnline: pandit?.chat, is_free: orderDetail?.is_free, pandit_id: orderDetail?.pandit_id,
             discounted_chat_call_rate: pandit?.discounted_chat_call_rate,
@@ -1619,6 +1626,8 @@ async function newOrderDetail(req, res) {
             rating_3: pandit?.rating_3,
             rating_4: pandit?.rating_4,
             rating_5: pandit?.rating_5,
+            pandit_rate: finalAmount,
+            currency: getCurrencySymbolByCurrency(user?.default_currency || "INR")
         }
 
         if (orderDetail) {
