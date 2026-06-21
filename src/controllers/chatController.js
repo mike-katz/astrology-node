@@ -1333,7 +1333,7 @@ async function orderAccept(req, res) {
             duration = Number(settings?.free_chat_minutes) || 0;
             deduction = 0;
         } else {
-            duration = Math.floor(Number(Number(userDetail?.balance)) / Number(order?.final_chat_call_rate));
+            duration = Math.floor(Number(Number(userDetail?.balance)) / Number(order?.rate));
             // console.log("duration", duration);
             if (!Number.isFinite(duration)) {
                 logger.info('order_acceptOrder fail', { userId: req.userId, orderId, message: 'Min. 5 min balance required.' });
@@ -1344,7 +1344,7 @@ async function orderAccept(req, res) {
                 logger.info('order_acceptOrder fail', { userId: req.userId, orderId, message: 'Min. 5 min balance required.' });
                 return res.status(400).json({ success: false, message: 'Min. 5 min balance required.' });
             }
-            deduction = Number(duration) * Number(order?.final_chat_call_rate)
+            deduction = Number(duration) * Number(order?.rate)
             if (isNaN(deduction)) {
                 logger.info('order_acceptOrder fail', { userId: req.userId, orderId, message: 'Balance could not be NaN.' });
                 return res.status(400).json({ success: false, message: 'Balance could not be NaN.' });
