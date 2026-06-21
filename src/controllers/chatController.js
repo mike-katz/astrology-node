@@ -1027,6 +1027,7 @@ async function newCreateOrder(req, res) {
         const upd = { is_free_order: "paid" }
         if (count == 0 || user?.is_free_order_available) {
             ins.is_free = true
+            ins.currency = 'INR'
         }
 
         if (count == 0) {
@@ -1044,7 +1045,7 @@ async function newCreateOrder(req, res) {
         // if (count == 0 && type == "chat") {
         //     sendAutoMessage(profile, req.userId, orderId, panditId);
         // }
-        saved.rate = convertCurrency(rate, (currencyData?.user_inr_rate || 1));
+        saved.rate = ins.is_free ? rate : convertCurrency(rate, (currencyData?.user_inr_rate || 1));
         saved.currency = await getCurrencySymbolByCurrency(saved.currency || "INR")
         callEvent("emit_to_user_for_register", {
             key: `user_${req?.userId}`,
