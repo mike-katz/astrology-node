@@ -465,19 +465,22 @@ async function getRecommendations(req, res) {
 
 async function findIsFree(req, res) {
     try {
-        const existing = await db('users').where({ id: req.userId }).select('is_free_order_available', 'id', 'default_currency').first();
-        const is_free = existing?.is_free_order_available || false;
-        const response = { is_free, is_offer: false, offer_detail: {} }
-        if (is_free) {
-            const setting = await db('settings').select('currency_amount').first();
+        const existing = await db('users').where({ id: req.userId }).select('offer_amount').first();
+        const response = { is_free: false, is_offer: false, offer_detail: {} }
 
-            setting?.currency_amount?.map(item => {
-                if (item?.currency == existing?.default_currency || "INR") {
-                    response.is_offer = true
-                    response.offer_detail = item
-                }
-            })
+        if (existing?.offer_amount == 0) {
+            const order = await db('orders').whereNotIn('status', ['cancel', 'rejected']).select('id').first();
+            if (!order) {
+                const setting = await db('settings').select('currency_amount').first();
+                setting?.currency_amount?.map(item => {
+                    if (item?.currency == existing?.default_currency || "INR") {
+                        response.is_offer = true
+                        response.offer_detail = item
+                    }
+                })
+            }
         }
+        // }
         return res.status(200).json({ success: true, data: response, message: 'Get successfully' });
     }
     catch (err) {
