@@ -621,6 +621,10 @@ async function updateCurrency(req, res) {
             .where('id', Number(req?.userId))
             .first();
         if (!user) return res.status(400).json({ success: false, message: 'Please enter correct user.' });
+
+        if (user?.offer_amount != 0) {
+            return res.status(400).json({ success: false, message: 'Please Complete 1 order.' });
+        }
         const currencyData = await db('currency').where({ currency_name: currency }).whereNull('deleted_at').first();
         if (!currencyData) return res.status(400).json({ success: false, message: 'Please enter correct currency.' });
 
