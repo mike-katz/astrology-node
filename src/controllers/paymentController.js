@@ -223,13 +223,13 @@ async function getFirstRechargeOfferAmount(user) {
 
     const setting = await db('settings').select('currency_amount').first();
     let offer_amount = 0;
+    const currencyItem = JSON.parse(setting?.currency_amount || '[]').find(
+        item => item?.currency === (user?.default_currency || 'INR')
+    );
 
-    JSON.parse(setting?.currency_amount)?.map(item => {
-        console.log("item", item);
-        if (item?.currency == user?.default_currency || "INR") {
-            offer_amount = item?.offer_amount;
-        }
-    });
+    if (currencyItem) {
+        offer_amount = currencyItem.offer_amount;
+    }
     return offer_amount || 0;
 }
 
