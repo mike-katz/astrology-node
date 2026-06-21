@@ -218,7 +218,7 @@ async function initRazorpayPayment({ user, userId, amount, currencyRate, gateway
 }
 
 async function getFirstRechargeOfferAmount(user) {
-    const payment = await db('payments').where({ user_id: user?.id }).first();
+    const payment = await db('orders').where({ user_id: user?.id }).whereNotIn('status', ['cancel', 'rejected']).first();
     if (payment) return 0;
 
     const setting = await db('settings').select('currency_amount').first();
