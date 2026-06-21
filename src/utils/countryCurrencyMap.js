@@ -427,9 +427,36 @@ function getCurrencySymbolByCurrency(currencyCode) {
     return currency.symbol;
 }
 
+const FLAG_COUNTRY = {
+    INR: '🇮🇳',
+    AED: '🇦🇪',
+    USD: '🇺🇸',
+    GBP: '🇬🇧',
+    CAD: '🇨🇦',
+    SAR: '🇸🇦',
+    QAR: '🇶🇦',
+    SGD: '🇸🇬',
+    AUD: '🇦🇺',
+    EUR: '🇪🇺',
+    MYR: '🇲🇾',
+    ZAR: '🇿🇦',
+    FJD: '🇫🇯',
+    MUR: '🇲🇺',
+    PHP: '🇵🇭',
+    BRL: '🇧🇷',
+    MXN: '🇲🇽',
+}
+
+function getCurrencyIconByCurrency(currencyCode) {
+    const currency = FLAG_COUNTRY[currencyCode] || FLAG_COUNTRY.INR;
+    console.log("currency", currency);
+    return currency;
+}
+
 module.exports = {
     CURRENCIES,
     COUNTRY_CURRENCY,
     getCurrencyByCountry,
-    getCurrencySymbolByCurrency
+    getCurrencySymbolByCurrency,
+    getCurrencyIconByCurrency
 };

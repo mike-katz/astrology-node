@@ -7,7 +7,7 @@ require('dotenv').config();
 
 const { deleteKey } = require('../config/redisClient');
 const { uploadImageToAzure, deleteFileFromAzure } = require('../utils/azureUploader');
-const { getCurrencySymbolByCurrency } = require('../utils/countryCurrencyMap');
+const { getCurrencySymbolByCurrency, getCurrencyIconByCurrency } = require('../utils/countryCurrencyMap');
 
 async function makeAvtarString(user, gender) {
     if (!user || !gender) return null;
@@ -597,6 +597,10 @@ async function getCurrencyList(req, res) {
         const result = tokenData?.currency !== 'INR'
             ? await db('currency').select('*').whereNull('deleted_at')
             : [];
+
+        result?.map(item => {
+            item.icon = getCurrencyIconByCurrency(item?.currency_name)
+        })
 
         return res.status(200).json({
             success: true,
