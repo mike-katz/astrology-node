@@ -493,7 +493,7 @@ async function balanceCut(user_id, order, end_time, place) {
             if (!panditDetail) throw new Error('PANDIT_NOT_FOUND');
 
             const diffMinutes = getDuration(lockedOrder.start_time, end_time);
-            isFreeOrder = lockedOrder.is_free === true;
+            isFreeOrder = lockedOrder.is_offer === true;
 
             let deduction = 0;
             let newBalance = Number(user.balance);
@@ -501,8 +501,20 @@ async function balanceCut(user_id, order, end_time, place) {
 
             if (isFreeOrder) {
                 const settings = await trx('settings').first();
-                const freeChatPerMinute = Number(settings?.free_chat_amount_per_minute) || 0;
-                panditAmount = Number(diffMinutes) * freeChatPerMinute;
+                // const freeChatPerMinute = Number(settings?.free_chat_amount_per_minute) || 0;
+                // panditAmount = Number(diffMinutes) * freeChatPerMinute;
+
+                const currencyItem = JSON.parse(settings?.currency_amount || '[]').find(
+                    item => item?.currency === (lockedOrder?.currency || 'INR')
+                );
+
+                const currency = await trx('currency').where({ currency_name: lockedOrder?.currency || 'INR' }).first();
+
+                let amount = Number(currencyItem.amount) * Number(currency?.user_inr_rate)
+
+                deduction = Number(amount);
+                newBalance = Number(user.balance) - deduction;
+                panditAmount = (Number(deduction) * Number(panditDetail?.chat_call_share)) / 100;
             } else {
                 const perMinute = Number(lockedOrder?.rate);
                 deduction = Number(diffMinutes) * Number(perMinute);
@@ -531,8 +543,11 @@ async function balanceCut(user_id, order, end_time, place) {
 
             // 7. User balance cut — only if paid
             const updUser = { is_free_order_available: false }
-            if (!isFreeOrder) {
-                updUser.balance = newBalance
+            // if (!isFreeOrder) {
+            updUser.balance = newBalance
+            // }
+            if (isFreeOrder) {
+                updUser.offer_amount = 0
             }
             await trx('users').where({ id: user_id }).update(updUser);
 
@@ -618,7 +633,7 @@ async function balanceCut(user_id, order, end_time, place) {
                 pandit_id: panditDetail?.id,
                 pandit_message: `${type} with ${user?.name} for ${diffMinutes} minutes`,
                 pandit_amount: panditAmount,
-                amount: isFreeOrder ? 0 : -deduction,
+                amount: -deduction,
                 currency: lockedOrder?.currency || "INR"
             });
 
