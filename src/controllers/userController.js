@@ -189,13 +189,13 @@ async function updateProfile(req, res) {
 async function getBalance(req, res) {
     const user = await db('users')
         .where('id', req?.userId)
-        .select('balance', 'default_currency', 'permanent_currency')
+        .select('balance', 'default_currency', 'permanent_currency', 'offer_amount')
         .first();
     if (!user) return res.status(400).json({ success: false, message: 'Please enter correct user.' });
     const currency = user?.default_currency
     const currencyData = await db('currency').select('currency_name', 'user_inr_rate').where({ currency_name: currency }).first();
 
-    const balance = await convertCurrency(user?.balance, (currencyData?.user_inr_rate || 1));
+    const balance = await convertCurrency((Number(user?.balance) + Number(user?.offer_amount)), (currencyData?.user_inr_rate || 1));
     user.balance = balance;
     const symbol = getCurrencySymbolByCurrency(currency)
     user.currency = symbol;
