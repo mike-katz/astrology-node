@@ -954,8 +954,12 @@ async function newCreateOrder(req, res) {
             return res.status(400).json({ success: false, message: `Please reject your pending ${type}.` });
         }
         let count = 1;
+        console.log("user?.offer_amount", user?.offer_amount);
         if (user?.offer_amount > 0) {
-            count = 0;
+            const isOfferOrder = await db('orders').where({ user_id: req.userId, status: "completed", is_offer: true }).first()
+            if (!isOfferOrder) {
+                count = 0;
+            }
         }
 
         // const [{ count }] = await db('orders')
@@ -973,11 +977,14 @@ async function newCreateOrder(req, res) {
         let rate = panditRate;
         const settings = await db('settings').first();
         const isFreeOrderAvail = user?.is_free_order_available || false
-        if (count == 0 || isFreeOrderAvail) {
-            duration = Number(settings?.free_chat_minutes) || 0;
-            deduction = 0;
-            rate = settings?.free_chat_amount_per_minute || 1;
-        } else {
+        // if (count == 0 || isFreeOrderAvail) {
+        //     duration = Number(settings?.free_chat_minutes) || 0;
+        //     deduction = 0;
+        //     rate = settings?.free_chat_amount_per_minute || 1;
+        // } else {
+        const orderId = `${new Date().getTime().toString()}${Math.floor(100000 + Math.random() * 900000).toString()}`;
+        console.log("count", count);
+        if (count != 0) {
             const minTime = Number(settings?.min_minutes_required_balance) || 5
             if (user?.balance < minTime) {
                 logger.info('order_create fail', { userId: req.userId, message: 'Please recharge your wallet.' });
@@ -991,18 +998,29 @@ async function newCreateOrder(req, res) {
                 logger.info('order_create fail', { userId: req.userId, message: 'Min. 5 min balance required.' });
                 return res.status(400).json({ success: false, message: 'Min. 5 min balance required.' });
             }
-        }
-        // const order = await db('orders').where({ user_id: req.userId, pandit_id: panditId }).first()
-        const orderId = `${new Date().getTime().toString()}${Math.floor(100000 + Math.random() * 900000).toString()}`;
-        // console.log("duration", duration);
-        if (!Number.isFinite(duration)) {
-            logger.info('order_create fail', { userId: req.userId, message: 'Min. 5 min balance required.' });
-            return res.status(400).json({ success: false, message: 'Min. 5 min balance required.' });
-        }
 
-        if (isNaN(deduction)) {
-            logger.info('order_create fail', { userId: req.userId, message: 'Balance could not be NaN.' });
-            return res.status(400).json({ success: false, message: 'Balance could not be NaN.' });
+            // }
+            // const order = await db('orders').where({ user_id: req.userId, pandit_id: panditId }).first()
+            // console.log("duration", duration);
+            if (!Number.isFinite(duration)) {
+                logger.info('order_create fail', { userId: req.userId, message: 'Min. 5 min balance required.' });
+                return res.status(400).json({ success: false, message: 'Min. 5 min balance required.' });
+            }
+
+            if (isNaN(deduction)) {
+                logger.info('order_create fail', { userId: req.userId, message: 'Balance could not be NaN.' });
+                return res.status(400).json({ success: false, message: 'Balance could not be NaN.' });
+            }
+        } else {
+            const currencyItem = JSON.parse(settings?.currency_amount || '[]').find(
+                item => item?.currency === (user?.default_currency || 'INR')
+            );
+
+            if ((user?.balance) < currencyItem?.amount) {
+                logger.info('order_create fail', { userId: req.userId, message: 'Please recharge your wallet.' });
+                return res.status(400).json({ success: false, message: 'Please recharge your wallet.' });
+            }
+            deduction = currencyItem?.amount
         }
         // console.log("last order", order);
         // if (!order) {
@@ -1029,13 +1047,9 @@ async function newCreateOrder(req, res) {
         }
 
         const upd = { is_free_order: "paid" }
-        if (count == 0 || user?.is_free_order_available) {
-            ins.is_free = true
-            ins.currency = 'INR'
-        }
-
         if (count == 0) {
-            upd.is_free_order = "free"
+            ins.is_offer = true
+            // upd.is_free_order = "free"
         }
         await db('users').where({ id: Number(req.userId) }).update(upd);
 
@@ -1049,7 +1063,7 @@ async function newCreateOrder(req, res) {
         // if (count == 0 && type == "chat") {
         //     sendAutoMessage(profile, req.userId, orderId, panditId);
         // }
-        saved.rate = ins.is_free ? rate : convertCurrency(rate, (currencyData?.user_inr_rate || 1));
+        saved.rate = convertCurrency(rate, (currencyData?.user_inr_rate || 1));
         saved.currency = await getCurrencySymbolByCurrency(saved.currency || "INR")
         callEvent("emit_to_user_for_register", {
             key: `user_${req?.userId}`,
