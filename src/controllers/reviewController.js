@@ -186,6 +186,7 @@ async function getReviewDetail(req, res) {
 
         const currency = await db('currency').where({ currency_name: reviews?.currency || "INR" }).first();
         reviews.rate = convertCurrency(reviews.rate, (currency?.user_inr_rate || 1));
+        reviews.deduction = convertCurrency(reviews.deduction, (currency?.user_inr_rate || 1));
         return res.status(200).json({ success: true, data: reviews || {}, message: 'Review get Successfully' });
     } catch (err) {
         console.error(err);
