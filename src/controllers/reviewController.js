@@ -4,6 +4,7 @@ const jwt = require('jsonwebtoken');
 require('dotenv').config();
 const admin = require('../config/firebase');
 const { replaceTemplate } = require('../utils/replaceTemplate');
+const { convertCurrency } = require('../utils/decodeJWT');
 
 async function sendBulkPush(tokens, title, body, data = {}) {
     // Normalize: allow single token string or array, filter invalid
@@ -177,12 +178,14 @@ async function getReviewDetail(req, res) {
                 'o.start_time',
                 'o.end_time',
                 'o.duration',
-                'o.deduction'
+                'o.deduction',
+                'o.currency'
             )
             .orderBy('r.id', 'desc')
             .first()
 
-
+        const currency = await db('currency').where({ currency_name: reviews?.currency || "INR" }).first();
+        reviews.rate = convertCurrency(reviews.rate, (currency?.pandit_inr_rate || 1));
         return res.status(200).json({ success: true, data: reviews || {}, message: 'Review get Successfully' });
     } catch (err) {
         console.error(err);
