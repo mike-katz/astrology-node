@@ -500,19 +500,7 @@ async function balanceCut(user_id, order, end_time, place) {
             let panditAmount = 0;
 
             if (isFreeOrder) {
-                const settings = await trx('settings').first();
-                // const freeChatPerMinute = Number(settings?.free_chat_amount_per_minute) || 0;
-                // panditAmount = Number(diffMinutes) * freeChatPerMinute;
-
-                const currencyItem = JSON.parse(settings?.currency_amount || '[]').find(
-                    item => item?.currency === (lockedOrder?.currency || 'INR')
-                );
-
-                const currency = await trx('currency').where({ currency_name: lockedOrder?.currency || 'INR' }).first();
-
-                let amount = Number(currencyItem.amount) * Number(currency?.user_inr_rate)
-
-                deduction = Number(amount);
+                deduction = Number(user?.offer_amount);
                 newBalance = Number(user.balance) - deduction;
                 panditAmount = (Number(deduction) * Number(panditDetail?.chat_call_share)) / 100;
             } else {
