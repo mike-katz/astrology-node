@@ -1628,7 +1628,7 @@ async function newOrderDetail(req, res) {
         }
         const user = await db('users').where({ id: Number(req.userId) }).first();
         const currencyDetail = await db('currency').where({ currency_name: user?.default_currency }).select('pandit_inr_rate').first();
-        const finalAmount = Number(pandit?.final_chat_call_rate) / Number(currencyDetail?.pandit_inr_rate)
+        const finalAmount = Number(Number(pandit?.final_chat_call_rate) / Number(currencyDetail?.pandit_inr_rate).toFixed(2))
         const response = {
             id: orderDetail?.pandit_id, name: pandit?.display_name, status: pandit?.status, profile: pandit?.profile, isOnline: pandit?.chat, is_free: orderDetail?.is_free, pandit_id: orderDetail?.pandit_id,
             discounted_chat_call_rate: pandit?.discounted_chat_call_rate,
