@@ -132,9 +132,7 @@ async function getPandits(req, res) {
             });
         }
         console.log("isFree", isFree);
-        if (isFree) {
-            filter['p.unlimited_free_calls_chats'] = true
-        }
+
         // console.log("sort_by", sorting);
         let query = db('pandits as p')
             //.distinctOn('p.id')
