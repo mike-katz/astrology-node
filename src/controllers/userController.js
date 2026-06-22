@@ -258,6 +258,7 @@ async function deleteMyAccount(req, res) {
 }
 
 async function getRecharge(req, res) {
+    console.log("getRecharge api called");
     try {
         const [{ count }] = await db('payments')
             .count('* as count')
