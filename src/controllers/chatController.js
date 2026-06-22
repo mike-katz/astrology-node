@@ -1082,10 +1082,7 @@ async function newCreateOrder(req, res) {
         const token = pandit?.token || false;
         if (token) {
             const waiting_time = pandit?.waiting_time == null ? true : false
-            const finalRate = ins.is_free ? rate : panditRate;
-            const currency = ins.is_free ? 'INR' : user?.default_currency;
-            const finalAmount = Number(finalRate) / Number(currencyData?.user_inr_rate || 1)
-            await sendNotification(token, user?.name, finalAmount, panditId, type, waiting_time, orderId, user?.id, user?.profile, user?.avatar, currency)
+            await sendNotification(token, user?.name, rate, panditId, type, waiting_time, orderId, user?.id, user?.profile, user?.avatar, 'INR')
         }
         // socket.emit("emit_to_user_for_register", {
         //     key: `user_${req?.userId}`,
