@@ -35,6 +35,9 @@ function numberToIndianWords(amount) {
 
 async function getRechargeBonus(user, paymentRow) {
     let extra = 0;
+    if (paymentRow?.offer_amount > 0) {
+        return extra
+    }
     const [{ count }] = await db('payments')
         .count('* as count')
         .where({ user_id: paymentRow.user_id })
