@@ -944,7 +944,11 @@ async function sendGift(req, res) {
         }
         const pandit = await db('pandits').where({ id: pandit_id }).first();
         const user = await db('users').where({ id: req.userId }).first();
+        if (user?.offer_amount > 0) {
+            return res.status(400).json({ success: false, message: 'please complete order first.' });
+        }
         const order = await db('orders').where({ user_id: req.userId, status: "continue" }).first();
+
         if (order) {
             logger.info('order_sendGift fail', { userId: req.userId, message: 'please finish your continue order.' });
             return res.status(400).json({ success: false, message: 'please finish your continue order.' });
