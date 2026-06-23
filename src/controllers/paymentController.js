@@ -154,7 +154,7 @@ async function initXpayPayment({ user, userId, amount, currencyRate }) {
         }
     );
 
-    const offer_amount = await getFirstRechargeOfferAmount(user, amount);
+    const offer_amount = await getFirstRechargeOfferAmount(user, dbAmount);
     await db('payments').insert({
         user_id: userId,
         order_id: intent.xIntentId,
