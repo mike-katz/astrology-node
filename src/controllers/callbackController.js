@@ -375,7 +375,7 @@ async function xpay(req, res) {
                 user_new_balance: Number(newBalance) + Number(extra || 0) + Number(paymentRow?.offer_amount),
                 user_id: user.id,
                 message: `Offer Bonus Order(${receiptId})`,
-                amount: Number(paymentRow?.offer_amount) - Number(paymentRow?.offer_amount),
+                amount: Number(paymentRow?.offer_amount) - Number(paymentRow?.amount),
                 currency: paymentRow?.currency,
                 gst: 0,
                 invoice: "",
