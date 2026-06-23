@@ -234,7 +234,7 @@ async function getFirstRechargeOfferAmount(user, userAmount) {
     if (currencyItem) {
         const currency = await db('currency').where({ "currency_name": currencyItem?.currency }).first();
         const amount = Number(userAmount) / Number(currency?.user_inr_rate);
-        if (Number(amount) == Number(currencyItem.offer_amount)) {
+        if (Number(amount) == Number(currencyItem.amount)) {
             offer_amount = Number(currencyItem.offer_amount) * Number(currency?.user_inr_rate);
         }
     }
