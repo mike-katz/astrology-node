@@ -154,7 +154,7 @@ async function initXpayPayment({ user, userId, amount, currencyRate }) {
         }
     );
 
-    const offer_amount = await getFirstRechargeOfferAmount(user);
+    const offer_amount = await getFirstRechargeOfferAmount(user, amount);
     await db('payments').insert({
         user_id: userId,
         order_id: intent.xIntentId,
@@ -217,9 +217,12 @@ async function initRazorpayPayment({ user, userId, amount, currencyRate, gateway
     };
 }
 
-async function getFirstRechargeOfferAmount(user) {
+async function getFirstRechargeOfferAmount(user, userAmount) {
     if (user?.offer_amount != 0) return 0;
-    const payment = await db('orders').where({ user_id: user?.id }).whereNotIn('status', ['cancel', 'rejected']).first();
+    const order = await db('orders').where({ user_id: user?.id }).whereNotIn('status', ['cancel', 'rejected']).first();
+    if (order) return 0;
+
+    const payment = await db('payments').where({ user_id: user?.id }).where({ 'status': "success" }).first();
     if (payment) return 0;
 
     const setting = await db('settings').select('currency_amount').first();
@@ -230,7 +233,10 @@ async function getFirstRechargeOfferAmount(user) {
 
     if (currencyItem) {
         const currency = await db('currency').where({ "currency_name": currencyItem?.currency }).first();
-        offer_amount = Number(currencyItem.offer_amount) * Number(currency?.user_inr_rate);
+        const amount = Number(userAmount) / Number(currency?.user_inr_rate);
+        if (Number(amount) == Number(currencyItem.offer_amount)) {
+            offer_amount = Number(currencyItem.offer_amount) * Number(currency?.user_inr_rate);
+        }
     }
     return offer_amount || 0;
 }
