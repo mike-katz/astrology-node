@@ -449,7 +449,7 @@ const FLAG_COUNTRY = {
 
 function getCurrencyIconByCurrency(currencyCode) {
     const currency = FLAG_COUNTRY[currencyCode] || FLAG_COUNTRY.INR;
-    console.log("currency", currency);
+    // console.log("currency", currency);
     return currency;
 }
 
