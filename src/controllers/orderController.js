@@ -986,7 +986,7 @@ async function sendGift(req, res) {
 
             callEvent("emit_to_live_gift_send", {
                 key: `pandit_${pandit_id}`,
-                payload: { name, user_id: req.userId, username: user?.name, avatar: user?.avatar, profile: user?.profile, balance, qty, is_live, currency: symbol },
+                payload: { name, user_id: req.userId, username: user?.name, avatar: user?.avatar, profile: user?.profile, amount: balance, qty, is_live, currency: symbol },
             });
 
             const channel = await db('live_streams').select('channel_id').where({ pandit_id: Number(pandit.id), status: "live" }).first();
