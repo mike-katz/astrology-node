@@ -978,9 +978,13 @@ async function sendGift(req, res) {
         logger.info('order_sendGift success', { userId: req.userId, pandit_id, amount: final });
 
         if (is_live) {
+            const currencyData = await db('currency').where({ currency_name: user?.default_currency })
+            const balance = await convertCurrency(amount, (currencyData?.user_inr_rate || 1));
+            const symbol = getCurrencySymbolByCurrency(currency)
+
             callEvent("emit_to_live_gift_send", {
                 key: `pandit_${pandit_id}`,
-                payload: { name, user_id: req.userId, username: user?.name, avatar: user?.avatar, profile: user?.profile, amount, qty, is_live },
+                payload: { name, user_id: req.userId, username: user?.name, avatar: user?.avatar, profile: user?.profile, balance, qty, is_live, currency: symbol },
             });
 
             const channel = await db('live_streams').select('channel_id').where({ pandit_id: Number(pandit.id), status: "live" }).first();
@@ -989,7 +993,8 @@ async function sendGift(req, res) {
                 profile: user?.profile,
                 avatar: user?.avatar,
                 gift_name: name,
-                amount,
+                amount: balance,
+                currency: symbol,
                 channel_id: channel?.channel_id
             }
             if (channel?.channel_id) {
