@@ -471,7 +471,8 @@ async function findIsFree(req, res) {
 
         if (existing?.offer_amount == 0) {
             const order = await db('orders').where({ user_id: Number(req.userId) }).whereNotIn('status', ['cancel', 'rejected']).select('id').first();
-            if (!order) {
+            const payment = await db('payments').where({ user_id: Number(req.userId) }).whereNotIn('status', ['failed']).select('id').first();
+            if (!order || !payment) {
                 const setting = await db('settings').select('currency_amount').first();
                 const currencyItem = JSON.parse(setting?.currency_amount || '[]').find(
                     item => item?.currency === (existing?.default_currency || 'INR')
