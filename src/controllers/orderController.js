@@ -986,7 +986,7 @@ async function sendGift(req, res) {
 
             callEvent("emit_to_live_gift_send", {
                 key: `pandit_${pandit_id}`,
-                payload: { name, user_id: req.userId, username: user?.name, avatar: user?.avatar, profile: user?.profile, amount: balance, qty, is_live, currency: symbol },
+                payload: { name, user_id: req.userId, username: user?.name, avatar: user?.avatar, profile: user?.profile, amount, qty, is_live },
             });
 
             const channel = await db('live_streams').select('channel_id').where({ pandit_id: Number(pandit.id), status: "live" }).first();
@@ -995,13 +995,13 @@ async function sendGift(req, res) {
                 profile: user?.profile,
                 avatar: user?.avatar,
                 gift_name: name,
-                amount: balance,
-                currency: symbol,
+                amount,
+                currency: 'INR',
                 channel_id: channel?.channel_id
             }
+
             if (channel?.channel_id) {
                 const joined_user_ids = await readJoinedUserIds(channel?.channel_id);
-
                 const base = payload;
                 for (const user_id of joined_user_ids) {
                     const uid = user_id != null && Number.isFinite(Number(user_id)) ? Number(user_id) : null;
@@ -1009,6 +1009,9 @@ async function sendGift(req, res) {
                         callEvent('emit_to_user_send_gift', { key: `user_${uid}`, payload: base });
                     }
                 }
+                payload.amount = balance
+                payload.currency = symbol
+                callEvent('emit_to_user_send_gift', { key: `user_${req.userId}`, payload });
             }
         }
         return res.status(200).json({ success: true, message: 'Order cancel Successfully' });
