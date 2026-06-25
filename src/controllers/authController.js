@@ -324,9 +324,12 @@ async function verifyOtp(req, res) {
         const ip = getClientIp(req);
         let currency;
         if (ip) {
+            console.log("ip", ip);
             const geo = geoip.lookup(ip);
             const country = geo ? geo.country : 'IN';
+            console.log("country", country);
             currency = getCurrencyByCountry(country);
+            console.log("currency", currency);
             currency = currency?.currency
         }
         currency = existing?.default_currency || 'INR';
