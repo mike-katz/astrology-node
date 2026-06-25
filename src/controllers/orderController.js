@@ -1007,7 +1007,7 @@ async function sendGift(req, res) {
                 const base = payload;
                 for (const user_id of joined_user_ids) {
                     const uid = user_id != null && Number.isFinite(Number(user_id)) ? Number(user_id) : null;
-                    if (uid != null) {
+                    if (uid != null || Number(uid) != Number(req.userId)) {
                         callEvent('emit_to_user_send_gift', { key: `user_${uid}`, payload: base });
                     }
                 }
