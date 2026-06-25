@@ -982,7 +982,7 @@ async function sendGift(req, res) {
         if (is_live) {
             const currencyData = await db('currency').where({ currency_name: user?.default_currency })
             const balance = await convertCurrency(amount, (currencyData?.user_inr_rate || 1));
-            const symbol = getCurrencySymbolByCurrency(currency)
+            const symbol = getCurrencySymbolByCurrency(user?.default_currency)
 
             callEvent("emit_to_live_gift_send", {
                 key: `pandit_${pandit_id}`,
