@@ -320,21 +320,18 @@ async function verifyOtp(req, res) {
                 }
             }
         }
-
-        const ip = await getClientIp(req);
-        let currency;
-        if (ip) {
-            console.log("ip", ip);
-            const geo = await geoip.lookup(ip);
-            const country = geo ? geo.country : 'IN';
-            console.log("country", country);
-            currency = await getCurrencyByCountry(country);
-            console.log("currency", currency);
-            currency = currency?.currency
-        }
-        currency = existing?.default_currency || 'INR';
-
+        let currency = existing?.default_currency || 'INR';
         if (!existing) {
+            const ip = await getClientIp(req);
+            if (ip) {
+                console.log("ip", ip);
+                const geo = await geoip.lookup(ip);
+                const country = geo ? geo.country : 'IN';
+                console.log("country", country);
+                currency = await getCurrencyByCountry(country);
+                console.log("currency", currency);
+                currency = currency?.currency
+            }
             [existing] = await db('users').insert({ mobile, country_code, status: "active", balance: 0, ad_set_id: set_id, utm_source, ad_id, mode, version, is_free_order_available: true, default_currency: currency, permanent_currency: currency }).returning(['id', 'mobile', 'avatar', 'country_code', 'otp', 'is_free_order_available', 'permanent_currency', 'default_currency']);
         }
         if (Object.keys(upd).length > 0) {
