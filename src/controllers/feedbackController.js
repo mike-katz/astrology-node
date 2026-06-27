@@ -38,7 +38,7 @@ async function createFeedback(req, res) {
             device_id: device_id || null,
         }).returning(['id', 'mobile', 'email', 'name', 'subject', 'content', 'device_id', 'created_at']);
 
-        return res.status(201).json({
+        return res.status(200).json({
             success: true,
             data: feedback,
             message: 'Feedback submitted successfully.',
