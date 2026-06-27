@@ -197,7 +197,7 @@ async function login(req, res) {
 
         const devices = await db('users').where({ device_id }).whereNot('mobile', mobile).first();
         if (devices) {
-            return res.status(400).json({ success: false, message: 'Your account is already registered.' });
+            return res.status(400).json({ success: false, message: 'This device is already linked to another account. Please sign in using the existing account or contact support if you need assistance.' });
         }
         const user = await db('users').where({ country_code, mobile }).first();
         if (user && user?.status == 'block') {
