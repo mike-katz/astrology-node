@@ -195,7 +195,7 @@ async function login(req, res) {
         const isValid = isValidMobile(mobile);
         if (!isValid) return res.status(400).json({ success: false, message: 'Enter valid mobile number.' });
 
-        const devices = await db('users').where({ device_id }).first();
+        const devices = await db('users').where({ device_id }).whereNot('mobile', mobile).first();
         if (devices) {
             return res.status(400).json({ success: false, message: 'Your account is already registered.' });
         }
