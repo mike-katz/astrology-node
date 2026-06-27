@@ -12,12 +12,6 @@ async function createFeedback(req, res) {
         if (!mobile && !email) {
             return res.status(400).json({ success: false, message: 'Mobile or email is required.' });
         }
-        if (mobile && !isValidMobile(mobile)) {
-            return res.status(400).json({ success: false, message: 'Enter valid mobile number.' });
-        }
-        if (email && !isValidEmail(email)) {
-            return res.status(400).json({ success: false, message: 'Enter valid email address.' });
-        }
         if (!name || !String(name).trim()) {
             return res.status(400).json({ success: false, message: 'Name is required.' });
         }
