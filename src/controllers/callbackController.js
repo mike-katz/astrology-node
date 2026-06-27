@@ -294,6 +294,18 @@ async function xpay(req, res) {
             return res.status(200).json({ success: true, message: 'payment.intent acknowledged' });
         }
 
+        if (status == 'FAILED') {
+            const paymentRow = await db('payments')
+                .where({ order_id: intentId })
+                .whereIn('status', ['pending', 'failed'])
+                .first();
+            if (!paymentRow) {
+                return res.status(200).json({ success: true, message: 'No pending payment or already processed' });
+            }
+            await db('payments').where({ id: paymentRow.id }).update({ status: 'failed' });
+            return res.status(200).json({ success: true, message: 'payment.intent acknowledged' });
+        }
+
         if (status != 'SUCCESS') {
             return res.status(200).json({ success: true, message: 'payment.intent acknowledged' });
         }
