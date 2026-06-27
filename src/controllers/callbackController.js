@@ -290,10 +290,6 @@ async function xpay(req, res) {
     logger.info('xpay callback start query', req.query);
     const { eventType, intentId, status, receiptId } = req.body
     try {
-        if (eventType != 'intent.success') {
-            return res.status(200).json({ success: true, message: 'payment.intent acknowledged' });
-        }
-
         if (status == 'FAILED') {
             const paymentRow = await db('payments')
                 .where({ order_id: intentId })
@@ -303,6 +299,10 @@ async function xpay(req, res) {
                 return res.status(200).json({ success: true, message: 'No pending payment or already processed' });
             }
             await db('payments').where({ id: paymentRow.id }).update({ status: 'failed' });
+            return res.status(200).json({ success: true, message: 'payment.intent acknowledged' });
+        }
+
+        if (eventType != 'intent.success') {
             return res.status(200).json({ success: true, message: 'payment.intent acknowledged' });
         }
 
