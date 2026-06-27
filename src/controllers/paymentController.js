@@ -112,11 +112,13 @@ async function initXpayPayment({ user, userId, amount, currencyRate, from }) {
     const publicKey = process.env.XPAY_PUBLIC_KEY;
     const secretKey = process.env.XPAY_SECRET_KEY;
     let callbackUrl = process.env.XPAY_CALLBACK_URL;
+    let cancelUrl = process.env.XPAY_CANCEL_URL;
     if (!publicKey || !secretKey) {
         return { error: { status: 500, message: 'xPay is not configured.' } };
     }
     if (from == 'web') {
         callbackUrl = process.env.XPAY_WEB_CALLBACK_URL;
+        cancelUrl = process.env.XPAY_WEB_CANCEL_URL;
     }
     if (!callbackUrl) {
         return { error: { status: 500, message: 'xPay callback URL is not configured.' } };
@@ -132,7 +134,7 @@ async function initXpayPayment({ user, userId, amount, currencyRate, from }) {
             currency: gatewayCurrency,
             receiptId,
             callbackUrl,
-            cancelUrl: process.env.XPAY_CANCEL_URL || callbackUrl,
+            cancelUrl: cancelUrl || callbackUrl,
             customerDetails: {
                 name: user.name || 'Customer',
                 email: user.email || `user${user.id}@astroguruji.com`,
