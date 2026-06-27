@@ -195,16 +195,18 @@ async function login(req, res) {
         const isValid = isValidMobile(mobile);
         if (!isValid) return res.status(400).json({ success: false, message: 'Enter valid mobile number.' });
 
-        const devices = await db('users').where({ device_id }).whereNot('mobile', mobile).first();
-        if (devices) {
-            return res.status(400).json({ success: false, message: 'This device is already linked to another account. Please sign in using the existing account or contact support if you need assistance.' });
-        }
         const user = await db('users').where({ country_code, mobile }).first();
         if (user && user?.status == 'block') {
             return res.status(400).json({ success: false, message: 'Your account is blocked.' });
         }
         if (user && user?.status == 'inactive') {
             return res.status(400).json({ success: false, message: 'Oops! Your account is inactive right now. Please contact support.' });
+        }
+        if (!user) {
+            const devices = await db('users').where({ device_id }).first();
+            if (devices) {
+                return res.status(400).json({ success: false, message: 'This device is already linked to another account. Please sign in using the existing account or contact support if you need assistance.' });
+            }
         }
         let newMobile = mobile
         console.log("mobile.length", mobile.length);
@@ -304,9 +306,6 @@ async function verifyOtp(req, res) {
         }
         if (mode) {
             upd.mode = mode
-        }
-        if (device_id) {
-            upd.device_id = device_id
         }
         let set_id = ad_set_id ?? referrer ?? null;
 
@@ -486,11 +485,6 @@ async function googleLogin(req, res) {
         // const picture = tokenPayload.picture || null;
         let { ad_set_id, utm_source, ad_id, type, version, referrer, email, device_id } = req.query;
 
-        const devices = await db('users').where({ device_id }).first();
-        if (devices) {
-            if (devices?.email != email) { return res.status(400).json({ success: false, message: 'This device is already linked to another account. Please sign in using the existing account or contact support if you need assistance.' }); }
-        }
-
         let existing = await db('users').whereNull('deleted_at').where({ email }).first();
 
         if (existing?.status === 'block') {
@@ -535,6 +529,8 @@ async function googleLogin(req, res) {
         currency = existing?.default_currency || 'INR';
 
         if (!existing) {
+            const devices = await db('users').where({ device_id }).first();
+            if (devices) return res.status(400).json({ success: false, message: 'This device is already linked to another account. Please sign in using the existing account or contact support if you need assistance.' });
             const insertRow = {
                 // google_id: sub,
                 email,
@@ -707,6 +703,8 @@ async function appleLogin(req, res) {
         currency = existing?.default_currency || 'INR';
 
         if (!existing) {
+            const devices = await db('users').where({ device_id }).first();
+            if (devices) return res.status(400).json({ success: false, message: 'This device is already linked to another account. Please sign in using the existing account or contact support if you need assistance.' });
             const insertRow = {
                 // google_id: sub,
                 email: userToken,
