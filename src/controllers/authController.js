@@ -189,11 +189,16 @@ async function login(req, res) {
     try {
         console.log("login body param", req.body);
         logger.info('login called')
-        const { mobile, country_code = '+91' } = req.body;
+        const { mobile, country_code = '+91', device_id } = req.body;
 
         if (!mobile || !country_code) return res.status(400).json({ success: false, message: 'Mobile number required.' });
         const isValid = isValidMobile(mobile);
         if (!isValid) return res.status(400).json({ success: false, message: 'Enter valid mobile number.' });
+
+        const devices = await db('users').where({ device_id }).first();
+        if (devices) {
+            return res.status(400).json({ success: false, message: 'Your account is already registered.' });
+        }
         const user = await db('users').where({ country_code, mobile }).first();
         if (user && user?.status == 'block') {
             return res.status(400).json({ success: false, message: 'Your account is blocked.' });
