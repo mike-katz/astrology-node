@@ -293,12 +293,22 @@ async function xpay(req, res) {
         if (status == 'FAILED') {
             const paymentRow = await db('payments')
                 .where({ order_id: intentId })
-                .whereIn('status', ['pending', 'failed'])
+                .whereIn('status', ['pending', 'canceled'])
                 .first();
             if (!paymentRow) {
                 return res.status(200).json({ success: true, message: 'No pending payment or already processed' });
             }
             await db('payments').where({ id: paymentRow.id }).update({ status: 'failed' });
+            return res.status(200).json({ success: true, message: 'payment.intent acknowledged' });
+        }
+        if (status == 'CANCEL') {
+            const paymentRow = await db('payments')
+                .where({ order_id: intentId, status: 'pending' })
+                .first();
+            if (!paymentRow) {
+                return res.status(200).json({ success: true, message: 'No pending payment or already processed' });
+            }
+            await db('payments').where({ id: paymentRow.id }).update({ status: 'canceled' });
             return res.status(200).json({ success: true, message: 'payment.intent acknowledged' });
         }
 
@@ -312,7 +322,7 @@ async function xpay(req, res) {
 
         const paymentRow = await db('payments')
             .where({ order_id: intentId })
-            .whereIn('status', status === 'failed' ? ['pending'] : ['pending', 'failed'])
+            .whereIn('status', ['pending', 'failed', 'canceled'])
             .first();
         if (!paymentRow) {
             return res.status(200).json({ success: true, message: 'No pending payment or already processed' });
