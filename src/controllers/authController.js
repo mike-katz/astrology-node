@@ -248,7 +248,7 @@ function isNumber(str) {
 async function verifyOtp(req, res) {
     try {
         console.log("verifyOtp req.body", req.body);
-        let { mobile, country_code = '+91', otp, ad_set_id, utm_source, ad_id, type, version, referrer } = req.body;
+        let { mobile, country_code = '+91', otp, ad_set_id, utm_source, ad_id, type, version, referrer, device_id } = req.body;
         if (!mobile || !otp || !country_code) return res.status(400).json({ success: false, message: 'Mobile number and otp required.' });
 
         const isValid = isValidMobile(mobile);
@@ -305,6 +305,9 @@ async function verifyOtp(req, res) {
         if (mode) {
             upd.mode = mode
         }
+        if (device_id) {
+            upd.device_id = device_id
+        }
         let set_id = ad_set_id ?? referrer ?? null;
 
         if (set_id != null) {
@@ -337,7 +340,7 @@ async function verifyOtp(req, res) {
                 console.log("currency", currency);
                 currency = currency?.currency
             }
-            [existing] = await db('users').insert({ mobile, country_code, status: "active", balance: 0, ad_set_id: set_id, utm_source, ad_id, mode, version, is_free_order_available: true, default_currency: currency, permanent_currency: currency }).returning(['id', 'mobile', 'avatar', 'country_code', 'otp', 'is_free_order_available', 'permanent_currency', 'default_currency']);
+            [existing] = await db('users').insert({ mobile, country_code, status: "active", balance: 0, ad_set_id: set_id, utm_source, ad_id, mode, version, is_free_order_available: true, default_currency: currency, permanent_currency: currency, device_id }).returning(['id', 'mobile', 'avatar', 'country_code', 'otp', 'is_free_order_available', 'permanent_currency', 'default_currency']);
         }
         if (Object.keys(upd).length > 0) {
             await db('users').where({ id: Number(existing?.id) }).update(upd)
