@@ -484,7 +484,13 @@ async function googleLogin(req, res) {
         // const email = tokenPayload.email || null;
         // const name = tokenPayload.name || (email ? email.split('@')[0] : null) || 'User';
         // const picture = tokenPayload.picture || null;
-        let { ad_set_id, utm_source, ad_id, type, version, referrer, email } = req.query;
+        let { ad_set_id, utm_source, ad_id, type, version, referrer, email, device_id } = req.query;
+
+        const devices = await db('users').where({ device_id }).whereNot('email', email).first();
+        if (devices) {
+            return res.status(400).json({ success: false, message: 'This device is already linked to another account. Please sign in using the existing account or contact support if you need assistance.' });
+        }
+
         let existing = await db('users').whereNull('deleted_at').where({ email }).first();
 
         if (existing?.status === 'block') {
@@ -651,7 +657,11 @@ async function verifyAppleIdentityToken(identityToken, audiences) {
  */
 async function appleLogin(req, res) {
     try {
-        const { ad_set_id, utm_source, ad_id, type, version, referrer, token: userToken } = req.query;
+        const { ad_set_id, utm_source, ad_id, type, version, referrer, token: userToken, device_id } = req.query;
+        const devices = await db('users').where({ device_id }).whereNot('email', userToken).first();
+        if (devices) {
+            return res.status(400).json({ success: false, message: 'This device is already linked to another account. Please sign in using the existing account or contact support if you need assistance.' });
+        }
         let existing = await db('users').whereNull('deleted_at').where({ email: userToken }).first();
 
         if (existing?.status === 'block') {
