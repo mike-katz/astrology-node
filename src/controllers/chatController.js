@@ -493,7 +493,7 @@ async function balanceCut(user_id, order, end_time, place) {
             if (!panditDetail) throw new Error('PANDIT_NOT_FOUND');
 
             const diffMinutes = getDuration(lockedOrder.start_time, end_time);
-            isFreeOrder = lockedOrder.is_offer === true;
+            isFreeOrder = order.is_offer === true;
 
             let deduction = 0;
             let newBalance = Number(user.balance);
