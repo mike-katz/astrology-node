@@ -819,6 +819,7 @@ function getDuration(start_time, end_time) {
 async function stopLive(req, res) {
     const { channel_id } = req.body
     try {
+        return res.status(200).json({ success: false, message: 'Live ended.' });
         const active = await db('live_streams').where({ channel_id, status: 'live' }).first();
         if (!active) {
             return res.status(200).json({ success: false, message: 'No active live to stop.' });
