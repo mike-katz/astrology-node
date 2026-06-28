@@ -494,7 +494,8 @@ async function balanceCut(user_id, order, end_time, place) {
 
             const diffMinutes = getDuration(lockedOrder.start_time, end_time);
             isFreeOrder = order.is_offer === true;
-
+            console.log("order.is_offer", order.is_offer);
+            console.log("lockedOrder.is_offer", lockedOrder.is_offer);
             let deduction = 0;
             let newBalance = Number(user.balance);
             let panditAmount = 0;
