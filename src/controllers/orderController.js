@@ -554,6 +554,16 @@ const ORDER_LIST_STATUS_RANK_SQL = `
 
 const ORDER_LIST_MAX_LIMIT = 100;
 
+function formatOrderAmounts(order, userInrRate, currencySymbol) {
+    const rate = userInrRate || 1;
+    return {
+        ...order,
+        rate: order?.rate != null ? convertCurrency(order.rate, rate) : order.rate,
+        deduction: order?.deduction != null ? convertCurrency(order.deduction, rate) : order.deduction,
+        currency: currencySymbol,
+    };
+}
+
 /**
  * Order list: one row per pandit, last chat per order.
  * Perf: subquery DISTINCT ON first (no full chats denormalized join on every order row);
@@ -611,7 +621,17 @@ async function list(req, res) {
             .whereNot('o.status', 'cancel')
             .countDistinct('o.pandit_id as count');
 
-        let [order, countRows] = await Promise.all([listPromise, countPromise]);
+        const userPromise = db('users').where({ id: req.userId }).select('default_currency').first();
+
+        let [order, countRows, userDetail] = await Promise.all([listPromise, countPromise, userPromise]);
+
+        const userCurrency = userDetail?.default_currency || 'INR';
+        const currencyData = await db('currency')
+            .where({ currency_name: userCurrency })
+            .select('user_inr_rate')
+            .first();
+        const userInrRate = currencyData?.user_inr_rate || 1;
+        const currencySymbol = getCurrencySymbolByCurrency(userCurrency);
 
         if (!skipLastMessage && order.length > 0) {
             const lastMessages = await Promise.all(
@@ -638,10 +658,12 @@ async function list(req, res) {
                 })
             );
 
-            order = order.map((item, idx) => ({
+            order = order.map((item, idx) => formatOrderAmounts({
                 ...item,
                 last_message: lastMessages[idx] || null,
-            }));
+            }, userInrRate, currencySymbol));
+        } else {
+            order = order.map((item) => formatOrderAmounts(item, userInrRate, currencySymbol));
         }
 
         const count = countRows[0]?.count ?? 0;
