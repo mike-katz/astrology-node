@@ -203,9 +203,11 @@ async function login(req, res) {
             return res.status(400).json({ success: false, message: 'Oops! Your account is inactive right now. Please contact support.' });
         }
         if (!user) {
-            const devices = await db('users').where({ device_id }).first();
-            if (devices) {
-                return res.status(400).json({ success: false, message: 'This device is already linked to another account. Please sign in using the existing account or contact support if you need assistance.' });
+            if (device_id) {
+                const devices = await db('users').where({ device_id }).first();
+                if (devices) {
+                    return res.status(400).json({ success: false, message: 'This device is already linked to another account. Please sign in using the existing account or contact support if you need assistance.' });
+                }
             }
         }
         let newMobile = mobile
@@ -529,8 +531,10 @@ async function googleLogin(req, res) {
         currency = existing?.default_currency || 'INR';
 
         if (!existing) {
-            const devices = await db('users').where({ device_id }).first();
-            if (devices) return res.status(400).json({ success: false, message: 'This device is already linked to another account. Please sign in using the existing account or contact support if you need assistance.' });
+            if (device_id) {
+                const devices = await db('users').where({ device_id }).first();
+                if (devices) return res.status(400).json({ success: false, message: 'This device is already linked to another account. Please sign in using the existing account or contact support if you need assistance.' });
+            }
             const insertRow = {
                 // google_id: sub,
                 email,
@@ -703,8 +707,10 @@ async function appleLogin(req, res) {
         currency = existing?.default_currency || 'INR';
 
         if (!existing) {
-            const devices = await db('users').where({ device_id }).first();
-            if (devices) return res.status(400).json({ success: false, message: 'This device is already linked to another account. Please sign in using the existing account or contact support if you need assistance.' });
+            if (device_id) {
+                const devices = await db('users').where({ device_id }).first();
+                if (devices) return res.status(400).json({ success: false, message: 'This device is already linked to another account. Please sign in using the existing account or contact support if you need assistance.' });
+            }
             const insertRow = {
                 // google_id: sub,
                 email: userToken,
