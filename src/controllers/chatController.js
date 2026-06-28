@@ -505,7 +505,7 @@ async function balanceCut(user_id, order, end_time, place) {
                 newBalance = Number(user.balance) - deduction;
                 const settings = await trx('settings').first();
                 const freeChatPerMinute = Number(settings?.free_chat_amount_per_minute) || 0;
-                panditAmount = (Number(deduction) * Number(freeChatPerMinute));
+                panditAmount = (Number(diffMinutes) * Number(freeChatPerMinute));
             } else {
                 const perMinute = Number(lockedOrder?.rate);
                 deduction = Number(diffMinutes) * Number(perMinute);
