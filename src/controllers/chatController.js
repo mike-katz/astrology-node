@@ -1636,9 +1636,9 @@ async function newOrderDetail(req, res) {
         const finalAmount = Number((Number(pandit?.final_chat_call_rate) / Number(currencyDetail?.pandit_inr_rate)).toFixed(2))
         const response = {
             id: orderDetail?.pandit_id, name: pandit?.display_name, status: pandit?.status, profile: pandit?.profile, isOnline: pandit?.chat, is_free: orderDetail?.is_free, pandit_id: orderDetail?.pandit_id,
-            discounted_chat_call_rate: pandit?.discounted_chat_call_rate,
-            final_chat_call_rate: pandit?.final_chat_call_rate,
-            chat_call_rate: pandit?.chat_call_rate,
+            discounted_chat_call_rate: Number((Number(pandit?.discounted_chat_call_rate) / Number(currencyDetail?.pandit_inr_rate)).toFixed(2)),
+            final_chat_call_rate: finalAmount,
+            chat_call_rate: Number((Number(pandit?.chat_call_rate) / Number(currencyDetail?.pandit_inr_rate)).toFixed(2)),
             tag: pandit?.tag,
             rating_1: pandit?.rating_1,
             rating_2: pandit?.rating_2,
