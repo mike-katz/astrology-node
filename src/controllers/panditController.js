@@ -13,6 +13,143 @@ const { getClientIp } = require('../utils/getClientIp');
 const { getCurrencyByCountry, getCurrencySymbolByCurrency } = require('../utils/countryCurrencyMap');
 const geoip = require('geoip-lite');
 
+const PANDIT_LIST_MAX = 150;
+
+const PANDIT_LIST_SELECT = [
+    'p.display_name as name',
+    'p.id',
+    'p.languages',
+    'p.experience',
+    'p.profile',
+    'p.available_for',
+    'p.total_chat_minutes',
+    'p.total_call_minutes',
+    'p.primary_expertise',
+    'p.secondary_expertise',
+    'p.discounted_chat_call_rate',
+    'p.final_chat_call_rate',
+    'p.waiting_time',
+    'p.unlimited_free_calls_chats',
+    'p.chat',
+    'p.call',
+    'p.online',
+    'p.rating_1',
+    'p.rating_2',
+    'p.rating_3',
+    'p.rating_5',
+    'p.rating_4',
+    'p.total_orders',
+    'p.tag',
+    'p.chat_call_rate',
+];
+
+const RATING_RATIO_RAW = `
+    CASE 
+        WHEN (COALESCE(p.rating_1, 0) + COALESCE(p.rating_2, 0) + COALESCE(p.rating_3, 0) + COALESCE(p.rating_4, 0) + COALESCE(p.rating_5, 0)) > 0 
+        THEN (COALESCE(p.rating_5, 0) + COALESCE(p.rating_4, 0))::float / 
+             (COALESCE(p.rating_1, 0) + COALESCE(p.rating_2, 0) + COALESCE(p.rating_3, 0) + COALESCE(p.rating_4, 0) + COALESCE(p.rating_5, 0))::float
+        ELSE 0 
+    END
+`;
+
+function applyChatCallFilter(query, { type, isFree, search }) {
+    if (search?.trim()) return query;
+    if (isFree) {
+        return query.andWhere(function () {
+            this.where('p.chat', true).orWhere('p.call', true);
+        });
+    }
+    return query.andWhere(function () {
+        if (type === 'call') this.where('p.call', true);
+        if (type === 'chat') this.where('p.chat', true);
+    });
+}
+
+function applyPanditFilters(query, { search, secondary_expertise, skill, language, gender, top_astrologers, country }) {
+    if (search?.trim()) {
+        query.andWhere('p.display_name', 'ilike', `%${search.trim()}%`);
+    }
+
+    if (secondary_expertise && secondary_expertise != 'all') {
+        query.andWhere('p.secondary_expertise', 'ILIKE', `%${secondary_expertise.trim()}%`);
+    }
+
+    if (Array.isArray(skill) && skill.length) {
+        const skills = skill.map(s => s?.trim()).filter(Boolean).map(s => `%${s}%`);
+        query.andWhereRaw(
+            `p.primary_expertise ILIKE ANY (ARRAY[${skills.map(() => '?').join(',')}])`,
+            skills
+        );
+    }
+
+    if (Array.isArray(language) && language.length) {
+        const languages = language.map(s => s?.trim()).filter(Boolean).map(s => `%${s}%`);
+        query.andWhereRaw(
+            `p.languages ILIKE ANY (ARRAY[${languages.map(() => '?').join(',')}])`,
+            languages
+        );
+    }
+
+    if (Array.isArray(gender) && gender.length) {
+        const genders = gender.map(g => g?.trim().toLowerCase()).filter(Boolean);
+        query.whereIn(db.raw('LOWER(p.gender)'), genders);
+    }
+
+    if (Array.isArray(top_astrologers) && top_astrologers.length && !top_astrologers.includes('All')) {
+        const tags = top_astrologers.map(g => g?.trim().toLowerCase()).filter(Boolean);
+        query.whereIn(db.raw('LOWER(p.tag)'), tags);
+    }
+
+    if (Array.isArray(country) && country.length == 1) {
+        if (country[0] == 'India') {
+            query.andWhere('p.country', 'India');
+        } else {
+            query.andWhereNot('p.country', 'India');
+        }
+    }
+
+    return query;
+}
+
+function applyPanditSort(query, { sort_by, sorting }) {
+    if (sort_by == 'rating_high_to_low') {
+        query.orderByRaw(RATING_RATIO_RAW + ' DESC').orderBy('p.total_orders', 'desc');
+    } else if (sort_by == 'rating_low_to_high') {
+        query.orderByRaw(RATING_RATIO_RAW + ' ASC').orderBy('p.total_orders', 'desc');
+    } else if (sorting?.length > 0) {
+        query.orderBy(sorting);
+    }
+    query.orderByRaw('RANDOM()');
+    return query;
+}
+
+function excludePanditIds(query, excludeIds) {
+    if (excludeIds.length > 0) {
+        query.whereNotIn('p.id', excludeIds);
+    }
+    return query;
+}
+
+function formatPanditResults(user, currency, currencyData) {
+    const symbol = getCurrencySymbolByCurrency(currency);
+    return user.map(item => {
+        item.currency = symbol;
+        item.chat_call_rate = convertCurrency(item.chat_call_rate, (currencyData?.pandit_inr_rate || 1));
+        item.discounted_chat_call_rate = convertCurrency(item.discounted_chat_call_rate, (currencyData?.pandit_inr_rate || 1));
+        item.final_chat_call_rate = convertCurrency(item.final_chat_call_rate, (currencyData?.pandit_inr_rate || 1));
+        item.govt_id = item?.govt_id ? deepParse(item?.govt_id) : [];
+        item.available_for = item?.available_for ? deepParse(item?.available_for) : [];
+        item.languages = item?.languages ? deepParse(item?.languages) : [];
+        item.primary_expertise = item?.primary_expertise ? deepParse(item?.primary_expertise) : [];
+        item.secondary_expertise = item?.secondary_expertise ? deepParse(item?.secondary_expertise) : [];
+        item.certificate = item?.certificate ? deepParse(item?.certificate) : [];
+        if (item?.unlimited_free_calls_chats) {
+            item.chat = true;
+        }
+        return item;
+    });
+}
+
 async function getPandits(req, res) {
     try {
         const ip = getClientIp(req);
@@ -28,7 +165,7 @@ async function getPandits(req, res) {
         if (reqPage != 1) {
             const response = {
                 page: reqPage,
-                limit: 100,
+                limit: PANDIT_LIST_MAX,
                 total: 0,
                 totalPages: 1,
                 results: []
@@ -36,10 +173,8 @@ async function getPandits(req, res) {
             return res.status(200).json({ success: true, data: response, message: 'List success' });
         }
         let page = 1;
-        let limit = 100
-        //  parseInt(req.query.limit) || 20;
+        let limit = PANDIT_LIST_MAX;
         if (page < 1) page = 1;
-        // if (limit < 1) limit = 100;
         const offset = (page - 1) * limit;
         let { type = "chat", search, sort_by, skill, language, gender, country, offer, top_astrologers, secondary_expertise } = req.query
         const filter = {
@@ -133,289 +268,64 @@ async function getPandits(req, res) {
         }
         console.log("isFree", isFree);
 
-        // console.log("sort_by", sorting);
-        let query = db('pandits as p')
-            //.distinctOn('p.id')
-            .select(
-                'p.display_name as name',
-                'p.id',
-                'p.languages',
-                'p.experience',
-                'p.profile',
-                'p.available_for',
-                'p.total_chat_minutes',
-                'p.total_call_minutes',
-                'p.primary_expertise',
-                'p.secondary_expertise',
-                'p.discounted_chat_call_rate',
-                'p.final_chat_call_rate',
-                'p.waiting_time',
-                'p.unlimited_free_calls_chats',
-                'p.chat',
-                'p.call',
-                'p.online',
-                'p.rating_1',
-                'p.rating_2',
-                'p.rating_3',
-                'p.rating_5',
-                'p.rating_4',
-                'p.total_orders',
-                'p.tag',
-                'p.chat_call_rate',
-            ).where(filter)
-            .limit(limit)
-            .offset(offset);
-        let countQuery = db('pandits as p')
-            .count('* as count')
-            .where(filter)
+        const filterParams = { type, isFree, search, secondary_expertise, skill, language, gender, top_astrologers, country };
+        let user = [];
+        const excludeIds = [];
 
-        if (search && search.trim()) {
-            query.andWhere('p.display_name', 'ilike', `%${search.trim()}%`);
-            countQuery.andWhere('p.display_name', 'ilike', `%${search.trim()}%`);
-        } else {
-            if (!isFree) {
-                query.andWhere(function () {
-                    if (type === 'call') {
-                        this.where('p.call', true);
-                    }
-                    if (type === 'chat') {
-                        this.where('p.chat', true);
-                    }
-                });
-                countQuery.andWhere(function () {
-                    if (type === 'call') {
-                        this.where('p.call', true);
-                    }
-                    if (type === 'chat') {
-                        this.where('p.chat', true);
-                    }
-                });
+        // Step 1: pandit_sequence table – sequence order, chat/call filter
+        try {
+            const step1Query = applyChatCallFilter(
+                db('pandits as p')
+                    .join('pandit_sequence as ps', 'ps.pandit_id', 'p.id')
+                    .select(PANDIT_LIST_SELECT)
+                    .where(filter)
+                    .orderBy('ps.sequence', 'asc'),
+                filterParams
+            );
+            if (search?.trim()) {
+                step1Query.andWhere('p.display_name', 'ilike', `%${search.trim()}%`);
             }
-        }
-        if (isFree) {
-            query.andWhere(function () {
-                this.where('p.chat', true)
-                    .orWhere('p.call', true);
-            });
-            countQuery.andWhere(function () {
-                this.where('p.chat', true)
-                    .orWhere('p.call', true);
-            });
-        }
-        if (secondary_expertise && secondary_expertise != 'all') {
-            query.andWhere('p.secondary_expertise', 'ILIKE', `%${secondary_expertise.trim()}%`);
-            countQuery.andWhere('p.secondary_expertise', 'ILIKE', `%${secondary_expertise.trim()}%`);
+            const step1Results = await step1Query.limit(PANDIT_LIST_MAX);
+            user.push(...step1Results);
+            step1Results.forEach((item) => excludeIds.push(item.id));
+        } catch (step1Err) {
+            console.error('getPandits step1 (pandit_sequence):', step1Err?.message);
         }
 
-        if (Array.isArray(skill) && skill.length) {
-            const skills = skill
-                .map(s => s?.trim())
-                .filter(Boolean)
-                .map(s => `%${s}%`);
-
-            query.andWhereRaw(
-                `p.primary_expertise ILIKE ANY (ARRAY[${skills.map(() => '?').join(',')}])`,
-                skills
-            );
-
-            countQuery.andWhereRaw(
-                `p.primary_expertise ILIKE ANY (ARRAY[${skills.map(() => '?').join(',')}])`,
-                skills
-            );
+        // Step 2: current filtered list (exclude step 1 ids)
+        const step2Limit = PANDIT_LIST_MAX - user.length;
+        if (step2Limit > 0) {
+            let step2Query = db('pandits as p')
+                .select(PANDIT_LIST_SELECT)
+                .where(filter);
+            step2Query = applyChatCallFilter(step2Query, filterParams);
+            step2Query = applyPanditFilters(step2Query, filterParams);
+            step2Query = excludePanditIds(step2Query, excludeIds);
+            step2Query = applyPanditSort(step2Query, { sort_by, sorting });
+            const step2Results = await step2Query.limit(step2Limit).offset(offset);
+            user.push(...step2Results);
+            step2Results.forEach((item) => excludeIds.push(item.id));
         }
 
-        if (Array.isArray(language) && language.length) {
-            // query.andWhere(builder => {
-            //     language.forEach((s, index) => {
-            //         const condition = ['ilike', `%${s.trim()}%`];
-            //         index === 0
-            //             ? builder.where('p.languages', ...condition)
-            //             : builder.orWhere('p.languages', ...condition);
-            //     });
-            // });
-
-            // countQuery.andWhere(builder => {
-            //     language.forEach((s, index) => {
-            //         const condition = ['ilike', `%${s.trim()}%`];
-            //         index === 0
-            //             ? builder.where('p.languages', ...condition)
-            //             : builder.orWhere('p.languages', ...condition);
-            //     });
-            // });
-
-            const languages = language
-                .map(s => s?.trim())
-                .filter(Boolean)
-                .map(s => `%${s}%`);
-
-            query.andWhereRaw(
-                `p.languages ILIKE ANY (ARRAY[${languages.map(() => '?').join(',')}])`,
-                languages
-            );
-
-            countQuery.andWhereRaw(
-                `p.languages ILIKE ANY (ARRAY[${languages.map(() => '?').join(',')}])`,
-                languages
-            );
+        // Step 3: fill remaining up to 150 – basic chat/call filter only
+        const step3Limit = PANDIT_LIST_MAX - user.length;
+        if (step3Limit > 0) {
+            let step3Query = db('pandits as p')
+                .select(PANDIT_LIST_SELECT)
+                .where(filter);
+            step3Query = applyChatCallFilter(step3Query, filterParams);
+            step3Query = excludePanditIds(step3Query, excludeIds);
+            step3Query.orderByRaw('RANDOM()');
+            const step3Results = await step3Query.limit(step3Limit);
+            user.push(...step3Results);
         }
 
-        if (Array.isArray(gender) && gender.length) {
-            // console.log("gender.length", gender.length);
-            const genders = gender
-                .map(g => g?.trim().toLowerCase())
-                .filter(Boolean);
-            query.whereIn(
-                db.raw('LOWER(p.gender)'),
-                genders
-            );
-            countQuery.whereIn(
-                db.raw('LOWER(p.gender)'),
-                genders
-            );
-        }
-
-        if (Array.isArray(top_astrologers) && top_astrologers.length && !top_astrologers.includes("All")) {
-
-            const genders = top_astrologers
-                .map(g => g?.trim().toLowerCase())
-                .filter(Boolean);
-
-            // console.log("genders", genders);
-            query.whereIn(
-                db.raw('LOWER(p.tag)'),
-                genders
-            );
-            countQuery.whereIn(
-                db.raw('LOWER(p.tag)'),
-                genders
-            );
-        }
-
-        if (Array.isArray(country) && country.length == 1) {
-            // console.log("country", country[0]);
-            if (country[0] == 'India') {
-                query.andWhere('p.country', "India");
-                countQuery.andWhere('p.country', "India");
-            } else {
-                query.andWhereNot('p.country', "India");
-                countQuery.andWhereNot('p.country', "India");
-            }
-        }
-
-        // if (offer && offer.trim()) {
-        //     query.andWhere('p.tag', 'ilike', `%${offer.trim()}%`);
-        //     countQuery.andWhere('p.tag', 'ilike', `%${offer.trim()}%`);
-        // }
-
-        // Rating ratio: (rating_5 + rating_4) / total_ratings — reuse for tie-breaker
-        const ratingRatioRaw = `
-            CASE 
-                WHEN (COALESCE(p.rating_1, 0) + COALESCE(p.rating_2, 0) + COALESCE(p.rating_3, 0) + COALESCE(p.rating_4, 0) + COALESCE(p.rating_5, 0)) > 0 
-                THEN (COALESCE(p.rating_5, 0) + COALESCE(p.rating_4, 0))::float / 
-                     (COALESCE(p.rating_1, 0) + COALESCE(p.rating_2, 0) + COALESCE(p.rating_3, 0) + COALESCE(p.rating_4, 0) + COALESCE(p.rating_5, 0))::float
-                ELSE 0 
-            END
-        `;
-
-        console.log("sort_by", sort_by);
-        // Primary sort: RANDOM() so response order changes every time
-        if (sort_by == 'rating_high_to_low') {
-            query.orderByRaw(ratingRatioRaw + ' DESC').orderBy('p.total_orders', 'desc');
-        } else if (sort_by == 'rating_low_to_high') {
-            query.orderByRaw(ratingRatioRaw + ' ASC').orderBy('p.total_orders', 'desc');
-        }
-        else if (sorting?.length > 0) {
-            query.orderBy(sorting)
-
-            // .orderBy('p.total_orders', 'desc').orderByRaw(ratingRatioRaw + ' DESC');
-        }
-        //  else {
-        //     query.orderBy('p.total_orders', 'desc').orderByRaw(ratingRatioRaw + ' DESC');
-        // }
-        query.orderByRaw('RANDOM()');
-        // console.log("sd", query.toQuery());
-        let user = await query;
-        // const [{ count }] = await countQuery
-        // const total = parseInt(count);
-        const total = 100
+        user = user.slice(0, PANDIT_LIST_MAX);
+        const total = PANDIT_LIST_MAX;
         const totalPages = Math.ceil(total / limit);
 
-        // if (user?.length < 100) {
-        //     console.log("inside if");
-        //     const newLimit = 100 - user?.length
-        //     console.log("newLimit", newLimit);
-        //     if (isFree) {
-        //         filter.unlimited_free_calls_chats = true
-        //     }
-        //     const ids = [];
-        //     user?.map(item => ids.push(item?.id))
-        //     console.log("ids", ids);
-        //     const query = db('pandits as p')
-        //         //.distinctOn('p.id')
-        //         .select(
-        //             'p.display_name as name',
-        //             'p.id',
-        //             'p.languages',
-        //             'p.experience',
-        //             'p.profile',
-        //             'p.available_for',
-        //             'p.total_chat_minutes',
-        //             'p.total_call_minutes',
-        //             'p.primary_expertise',
-        //             'p.secondary_expertise',
-        //             'p.discounted_chat_call_rate',
-        //             'p.final_chat_call_rate',
-        //             'p.waiting_time',
-        //             'p.unlimited_free_calls_chats',
-        //             'p.chat',
-        //             'p.call',
-        //             'p.online',
-        //             'p.rating_1',
-        //             'p.rating_2',
-        //             'p.rating_3',
-        //             'p.rating_5',
-        //             'p.rating_4',
-        //             'p.total_orders',
-        //             'p.tag',
-        //             'p.chat_call_rate',
-        //         ).where(filter)
-        //         .limit(newLimit)
-        //     if (!isFree) {
-        //         query.andWhere(function () {
-        //             this.where('p.chat', true)
-        //                 .orWhere('p.call', true);
-        //         });
-        //     }
-        //     if (isFree) {
-        //         query.andWhere(function () {
-        //             this.where('p.chat', true)
-        //                 .orWhere('p.call', true);
-        //         });
-        //     }
-        //     query.whereNotIn("p.id", ids)
-        //     query.orderByRaw('RANDOM()');
-        //     console.log("sd", query.toQuery());
-
-        //     const newUser = await query;
-        //     user = [...user, ...newUser]
-        // }
         console.log("currency", currency);
-        const symbol = getCurrencySymbolByCurrency(currency)
-        user.map(item => {
-            item.currency = symbol;
-            item.chat_call_rate = convertCurrency(item.chat_call_rate, (currencyData?.pandit_inr_rate || 1));
-            item.discounted_chat_call_rate = convertCurrency(item.discounted_chat_call_rate, (currencyData?.pandit_inr_rate || 1));
-            item.final_chat_call_rate = convertCurrency(item.final_chat_call_rate, (currencyData?.pandit_inr_rate || 1));
-            item.govt_id = item?.govt_id ? deepParse(item?.govt_id) : [];
-            item.available_for = item?.available_for ? deepParse(item?.available_for) : [];
-            item.languages = item?.languages ? deepParse(item?.languages) : [];
-            item.primary_expertise = item?.primary_expertise ? deepParse(item?.primary_expertise) : [];
-            item.secondary_expertise = item?.secondary_expertise ? deepParse(item?.secondary_expertise) : [];
-            item.certificate = item?.certificate ? deepParse(item?.certificate) : [];
-            if (item?.unlimited_free_calls_chats) {
-                item.chat = true
-            }
-        })
+        user = formatPanditResults(user, currency, currencyData);
         const response = {
             page,
             limit,
