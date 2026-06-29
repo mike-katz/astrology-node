@@ -33,7 +33,7 @@ async function createContactUs(req, res) {
             city: String(city).trim(),
         }).returning(['id', 'first_name', 'last_name', 'phone_no', 'email', 'city', 'created_at']);
 
-        return res.status(201).json({
+        return res.status(200).json({
             success: true,
             data: contact,
             message: 'Contact request submitted successfully.',
