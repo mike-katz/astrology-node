@@ -160,7 +160,7 @@ async function getPandits(req, res) {
             currency = getCurrencyByCountry(country);
             currency = currency?.currency
         }
-        // console.log("req.query", req.query);
+        console.log("req.query", req.query);
         const reqPage = parseInt(req.query.page) || 1;
         if (reqPage != 1) {
             const response = {
