@@ -274,7 +274,7 @@ async function getPandits(req, res) {
 
         // Step 1: pandit_sequence table – sequence order, chat/call filter
         try {
-            const step1Query = applyChatCallFilter(
+            let step1Query = applyChatCallFilter(
                 db('pandits as p')
                     .join('pandit_sequence as ps', 'ps.pandit_id', 'p.id')
                     .select(PANDIT_LIST_SELECT)
@@ -282,9 +282,11 @@ async function getPandits(req, res) {
                     .orderBy('ps.sequence', 'asc'),
                 filterParams
             );
-            if (search?.trim()) {
-                step1Query.andWhere('p.display_name', 'ilike', `%${search.trim()}%`);
-            }
+            step1Query = applyPanditFilters(step1Query, filterParams);
+
+            // if (search?.trim()) {
+            //     step1Query.andWhere('p.display_name', 'ilike', `%${search.trim()}%`);
+            // }
             const step1Results = await step1Query.limit(PANDIT_LIST_MAX);
             user.push(...step1Results);
             step1Results.forEach((item) => excludeIds.push(item.id));
