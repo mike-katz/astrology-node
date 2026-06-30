@@ -278,11 +278,12 @@ async function getPandits(req, res) {
                 db('pandits as p')
                     .join('pandit_sequence as ps', 'ps.pandit_id', 'p.id')
                     .select(PANDIT_LIST_SELECT)
-                    .where(filter)
-                    .orderBy('ps.sequence', 'asc'),
+                    .where(filter),
+                // .orderBy('ps.sequence', 'asc'),
                 filterParams
             );
             step1Query = applyPanditFilters(step1Query, filterParams);
+            step1Query.orderByRaw('RANDOM()');
 
             // if (search?.trim()) {
             //     step1Query.andWhere('p.display_name', 'ilike', `%${search.trim()}%`);
