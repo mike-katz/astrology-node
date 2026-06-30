@@ -1352,13 +1352,13 @@ async function orderAccept(req, res) {
 
         const userDetail = await db('users').where({ id: order.user_id }).first();
 
-        let duration;
-        let deduction;
-        if (order.is_free) {
-            const settings = await db('settings').first();
-            duration = Number(settings?.free_chat_minutes) || 0;
-            deduction = 0;
-        } else {
+        let duration = order?.duration;
+        let deduction = order?.deduction;
+        if (!order.is_offer) {
+            // const settings = await db('settings').first();
+            // duration = Number(settings?.free_chat_minutes) || 0;
+            // deduction = 0;
+            // } else {
             duration = Math.floor(Number(Number(userDetail?.balance)) / Number(order?.rate));
             // console.log("duration", duration);
             if (!Number.isFinite(duration)) {
