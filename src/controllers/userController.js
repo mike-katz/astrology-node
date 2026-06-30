@@ -477,10 +477,11 @@ async function findIsFree(req, res) {
                 const currencyItem = JSON.parse(setting?.currency_amount || '[]').find(
                     item => item?.currency === (existing?.default_currency || 'INR')
                 );
-
-                currencyItem.currency = getCurrencySymbolByCurrency(currencyItem?.currency)
-                response.is_offer = true
-                response.offer_detail = currencyItem
+                if (currencyItem) {
+                    currencyItem.currency = getCurrencySymbolByCurrency(currencyItem?.currency)
+                    response.is_offer = true
+                    response.offer_detail = currencyItem
+                }
             }
         }
         // }
