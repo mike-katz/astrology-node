@@ -1,11 +1,13 @@
 const FormData = require('form-data');
 const db = require('../db');
 const axios = require('axios');
+const { decodeJWT, convertCurrency } = require('../utils/decodeJWT');
 
 require('dotenv').config();
 
 const { deleteKey } = require('../config/redisClient');
 const { uploadImageToAzure, deleteFileFromAzure } = require('../utils/azureUploader');
+const { getCurrencySymbolByCurrency, getCurrencyIconByCurrency } = require('../utils/countryCurrencyMap');
 
 async function makeAvtarString(user, gender) {
     if (!user || !gender) return null;
@@ -187,9 +189,17 @@ async function updateProfile(req, res) {
 async function getBalance(req, res) {
     const user = await db('users')
         .where('id', req?.userId)
-        .select('balance')
+        .select('balance', 'default_currency', 'permanent_currency', 'offer_amount')
         .first();
     if (!user) return res.status(400).json({ success: false, message: 'Please enter correct user.' });
+    const currency = user?.default_currency
+    const currencyData = await db('currency').select('currency_name', 'user_inr_rate').where({ currency_name: currency }).first();
+
+    const balance = await convertCurrency(user?.balance, (currencyData?.user_inr_rate || 1));
+    user.balance = balance;
+    const symbol = getCurrencySymbolByCurrency(currency)
+    user.currency = symbol;
+
     return res.status(200).json({ success: true, data: user, message: 'Profile get Successfully' });
 }
 
@@ -248,6 +258,7 @@ async function deleteMyAccount(req, res) {
 }
 
 async function getRecharge(req, res) {
+    console.log("getRecharge api called");
     try {
         const [{ count }] = await db('payments')
             .count('* as count')
@@ -268,8 +279,17 @@ async function getRecharge(req, res) {
                 message: 'Recharge list success'
             });
         }
-        const amounts = matchedRecharge?.amounts || [];
-        return res.status(200).json({ success: true, data: amounts, message: 'Recharge list success' });
+        const userDetail = await db('users').where({ id: Number(req.userId) }).first();
+        const amounts = matchedRecharge?.amounts[userDetail?.default_currency || 'INR'] || [];
+        const symbol = getCurrencySymbolByCurrency(userDetail?.default_currency || 'INR')
+
+        const currencyDetail = await db('currency').where({ currency_name: userDetail?.default_currency || 'INR' }).first();
+        let gst = Number(currencyDetail?.user_tax_percentage || 0)
+        let taxDetail = 'GST'
+        if (userDetail?.default_currency != 'INR') {
+            taxDetail = 'VAT'
+        }
+        return res.status(200).json({ success: true, data: { amounts, currency: symbol, gst, taxDetail }, message: 'Recharge list success' });
     }
     catch (err) {
         console.error(err);
@@ -446,14 +466,26 @@ async function getRecommendations(req, res) {
 
 async function findIsFree(req, res) {
     try {
-        const existing = await db('users').where({ id: req.userId }).select('is_free_order_available', 'id').first();
+        const existing = await db('users').where({ id: req.userId }).select('offer_amount', 'default_currency').first();
+        const response = { is_free: false, is_offer: false, offer_detail: {} }
 
-        const [{ count }] = await db('orders')
-            .count('* as count')
-            .where({ user_id: existing.id })
-            .whereIn('status', ['continue', 'completed', 'pending']);
-        const is_free = count == 0 || existing?.is_free_order_available ? true : false
-        return res.status(200).json({ success: true, data: { is_free }, message: 'Get successfully' });
+        if (existing?.offer_amount == 0) {
+            const order = await db('orders').where({ user_id: Number(req.userId) }).whereNotIn('status', ['cancel', 'rejected']).select('id').first();
+            const payment = await db('payments').where({ user_id: Number(req.userId) }).whereIn('status', ['pending', 'success']).select('id').first();
+            if (!order && !payment) {
+                const setting = await db('settings').select('currency_amount').first();
+                const currencyItem = JSON.parse(setting?.currency_amount || '[]').find(
+                    item => item?.currency === (existing?.default_currency || 'INR')
+                );
+                if (currencyItem) {
+                    currencyItem.currency = getCurrencySymbolByCurrency(currencyItem?.currency)
+                    response.is_offer = true
+                    response.offer_detail = currencyItem
+                }
+            }
+        }
+        // }
+        return res.status(200).json({ success: true, data: response, message: 'Get successfully' });
     }
     catch (err) {
         console.error(err);
@@ -565,4 +597,87 @@ async function getUserStats(req, res) {
     }
 }
 
-module.exports = { updateProfile, getProfile, getBalance, updateToken, profileUpdate, makeAvtarString, deleteMyAccount, getRecharge, getRechargeBanner, getCookie, getRecommendations, findIsFree, getUserStats };
+async function getCurrencyList(req, res) {
+    try {
+        const authHeader = req.headers.authorization;
+        const tokenData = decodeJWT(authHeader);
+        const result = tokenData?.currency !== 'INR'
+            ? await db('currency').select('*').whereNull('deleted_at')
+            : [];
+
+        result?.map(item => {
+            item.icon = getCurrencyIconByCurrency(item?.currency_name)
+        })
+
+        return res.status(200).json({
+            success: true,
+            data: result,
+            message: 'Currency successful',
+        });
+    }
+    catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
+async function updateCurrency(req, res) {
+    try {
+        const { currency } = req.body
+        const user = await db('users')
+            .where('id', Number(req?.userId))
+            .first();
+        if (!user) return res.status(400).json({ success: false, message: 'Please enter correct user.' });
+
+        if (user?.offer_amount != 0) {
+            return res.status(400).json({ success: false, message: 'Please Complete 1 order.' });
+        }
+        const currencyData = await db('currency').where({ currency_name: currency }).whereNull('deleted_at').first();
+        if (!currencyData) return res.status(400).json({ success: false, message: 'Please enter correct currency.' });
+
+        await db('users').where({ id: Number(req?.userId) }).update({ default_currency: currency })
+
+        return res.status(200).json({
+            success: true,
+            data: null,
+            message: 'User currency successfully',
+        });
+    }
+    catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
+async function getGiftList(req, res) {
+    try {
+        const userDetail = await db('users').where({ id: Number(req.userId) }).select('default_currency').first();
+        const currency = userDetail?.default_currency || 'INR'
+        let result = await db('gifts')
+            .whereRaw("(amount::jsonb)->>? IS NOT NULL", [currency])
+            .whereNull('deleted_at')
+        if (result?.length > 0) {
+            const symbol = getCurrencySymbolByCurrency(currency);
+            const rate = await db('currency').where({ currency_name: currency }).select('user_inr_rate').first();
+            result.map(item => {
+                const amount = JSON.parse(item?.amount);
+                item.amount = Number(amount[currency])
+                item.currency = symbol
+                item.inr_amount = Number(amount[currency]) * Number(rate?.user_inr_rate || 1)
+            })
+        }
+        return res.status(200).json({
+            success: true,
+            data: result,
+            message: 'gift successful',
+        });
+    }
+    catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
+
+
+module.exports = { updateProfile, getProfile, getBalance, updateToken, profileUpdate, makeAvtarString, deleteMyAccount, getRecharge, getRechargeBanner, getCookie, getRecommendations, findIsFree, getUserStats, getCurrencyList, updateCurrency, getGiftList };

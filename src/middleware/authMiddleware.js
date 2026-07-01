@@ -5,7 +5,8 @@ const { getCache } = require("../config/redisClient")
 
 
 module.exports = async function (req, res, next) {
-    console.log("req.body", req.body);
+    // console.log("req.body", req.body);
+    console.log("originalUrl", req.originalUrl);
     const authHeader = req.headers.authorization;
     // console.log("authHeader", authHeader);
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -30,7 +31,7 @@ module.exports = async function (req, res, next) {
         // Get user from database to get username
         // Check if token exists in Redis
         const username = verified?.userId;
-        const redisKey = `user_${username}`;
+        const redisKey = `beta_user_${username}`;
         let redisToken;
         try {
             redisToken = await getCache(redisKey);

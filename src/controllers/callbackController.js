@@ -33,6 +33,54 @@ function numberToIndianWords(amount) {
     return words + ' Only';
 }
 
+async function getRechargeBonus(user, paymentRow) {
+    let extra = 0;
+    if (paymentRow?.offer_amount > 0) {
+        return extra
+    }
+    const [{ count }] = await db('payments')
+        .count('* as count')
+        .where({ user_id: paymentRow.user_id })
+        .whereIn('status', ['success']);
+    const rechargeNo = Number(count) + 1;
+    const recharges = await db('recharges')
+        .whereIn('recharge_number', [1111, rechargeNo])
+        .whereNull('deleted_at');
+    const matchedRecharge =
+        recharges.find(r => r.recharge_number === rechargeNo) ||
+        recharges.find(r => r.recharge_number === 1111);
+    if (!matchedRecharge) return extra;
+
+    const userCurrency = user?.default_currency || 'INR';
+    const amounts = matchedRecharge?.amounts?.[userCurrency] || matchedRecharge?.amounts || [];
+    const amountsList = Array.isArray(amounts) ? amounts : (typeof amounts === 'string' ? JSON.parse(amounts || '[]') : []);
+    const currencyRate = await db('currency').where('currency_name', userCurrency).first();
+    const inrRate = Number(currencyRate?.user_inr_rate || 1);
+    const taxPercent = Number(currencyRate?.user_tax_percentage || 0);
+    const currencyTax = taxPercent + 100;
+
+    const matched = amountsList.find((a) => {
+        const rechargeBaseInr = Math.round(((Number(a.amount) * 100) / currencyTax) * inrRate * 100);
+        const paymentInrAmount = Math.round(Number(paymentRow.amount) * 100);
+        return rechargeBaseInr === paymentInrAmount;
+    });
+
+    if (!matched) return extra;
+
+    const d = matched.discount;
+    const dt = matched.discount_type;
+    if (d == null || d === '' || dt == null || dt === '') {
+        return 0;
+    }
+    if (String(dt).toLowerCase() === 'amount') {
+        return Number(d) * inrRate;
+    }
+    if (String(dt).toLowerCase() === 'percentage') {
+        return (Number(paymentRow.amount) * Number(d)) / 100;
+    }
+    return 0;
+}
+
 /**
  * Razorpay webhook: Step 1 – payment success/fail nu status set
  * Step 2 – DB ma jyare status "pending" hoy tyare j success/failed update karvu
@@ -146,37 +194,7 @@ async function razorpay(req, res) {
         const total_in_word = numberToIndianWords(Number(with_tax_amount).toFixed(2),);
 
         // user/recharge logic: amounts array ma amount match kari ne discount apply
-        let extra = 0;
-        const [{ count }] = await db('payments')
-            .count('* as count')
-            .where({ user_id: paymentRow.user_id })
-            .whereIn('status', ['success']);
-        logger.info('previous recharge count', count);
-        const rechargeNo = Number(count) + 1;
-        const recharges = await db('recharges')
-            .whereIn('recharge_number', [1111, rechargeNo])
-            .whereNull('deleted_at');
-        const matchedRecharge =
-            recharges.find(r => r.recharge_number === rechargeNo) ||
-            recharges.find(r => r.recharge_number === 1111);
-        if (matchedRecharge) {
-            const amounts = matchedRecharge.amounts || [];
-            const amountsList = Array.isArray(amounts) ? amounts : (typeof amounts === 'string' ? JSON.parse(amounts || '[]') : []);
-            const matched = amountsList.find(a => Number(a.amount) === Number(paymentRow.amount));
-            if (matched) {
-                const d = matched.discount;
-                const dt = matched.discount_type;
-                if (d == null || d === '' || dt == null || dt === '') {
-                    extra = 0;
-                } else if (String(dt).toLowerCase() === 'amount') {
-                    extra = Number(d) || 0;
-                } else if (String(dt).toLowerCase() === 'percentage') {
-                    extra = (Number(paymentRow.amount) * Number(d)) / 100;
-                } else {
-                    extra = 0;
-                }
-            }
-        }
+        const extra = await getRechargeBonus(user, paymentRow);
 
         logger.info(`bonus amount for ${user?.mobile} ${extra}`);
         logger.info(`payment amount for ${user?.mobile} ${paymentRow?.amount}`);
@@ -209,7 +227,7 @@ async function razorpay(req, res) {
             transaction_id: razorpayPaymentId,
             status: 'success',
         });
-        await db('users').where({ id: user.id }).increment({ balance: Number(Number(paymentRow?.amount) + Number(extra)) });
+        await db('users').where({ id: user.id }).increment({ balance: Number(Number(paymentRow?.amount) + Number(extra)), offer_amount: Number(paymentRow?.offer_amount || 0) });
 
         if (extra > 0) {
             await db('balancelogs').insert({
@@ -267,5 +285,141 @@ async function razorpay(req, res) {
     }
 }
 
+async function xpay(req, res) {
+    logger.info('xpay callback start body', req.body);
+    logger.info('xpay callback start query', req.query);
+    const { eventType, intentId, status, receiptId } = req.body
+    try {
+        if (status == 'FAILED') {
+            const paymentRow = await db('payments')
+                .where({ order_id: intentId })
+                .whereIn('status', ['pending', 'canceled'])
+                .first();
+            if (!paymentRow) {
+                return res.status(200).json({ success: true, message: 'No pending payment or already processed' });
+            }
+            await db('payments').where({ id: paymentRow.id }).update({ status: 'failed' });
+            return res.status(200).json({ success: true, message: 'payment.intent acknowledged' });
+        }
+        if (status == 'CANCEL') {
+            const paymentRow = await db('payments')
+                .where({ order_id: intentId, status: 'pending' })
+                .first();
+            if (!paymentRow) {
+                return res.status(200).json({ success: true, message: 'No pending payment or already processed' });
+            }
+            await db('payments').where({ id: paymentRow.id }).update({ status: 'canceled' });
+            return res.status(200).json({ success: true, message: 'payment.intent acknowledged' });
+        }
 
-module.exports = { razorpay };
+        if (eventType != 'intent.success') {
+            return res.status(200).json({ success: true, message: 'payment.intent acknowledged' });
+        }
+
+        if (status != 'SUCCESS') {
+            return res.status(200).json({ success: true, message: 'payment.intent acknowledged' });
+        }
+
+        const paymentRow = await db('payments')
+            .where({ order_id: intentId })
+            .whereIn('status', ['pending', 'failed', 'canceled'])
+            .first();
+        if (!paymentRow) {
+            return res.status(200).json({ success: true, message: 'No pending payment or already processed' });
+        }
+
+        const user = await db('users').where('id', paymentRow.user_id).first();
+        if (!user) {
+            logger.info('user not found case', intentId);
+            await db('payments').where({ id: paymentRow.id }).update({ status: 'failed' });
+            return res.status(200).json({ success: true, message: 'User not found' });
+        }
+
+
+        const gst = Number(paymentRow?.gst);
+        const with_tax_amount = Number(Number(gst) + Number(paymentRow?.amount)).toFixed(2);
+        const total_in_word = numberToIndianWords(Number(with_tax_amount).toFixed(2),);
+
+        const extra = await getRechargeBonus(user, paymentRow);
+
+        logger.info(`bonus amount for ${user?.mobile} ${extra}`);
+        logger.info(`payment amount for ${user?.mobile} ${paymentRow?.amount}`);
+
+        const newBalance = Number(user.balance) + Number(paymentRow?.amount);
+
+        const data = {
+            transaction_id: receiptId,
+            utr: "",
+            amount: Number(paymentRow?.amount).toFixed(2),
+            with_tax_amount: Number(with_tax_amount).toFixed(2),
+            gst: Number(gst).toFixed(2),
+            city: user?.city_state_country || '',
+            pincode: user?.pincode || '',
+            total_in_word,
+        };
+
+        logger.info(`user= ${user?.mobile} old balance ${user.balance} new balance ${Number(Number(paymentRow?.amount) + Number(extra))} extra bonus= ${extra} `);
+
+        const [saved] = await db('balancelogs').insert({
+            user_old_balance: Number(user.balance),
+            user_new_balance: Number(newBalance),
+            user_id: user.id,
+            message: `Purchase of AG-Money via xpay (${receiptId})`,
+            amount: paymentRow?.amount,
+            currency: paymentRow?.currency,
+            gst,
+        }).returning('*');
+        await db('payments').where({ id: paymentRow.id }).update({
+            utr: "",
+            transaction_id: receiptId,
+            status: 'success',
+        });
+
+        const amount = paymentRow?.offer_amount > 0 ? paymentRow?.offer_amount : paymentRow?.amount
+        await db('users').where({ id: user.id }).increment({ balance: Number(Number(amount) + Number(extra)), offer_amount: Number(paymentRow?.offer_amount || 0) });
+
+        if (extra > 0) {
+            await db('balancelogs').insert({
+                user_old_balance: Number(newBalance),
+                user_new_balance: Number(newBalance) + Number(extra),
+                user_id: user.id,
+                message: `Cashback Order(${receiptId})`,
+                amount: extra,
+                currency: paymentRow?.currency,
+                gst: 0,
+                invoice: "",
+            });
+        }
+
+        if (paymentRow?.offer_amount > 0) {
+            await db('balancelogs').insert({
+                user_old_balance: Number(newBalance),
+                user_new_balance: Number(newBalance) + Number(extra || 0) + Number(paymentRow?.offer_amount),
+                user_id: user.id,
+                message: `Offer Bonus Order(${receiptId})`,
+                amount: Number(paymentRow?.offer_amount) - Number(paymentRow?.amount),
+                currency: paymentRow?.currency,
+                gst: 0,
+                invoice: "",
+            });
+        }
+
+        const invoice = await generateInvoicePDF(data);
+        logger.info("payment invoice", invoice);
+        await db('payments').where({ id: paymentRow.id }).update({
+            invoice
+        });
+        await db('balancelogs').where({ id: saved.id }).update({
+            invoice
+        });
+        logger.info('xpay callback end');
+        return res.status(200).json({ success: true, message: 'Payment success updated' });
+    }
+    catch (err) {
+        logger.info('xpay callback error catch', err);
+        console.error('xpay callback:', err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
+module.exports = { razorpay, xpay };

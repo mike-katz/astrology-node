@@ -5,12 +5,16 @@ const jwt = require('jsonwebtoken');
 require('dotenv').config();
 const { validationResult } = require('express-validator');
 const { encrypt } = require("../utils/crypto")
-const { checkOrders, isValidMobile } = require('../utils/decodeJWT');
+const { checkOrders, isValidMobile, generateLoginResponse } = require('../utils/decodeJWT');
 const axios = require('axios');
+const { sendTwilioSMS } = require('../utils/twilioSms');
 const { setCache } = require('../config/redisClient');
 const sendMail = require('../utils/sendMail');
 const SALT_ROUNDS = parseInt(process.env.BCRYPT_SALT_ROUNDS || '12', 10);
 const logger = require('../utils/logger').getLogger('authController');
+const geoip = require('geoip-lite');
+const { getClientIp } = require('../utils/getClientIp');
+const { getCurrencyByCountry } = require('../utils/countryCurrencyMap');
 
 async function register(req, res) {
     try {
@@ -63,47 +67,55 @@ async function sendSMS(mobile, country_code) {
         }
         const OTP = Math.floor(100000 + Math.random() * 900000);
 
-        let config = {};
         if (country_code == '+91') {
-            config = {
+            const config = {
                 method: 'get',
                 maxBodyLength: Infinity,
                 url: `${process.env.SMS_URL}?authkey=${process.env.SMS_KEY}&mobiles=${country_code}${mobile}&message= ${OTP} is the One Time Password (OTP) for AstroGuruji Application.&sender=${process.env.SMS_SENDER_NAME}&route=4&country=91&DLT_TE_ID=${process.env.SMS_TEMPLATE}`,
-                headers: {
-                },
+                headers: {},
             };
+            const data = await axios.request(config);
+            console.log("otp response data", data);
         } else {
-            config = {
+            const otpMessage = `${OTP} is the One Time Password (OTP) for AstroGuruji Application.`;
+            const phone = `${country_code}${mobile}`;
+
+            const whatsappConfig = {
                 method: 'post',
                 maxBodyLength: Infinity,
                 url: process.env.WHATSAPP_SMS_URL,
-                // url: "https://api.verifyway.com/api/v1/",
                 headers: {
-                    // Authorization: "Bearer 2593$iKTikmAQxk3oHxWeI66keOGDu4nsw7inaMhH"
                     Authorization: "Bearer 2593$SjlOUEN6ZllXbzE1QUpOK09DVFU2dz09"
                 },
                 data: {
-                    "type": "buttonTemplate",
-                    // "templateId": "appotpwa",
-                    "templateId": "appotp",
-                    "templateLanguage": "en",
-                    "sender_phone": `${country_code + mobile}`,
-                    "templateArgs": [
-                        OTP
-                    ]
+                    type: "buttonTemplate",
+                    templateId: "appotp",
+                    templateLanguage: "en",
+                    sender_phone: phone,
+                    templateArgs: [OTP]
                 }
-                // data: {
-                //     "recipient": `${country_code + mobile}`,
-                //     "type": "otp",
-                //     "channel": "whatsapp",
-                //     "fallback": "yes",
-                //     "code": OTP,
-                //     "lang": "en"
-                // }
+            };
+
+            const [whatsappResult, twilioResult] = await Promise.allSettled([
+                axios.request(whatsappConfig),
+                sendTwilioSMS(phone, otpMessage),
+            ]);
+
+            if (whatsappResult.status === 'rejected') {
+                console.log('WhatsApp OTP failed:', whatsappResult.reason?.response?.data || whatsappResult.reason?.message);
             }
+            if (twilioResult.status === 'rejected') {
+                console.log('Twilio OTP failed:', twilioResult.reason?.message);
+            }
+            if (whatsappResult.status === 'rejected' && twilioResult.status === 'rejected') {
+                response.return = false;
+                response.message = 'Something Wrong in generate otp.';
+                return response;
+            }
+
+            console.log("otp response whatsapp", whatsappResult.status === 'fulfilled' ? whatsappResult.value?.data : null);
+            console.log("otp response twilio", twilioResult.status === 'fulfilled' ? twilioResult.value?.sid : null);
         }
-        const data = await axios.request(config);
-        console.log("otp response data", data);
         const upd = {
             otp: OTP,
             mobile,
@@ -177,17 +189,26 @@ async function login(req, res) {
     try {
         console.log("login body param", req.body);
         logger.info('login called')
-        const { mobile, country_code = '+91' } = req.body;
+        const { mobile, country_code = '+91', device_id } = req.body;
 
         if (!mobile || !country_code) return res.status(400).json({ success: false, message: 'Mobile number required.' });
         const isValid = isValidMobile(mobile);
         if (!isValid) return res.status(400).json({ success: false, message: 'Enter valid mobile number.' });
+
         const user = await db('users').where({ country_code, mobile }).first();
         if (user && user?.status == 'block') {
             return res.status(400).json({ success: false, message: 'Your account is blocked.' });
         }
         if (user && user?.status == 'inactive') {
             return res.status(400).json({ success: false, message: 'Oops! Your account is inactive right now. Please contact support.' });
+        }
+        if (!user) {
+            if (device_id) {
+                const devices = await db('users').where({ device_id }).first();
+                if (devices) {
+                    return res.status(400).json({ success: false, message: 'This device is already linked to another account. Please sign in using the existing account or contact support if you need assistance.' });
+                }
+            }
         }
         let newMobile = mobile
         console.log("mobile.length", mobile.length);
@@ -231,7 +252,7 @@ function isNumber(str) {
 async function verifyOtp(req, res) {
     try {
         console.log("verifyOtp req.body", req.body);
-        let { mobile, country_code = '+91', otp, ad_set_id, utm_source, ad_id, type, version, referrer } = req.body;
+        let { mobile, country_code = '+91', otp, ad_set_id, utm_source, ad_id, type, version, referrer, device_id } = req.body;
         if (!mobile || !otp || !country_code) return res.status(400).json({ success: false, message: 'Mobile number and otp required.' });
 
         const isValid = isValidMobile(mobile);
@@ -308,34 +329,25 @@ async function verifyOtp(req, res) {
                 }
             }
         }
-
+        let currency = existing?.default_currency || 'INR';
         if (!existing) {
-            [existing] = await db('users').insert({ mobile, country_code, status: "active", balance: 0, ad_set_id: set_id, utm_source, ad_id, mode, version, is_free_order_available: true }).returning(['id', 'mobile', 'avatar', 'country_code', 'otp', 'is_free_order_available']);
+            const ip = await getClientIp(req);
+            if (ip) {
+                console.log("ip", ip);
+                const geo = await geoip.lookup(ip);
+                const country = geo ? geo.country : 'IN';
+                console.log("country", country);
+                currency = await getCurrencyByCountry(country);
+                console.log("currency", currency);
+                currency = currency?.currency
+            }
+            [existing] = await db('users').insert({ mobile, country_code, status: "active", balance: 0, ad_set_id: set_id, utm_source, ad_id, mode, version, is_free_order_available: true, default_currency: currency, permanent_currency: currency, device_id }).returning(['id', 'mobile', 'avatar', 'country_code', 'otp', 'is_free_order_available', 'permanent_currency', 'default_currency']);
         }
         if (Object.keys(upd).length > 0) {
             await db('users').where({ id: Number(existing?.id) }).update(upd)
         }
-        const token = jwt.sign({ userId: existing.id, username: existing.name, mobile: existing.mobile }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '1h' });
-        // hide password
-        const encryptToken = encrypt(token);
-
-        // Store token in Redis with key user_username (or user_mobile if username doesn't exist)
-        const username = existing.id;
-        const redisKey = `user_${username}`;
-        // Set TTL to match JWT expiration (1 hour = 3600 seconds)
-        const jwtExpiry = process.env.JWT_EXPIRES_IN || '1h';
-        let ttlSeconds = 3600; // default 1 hour
-        if (jwtExpiry.includes('h')) {
-            ttlSeconds = parseInt(jwtExpiry.replace('h', '')) * 3600;
-        }
-        await setCache(redisKey, encryptToken, ttlSeconds);
-
-        const [{ count }] = await db('orders')
-            .count('* as count')
-            .where({ user_id: existing.id })
-            .whereIn('status', ['continue', 'completed', 'pending']);
-        const is_free = count == 0 || existing?.is_free_order_available ? true : false
-        return res.status(200).json({ success: true, data: { id: existing?.id, name: existing?.name, profile: existing?.profile, avatar: existing?.avatar, mobile: existing?.mobile, country_code: existing?.country_code, token: encryptToken, is_free }, message: 'Otp Verify Successfully' });
+        const response = await generateLoginResponse(existing, currency)
+        return res.status(200).json(response);
     } catch (err) {
         console.error(err);
         res.status(500).json({ success: false, message: 'Server error' });
@@ -473,7 +485,8 @@ async function googleLogin(req, res) {
         // const email = tokenPayload.email || null;
         // const name = tokenPayload.name || (email ? email.split('@')[0] : null) || 'User';
         // const picture = tokenPayload.picture || null;
-        let { ad_set_id, utm_source, ad_id, type, version, referrer, email } = req.query;
+        let { ad_set_id, utm_source, ad_id, type, version, referrer, email, device_id } = req.query;
+
         let existing = await db('users').whereNull('deleted_at').where({ email }).first();
 
         if (existing?.status === 'block') {
@@ -507,8 +520,21 @@ async function googleLogin(req, res) {
                 upd.ad_set_id = Number(set_id);
             }
         }
+        const ip = getClientIp(req);
+        let currency;
+        if (ip) {
+            const geo = geoip.lookup(ip);
+            const country = geo ? geo.country : 'IN';
+            currency = getCurrencyByCountry(country);
+            currency = currency?.currency
+        }
+        currency = existing?.default_currency || 'INR';
 
         if (!existing) {
+            if (device_id) {
+                const devices = await db('users').where({ device_id }).first();
+                if (devices) return res.status(400).json({ success: false, message: 'This device is already linked to another account. Please sign in using the existing account or contact support if you need assistance.' });
+            }
             const insertRow = {
                 // google_id: sub,
                 email,
@@ -522,6 +548,8 @@ async function googleLogin(req, res) {
                 version: version || null,
                 utm_source: utm_source || null,
                 ad_id: ad_id || null,
+                permanent_currency: currency,
+                default_currency: currency,
                 ad_set_id: set_id != null && isNumber(set_id) ? Number(set_id) : null,
             };
             [existing] = await db('users').insert(insertRow).returning([
@@ -533,6 +561,8 @@ async function googleLogin(req, res) {
                 'name',
                 'profile',
                 'email',
+                'permanent_currency',
+                'default_currency'
                 // 'google_id',
             ]);
         } else {
@@ -554,43 +584,8 @@ async function googleLogin(req, res) {
             }
             existing = await db('users').where({ id: existing.id }).first();
         }
-
-        const token = jwt.sign(
-            { userId: existing.id, username: existing.name, mobile: existing.mobile },
-            process.env.JWT_SECRET,
-            { expiresIn: process.env.JWT_EXPIRES_IN || '1h' },
-        );
-        const encryptToken = encrypt(token);
-
-        const username = existing.id;
-        const redisKey = `user_${username}`;
-        const jwtExpiry = process.env.JWT_EXPIRES_IN || '1h';
-        let ttlSeconds = 3600;
-        if (jwtExpiry.includes('h')) {
-            ttlSeconds = parseInt(jwtExpiry.replace('h', ''), 10) * 3600;
-        }
-        await setCache(redisKey, encryptToken, ttlSeconds);
-
-        const [{ count }] = await db('orders')
-            .count('* as count')
-            .where({ user_id: existing?.id })
-            .whereIn('status', ['continue', 'completed', 'pending']);
-        const is_free = count == 0;
-
-        return res.status(200).json({
-            success: true,
-            data: {
-                id: existing?.id,
-                name: existing?.name,
-                profile: existing?.profile,
-                avatar: existing?.avatar,
-                mobile: existing?.mobile,
-                country_code: existing?.country_code,
-                token: encryptToken,
-                is_free,
-            },
-            message: 'Google sign-in successful',
-        });
+        const response = await generateLoginResponse(existing, currency)
+        return res.status(200).json(response);
     } catch (err) {
         logger.error(err);
         res.status(500).json({ success: false, message: 'Server error' });
@@ -662,7 +657,11 @@ async function verifyAppleIdentityToken(identityToken, audiences) {
  */
 async function appleLogin(req, res) {
     try {
-        const { ad_set_id, utm_source, ad_id, type, version, referrer, token: userToken } = req.query;
+        const { ad_set_id, utm_source, ad_id, type, version, referrer, token: userToken, device_id } = req.query;
+        const devices = await db('users').where({ device_id }).first();
+        if (devices) {
+            if (devices?.email != userToken) { return res.status(400).json({ success: false, message: 'This device is already linked to another account. Please sign in using the existing account or contact support if you need assistance.' }); }
+        }
         let existing = await db('users').whereNull('deleted_at').where({ email: userToken }).first();
 
         if (existing?.status === 'block') {
@@ -697,7 +696,21 @@ async function appleLogin(req, res) {
             }
         }
 
+        const ip = getClientIp(req);
+        let currency;
+        if (ip) {
+            const geo = geoip.lookup(ip);
+            const country = geo ? geo.country : 'IN';
+            currency = getCurrencyByCountry(country);
+            currency = currency?.currency
+        }
+        currency = existing?.default_currency || 'INR';
+
         if (!existing) {
+            if (device_id) {
+                const devices = await db('users').where({ device_id }).first();
+                if (devices) return res.status(400).json({ success: false, message: 'This device is already linked to another account. Please sign in using the existing account or contact support if you need assistance.' });
+            }
             const insertRow = {
                 // google_id: sub,
                 email: userToken,
@@ -710,6 +723,8 @@ async function appleLogin(req, res) {
                 mode,
                 version: version || null,
                 utm_source: utm_source || null,
+                permanent_currency: currency,
+                default_currency: currency,
                 ad_id: ad_id || null,
                 ad_set_id: set_id != null && isNumber(set_id) ? Number(set_id) : null,
             };
@@ -722,6 +737,8 @@ async function appleLogin(req, res) {
                 'name',
                 'profile',
                 'email',
+                'permanent_currency',
+                'default_currency'
                 // 'google_id',
             ]);
         } else {
@@ -743,43 +760,45 @@ async function appleLogin(req, res) {
             }
             existing = await db('users').where({ id: existing.id }).first();
         }
+        const response = await generateLoginResponse(existing, currency)
+        return res.status(200).json(response);
 
-        const token = jwt.sign(
-            { userId: existing.id, username: existing.name, mobile: existing.mobile },
-            process.env.JWT_SECRET,
-            { expiresIn: process.env.JWT_EXPIRES_IN || '1h' },
-        );
-        const encryptToken = encrypt(token);
+        // const token = jwt.sign(
+        //     { userId: existing.id, username: existing.name, mobile: existing.mobile },
+        //     process.env.JWT_SECRET,
+        //     { expiresIn: process.env.JWT_EXPIRES_IN || '1h' },
+        // );
+        // const encryptToken = encrypt(token);
 
-        const username = existing.id;
-        const redisKey = `user_${username}`;
-        const jwtExpiry = process.env.JWT_EXPIRES_IN || '1h';
-        let ttlSeconds = 3600;
-        if (jwtExpiry.includes('h')) {
-            ttlSeconds = parseInt(jwtExpiry.replace('h', ''), 10) * 3600;
-        }
-        await setCache(redisKey, encryptToken, ttlSeconds);
+        // const username = existing.id;
+        // const redisKey = `user_${username}`;
+        // const jwtExpiry = process.env.JWT_EXPIRES_IN || '1h';
+        // let ttlSeconds = 3600;
+        // if (jwtExpiry.includes('h')) {
+        //     ttlSeconds = parseInt(jwtExpiry.replace('h', ''), 10) * 3600;
+        // }
+        // await setCache(redisKey, encryptToken, ttlSeconds);
 
-        const [{ count }] = await db('orders')
-            .count('* as count')
-            .where({ user_id: existing?.id })
-            .whereIn('status', ['continue', 'completed', 'pending']);
-        const is_free = count == 0;
+        // const [{ count }] = await db('orders')
+        //     .count('* as count')
+        //     .where({ user_id: existing?.id })
+        //     .whereIn('status', ['continue', 'completed', 'pending']);
+        // const is_free = count == 0;
 
-        return res.status(200).json({
-            success: true,
-            data: {
-                id: existing?.id,
-                name: existing?.name,
-                profile: existing?.profile,
-                avatar: existing?.avatar,
-                mobile: existing?.mobile,
-                country_code: existing?.country_code,
-                token: encryptToken,
-                is_free,
-            },
-            message: 'Apple sign-in successful',
-        });
+        // return res.status(200).json({
+        //     success: true,
+        //     data: {
+        //         id: existing?.id,
+        //         name: existing?.name,
+        //         profile: existing?.profile,
+        //         avatar: existing?.avatar,
+        //         mobile: existing?.mobile,
+        //         country_code: existing?.country_code,
+        //         token: encryptToken,
+        //         is_free,
+        //     },
+        //     message: 'Apple sign-in successful',
+        // });
     } catch (err) {
         logger.error(err);
         res.status(500).json({ success: false, message: 'Server error' });

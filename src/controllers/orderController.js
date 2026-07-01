@@ -9,6 +9,8 @@ const { callEvent } = require("../socket");
 const { channelLeave } = require('./agoraController');
 const { replaceTemplate } = require('../utils/replaceTemplate');
 const { readJoinedUserIds, emitLiveChatMessage } = require('./liveStreamingController');
+const { convertCurrency } = require('../utils/decodeJWT');
+const { getCurrencySymbolByCurrency } = require('../utils/countryCurrencyMap');
 
 async function sendAutoMessage(profile, userId, orderId, panditId) {
     const panditIdNum = panditId != null && panditId !== '' ? Number(panditId) : null;
@@ -552,6 +554,16 @@ const ORDER_LIST_STATUS_RANK_SQL = `
 
 const ORDER_LIST_MAX_LIMIT = 100;
 
+function formatOrderAmounts(order, userInrRate, currencySymbol) {
+    const rate = userInrRate || 1;
+    return {
+        ...order,
+        rate: order?.rate != null ? convertCurrency(order.rate, rate) : order.rate,
+        deduction: order?.deduction != null ? convertCurrency(order.deduction, rate) : order.deduction,
+        currency: currencySymbol,
+    };
+}
+
 /**
  * Order list: one row per pandit, last chat per order.
  * Perf: subquery DISTINCT ON first (no full chats denormalized join on every order row);
@@ -609,7 +621,17 @@ async function list(req, res) {
             .whereNot('o.status', 'cancel')
             .countDistinct('o.pandit_id as count');
 
-        let [order, countRows] = await Promise.all([listPromise, countPromise]);
+        const userPromise = db('users').where({ id: req.userId }).select('default_currency').first();
+
+        let [order, countRows, userDetail] = await Promise.all([listPromise, countPromise, userPromise]);
+
+        const userCurrency = userDetail?.default_currency || 'INR';
+        const currencyData = await db('currency')
+            .where({ currency_name: userCurrency })
+            .select('user_inr_rate')
+            .first();
+        const userInrRate = currencyData?.user_inr_rate || 1;
+        const currencySymbol = getCurrencySymbolByCurrency(userCurrency);
 
         if (!skipLastMessage && order.length > 0) {
             const lastMessages = await Promise.all(
@@ -636,10 +658,12 @@ async function list(req, res) {
                 })
             );
 
-            order = order.map((item, idx) => ({
+            order = order.map((item, idx) => formatOrderAmounts({
                 ...item,
                 last_message: lastMessages[idx] || null,
-            }));
+            }, userInrRate, currencySymbol));
+        } else {
+            order = order.map((item) => formatOrderAmounts(item, userInrRate, currencySymbol));
         }
 
         const count = countRows[0]?.count ?? 0;
@@ -944,13 +968,18 @@ async function sendGift(req, res) {
         }
         const pandit = await db('pandits').where({ id: pandit_id }).first();
         const user = await db('users').where({ id: req.userId }).first();
+        if (user?.offer_amount > 0) {
+            return res.status(400).json({ success: false, message: 'please complete order first.' });
+        }
         const order = await db('orders').where({ user_id: req.userId, status: "continue" }).first();
+
         if (order) {
             logger.info('order_sendGift fail', { userId: req.userId, message: 'please finish your continue order.' });
             return res.status(400).json({ success: false, message: 'please finish your continue order.' });
         }
-
-        const final = qty * amount
+        // const currencyRate = await db('currency').where('currency_name', (user?.default_currency || 'INR')).first();
+        // const finalAmount = Number(amount) * Number(currencyRate?.user_inr_rate || 1);
+        const final = amount
         if (user?.balance < Number(final)) {
             logger.info('order_sendGift fail', { userId: req.userId, message: 'Insufficient balance.' });
             return res.status(400).json({ success: false, message: 'Insufficient balance.' });
@@ -969,10 +998,16 @@ async function sendGift(req, res) {
         await db('users').where({ id: user?.id }).increment({ balance: -Number(final) });
         const newBalance = Number(user.balance) - Number(final)
         const pandit_new_balance = Number(pandit.balance) + Number(panditAmount)
-        await db('balancelogs').insert({ pandit_old_balance: Number(pandit?.balance), pandit_new_balance, user_old_balance: Number(user.balance), user_new_balance: Number(newBalance), user_id: req.userId, message: `Send gift to ${pandit?.display_name} (${name}) - ${qty}`, pandit_id: pandit?.id, pandit_message: `Receive gift from ${user?.name} (${name}) - ${qty}`, pandit_amount: panditAmount, amount: - final });
+        await db('balancelogs').insert({ currency: user?.default_currency, pandit_old_balance: Number(pandit?.balance), pandit_new_balance, user_old_balance: Number(user.balance), user_new_balance: Number(newBalance), user_id: req.userId, message: `Send gift to ${pandit?.display_name} (${name}) - ${qty}`, pandit_id: pandit?.id, pandit_message: `Receive gift from ${user?.name} (${name}) - ${qty}`, pandit_amount: panditAmount, amount: - final, currency: user?.default_currency });
         logger.info('order_sendGift success', { userId: req.userId, pandit_id, amount: final });
 
         if (is_live) {
+            const currencyData = await db('currency').where({ currency_name: user?.default_currency }).first();
+            console.log("currencyData", currencyData);
+            const balance = await convertCurrency(amount, (currencyData?.user_inr_rate || 1));
+            const symbol = getCurrencySymbolByCurrency(user?.default_currency)
+            console.log("balance", balance);
+            console.log("symbol", symbol);
             callEvent("emit_to_live_gift_send", {
                 key: `pandit_${pandit_id}`,
                 payload: { name, user_id: req.userId, username: user?.name, avatar: user?.avatar, profile: user?.profile, amount, qty, is_live },
@@ -985,18 +1020,23 @@ async function sendGift(req, res) {
                 avatar: user?.avatar,
                 gift_name: name,
                 amount,
+                currency: '₹',
                 channel_id: channel?.channel_id
             }
+
             if (channel?.channel_id) {
                 const joined_user_ids = await readJoinedUserIds(channel?.channel_id);
-
                 const base = payload;
                 for (const user_id of joined_user_ids) {
                     const uid = user_id != null && Number.isFinite(Number(user_id)) ? Number(user_id) : null;
-                    if (uid != null) {
+                    if (uid != null && Number(uid) != Number(req.userId)) {
                         callEvent('emit_to_user_send_gift', { key: `user_${uid}`, payload: base });
                     }
                 }
+                payload.amount = balance
+                payload.currency = symbol
+                console.log("payload", payload);
+                callEvent('emit_to_user_send_gift', { key: `user_${req.userId}`, payload });
             }
         }
         return res.status(200).json({ success: true, message: 'Order cancel Successfully' });

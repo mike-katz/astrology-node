@@ -6,6 +6,8 @@ const logger = require('../utils/logger').getLogger('liveStreamingController');
 const { RtcTokenBuilder, RtcRole } = require('agora-access-token');
 const { channelLeave, geneateToken } = require('./agoraController');
 const { balanceCut } = require('./chatController');
+const { getCurrencySymbolByCurrency } = require('../utils/countryCurrencyMap');
+const { convertCurrency } = require('../utils/decodeJWT');
 
 require('dotenv').config();
 
@@ -213,6 +215,10 @@ async function listLive(req, res) {
         const data = await Promise.all(
             rows.map(async (r) => {
                 const isFollow = followData.find(i => i.pandit_id == r.pandit_id);
+                const userCurrency = await db('users').where({ id: Number(req.userId) }).select('default_currency').first();
+                const currency = await getCurrencySymbolByCurrency(userCurrency?.default_currency);
+                const currencyData = await db('currency').select('currency_name', 'pandit_inr_rate').where({ currency_name: userCurrency?.default_currency }).first();
+
                 return {
                     channel_id: r.channel_id,
                     title: r.title,
@@ -233,7 +239,9 @@ async function listLive(req, res) {
                         rating_3: r.rating_3,
                         rating_4: r.rating_4,
                         rating_5: r.rating_5,
-                        final_chat_call_rate: r.final_chat_call_rate,
+                        final_chat_call_rate: convertCurrency(r.final_chat_call_rate, (currencyData?.pandit_inr_rate || 1)),
+                        // final_chat_call_rate: r.final_chat_call_rate,
+                        currency
                     }
                 };
             })
@@ -555,19 +563,26 @@ async function createMediaOrder(req, res) {
         }
 
         const pandit = await db('pandits').where({ id: Number(pandit_id) }).first();
-        const [{ count }] = await db('orders')
-            .count('* as count')
-            .where({ user_id: req.userId })
-            .whereIn('status', ['continue', 'completed', 'pending']);
-        let duration = Math.floor(Number(Number(user?.balance)) / Number(pandit?.final_chat_call_rate));
+        let count = 1;
+        console.log("user?.offer_amount", user?.offer_amount);
+        if (user?.offer_amount > 0) {
+            const isOfferOrder = await db('orders').where({ user_id: req.userId, status: "completed", is_offer: true }).first()
+            if (!isOfferOrder) {
+                count = 0;
+            }
+        }
+        const currencyData = await db('currency').select('currency_name', 'user_inr_rate', 'pandit_inr_rate').where({ currency_name: user?.default_currency }).first();
+        let panditRate = convertCurrency(pandit?.final_chat_call_rate, (currencyData?.pandit_inr_rate || 1));
+        panditRate = Number(panditRate) * Number(currencyData?.user_inr_rate || 1)
+        const userBalance = user?.balance
+
+        let duration = Math.floor(Number(Number(userBalance)) / Number(panditRate));
         let deduction = Number(duration) * Number(pandit?.final_chat_call_rate)
-        let rate = pandit?.final_chat_call_rate;
+        let rate = panditRate;
         const settings = await db('settings').first();
-        if (count == 0 || user?.is_free_order_available) {
-            duration = Number(settings?.free_chat_minutes) || 0;
-            deduction = 0;
-            rate = settings?.free_chat_amount_per_minute || 1;
-        } else {
+        const isFreeOrderAvail = user?.is_free_order_available || false
+
+        if (count != 0) {
             const minTime = Number(settings?.min_minutes_required_balance) || 5
             if (user?.balance < minTime) {
                 logger.info('order_create fail', { userId: req.userId, message: 'Please recharge your wallet.' });
@@ -581,6 +596,29 @@ async function createMediaOrder(req, res) {
                 logger.info('order_create fail', { userId: req.userId, message: 'Min. 5 min balance required.' });
                 return res.status(400).json({ success: false, message: 'Min. 5 min balance required.' });
             }
+
+            // }
+            // const order = await db('orders').where({ user_id: req.userId, pandit_id: panditId }).first()
+            // console.log("duration", duration);
+            if (!Number.isFinite(duration)) {
+                logger.info('order_create fail', { userId: req.userId, message: 'Min. 5 min balance required.' });
+                return res.status(400).json({ success: false, message: 'Min. 5 min balance required.' });
+            }
+
+            if (isNaN(deduction)) {
+                logger.info('order_create fail', { userId: req.userId, message: 'Balance could not be NaN.' });
+                return res.status(400).json({ success: false, message: 'Balance could not be NaN.' });
+            }
+        } else {
+            const currencyItem = JSON.parse(settings?.currency_amount || '[]').find(
+                item => item?.currency === (user?.default_currency || 'INR')
+            );
+
+            if ((user?.balance) < currencyItem?.amount) {
+                logger.info('order_create fail', { userId: req.userId, message: 'Please recharge your wallet.' });
+                return res.status(400).json({ success: false, message: 'Please recharge your wallet.' });
+            }
+            deduction = currencyItem?.amount
         }
 
         const orderId = `${new Date().getTime().toString()}${Math.floor(100000 + Math.random() * 900000).toString()}`;
@@ -594,23 +632,22 @@ async function createMediaOrder(req, res) {
         }
 
         const ins = {
-            pandit_id: pandit?.id,
+            pandit_id,
             user_id: req.userId,
             order_id: orderId,
-            status: 'pending',
+            status: "pending",
             rate,
             duration,
             deduction,
             type,
             profile_id,
+            currency: user?.default_currency,
             is_free: false,
-        };
-        const upd = { is_free_order: 'paid' };
-        if (count == 0 || user?.is_free_order_available) {
-            ins.is_free = true
         }
+
+        const upd = { is_free_order: "paid" }
         if (count == 0) {
-            upd.is_free_order = "free"
+            ins.is_offer = true
         }
         await db('users').where({ id: Number(req.userId) }).update(upd);
         await db('orders').insert(ins).returning('*');
@@ -783,7 +820,6 @@ async function stopLive(req, res) {
     const { channel_id } = req.body
     try {
         return res.status(200).json({ success: false, message: 'Live ended.' });
-
         const active = await db('live_streams').where({ channel_id, status: 'live' }).first();
         if (!active) {
             return res.status(200).json({ success: false, message: 'No active live to stop.' });
