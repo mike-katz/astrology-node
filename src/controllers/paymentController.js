@@ -199,7 +199,7 @@ async function initRazorpayPayment({ user, userId, amount, currencyRate, gateway
         notes: { user_id: String(userId) },
     });
 
-    const offer_amount = await getFirstRechargeOfferAmount(user, dbAmount);
+    const offer_amount = await getFirstRechargeOfferAmount(user, amount);
     if (offer_amount > 0) {
         dbGst = 0;
         dbAmount = amount
