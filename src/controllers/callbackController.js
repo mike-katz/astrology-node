@@ -60,7 +60,7 @@ async function getRechargeBonus(user, paymentRow) {
     const currencyTax = taxPercent + 100;
 
     const matched = amountsList.find((a) => {
-        const rechargeBaseInr = Math.round(((Number(a.amount) * 100) / currencyTax) * inrRate * 100);
+        const rechargeBaseInr = Math.round((Number(a.amount)) * inrRate * 100);
         const paymentInrAmount = Math.round(Number(paymentRow.amount) * 100);
         return rechargeBaseInr === paymentInrAmount;
     });
