@@ -656,6 +656,7 @@ async function getGiftList(req, res) {
         let result = await db('gifts')
             .whereRaw("(amount::jsonb)->>? IS NOT NULL", [currency])
             .whereNull('deleted_at')
+            .orderBy('id', 'asc')
         if (result?.length > 0) {
             const symbol = getCurrencySymbolByCurrency(currency);
             const rate = await db('currency').where({ currency_name: currency }).select('user_inr_rate').first();
