@@ -83,7 +83,7 @@ const generateLoginResponse = async (existing, currency) => {
 
     // Store token in Redis with key user_username (or user_mobile if username doesn't exist)
     const username = existing.id;
-    const redisKey = `beta_user_${username}`;
+    const redisKey = `user_${username}`;
     // Set TTL to match JWT expiration (1 hour = 3600 seconds)
     const jwtExpiry = process.env.JWT_EXPIRES_IN || '1h';
     let ttlSeconds = 3600; // default 1 hour

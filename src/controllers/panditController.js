@@ -189,7 +189,7 @@ async function getPandits(req, res) {
                 console.log("token", token);
                 const tokenData = decodeJWT(authHeader)
                 if (tokenData?.success || tokenData?.data?.userId) {
-                    const redisKey = `beta_user_${tokenData?.data?.userId}`;
+                    const redisKey = `user_${tokenData?.data?.userId}`;
                     const redisToken = await getCache(redisKey);
                     if (redisToken == token) {
                         const userId = tokenData?.data?.userId
