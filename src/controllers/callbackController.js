@@ -247,7 +247,7 @@ async function razorpay(req, res) {
                 user_old_balance: Number(newBalance),
                 user_new_balance: Number(newBalance) + Number(extra || 0) + Number(paymentRow?.offer_amount),
                 user_id: user.id,
-                message: `Offer Bonus Order(${receiptId})`,
+                message: `Offer Bonus Order(${orderId})`,
                 amount: Number(paymentRow?.offer_amount) - Number(paymentRow?.amount),
                 currency: paymentRow?.currency,
                 gst: 0,
