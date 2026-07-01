@@ -240,6 +240,20 @@ async function razorpay(req, res) {
                 invoice: "",
             });
         }
+
+        if (paymentRow?.offer_amount > 0) {
+            await db('balancelogs').insert({
+                user_old_balance: Number(newBalance),
+                user_new_balance: Number(newBalance) + Number(extra || 0) + Number(paymentRow?.offer_amount),
+                user_id: user.id,
+                message: `Offer Bonus Order(${receiptId})`,
+                amount: Number(paymentRow?.offer_amount) - Number(paymentRow?.amount),
+                currency: paymentRow?.currency,
+                gst: 0,
+                invoice: "",
+            });
+        }
+
         const order = await db('orders').where({ user_id: user.id, status: 'continue', is_free: false }).first();
         if (order) {
             const minute = Math.floor(Number(paymentRow?.amount) / Number(order?.rate || order?.final_chat_call_rate || 1));
