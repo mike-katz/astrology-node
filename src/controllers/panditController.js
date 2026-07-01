@@ -1,22 +1,171 @@
 const db = require('../db');
 const { decrypt, encrypt } = require('../utils/crypto');
-const { decodeJWT } = require('../utils/decodeJWT');
+const { decodeJWT, deepParse, convertCurrency } = require('../utils/decodeJWT');
 require('dotenv').config();
-const { uploadImageTos3, deleteFileFroms3 } = require('./uploader');
 const jwt = require('jsonwebtoken');
 const { isValidMobile } = require('../utils/decodeJWT');
 const axios = require('axios');
 const sendMail = require('../utils/sendMail');
-const { getCache } = require("../config/redisClient")
+const { getCache } = require("../config/redisClient");
+const { uploadImageToAzure, deleteFileFromAzure } = require('../utils/azureUploader');
+const { sendSMS, verifySMS } = require('./authController');
+const { getClientIp } = require('../utils/getClientIp');
+const { getCurrencyByCountry, getCurrencySymbolByCurrency } = require('../utils/countryCurrencyMap');
+const geoip = require('geoip-lite');
+
+const PANDIT_LIST_MAX = 150;
+
+const PANDIT_LIST_SELECT = [
+    'p.display_name as name',
+    'p.id',
+    'p.languages',
+    'p.experience',
+    'p.profile',
+    'p.available_for',
+    'p.total_chat_minutes',
+    'p.total_call_minutes',
+    'p.primary_expertise',
+    'p.secondary_expertise',
+    'p.discounted_chat_call_rate',
+    'p.final_chat_call_rate',
+    'p.waiting_time',
+    'p.unlimited_free_calls_chats',
+    'p.chat',
+    'p.call',
+    'p.online',
+    'p.rating_1',
+    'p.rating_2',
+    'p.rating_3',
+    'p.rating_5',
+    'p.rating_4',
+    'p.total_orders',
+    'p.tag',
+    'p.chat_call_rate',
+];
+
+const RATING_RATIO_RAW = `
+    CASE 
+        WHEN (COALESCE(p.rating_1, 0) + COALESCE(p.rating_2, 0) + COALESCE(p.rating_3, 0) + COALESCE(p.rating_4, 0) + COALESCE(p.rating_5, 0)) > 0 
+        THEN (COALESCE(p.rating_5, 0) + COALESCE(p.rating_4, 0))::float / 
+             (COALESCE(p.rating_1, 0) + COALESCE(p.rating_2, 0) + COALESCE(p.rating_3, 0) + COALESCE(p.rating_4, 0) + COALESCE(p.rating_5, 0))::float
+        ELSE 0 
+    END
+`;
+
+function applyChatCallFilter(query, { type, isFree, search }) {
+    if (search?.trim()) return query;
+    if (isFree) {
+        return query.andWhere(function () {
+            this.where('p.chat', true).orWhere('p.call', true);
+        });
+    }
+    return query.andWhere(function () {
+        if (type === 'call') this.where('p.call', true);
+        if (type === 'chat') this.where('p.chat', true);
+    });
+}
+
+function applyPanditFilters(query, { search, secondary_expertise, skill, language, gender, top_astrologers, country }) {
+    if (search?.trim()) {
+        query.andWhere('p.display_name', 'ilike', `%${search.trim()}%`);
+    }
+
+    if (secondary_expertise && secondary_expertise != 'all') {
+        query.andWhere('p.secondary_expertise', 'ILIKE', `%${secondary_expertise.trim()}%`);
+    }
+
+    if (Array.isArray(skill) && skill.length) {
+        const skills = skill.map(s => s?.trim()).filter(Boolean).map(s => `%${s}%`);
+        query.andWhereRaw(
+            `p.primary_expertise ILIKE ANY (ARRAY[${skills.map(() => '?').join(',')}])`,
+            skills
+        );
+    }
+
+    if (Array.isArray(language) && language.length) {
+        const languages = language.map(s => s?.trim()).filter(Boolean).map(s => `%${s}%`);
+        query.andWhereRaw(
+            `p.languages ILIKE ANY (ARRAY[${languages.map(() => '?').join(',')}])`,
+            languages
+        );
+    }
+
+    if (Array.isArray(gender) && gender.length) {
+        const genders = gender.map(g => g?.trim().toLowerCase()).filter(Boolean);
+        query.whereIn(db.raw('LOWER(p.gender)'), genders);
+    }
+
+    if (Array.isArray(top_astrologers) && top_astrologers.length && !top_astrologers.includes('All')) {
+        const tags = top_astrologers.map(g => g?.trim().toLowerCase()).filter(Boolean);
+        query.whereIn(db.raw('LOWER(p.tag)'), tags);
+    }
+
+    if (Array.isArray(country) && country.length == 1) {
+        if (country[0] == 'India') {
+            query.andWhere('p.country', 'India');
+        } else {
+            query.andWhereNot('p.country', 'India');
+        }
+    }
+
+    return query;
+}
+
+function applyPanditSort(query, { sort_by, sorting }) {
+    if (sort_by == 'rating_high_to_low') {
+        query.orderByRaw(RATING_RATIO_RAW + ' DESC').orderBy('p.total_orders', 'desc');
+    } else if (sort_by == 'rating_low_to_high') {
+        query.orderByRaw(RATING_RATIO_RAW + ' ASC').orderBy('p.total_orders', 'desc');
+    } else if (sorting?.length > 0) {
+        query.orderBy(sorting);
+    }
+    query.orderByRaw('RANDOM()');
+    return query;
+}
+
+function excludePanditIds(query, excludeIds) {
+    if (excludeIds.length > 0) {
+        query.whereNotIn('p.id', excludeIds);
+    }
+    return query;
+}
+
+function formatPanditResults(user, currency, currencyData) {
+    const symbol = getCurrencySymbolByCurrency(currency);
+    return user.map(item => {
+        item.currency = symbol;
+        item.chat_call_rate = convertCurrency(item.chat_call_rate, (currencyData?.pandit_inr_rate || 1));
+        item.discounted_chat_call_rate = convertCurrency(item.discounted_chat_call_rate, (currencyData?.pandit_inr_rate || 1));
+        item.final_chat_call_rate = convertCurrency(item.final_chat_call_rate, (currencyData?.pandit_inr_rate || 1));
+        item.govt_id = item?.govt_id ? deepParse(item?.govt_id) : [];
+        item.available_for = item?.available_for ? deepParse(item?.available_for) : [];
+        item.languages = item?.languages ? deepParse(item?.languages) : [];
+        item.primary_expertise = item?.primary_expertise ? deepParse(item?.primary_expertise) : [];
+        item.secondary_expertise = item?.secondary_expertise ? deepParse(item?.secondary_expertise) : [];
+        item.certificate = item?.certificate ? deepParse(item?.certificate) : [];
+        if (item?.unlimited_free_calls_chats) {
+            item.chat = true;
+        }
+        return item;
+    });
+}
 
 async function getPandits(req, res) {
     try {
-        // console.log("req.query", req.query);
+        const ip = getClientIp(req);
+        let currency = "INR";
+        if (ip) {
+            const geo = geoip.lookup(ip);
+            const country = geo ? geo.country : 'IN';
+            currency = getCurrencyByCountry(country);
+            currency = currency?.currency
+        }
+        console.log("pandit list req.query", req.query);
         const reqPage = parseInt(req.query.page) || 1;
         if (reqPage != 1) {
             const response = {
                 page: reqPage,
-                limit: 100,
+                limit: PANDIT_LIST_MAX,
                 total: 0,
                 totalPages: 1,
                 results: []
@@ -24,10 +173,8 @@ async function getPandits(req, res) {
             return res.status(200).json({ success: true, data: response, message: 'List success' });
         }
         let page = 1;
-        let limit = 100
-        //  parseInt(req.query.limit) || 20;
+        let limit = PANDIT_LIST_MAX;
         if (page < 1) page = 1;
-        // if (limit < 1) limit = 100;
         const offset = (page - 1) * limit;
         let { type = "chat", search, sort_by, skill, language, gender, country, offer, top_astrologers, secondary_expertise } = req.query
         const filter = {
@@ -39,24 +186,26 @@ async function getPandits(req, res) {
         if (authHeader) {
             const token = authHeader?.split(' ')[1];
             if (token) {
-                const decryptToken = decrypt(token);
-                if (decryptToken) {
-                    const verified = jwt.verify(decryptToken, process.env.JWT_SECRET);
-                    const username = verified?.userId;
-                    const redisKey = `user_${username}`;
+                console.log("token", token);
+                const tokenData = decodeJWT(authHeader)
+                if (tokenData?.success || tokenData?.data?.userId) {
+                    const redisKey = `beta_user_${tokenData?.data?.userId}`;
                     const redisToken = await getCache(redisKey);
-
-                    if (!redisToken || redisToken == token) {
+                    if (redisToken == token) {
+                        const userId = tokenData?.data?.userId
+                        console.log("inside token");
                         const [{ count }] = await db('orders')
                             .count('* as count')
-                            .where({ user_id: username })
+                            .where({ user_id: Number(userId) })
                             .whereIn('status', ['continue', 'completed', 'pending']);
                         isFree = count == 0 ? true : false;
+                        const userData = await db('users').select('language', 'default_currency').where({ id: Number(userId) }).first();
+                        console.log("userData", userData?.default_currency);
+                        if (userData) {
+                            currency = userData?.default_currency
+                        }
                         if (isFree) {
-                            const userData = await db('users').select('language').where({ id: Number(username) }).first();
-                            if (userData) {
-                                language = userData?.language ? JSON.parse(userData?.language) : [] || []
-                            }
+                            language = userData?.language ? deepParse(userData?.language) : [] || []
                         }
                     }
                 }
@@ -65,6 +214,8 @@ async function getPandits(req, res) {
         let sort
         let orderBy
         let sorting = []
+        const currencyData = await db('currency').select('currency_name', 'pandit_inr_rate').where({ currency_name: currency }).first();
+
         if (sort_by) {
             if (sort_by == 'popularity') {
                 sort = 'tag'
@@ -115,259 +266,69 @@ async function getPandits(req, res) {
                 return item && item.column !== undefined && item.order !== undefined && item.column !== null && item.order !== null;
             });
         }
+        console.log("isFree", isFree);
 
-        // console.log("sort_by", sorting);
-        let query = db('pandits as p')
-            //.distinctOn('p.id')
-            .select(
-                'p.display_name as name',
-                'p.id',
-                'p.languages',
-                'p.experience',
-                'p.profile',
-                'p.available_for',
-                'p.total_chat_minutes',
-                'p.total_call_minutes',
-                'p.primary_expertise',
-                'p.secondary_expertise',
-                'p.discounted_chat_call_rate',
-                'p.final_chat_call_rate',
-                'p.waiting_time',
-                'p.unlimited_free_calls_chats',
-                'p.chat',
-                'p.call',
-                'p.online',
-                'p.rating_1',
-                'p.rating_2',
-                'p.rating_3',
-                'p.rating_5',
-                'p.rating_4',
-                'p.total_orders',
-                'p.tag',
-                'p.chat_call_rate',
-            ).where(filter)
-            .limit(limit)
-            .offset(offset);
-        let countQuery = db('pandits as p')
-            .count('* as count')
-            .where(filter)
+        const filterParams = { type, isFree, search, secondary_expertise, skill, language, gender, top_astrologers, country };
+        let user = [];
+        const excludeIds = [];
 
-        if (search && search.trim()) {
-            query.andWhere('p.display_name', 'ilike', `%${search.trim()}%`);
-            countQuery.andWhere('p.display_name', 'ilike', `%${search.trim()}%`);
-        } else {
-            query.andWhere(function () {
-                if (type === 'call') {
-                    this.where('p.call', true);
-                }
-                if (type === 'chat') {
-                    this.where('p.chat', true);
-                }
-            });
-            countQuery.andWhere(function () {
-                if (type === 'call') {
-                    this.where('p.call', true);
-                }
-                if (type === 'chat') {
-                    this.where('p.chat', true);
-                }
-            });
-        }
-
-        if (secondary_expertise && secondary_expertise != 'all') {
-            query.andWhere('p.secondary_expertise', 'ILIKE', `%${secondary_expertise.trim()}%`);
-            countQuery.andWhere('p.secondary_expertise', 'ILIKE', `%${secondary_expertise.trim()}%`);
-        }
-
-        if (Array.isArray(skill) && skill.length) {
-            const skills = skill
-                .map(s => s?.trim())
-                .filter(Boolean)
-                .map(s => `%${s}%`);
-
-            query.andWhereRaw(
-                `p.primary_expertise ILIKE ANY (ARRAY[${skills.map(() => '?').join(',')}])`,
-                skills
+        // Step 1: pandit_sequence table – sequence order, chat/call filter
+        try {
+            let step1Query = applyChatCallFilter(
+                db('pandits as p')
+                    .join('pandit_sequence as ps', 'ps.pandit_id', 'p.id')
+                    .select(PANDIT_LIST_SELECT)
+                    .where(filter),
+                // .orderBy('ps.sequence', 'asc'),
+                filterParams
             );
+            step1Query = applyPanditFilters(step1Query, filterParams);
+            step1Query.orderByRaw('RANDOM()');
 
-            countQuery.andWhereRaw(
-                `p.primary_expertise ILIKE ANY (ARRAY[${skills.map(() => '?').join(',')}])`,
-                skills
-            );
+            // if (search?.trim()) {
+            //     step1Query.andWhere('p.display_name', 'ilike', `%${search.trim()}%`);
+            // }
+            const step1Results = await step1Query.limit(PANDIT_LIST_MAX);
+            user.push(...step1Results);
+            step1Results.forEach((item) => excludeIds.push(item.id));
+        } catch (step1Err) {
+            console.error('getPandits step1 (pandit_sequence):', step1Err?.message);
         }
 
-        if (Array.isArray(language) && language.length) {
-            // query.andWhere(builder => {
-            //     language.forEach((s, index) => {
-            //         const condition = ['ilike', `%${s.trim()}%`];
-            //         index === 0
-            //             ? builder.where('p.languages', ...condition)
-            //             : builder.orWhere('p.languages', ...condition);
-            //     });
-            // });
-
-            // countQuery.andWhere(builder => {
-            //     language.forEach((s, index) => {
-            //         const condition = ['ilike', `%${s.trim()}%`];
-            //         index === 0
-            //             ? builder.where('p.languages', ...condition)
-            //             : builder.orWhere('p.languages', ...condition);
-            //     });
-            // });
-
-            const languages = language
-                .map(s => s?.trim())
-                .filter(Boolean)
-                .map(s => `%${s}%`);
-
-            query.andWhereRaw(
-                `p.languages ILIKE ANY (ARRAY[${languages.map(() => '?').join(',')}])`,
-                languages
-            );
-
-            countQuery.andWhereRaw(
-                `p.languages ILIKE ANY (ARRAY[${languages.map(() => '?').join(',')}])`,
-                languages
-            );
+        // Step 2: current filtered list (exclude step 1 ids)
+        const step2Limit = PANDIT_LIST_MAX - user.length;
+        if (step2Limit > 0) {
+            let step2Query = db('pandits as p')
+                .select(PANDIT_LIST_SELECT)
+                .where(filter);
+            step2Query = applyChatCallFilter(step2Query, filterParams);
+            step2Query = applyPanditFilters(step2Query, filterParams);
+            step2Query = excludePanditIds(step2Query, excludeIds);
+            step2Query = applyPanditSort(step2Query, { sort_by, sorting });
+            const step2Results = await step2Query.limit(step2Limit).offset(offset);
+            user.push(...step2Results);
+            step2Results.forEach((item) => excludeIds.push(item.id));
         }
 
-        if (Array.isArray(gender) && gender.length) {
-            // console.log("gender.length", gender.length);
-            const genders = gender
-                .map(g => g?.trim().toLowerCase())
-                .filter(Boolean);
-            query.whereIn(
-                db.raw('LOWER(p.gender)'),
-                genders
-            );
-            countQuery.whereIn(
-                db.raw('LOWER(p.gender)'),
-                genders
-            );
+        // Step 3: fill remaining up to 150 – basic chat/call filter only
+        const step3Limit = PANDIT_LIST_MAX - user.length;
+        if (step3Limit > 0) {
+            let step3Query = db('pandits as p')
+                .select(PANDIT_LIST_SELECT)
+                .where(filter);
+            step3Query = applyChatCallFilter(step3Query, filterParams);
+            step3Query = excludePanditIds(step3Query, excludeIds);
+            step3Query.orderByRaw('RANDOM()');
+            const step3Results = await step3Query.limit(step3Limit);
+            user.push(...step3Results);
         }
 
-        if (Array.isArray(top_astrologers) && top_astrologers.length && !top_astrologers.includes("All")) {
-
-            const genders = top_astrologers
-                .map(g => g?.trim().toLowerCase())
-                .filter(Boolean);
-
-            // console.log("genders", genders);
-            query.whereIn(
-                db.raw('LOWER(p.tag)'),
-                genders
-            );
-            countQuery.whereIn(
-                db.raw('LOWER(p.tag)'),
-                genders
-            );
-        }
-
-        if (Array.isArray(country) && country.length == 1) {
-            // console.log("country", country[0]);
-            if (country[0] == 'India') {
-                query.andWhere('p.country', "India");
-                countQuery.andWhere('p.country', "India");
-            } else {
-                query.andWhereNot('p.country', "India");
-                countQuery.andWhereNot('p.country', "India");
-            }
-        }
-
-        // if (offer && offer.trim()) {
-        //     query.andWhere('p.tag', 'ilike', `%${offer.trim()}%`);
-        //     countQuery.andWhere('p.tag', 'ilike', `%${offer.trim()}%`);
-        // }
-
-        // Rating ratio: (rating_5 + rating_4) / total_ratings — reuse for tie-breaker
-        const ratingRatioRaw = `
-            CASE 
-                WHEN (COALESCE(p.rating_1, 0) + COALESCE(p.rating_2, 0) + COALESCE(p.rating_3, 0) + COALESCE(p.rating_4, 0) + COALESCE(p.rating_5, 0)) > 0 
-                THEN (COALESCE(p.rating_5, 0) + COALESCE(p.rating_4, 0))::float / 
-                     (COALESCE(p.rating_1, 0) + COALESCE(p.rating_2, 0) + COALESCE(p.rating_3, 0) + COALESCE(p.rating_4, 0) + COALESCE(p.rating_5, 0))::float
-                ELSE 0 
-            END
-        `;
-
-        console.log("sort_by", sort_by);
-        // Primary sort: RANDOM() so response order changes every time
-        if (sort_by == 'rating_high_to_low') {
-            query.orderByRaw(ratingRatioRaw + ' DESC').orderBy('p.total_orders', 'desc');
-        } else if (sort_by == 'rating_low_to_high') {
-            query.orderByRaw(ratingRatioRaw + ' ASC').orderBy('p.total_orders', 'desc');
-        }
-        else if (sorting?.length > 0) {
-            query.orderBy(sorting)
-
-            // .orderBy('p.total_orders', 'desc').orderByRaw(ratingRatioRaw + ' DESC');
-        }
-        //  else {
-        //     query.orderBy('p.total_orders', 'desc').orderByRaw(ratingRatioRaw + ' DESC');
-        // }
-        query.orderByRaw('RANDOM()');
-        console.log("sd", query.toQuery());
-        let user = await query;
-        // const [{ count }] = await countQuery
-        // const total = parseInt(count);
-        const total = 100
+        user = user.slice(0, PANDIT_LIST_MAX);
+        const total = PANDIT_LIST_MAX;
         const totalPages = Math.ceil(total / limit);
 
-        if (user?.length < 100) {
-            console.log("inside if");
-            const newLimit = 100 - user?.length
-            console.log("newLimit", newLimit);
-            if (isFree) {
-                filter.unlimited_free_calls_chats = true
-            }
-            const query = db('pandits as p')
-                //.distinctOn('p.id')
-                .select(
-                    'p.display_name as name',
-                    'p.id',
-                    'p.languages',
-                    'p.experience',
-                    'p.profile',
-                    'p.available_for',
-                    'p.total_chat_minutes',
-                    'p.total_call_minutes',
-                    'p.primary_expertise',
-                    'p.secondary_expertise',
-                    'p.discounted_chat_call_rate',
-                    'p.final_chat_call_rate',
-                    'p.waiting_time',
-                    'p.unlimited_free_calls_chats',
-                    'p.chat',
-                    'p.call',
-                    'p.online',
-                    'p.rating_1',
-                    'p.rating_2',
-                    'p.rating_3',
-                    'p.rating_5',
-                    'p.rating_4',
-                    'p.total_orders',
-                    'p.tag',
-                    'p.chat_call_rate',
-                ).where(filter)
-                .limit(newLimit)
-            if (!isFree) {
-                query.andWhere(function () {
-                    this.where('p.unlimited_free_calls_chats', true)
-                        .orWhere('p.chat', true)
-                        .orWhere('p.call', true);
-                });
-            }
-            query.orderByRaw('RANDOM()');
-            const newUser = await query;
-            user = [...user, ...newUser]
-        }
-        user.map(item => {
-            item.govt_id = item?.govt_id ? JSON.parse(item?.govt_id) : [];
-            item.available_for = item?.available_for ? JSON.parse(item?.available_for) : [];
-            item.languages = item?.languages ? JSON.parse(item?.languages) : [];
-            item.primary_expertise = item?.primary_expertise ? JSON.parse(item?.primary_expertise) : [];
-            item.secondary_expertise = item?.secondary_expertise ? JSON.parse(item?.secondary_expertise) : [];
-            item.certificate = item?.certificate ? JSON.parse(item?.certificate) : [];
-        })
+        console.log("currency", currency);
+        user = formatPanditResults(user, currency, currencyData);
         const response = {
             page,
             limit,
@@ -401,17 +362,28 @@ async function getPanditDetail(req, res) {
     //     .limit(3);
 
     const gallery = await db('panditgallery').where({ pandit_id: user?.id }).orderBy('order', 'asc');
+    const isLive = await db('live_streams').where({ pandit_id: user?.id, status: "live" }).first();
+
+    const ip = getClientIp(req);
+    let currency = "INR";
+    if (ip) {
+        const geo = geoip.lookup(ip);
+        const country = geo ? geo.country : 'IN';
+        currency = getCurrencyByCountry(country);
+        currency = currency?.currency
+    }
+
     const response = {
         id: user?.id,
         name: user?.display_name,
-        languages: user?.languages ? JSON.parse(user?.languages) : [],
-        primary_expertise: user?.primary_expertise ? JSON.parse(user?.primary_expertise) : [],
+        languages: user?.languages ? deepParse(user?.languages) : [],
+        primary_expertise: user?.primary_expertise ? deepParse(user?.primary_expertise) : [],
         experience: user?.experience,
         profile: user?.profile,
         waiting_time: user?.waiting_time,
         online: user?.online,
         chat_call_rate: user?.chat_call_rate,
-        available_for: user?.available_for ? JSON.parse(user?.available_for) : [],
+        available_for: user?.available_for ? deepParse(user?.available_for) : [],
         discounted_chat_call_rate: user?.discounted_chat_call_rate,
         final_chat_call_rate: user?.final_chat_call_rate,
         unlimited_free_calls_chats: user?.unlimited_free_calls_chats,
@@ -433,7 +405,12 @@ async function getPanditDetail(req, res) {
         video_intro: user?.video_intro,
         // reviews: review,
         isFollow: false,
-        gallery
+        gallery,
+        currency,
+        is_live: isLive ? true : false
+    }
+    if (user?.unlimited_free_calls_chats) {
+        user.chat = true
     }
     const authHeader = req.headers.authorization;
     // console.log("authHeader", authHeader);
@@ -444,6 +421,8 @@ async function getPanditDetail(req, res) {
         // console.log("verified", verified);
         if (verified?.userId) {
             const follow = await db('follows').where({ 'pandit_id': user?.id, 'user_id': verified?.userId }).first();
+            const userDetail = await db('users').where({ 'id': Number(verified?.userId) }).select('default_currency').first();
+            currency = userDetail?.default_currency
             // console.log("user", user);
             if (follow) {
                 response.isFollow = true
@@ -451,6 +430,14 @@ async function getPanditDetail(req, res) {
         }
     }
 
+    const currencyData = await db('currency').select('currency_name', 'pandit_inr_rate').where({ currency_name: currency }).first();
+    if (currencyData) {
+        response.chat_call_rate = convertCurrency(user.chat_call_rate, (currencyData?.pandit_inr_rate || 1));
+        response.discounted_chat_call_rate = convertCurrency(user.discounted_chat_call_rate, (currencyData?.pandit_inr_rate || 1));
+        response.final_chat_call_rate = convertCurrency(user.final_chat_call_rate, (currencyData?.pandit_inr_rate || 1));
+    }
+    const symbol = getCurrencySymbolByCurrency(currency)
+    response.currency = symbol;
     return res.status(200).json({ success: true, data: response, message: 'Detail success' });
 }
 
@@ -472,17 +459,27 @@ async function signup(req, res) {
             return res.status(400).json({ success: false, message: 'Your account is blocked.' });
         }
 
-        const url = `http://pro.trinityservices.co.in/generateOtp.jsp?userid=${process.env.OTP_USERNAME}&key=${process.env.OTP_KEY}&mobileno=${mobile}&timetoalive=600&sms=%7Botp%7D%20is%20the%20one%20time%20password%20for%20Astroguruji%20Application.%20AstrotalkGuruji`
-        let otpResponse;
-        try {
-            otpResponse = await axios.get(url);
-            otpResponse = otpResponse.data
-        } catch (error) {
-            console.error('Acquire API failed:', error.message);
-            otpResponse = null;
+        const setting = await db('settings').select('otp_provider').first();
+        if (country_code != '+91') {
+            const response = await sendSMS(mobile, country_code)
+            if (!response.return) return res.status(400).json({ success: false, message: response?.message });
         }
-        if (!user) {
-            await db('otpmanages').insert({ mobile, country_code, otp: otpResponse?.otpId });
+        else if (setting?.otp_provider == 'bulksms') {
+            const response = await sendSMS(mobile, country_code)
+            if (!response.return) return res.status(400).json({ success: false, message: response?.message });
+        } else {
+            const url = `http://pro.trinityservices.co.in/generateOtp.jsp?userid=${process.env.OTP_USERNAME}&key=${process.env.OTP_KEY}&mobileno=${mobile}&timetoalive=600&sms=%7Botp%7D%20is%20the%20one%20time%20password%20for%20Astroguruji%20Application.%20AstrotalkGuruji`
+            let otpResponse;
+            try {
+                otpResponse = await axios.get(url);
+                otpResponse = otpResponse.data
+            } catch (error) {
+                console.error('Acquire API failed:', error.message);
+                otpResponse = null;
+            }
+            if (!user) {
+                await db('otpmanages').insert({ mobile, country_code, otp: otpResponse?.otpId });
+            }
         }
         return res.status(200).json({ success: true, message: 'Otp Send Successfully' });
     } catch (err) {
@@ -515,23 +512,34 @@ async function verifyOtp(req, res) {
             update.attempt = 1;
         }
 
-        const url = `http://pro.trinityservices.co.in/validateOtpApi.jsp?mobileno=${mobile}&otp=${otp}`;
-        let otpResponse;
-        try {
-            otpResponse = await axios.get(url);
-            otpResponse = otpResponse.data
-            if (otpResponse?.result != "success") {
-                update.expiry = new Date(currentDate.getTime() + 4 * 60 * 60 * 1000);
-                await db('otpmanages')
-                    .where('id', latestRecord?.id)
-                    .update(update);
-                return res.status(400).json({ success: false, data: null, message: 'Wrong otp' });
-            }
-        } catch (error) {
-            console.error('Acquire API failed:', error.message);
-            otpResponse = null;
-        }
 
+        const setting = await db('settings').select('otp_provider').first();
+        if (country_code != '+91') {
+            const response = await verifySMS(mobile, country_code, otp)
+            if (!response.return) return res.status(400).json({ success: false, message: response?.message });
+        }
+        else if (setting?.otp_provider == 'bulksms') {
+            console.log("here");
+            const response = await verifySMS(mobile, country_code, otp)
+            if (!response.return) return res.status(400).json({ success: false, message: response?.message });
+        } else {
+            const url = `http://pro.trinityservices.co.in/validateOtpApi.jsp?mobileno=${mobile}&otp=${otp}`;
+            let otpResponse;
+            try {
+                otpResponse = await axios.get(url);
+                otpResponse = otpResponse.data
+                if (otpResponse?.result != "success") {
+                    update.expiry = new Date(currentDate.getTime() + 4 * 60 * 60 * 1000);
+                    await db('otpmanages')
+                        .where('id', latestRecord?.id)
+                        .update(update);
+                    return res.status(400).json({ success: false, data: null, message: 'Wrong otp' });
+                }
+            } catch (error) {
+                console.error('Acquire API failed:', error.message);
+                otpResponse = null;
+            }
+        }
 
         update.attempt = 0;
         update.expiry = null;
@@ -569,24 +577,24 @@ async function verifyOtp(req, res) {
                 gender: gender || "",
                 dob: dob || "",
                 country_code: country_code || "", email: email || "", city: city || "", country: country || "", experience: experience || "",
-                primary_expertise: primary_expertise ? JSON.parse(primary_expertise) : [],
-                secondary_expertise: secondary_expertise ? JSON.parse(secondary_expertise) : [],
+                primary_expertise: primary_expertise ? deepParse(primary_expertise) : [],
+                secondary_expertise: secondary_expertise ? deepParse(secondary_expertise) : [],
                 other_working_text: other_working_text || "",
-                other_working: other_working ? JSON.parse(other_working) : []
+                other_working: other_working ? deepParse(other_working) : []
             },
             "step2": {
-                languages: languages ? JSON.parse(languages) : [],
-                available_for: available_for ? JSON.parse(available_for) : [],
+                languages: languages ? deepParse(languages) : [],
+                available_for: available_for ? deepParse(available_for) : [],
                 chat_call_rate: chat_call_rate || "",
                 training_type: training_type || "",
                 guru_name: guru_name || "",
-                certificate: certificate ? JSON.parse(certificate) : [],
+                certificate: certificate ? deepParse(certificate) : [],
                 // response_time: response_time || ""
             },
             "step3": {
-                govt_id: govt_id ? JSON.parse(govt_id) : [],
+                govt_id: govt_id ? deepParse(govt_id) : [],
                 about: about || "", achievement_url: achievement_url || "",
-                address: address ? JSON.parse(address) : [],
+                address: address ? deepParse(address) : [],
                 selfie: selfie || "", achievement_file: achievement_file || ""
             },
             "step4": {
@@ -635,8 +643,8 @@ async function basicOnboard(req, res) {
         if (!is18OrAbove(dob)) return res.status(400).json({ success: false, message: 'Enter DOB above 18+ year.' });
 
         if (files?.profile?.length > 0) {
-            const image = await uploadImageTos3('profile', files?.profile[0], 'pandit');
-            ins.profile = image.data.Location;
+            const image = await uploadImageToAzure('profile', files?.profile[0], 'pandit');
+            ins.profile = `${process.env.AZURE_STORAGE_BASE_URL}${image?.data?.key}`;
         }
         if (languages) {
             ins.languages = JSON.stringify(languages)
@@ -906,39 +914,13 @@ async function onboard(req, res) {
         // }
 
         if (files?.profile?.length > 0) {
-            const image = await uploadImageTos3('profile', files?.profile[0], 'pandit');
-            ins.profile = image.data.Location;
+            const image = await uploadImageToAzure('profile', files?.profile[0], 'pandit');
+            ins.profile = `${process.env.AZURE_STORAGE_BASE_URL}${image?.data?.key}`;
         }
         if (files?.selfie?.length > 0) {
-            const image = await uploadImageTos3('selfie', files?.selfie[0], 'document');
-            ins.selfie = image.data.Location;
+            const image = await uploadImageToAzure('selfie', files?.selfie[0], 'document');
+            ins.selfie = `${process.env.AZURE_STORAGE_BASE_URL}${image?.data?.key}`;
         }
-
-        // if (files?.achievement?.length > 0) {
-        //     const image = await uploadImageTos3('achievement', files?.achievement[0], 'document');
-        //     ins.achievement_file = image.data.Location;
-        // }
-
-        // if (files?.certificate?.length > 0) {
-        //     const certificates = await Promise.all(
-        //         files.certificate.map(file =>
-        //             uploadImageTos3('certificate', file, 'document')
-        //                 .then(res => res.data.Location)
-        //         )
-        //     );
-        //     ins.certificate = JSON.stringify(certificates);
-        // }
-
-        // if (files?.address?.length > 0) {
-        //     const addresss = await Promise.all(
-        //         files.address.map(file =>
-        //             uploadImageTos3('address', file, 'document')
-        //                 .then(res => res.data.Location)
-        //         )
-        //     );
-        //     console.log("addresss", addresss);
-        //     ins.address = JSON.stringify(addresss);
-        // }
 
         // console.log("ins", ins);
         await db('onboardings').where({ id: user?.id }).update(ins);
@@ -980,23 +962,28 @@ async function reSendOtp(req, res) {
             update.sendexpiry = new Date(currentDate.getTime() + 4 * 60 * 60 * 1000);
         }
         // const OTP = Math.floor(1000 + Math.random() * 9000);
-        const OTP = Math.floor(1000 + Math.random() * 9000);
 
-        const url = `http://pro.trinityservices.co.in/generateOtp.jsp?userid=${process.env.OTP_USERNAME}&key=${process.env.OTP_KEY}&mobileno=${mobile}&timetoalive=600&sms=%7Botp%7D%20is%20the%20one%20time%20password%20for%20Astroguruji%20Application.%20AstrotalkGuruji`
-        let otpResponse;
-        try {
-            otpResponse = await axios.get(url);
-            otpResponse = otpResponse.data
-        } catch (error) {
-            console.error('Acquire API failed:', error.message);
-            otpResponse = null;
+        if (setting?.otp_provider == 'bulksms') {
+            const response = await sendSMS(mobile, country_code)
+            if (!response.return) return res.status(400).json({ success: false, message: response?.message });
+        } else {
+            const url = `http://pro.trinityservices.co.in/generateOtp.jsp?userid=${process.env.OTP_USERNAME}&key=${process.env.OTP_KEY}&mobileno=${mobile}&timetoalive=600&sms=%7Botp%7D%20is%20the%20one%20time%20password%20for%20Astroguruji%20Application.%20AstrotalkGuruji`
+            let otpResponse;
+            try {
+                otpResponse = await axios.get(url);
+                otpResponse = otpResponse.data
+            } catch (error) {
+                console.error('Acquire API failed:', error.message);
+                otpResponse = null;
+            }
+            await db('otpmanages').where('mobile', mobile).where('country_code', country_code).del();
+            await db('otpmanages').insert({
+                'mobile': mobile, country_code: country_code, otp: otpResponse?.otpId, sendattempt: update.sendattempt || 1,
+                sendexpiry: update.sendexpiry || new Date(new Date().getTime() + 4 * 60 * 60 * 1000)
+            })
         }
 
-        await db('otpmanages').where('mobile', mobile).where('country_code', country_code).del();
-        await db('otpmanages').insert({
-            'mobile': mobile, country_code: country_code, otp: otpResponse?.otpId, sendattempt: update.sendattempt || 1,
-            sendexpiry: update.sendexpiry || new Date(new Date().getTime() + 4 * 60 * 60 * 1000)
-        })
+
         response.return = true;
         response.message = 'OTP Send successful.';
         // });
@@ -1048,6 +1035,7 @@ async function getReviewList(req, res) {
                 "u.profile"
             )
             .where(reviewWhere)
+            .orderBy('r.id', 'desc')
             .limit(limit)
             .offset(offset);
 
@@ -1105,8 +1093,8 @@ async function uploadImage(req, res) {
 
         if (type == 'upload') {
             if (files?.file?.length > 0) {
-                const image = await uploadImageTos3('file', files?.file[0], 'upload');
-                url = image.data.Location;
+                const image = await uploadImageToAzure('file', files?.file[0], 'upload');
+                url = `${process.env.AZURE_STORAGE_BASE_URL}${image?.data?.key}`;
             }
         }
         // console.log("type", type);
@@ -1133,7 +1121,7 @@ async function uploadImage(req, res) {
             // Check and remove from certificate array (stringified array of URLs)
             if (onboarding.certificate) {
                 try {
-                    const certificateArray = JSON.parse(onboarding.certificate);
+                    const certificateArray = deepParse(onboarding.certificate);
                     const result = certificateArray.filter(item => item !== file);
                     if (result?.length == 0) {
                         updateData.certificate = null
@@ -1147,7 +1135,7 @@ async function uploadImage(req, res) {
 
             // Check and remove from govt_id array (array of objects with URL)
             if (onboarding.govt_id) {
-                const govt_id = JSON.parse(onboarding.govt_id);
+                const govt_id = deepParse(onboarding.govt_id);
                 const returns = removeMatchedUrl(govt_id, file)
                 updateData.govt_id = JSON.stringify(returns);
 
@@ -1161,7 +1149,7 @@ async function uploadImage(req, res) {
             }
 
             // Delete file from S3
-            const dd = await deleteFileFroms3(decodedUrl);
+            const dd = await deleteFileFromAzure(decodedUrl);
             // console.log("dd", dd);
         }
         return res.status(200).json({ success: true, data: url, message: `Image ${type} Successfully` });
@@ -1188,7 +1176,7 @@ async function submitOnboard(req, res) {
         // Step 1 required fields - parse JSON string for primary_expertise
         let primary_expertise = [];
         try {
-            primary_expertise = user?.primary_expertise ? JSON.parse(user.primary_expertise) : [];
+            primary_expertise = user?.primary_expertise ? deepParse(user.primary_expertise) : [];
         } catch (e) {
             console.error('Error parsing primary_expertise:', e);
         }
@@ -1202,9 +1190,9 @@ async function submitOnboard(req, res) {
         let available_for = [];
         let certificate = [];
         try {
-            languages = user?.languages ? JSON.parse(user.languages) : [];
-            available_for = user?.available_for ? JSON.parse(user.available_for) : [];
-            certificate = user?.certificate ? JSON.parse(user.certificate) : [];
+            languages = user?.languages ? deepParse(user.languages) : [];
+            available_for = user?.available_for ? deepParse(user.available_for) : [];
+            certificate = user?.certificate ? deepParse(user.certificate) : [];
         } catch (e) {
             console.error('Error parsing JSON fields:', e);
         }
@@ -1216,7 +1204,7 @@ async function submitOnboard(req, res) {
         // Step 3 required fields - parse JSON string to check if it's empty
         let govt_id = [];
         try {
-            govt_id = user?.govt_id ? JSON.parse(user.govt_id) : [];
+            govt_id = user?.govt_id ? deepParse(user.govt_id) : [];
         } catch (e) {
             console.error('Error parsing govt_id:', e);
         }

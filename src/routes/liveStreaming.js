@@ -1,0 +1,20 @@
+const express = require('express');
+const auth = require('../middleware/authMiddleware');
+const live = require('../controllers/liveStreamingController');
+
+const router = express.Router();
+
+
+router.get('/list', live.listLive);
+router.post('/join', live.joinLive);
+router.post('/leave', live.viewerLeave);
+router.post('/sendMessage', live.sendLiveChatUser);
+router.get('/chat/list', live.listLiveChat);
+router.post('/call/create', live.createMediaOrder);
+router.post('/call/reject', live.rejectOrder);
+router.post('/call/end', live.completeOrder);
+router.post('/report', auth, live.reportUser);
+router.post('/stop', auth, live.stopLive);
+router.post('/check-live', auth, live.checkLive);
+
+module.exports = router;

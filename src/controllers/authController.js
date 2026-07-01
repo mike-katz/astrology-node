@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const db = require('../db');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
@@ -39,11 +40,11 @@ async function register(req, res) {
 }
 
 async function sendSMS(mobile, country_code) {
+    let response = {
+        return: true,
+        message: 'Message sent successfully',
+    };
     try {
-        let response = {
-            return: true,
-            message: 'Message sent successfully',
-        };
         const update = {}
         const latestRecord = await db('otpmanages').where({ mobile, country_code }).first();
         if (latestRecord) {
@@ -62,14 +63,47 @@ async function sendSMS(mobile, country_code) {
         }
         const OTP = Math.floor(100000 + Math.random() * 900000);
 
-        const config = {
-            method: 'get',
-            maxBodyLength: Infinity,
-            url: `${process.env.SMS_URL}?authkey=${process.env.SMS_KEY}&mobiles=${country_code}${mobile}&message= ${OTP} is the One Time Password (OTP) for AstroGuruji Application.&sender=${process.env.SMS_SENDER_NAME}&route=4&country=91&DLT_TE_ID=${process.env.SMS_TEMPLATE}`,
-            headers: {
-            },
-        };
-        await axios.request(config);
+        let config = {};
+        if (country_code == '+91') {
+            config = {
+                method: 'get',
+                maxBodyLength: Infinity,
+                url: `${process.env.SMS_URL}?authkey=${process.env.SMS_KEY}&mobiles=${country_code}${mobile}&message= ${OTP} is the One Time Password (OTP) for AstroGuruji Application.&sender=${process.env.SMS_SENDER_NAME}&route=4&country=91&DLT_TE_ID=${process.env.SMS_TEMPLATE}`,
+                headers: {
+                },
+            };
+        } else {
+            config = {
+                method: 'post',
+                maxBodyLength: Infinity,
+                url: process.env.WHATSAPP_SMS_URL,
+                // url: "https://api.verifyway.com/api/v1/",
+                headers: {
+                    // Authorization: "Bearer 2593$iKTikmAQxk3oHxWeI66keOGDu4nsw7inaMhH"
+                    Authorization: "Bearer 2593$SjlOUEN6ZllXbzE1QUpOK09DVFU2dz09"
+                },
+                data: {
+                    "type": "buttonTemplate",
+                    // "templateId": "appotpwa",
+                    "templateId": "appotp",
+                    "templateLanguage": "en",
+                    "sender_phone": `${country_code + mobile}`,
+                    "templateArgs": [
+                        OTP
+                    ]
+                }
+                // data: {
+                //     "recipient": `${country_code + mobile}`,
+                //     "type": "otp",
+                //     "channel": "whatsapp",
+                //     "fallback": "yes",
+                //     "code": OTP,
+                //     "lang": "en"
+                // }
+            }
+        }
+        const data = await axios.request(config);
+        console.log("otp response data", data);
         const upd = {
             otp: OTP,
             mobile,
@@ -85,7 +119,7 @@ async function sendSMS(mobile, country_code) {
         response.message = 'OTP Send successful.';
         return response
     } catch (err) {
-        console.error(err);
+        console.log(err?.response?.data || err?.message);
         response.return = false;
         response.message = 'Something Wrong in generate otp.';
         return response
@@ -126,6 +160,7 @@ async function verifySMS(mobile, country_code, otp) {
             response.return = true;
             response.message = 'OTP Matched Successfully!';
             update.attempt = 0;
+            update.sendattempt = 0;
             update.expiry = null;
         }
         await db('otpmanages').where({ mobile, country_code }).update(update);
@@ -140,7 +175,7 @@ async function verifySMS(mobile, country_code, otp) {
 
 async function login(req, res) {
     try {
-        console.log("login");
+        console.log("login body param", req.body);
         logger.info('login called')
         const { mobile, country_code = '+91' } = req.body;
 
@@ -162,7 +197,11 @@ async function login(req, res) {
         console.log("newMobile", newMobile);
         if (mobile != '1999999999') {
             const setting = await db('settings').select('otp_provider').first();
-            if (setting?.otp_provider != 'bulksms') {
+            if (country_code != "+91") {
+                const response = await sendSMS(newMobile, country_code)
+                if (!response.return) return res.status(400).json({ success: false, message: response?.message });
+            }
+            else if (setting?.otp_provider == 'bulksms') {
                 const response = await sendSMS(newMobile, country_code)
                 if (!response.return) return res.status(400).json({ success: false, message: response?.message });
             } else {
@@ -170,6 +209,7 @@ async function login(req, res) {
                 let otpResponse;
                 try {
                     otpResponse = await axios.get(url);
+                    // console.log("otpResponse", otpResponse);
                     otpResponse = otpResponse.data
                 } catch (error) {
                     console.error('Acquire API failed:', error.message);
@@ -199,13 +239,20 @@ async function verifyOtp(req, res) {
 
         //remove extra 91
         console.log("mobile.length", mobile.length);
+        if (mobile.length == 8 && country_code == "+91") {
+            mobile = `91${mobile}`;
+        }
         if (mobile.length == 12 && country_code == "+91") {
             mobile = mobile.slice(2);
         }
         console.log("new mobile", mobile);
         if (mobile != '1999999999') {
             const setting = await db('settings').select('otp_provider').first();
-            if (setting?.otp_provider != 'bulksms') {
+            if (country_code != "+91") {
+                const response = await verifySMS(mobile, country_code, otp)
+                if (!response.return) return res.status(400).json({ success: false, message: response?.message });
+            }
+            else if (setting?.otp_provider == 'bulksms') {
                 console.log("here");
                 const response = await verifySMS(mobile, country_code, otp)
                 if (!response.return) return res.status(400).json({ success: false, message: response?.message });
@@ -238,7 +285,9 @@ async function verifyOtp(req, res) {
         if (existing && version) {
             upd.version = version
         }
-
+        if (mode) {
+            upd.mode = mode
+        }
         let set_id = ad_set_id ?? referrer ?? null;
 
         if (set_id != null) {
@@ -261,7 +310,7 @@ async function verifyOtp(req, res) {
         }
 
         if (!existing) {
-            [existing] = await db('users').insert({ mobile, country_code, status: "active", balance: 0, ad_set_id: set_id, utm_source, ad_id, mode, version }).returning(['id', 'mobile', 'avatar', 'country_code', 'otp']);
+            [existing] = await db('users').insert({ mobile, country_code, status: "active", balance: 0, ad_set_id: set_id, utm_source, ad_id, mode, version, is_free_order_available: true }).returning(['id', 'mobile', 'avatar', 'country_code', 'otp', 'is_free_order_available']);
         }
         if (Object.keys(upd).length > 0) {
             await db('users').where({ id: Number(existing?.id) }).update(upd)
@@ -285,7 +334,7 @@ async function verifyOtp(req, res) {
             .count('* as count')
             .where({ user_id: existing.id })
             .whereIn('status', ['continue', 'completed', 'pending']);
-        const is_free = count == 0 ? true : false
+        const is_free = count == 0 || existing?.is_free_order_available ? true : false
         return res.status(200).json({ success: true, data: { id: existing?.id, name: existing?.name, profile: existing?.profile, avatar: existing?.avatar, mobile: existing?.mobile, country_code: existing?.country_code, token: encryptToken, is_free }, message: 'Otp Verify Successfully' });
     } catch (err) {
         console.error(err);
@@ -312,7 +361,7 @@ async function socialUrl(req, res) {
 
 async function getSettings(req, res) {
     try {
-        const setting = await db('settings').select('facebook', 'x', 'instagram', 'youtube', 'linkedin', 'ios_version', 'android_version', 'agora_app_id', 'agora_certificate', 'google_map_key', 'pandit_app_url', 'upload_base_url', 'user_response_time', 'call_type').first();
+        const setting = await db('settings').select('facebook', 'x', 'instagram', 'youtube', 'linkedin', 'ios_version', 'android_version', 'agora_app_id', 'agora_certificate', 'google_map_key', 'pandit_app_url', 'upload_base_url', 'user_response_time', 'call_type', 'map_api_key', 'is_live_enabled').first();
         return res.status(200).json({ success: true, data: setting, message: 'get config Successfully' });
     } catch (err) {
         console.error(err);
@@ -335,13 +384,17 @@ async function sendCall(req, res) {
         });
         const response = await axios({
             method: 'post',
-            url: "https://voicecallconnect.com/ctc/external/create-call",
+            url: "https://obdivr.in/api/ctc/initiate-call",
             headers: { Authorization: "Bearer 669B2JB1EKFF9aa0jUpwMvk4cel6ie47TyF3ZZJSxgjHGvKkHsbm9k6c9GQ0g669" },
             data: {
-                source: `+91${from}`,
-                destination: `+91${to}`,
+                apartyno: `+91${from}`,
+                bpartyno: `+91${to}`,
                 // did: "+911413231099",//["+911413231091", "+911413231099"]
-                did
+                cli: did,
+                "reference_id": "1",
+                "channelflag": 0,
+                "dtmfflag": 0,
+                "recordingflag": 0
             }
         });
         console.log("response,response", response?.data);
@@ -363,5 +416,386 @@ async function test(req, res) {
     }
 }
 
+function parseGoogleClientIds() {
+    const raw = process.env.GOOGLE_CLIENT_IDS || process.env.GOOGLE_CLIENT_ID || '';
+    return raw.split(',').map((s) => s.trim()).filter(Boolean);
+}
 
-module.exports = { register, login, verifyOtp, socialUrl, getSettings, sendCall, test };
+/**
+ * Verifies a Google ID token (from mobile/web Google Sign-In) and returns the same session shape as verifyOtp.
+ * Configure GOOGLE_CLIENT_IDS (comma-separated) or GOOGLE_CLIENT_ID with your OAuth client IDs (Web, iOS, Android).
+ */
+async function googleLogin(req, res) {
+    console.log("googleLogin req.body", req.query);
+    try {
+        // const idToken = req.query.token;
+        // if (!idToken) {
+        //     return res.status(400).json({ success: false, message: 'id_token or idToken is required' });
+        // }
+
+        // const clientIds = parseGoogleClientIds();
+        // if (!clientIds.length) {
+        //     logger.warn('googleLogin: GOOGLE_CLIENT_IDS / GOOGLE_CLIENT_ID not set');
+        //     return res.status(503).json({ success: false, message: 'Google login is not configured' });
+        // }
+
+        // let tokenPayload;
+        // try {
+        //     const tokenRes = await axios.get('https://oauth2.googleapis.com/tokeninfo', {
+        //         params: { id_token: idToken },
+        //         timeout: 15000,
+        //     });
+        //     tokenPayload = tokenRes.data;
+        // } catch (e) {
+        //     if (e.response?.status === 400) {
+        //         return res.status(401).json({ success: false, message: 'Invalid or expired Google token' });
+        //     }
+        //     logger.error(e);
+        //     return res.status(502).json({ success: false, message: 'Could not verify Google token' });
+        // }
+
+        // if (tokenPayload.error) {
+        //     return res.status(401).json({
+        //         success: false,
+        //         message: tokenPayload.error_description || tokenPayload.error || 'Invalid Google token',
+        //     });
+        // }
+
+        // if (!clientIds.includes(tokenPayload.aud)) {
+        //     return res.status(401).json({ success: false, message: 'Invalid token audience' });
+        // }
+
+        // if (tokenPayload.email && tokenPayload.email_verified !== 'true') {
+        //     return res.status(400).json({ success: false, message: 'Google account email is not verified' });
+        // }
+
+        // const sub = tokenPayload.sub;
+        // const email = tokenPayload.email || null;
+        // const name = tokenPayload.name || (email ? email.split('@')[0] : null) || 'User';
+        // const picture = tokenPayload.picture || null;
+        let { ad_set_id, utm_source, ad_id, type, version, referrer, email } = req.query;
+        let existing = await db('users').whereNull('deleted_at').where({ email }).first();
+
+        if (existing?.status === 'block') {
+            return res.status(400).json({ success: false, message: 'Your account is blocked.' });
+        }
+        if (existing?.status === 'inactive') {
+            return res.status(400).json({
+                success: false,
+                message: 'Oops! Your account is inactive right now. Please contact support.',
+            });
+        }
+
+        const mode = type ? type : 'APP';
+        const upd = {};
+        if (existing && version) {
+            upd.version = version;
+        }
+        if (mode) {
+            upd.mode = mode;
+        }
+
+        let set_id = ad_set_id ?? referrer ?? null;
+        if (set_id != null) {
+            const numOk = isNumber(set_id);
+            if (!numOk) {
+                set_id = null;
+                if (existing) {
+                    upd.ad_set_id = null;
+                }
+            } else if (existing) {
+                upd.ad_set_id = Number(set_id);
+            }
+        }
+
+        if (!existing) {
+            const insertRow = {
+                // google_id: sub,
+                email,
+                // name: email,
+                // avatar: picture,
+                country_code: '+91',
+                status: 'active',
+                balance: 0,
+                mobile: null,
+                mode,
+                version: version || null,
+                utm_source: utm_source || null,
+                ad_id: ad_id || null,
+                ad_set_id: set_id != null && isNumber(set_id) ? Number(set_id) : null,
+            };
+            [existing] = await db('users').insert(insertRow).returning([
+                'id',
+                'mobile',
+                'avatar',
+                'country_code',
+                'otp',
+                'name',
+                'profile',
+                'email',
+                // 'google_id',
+            ]);
+        } else {
+            const linkUpd = { ...upd };
+            // if (!existing.google_id) {
+            //     linkUpd.google_id = sub;
+            // }
+            if (email) {
+                linkUpd.email = email;
+            }
+            // if (picture) {
+            //     linkUpd.avatar = picture;
+            // }
+            // if (name && !existing.name) {
+            //     linkUpd.name = name;
+            // }
+            if (Object.keys(linkUpd).length > 0) {
+                await db('users').where({ id: Number(existing.id) }).update(linkUpd);
+            }
+            existing = await db('users').where({ id: existing.id }).first();
+        }
+
+        const token = jwt.sign(
+            { userId: existing.id, username: existing.name, mobile: existing.mobile },
+            process.env.JWT_SECRET,
+            { expiresIn: process.env.JWT_EXPIRES_IN || '1h' },
+        );
+        const encryptToken = encrypt(token);
+
+        const username = existing.id;
+        const redisKey = `user_${username}`;
+        const jwtExpiry = process.env.JWT_EXPIRES_IN || '1h';
+        let ttlSeconds = 3600;
+        if (jwtExpiry.includes('h')) {
+            ttlSeconds = parseInt(jwtExpiry.replace('h', ''), 10) * 3600;
+        }
+        await setCache(redisKey, encryptToken, ttlSeconds);
+
+        const [{ count }] = await db('orders')
+            .count('* as count')
+            .where({ user_id: existing?.id })
+            .whereIn('status', ['continue', 'completed', 'pending']);
+        const is_free = count == 0;
+
+        return res.status(200).json({
+            success: true,
+            data: {
+                id: existing?.id,
+                name: existing?.name,
+                profile: existing?.profile,
+                avatar: existing?.avatar,
+                mobile: existing?.mobile,
+                country_code: existing?.country_code,
+                token: encryptToken,
+                is_free,
+            },
+            message: 'Google sign-in successful',
+        });
+    } catch (err) {
+        logger.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
+const APPLE_ISSUER = 'https://appleid.apple.com';
+const APPLE_JWKS_URL = 'https://appleid.apple.com/auth/keys';
+let appleJwksCache = { keys: null, fetchedAt: 0 };
+const APPLE_JWKS_TTL_MS = 60 * 60 * 1000;
+
+async function getAppleSigningKeys() {
+    const now = Date.now();
+    if (appleJwksCache.keys && now - appleJwksCache.fetchedAt < APPLE_JWKS_TTL_MS) {
+        return appleJwksCache.keys;
+    }
+    const { data } = await axios.get(APPLE_JWKS_URL, { timeout: 15000 });
+    if (!data.keys || !Array.isArray(data.keys)) {
+        throw new Error('Invalid Apple JWKS response');
+    }
+    appleJwksCache = { keys: data.keys, fetchedAt: now };
+    return data.keys;
+}
+
+function bustAppleJwksCache() {
+    appleJwksCache = { keys: null, fetchedAt: 0 };
+}
+
+function parseAppleAudiences() {
+    const raw = process.env.APPLE_CLIENT_IDS || process.env.APPLE_CLIENT_ID || '';
+    return raw.split(',').map((s) => s.trim()).filter(Boolean);
+}
+
+/**
+ * Verify Sign in with Apple identity token (JWT from ASAuthorizationAppleIDCredential).
+ * @param {string} identityToken
+ * @param {string[]} audiences Bundle ID(s) and/or Services ID(s) from Apple Developer
+ */
+async function verifyAppleIdentityToken(identityToken, audiences) {
+    const decoded = jwt.decode(identityToken, { complete: true });
+    if (!decoded || typeof decoded !== 'object' || !decoded.header?.kid) {
+        throw new Error('Invalid Apple identity token');
+    }
+    let keys = await getAppleSigningKeys();
+    let jwk = keys.find((k) => k.kid === decoded.header.kid);
+    if (!jwk) {
+        bustAppleJwksCache();
+        keys = await getAppleSigningKeys();
+        jwk = keys.find((k) => k.kid === decoded.header.kid);
+    }
+    if (!jwk) {
+        throw new Error('Apple signing key not found');
+    }
+    const pubKey = crypto.createPublicKey({ key: jwk, format: 'jwk' });
+    const pem = pubKey.export({ type: 'spki', format: 'pem' });
+    return jwt.verify(identityToken, pem, {
+        algorithms: ['RS256'],
+        issuer: APPLE_ISSUER,
+        audience: audiences,
+    });
+}
+
+/**
+ * Same session contract as googleLogin / verifyOtP — iOS Sign in with Apple.
+ * Body (after decrypt): token | identity_token | identityToken (Apple identity JWT).
+ * Optional: name or userName (Apple only sends full name once on device — pass from iOS if you have it).
+ * Optional: type, version, ad_set_id, utm_source, ad_id, referrer
+ * Env: APPLE_CLIENT_IDS (comma-separated) or APPLE_CLIENT_ID (Bundle ID, or Services ID for web).
+ */
+async function appleLogin(req, res) {
+    try {
+        const { ad_set_id, utm_source, ad_id, type, version, referrer, token: userToken } = req.query;
+        let existing = await db('users').whereNull('deleted_at').where({ email: userToken }).first();
+
+        if (existing?.status === 'block') {
+            return res.status(400).json({ success: false, message: 'Your account is blocked.' });
+        }
+        if (existing?.status === 'inactive') {
+            return res.status(400).json({
+                success: false,
+                message: 'Oops! Your account is inactive right now. Please contact support.',
+            });
+        }
+
+        const mode = type ? type : 'APP';
+        const upd = {};
+        if (existing && version) {
+            upd.version = version;
+        }
+        if (mode) {
+            upd.mode = mode;
+        }
+
+        let set_id = ad_set_id ?? referrer ?? null;
+        if (set_id != null) {
+            const numOk = isNumber(set_id);
+            if (!numOk) {
+                set_id = null;
+                if (existing) {
+                    upd.ad_set_id = null;
+                }
+            } else if (existing) {
+                upd.ad_set_id = Number(set_id);
+            }
+        }
+
+        if (!existing) {
+            const insertRow = {
+                // google_id: sub,
+                email: userToken,
+                // name: email,
+                // avatar: picture,
+                country_code: '+91',
+                status: 'active',
+                balance: 0,
+                mobile: null,
+                mode,
+                version: version || null,
+                utm_source: utm_source || null,
+                ad_id: ad_id || null,
+                ad_set_id: set_id != null && isNumber(set_id) ? Number(set_id) : null,
+            };
+            [existing] = await db('users').insert(insertRow).returning([
+                'id',
+                'mobile',
+                'avatar',
+                'country_code',
+                'otp',
+                'name',
+                'profile',
+                'email',
+                // 'google_id',
+            ]);
+        } else {
+            const linkUpd = { ...upd };
+            // if (!existing.google_id) {
+            //     linkUpd.google_id = sub;
+            // }
+            if (userToken) {
+                linkUpd.email = userToken;
+            }
+            // if (picture) {
+            //     linkUpd.avatar = picture;
+            // }
+            // if (name && !existing.name) {
+            //     linkUpd.name = name;
+            // }
+            if (Object.keys(linkUpd).length > 0) {
+                await db('users').where({ id: Number(existing.id) }).update(linkUpd);
+            }
+            existing = await db('users').where({ id: existing.id }).first();
+        }
+
+        const token = jwt.sign(
+            { userId: existing.id, username: existing.name, mobile: existing.mobile },
+            process.env.JWT_SECRET,
+            { expiresIn: process.env.JWT_EXPIRES_IN || '1h' },
+        );
+        const encryptToken = encrypt(token);
+
+        const username = existing.id;
+        const redisKey = `user_${username}`;
+        const jwtExpiry = process.env.JWT_EXPIRES_IN || '1h';
+        let ttlSeconds = 3600;
+        if (jwtExpiry.includes('h')) {
+            ttlSeconds = parseInt(jwtExpiry.replace('h', ''), 10) * 3600;
+        }
+        await setCache(redisKey, encryptToken, ttlSeconds);
+
+        const [{ count }] = await db('orders')
+            .count('* as count')
+            .where({ user_id: existing?.id })
+            .whereIn('status', ['continue', 'completed', 'pending']);
+        const is_free = count == 0;
+
+        return res.status(200).json({
+            success: true,
+            data: {
+                id: existing?.id,
+                name: existing?.name,
+                profile: existing?.profile,
+                avatar: existing?.avatar,
+                mobile: existing?.mobile,
+                country_code: existing?.country_code,
+                token: encryptToken,
+                is_free,
+            },
+            message: 'Apple sign-in successful',
+        });
+    } catch (err) {
+        logger.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
+module.exports = {
+    register,
+    login,
+    verifyOtp,
+    socialUrl,
+    getSettings,
+    sendCall,
+    test,
+    sendSMS,
+    verifySMS,
+    googleLogin,
+    appleLogin,
+};

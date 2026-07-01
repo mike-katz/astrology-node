@@ -1,8 +1,9 @@
 
-const { decrypt } = require('./crypto');
+const { decrypt, encrypt } = require('./crypto');
 require('dotenv').config();
 const jwt = require('jsonwebtoken');
 const db = require('../db');
+const { setCache } = require('../config/redisClient');
 
 const decodeJWT = (authHeader) => {
     try {
@@ -55,5 +56,61 @@ const socketParseEventData = (message) => {
 
 const isValidMobile = (mobile) => /^[0-9]{8,12}$/.test(mobile);
 
-module.exports = { decodeJWT, checkOrders, socketParseEventData, isValidMobile };
 
+function deepParse(input) {
+    let result = input;
+
+    try {
+        while (typeof result === "string") {
+            result = JSON.parse(result);
+        }
+    } catch (err) {
+        // jo parse fail thay to last valid value return karo
+        return result;
+    }
+
+    return result;
+}
+
+function convertCurrency(amount, rate) {
+    return Number((Number(amount) / Number(rate)).toFixed(2));
+}
+
+const generateLoginResponse = async (existing, currency) => {
+    const token = jwt.sign({ userId: existing.id, username: existing.name, mobile: existing.mobile, currency }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '1h' });
+    // hide password
+    const encryptToken = encrypt(token);
+
+    // Store token in Redis with key user_username (or user_mobile if username doesn't exist)
+    const username = existing.id;
+    const redisKey = `beta_user_${username}`;
+    // Set TTL to match JWT expiration (1 hour = 3600 seconds)
+    const jwtExpiry = process.env.JWT_EXPIRES_IN || '1h';
+    let ttlSeconds = 3600; // default 1 hour
+    if (jwtExpiry.includes('h')) {
+        ttlSeconds = parseInt(jwtExpiry.replace('h', '')) * 3600;
+    }
+    await setCache(redisKey, encryptToken, ttlSeconds);
+
+    // const [{ count }] = await db('orders')
+    //     .count('* as count')
+    //     .where({ user_id: existing.id })
+    //     .whereIn('status', ['continue', 'completed', 'pending']);
+    // const is_free = count == 0 || existing?.is_free_order_available ? true : false
+    const is_free = existing?.is_free_order_available || false
+    return {
+        success: true,
+        data: {
+            id: existing?.id,
+            name: existing?.name,
+            profile: existing?.profile,
+            avatar: existing?.avatar,
+            mobile: existing?.mobile,
+            country_code: existing?.country_code,
+            token: encryptToken,
+            is_free
+        }, message: 'Otp Verify Successfully'
+    }
+}
+
+module.exports = { decodeJWT, checkOrders, socketParseEventData, isValidMobile, deepParse, convertCurrency, generateLoginResponse };

@@ -27,6 +27,7 @@ const callBackRoutes = require('./routes/callback');
 const twilloVoiceRoutes = require('./routes/twilioVoice');
 const twilioRoutes = require('./routes/twilio');
 const callRoutes = require('./routes/call');
+const liveStreamingRoutes = require('./routes/liveStreaming');
 
 
 // const cors = require('cors');
@@ -76,7 +77,7 @@ app.use('/payment', paymentRoutes);
 app.use('/support-ticket', supportTicketRoutes);
 app.use('/agora', agoraRoutes);
 app.use('/call', callRoutes);
-
+app.use('/live-stream', liveStreamingRoutes);
 
 
 app.use((err, req, res, next) => {

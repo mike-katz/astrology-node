@@ -23,6 +23,7 @@
     "express-validator": "^7.0.1",
     "firebase-admin": "^13.6.0",
     "fs": "^0.0.1-security",
+    "geoip-lite": "^2.0.3",
     "ioredis": "^5.8.2",
     "jsonwebtoken": "^9.0.0",
     "knex": "^2.5.1",

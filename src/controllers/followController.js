@@ -1,6 +1,8 @@
 const db = require('../db');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const { deepParse } = require('../utils/decodeJWT');
+const { callEvent } = require('../socket');
 require('dotenv').config();
 
 async function addFollow(req, res) {
@@ -30,6 +32,16 @@ async function addFollow(req, res) {
         }
         if (!user) {
             await db('follows').insert({ user_id: req?.userId, pandit_id: panditId, type: "user" });
+            const isLive = await db('live_streams').where({ pandit_id: panditId, status: "live" }).first();
+            if (isLive) {
+                callEvent("emit_to_live_user_follow", {
+                    key: `pandit_${panditId}`,
+                    payload: {
+                        username: req.user,
+                        user_id: req.userId
+                    }
+                });
+            }
         }
         return res.status(200).json({ success: true, message: 'Follow Successfully' });
     } catch (err) {
@@ -71,8 +83,8 @@ async function getFollow(req, res) {
         .offset(offset);
 
     user?.map(item => {
-        item.languages = JSON.parse(item?.languages)
-        item.primary_expertise = JSON.parse(item?.primary_expertise)
+        item.languages = deepParse(item?.languages)
+        item.primary_expertise = deepParse(item?.primary_expertise)
     })
 
     const [{ count }] = await db('follows')

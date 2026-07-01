@@ -8,6 +8,7 @@ const axios = require('axios');
 const { callEvent } = require("../socket");
 const { channelLeave } = require('./agoraController');
 const { replaceTemplate } = require('../utils/replaceTemplate');
+const { readJoinedUserIds, emitLiveChatMessage } = require('./liveStreamingController');
 
 async function sendAutoMessage(profile, userId, orderId, panditId) {
     const panditIdNum = panditId != null && panditId !== '' ? Number(panditId) : null;
@@ -48,6 +49,7 @@ async function sendAutoMessage(profile, userId, orderId, panditId) {
         receiver_id: panditIdNum,
         message: message,
         status: "send",
+        conversion_id: `${userId}-${panditIdNum}`,
         type: "text"
     }).returning('*');
     if (panditIdNum != null) {
@@ -74,6 +76,7 @@ async function sendAutoMessage(profile, userId, orderId, panditId) {
         receiver_id: Number(userId),
         message: "Welcome to AstroGuruji!",
         status: "send",
+        conversion_id: `${userId}-${panditIdNum}`,
         is_system_generate: true,
         type: "text"
     }).returning('*');
@@ -88,6 +91,7 @@ async function sendAutoMessage(profile, userId, orderId, panditId) {
         receiver_type: "user",
         order_id: orderId,
         receiver_id: Number(userId),
+        conversion_id: `${userId}-${panditIdNum}`,
         message: "Astrologer will join within 10 seconds",
         status: "send",
         is_system_generate: true,
@@ -104,6 +108,7 @@ async function sendAutoMessage(profile, userId, orderId, panditId) {
         receiver_type: "user",
         order_id: orderId,
         receiver_id: Number(userId),
+        conversion_id: `${userId}-${panditIdNum}`,
         message: "Please share your question in the meanwhile",
         status: "send",
         is_system_generate: true,
@@ -550,7 +555,8 @@ const ORDER_LIST_MAX_LIMIT = 100;
 /**
  * Order list: one row per pandit, last chat per order.
  * Perf: subquery DISTINCT ON first (no full chats denormalized join on every order row);
- * LATERAL limits chat work to final page rows; count + list in parallel.
+ * last chat is hydrated after the page query because Citus cannot run the LATERAL join
+ * against this distributed derived subquery.
  * DB: indexes on orders (user_id, pandit_id, …) and chats (order_id, id) help a lot — add in your DB if missing.
  * Optional: ?skip_last_message=1 — faster list if client does not need last_message JSON.
  */
@@ -587,51 +593,13 @@ async function list(req, res) {
 
         let listQb = db.from(oneOrderPerPandit.as('o')).leftJoin('pandits as p', 'p.id', 'o.pandit_id');
 
-        if (!skipLastMessage) {
-            listQb = listQb.joinRaw(
-                `LEFT JOIN LATERAL (
-                  SELECT c.id, c.message, c.sender_type, c.sender_id, c.receiver_type, c.receiver_id,
-                         c.type, c.status, c.created_at, c.receiver_delete, c.sender_delete, c.is_system_generate
-                  FROM chats c
-                  WHERE c.order_id = o.order_id
-                    AND c.deleted_at IS NULL
-                    AND c.is_system_generate IS NULL
-                  ORDER BY c.id DESC
-                  LIMIT 1
-                ) AS c ON true`
-            );
-        }
-
-        const lastMessageSelect = skipLastMessage
-            ? db.raw('NULL::json as last_message')
-            : db.raw(`
-                CASE
-                    WHEN c.id IS NOT NULL THEN
-                        json_build_object(
-                            'id', c.id,
-                            'message', c.message,
-                            'sender_type', c.sender_type,
-                            'sender_id', c.sender_id,
-                            'receiver_type', c.receiver_type,
-                            'receiver_id', c.receiver_id,
-                            'type', c.type,
-                            'status', c.status,
-                            'created_at', c.created_at,
-                            'receiver_delete', c.receiver_delete,
-                            'sender_delete', c.sender_delete,
-                            'is_system_generate', c.is_system_generate
-                        )
-                    ELSE NULL
-                END as last_message
-            `);
-
         const listPromise = listQb
             .clone()
-            .select('o.*', 'p.display_name as name', 'p.profile', 'p.online', 'p.tag', lastMessageSelect)
+            .select('o.*', 'p.display_name as name', 'p.profile', 'p.online', 'p.tag', db.raw('NULL::json as last_message'))
             .orderBy([
-                { column: 'o.pandit_id', order: 'asc' },
                 { column: db.raw(ORDER_LIST_STATUS_RANK_SQL), order: 'asc' },
                 { column: 'o.id', order: 'desc' },
+                { column: 'o.pandit_id', order: 'asc' },
             ])
             .limit(limit)
             .offset(offset);
@@ -641,7 +609,38 @@ async function list(req, res) {
             .whereNot('o.status', 'cancel')
             .countDistinct('o.pandit_id as count');
 
-        const [order, countRows] = await Promise.all([listPromise, countPromise]);
+        let [order, countRows] = await Promise.all([listPromise, countPromise]);
+
+        if (!skipLastMessage && order.length > 0) {
+            const lastMessages = await Promise.all(
+                order.map((item) => {
+                    const conversionId = `${req.userId}-${item.pandit_id}`;
+                    return db('chats as c')
+                        .select(
+                            'c.id',
+                            'c.message',
+                            'c.sender_type',
+                            'c.sender_id',
+                            'c.receiver_type',
+                            'c.receiver_id',
+                            'c.type',
+                            'c.status',
+                            'c.created_at',
+                            'c.receiver_delete',
+                            'c.sender_delete',
+                            'c.is_system_generate'
+                        )
+                        .where({ 'c.conversion_id': conversionId, 'c.order_id': item.order_id })
+                        .orderBy('c.id', 'desc')
+                        .first();
+                })
+            );
+
+            order = order.map((item, idx) => ({
+                ...item,
+                last_message: lastMessages[idx] || null,
+            }));
+        }
 
         const count = countRows[0]?.count ?? 0;
         const total = parseInt(count, 10);
@@ -780,6 +779,7 @@ async function acceptOrder(req, res) {
                 order_id: orderId,
                 receiver_id: Number(order?.pandit_id),
                 message: message,
+                conversion_id: `${order?.user_id}-${order?.pandit_id}`,
                 status: "send",
                 type: "text"
             }).returning('*');
@@ -804,6 +804,7 @@ async function acceptOrder(req, res) {
                 receiver_id: Number(order?.pandit_id),
                 message: "This is an automated message to confirm that chat has started.",
                 status: "send",
+                conversion_id: `${order?.user_id}-${order?.pandit_id}`,
                 is_system_generate: true,
                 type: "text"
             }).returning('*');
@@ -930,7 +931,7 @@ async function deleteOrder(req, res) {
 }
 
 async function sendGift(req, res) {
-    const { name, pandit_id, amount, qty } = req.body || {};
+    const { name, pandit_id, amount, qty, is_live } = req.body || {};
     logger.info('order_sendGift', { userId: req.userId, pandit_id, amount, qty });
     try {
         if (!pandit_id || !amount || !qty) {
@@ -970,6 +971,34 @@ async function sendGift(req, res) {
         const pandit_new_balance = Number(pandit.balance) + Number(panditAmount)
         await db('balancelogs').insert({ pandit_old_balance: Number(pandit?.balance), pandit_new_balance, user_old_balance: Number(user.balance), user_new_balance: Number(newBalance), user_id: req.userId, message: `Send gift to ${pandit?.display_name} (${name}) - ${qty}`, pandit_id: pandit?.id, pandit_message: `Receive gift from ${user?.name} (${name}) - ${qty}`, pandit_amount: panditAmount, amount: - final });
         logger.info('order_sendGift success', { userId: req.userId, pandit_id, amount: final });
+
+        if (is_live) {
+            callEvent("emit_to_live_gift_send", {
+                key: `pandit_${pandit_id}`,
+                payload: { name, user_id: req.userId, username: user?.name, avatar: user?.avatar, profile: user?.profile, amount, qty, is_live },
+            });
+
+            const channel = await db('live_streams').select('channel_id').where({ pandit_id: Number(pandit.id), status: "live" }).first();
+            const payload = {
+                username: user?.name,
+                profile: user?.profile,
+                avatar: user?.avatar,
+                gift_name: name,
+                amount,
+                channel_id: channel?.channel_id
+            }
+            if (channel?.channel_id) {
+                const joined_user_ids = await readJoinedUserIds(channel?.channel_id);
+
+                const base = payload;
+                for (const user_id of joined_user_ids) {
+                    const uid = user_id != null && Number.isFinite(Number(user_id)) ? Number(user_id) : null;
+                    if (uid != null) {
+                        callEvent('emit_to_user_send_gift', { key: `user_${uid}`, payload: base });
+                    }
+                }
+            }
+        }
         return res.status(200).json({ success: true, message: 'Order cancel Successfully' });
     } catch (err) {
         logger.error('order_sendGift error', { userId: req.userId, err: err?.message });

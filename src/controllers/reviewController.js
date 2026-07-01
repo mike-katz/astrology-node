@@ -49,6 +49,10 @@ async function addReview(req, res) {
             .first();
         // console.log("user", user);
         // if (user) return res.status(400).json({ success: false, message: 'You already follow this pandit' });
+        const orderDetail = await db('orders').where({ order_id: orderId }).first();
+        if (!orderDetail || orderDetail?.status != 'completed') {
+            return res.status(200).json({ success: true, message: 'Please complete your ongoing order.' });
+        }
         if (!user) {
             const saved = await db('pandits').where({ id: Number(panditId) }).first();
             const userDetail = await db('users').where('id', req?.userId).first();
