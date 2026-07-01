@@ -189,7 +189,7 @@ async function initRazorpayPayment({ user, userId, amount, currencyRate, gateway
         return { error: { status: 500, message: 'Razorpay is not configured.' } };
     }
 
-    const { dbAmount, dbGst, dbCurrency, gatewayAmountMinor, gatewayCurrency } = buildRechargeAmounts(amount, currencyRate);
+    let { dbAmount, dbGst, dbCurrency, gatewayAmountMinor, gatewayCurrency } = buildRechargeAmounts(amount, currencyRate);
     const receipt = `rcpt_${userId}_${Date.now()}`;
     const instance = new Razorpay({ key_id: keyId, key_secret: keySecret });
     const order = await instance.orders.create({
@@ -200,6 +200,10 @@ async function initRazorpayPayment({ user, userId, amount, currencyRate, gateway
     });
 
     const offer_amount = await getFirstRechargeOfferAmount(user, dbAmount);
+    if (offer_amount > 0) {
+        dbGst = 0;
+        dbAmount = amount
+    }
     await db('payments').insert({
         user_id: userId,
         order_id: order.id,
