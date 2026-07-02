@@ -660,6 +660,7 @@ async function balanceCut(user_id, order, end_time, place) {
         if (order.type === 'chat') {
             callEvent("emit_to_chat_end", { toType: "user", toId: order?.user_id, orderId: order?.order_id });
             callEvent("emit_to_chat_order_completed", { toType: "user", toId: order?.user_id, orderId: order?.order_id });
+            callEvent("emit_to_chat_order_completed", { toType: "pandit", toId: order?.pandit_id, orderId: order?.order_id });
         }
         // Pending order + order completed
         callEvent("emit_to_pending_order", { key: `pandit_${order?.pandit_id}`, payload: { pandit_id: order?.pandit_id } });
