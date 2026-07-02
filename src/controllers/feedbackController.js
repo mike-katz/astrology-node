@@ -9,9 +9,9 @@ async function createFeedback(req, res) {
     try {
         const { mobile, email, name, subject, content, device_id } = req.body || {};
 
-        if (!mobile && !email) {
-            return res.status(400).json({ success: false, message: 'Mobile or email is required.' });
-        }
+        // if (!mobile && !email) {
+        //     return res.status(400).json({ success: false, message: 'Mobile or email is required.' });
+        // }
         if (!name || !String(name).trim()) {
             return res.status(400).json({ success: false, message: 'Name is required.' });
         }
