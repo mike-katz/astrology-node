@@ -12,12 +12,12 @@ async function createFeedback(req, res) {
         // if (!mobile && !email) {
         //     return res.status(400).json({ success: false, message: 'Mobile or email is required.' });
         // }
-        if (!name || !String(name).trim()) {
-            return res.status(400).json({ success: false, message: 'Name is required.' });
-        }
-        if (!subject || !String(subject).trim()) {
-            return res.status(400).json({ success: false, message: 'Subject is required.' });
-        }
+        // if (!name || !String(name).trim()) {
+        //     return res.status(400).json({ success: false, message: 'Name is required.' });
+        // }
+        // if (!subject || !String(subject).trim()) {
+        //     return res.status(400).json({ success: false, message: 'Subject is required.' });
+        // }
         if (!content || !String(content).trim()) {
             return res.status(400).json({ success: false, message: 'Content is required.' });
         }
