@@ -220,6 +220,7 @@ async function razorpay(req, res) {
             user_id: user.id,
             message: `Purchase of AG-Money via Razorpay (${razorpayPaymentId})`,
             amount: paymentRow?.amount,
+            currency: paymentRow?.currency,
             gst,
         }).returning('*');
         await db('payments').where({ id: paymentRow.id }).update({
@@ -237,6 +238,7 @@ async function razorpay(req, res) {
                 user_id: user.id,
                 message: `Cashback Order(${orderId})`,
                 amount: extra,
+                currency: paymentRow?.currency,
                 gst: 0,
                 invoice: "",
             });
@@ -245,7 +247,7 @@ async function razorpay(req, res) {
         if (paymentRow?.offer_amount > 0) {
             await db('balancelogs').insert({
                 user_old_balance: Number(newBalance),
-                user_new_balance: Number(newBalance) + Number(extra || 0) + Number(paymentRow?.offer_amount),
+                user_new_balance: Number(newBalance) - Number(paymentRow?.amount) + Number(paymentRow?.offer_amount),
                 user_id: user.id,
                 message: `Offer Bonus Order(${orderId})`,
                 amount: Number(paymentRow?.offer_amount) - Number(paymentRow?.amount),
@@ -409,7 +411,7 @@ async function xpay(req, res) {
         if (paymentRow?.offer_amount > 0) {
             await db('balancelogs').insert({
                 user_old_balance: Number(newBalance),
-                user_new_balance: Number(newBalance) + Number(extra || 0) + Number(paymentRow?.offer_amount),
+                user_new_balance: Number(newBalance) - Number(paymentRow?.amount) + Number(paymentRow?.offer_amount),
                 user_id: user.id,
                 message: `Offer Bonus Order(${receiptId})`,
                 amount: Number(paymentRow?.offer_amount) - Number(paymentRow?.amount),
