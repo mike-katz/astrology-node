@@ -439,4 +439,10 @@ async function xpay(req, res) {
     }
 }
 
-module.exports = { razorpay, xpay };
+async function icici(req, res) {
+    logger.info('icici callback start body', req.body);
+    return res.status(200).json({ success: true, message: 'Payment success updated' });
+
+}
+
+module.exports = { razorpay, xpay, icici };
