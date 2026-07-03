@@ -445,4 +445,10 @@ async function icici(req, res) {
 
 }
 
-module.exports = { razorpay, xpay, icici };
+async function twilioSms(req, res) {
+    logger.info('twilioSms callback start body', req.body);
+    return res.status(200).json({ success: true, message: 'Success' });
+
+}
+
+module.exports = { razorpay, xpay, icici, twilioSms };
