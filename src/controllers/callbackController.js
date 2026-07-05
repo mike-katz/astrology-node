@@ -258,7 +258,7 @@ async function razorpay(req, res) {
         }
 
         const order = await db('orders').where({ user_id: user.id, status: 'continue', is_free: false }).first();
-        if (order) {
+        if (order && !order?.is_offer) {
             const minute = Math.floor(Number(paymentRow?.amount) / Number(order?.rate || order?.final_chat_call_rate || 1));
             const endTime = new Date(new Date(order.end_time).getTime() + minute * 60 * 1000);
             const duration = Number(order?.duration) + Number(minute);
