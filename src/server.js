@@ -23,6 +23,7 @@ const supportTicketRoutes = require('./routes/supportTicket');
 const faqRoutes = require('./routes/faq');
 const feedbackRoutes = require('./routes/feedback');
 const contactUsRoutes = require('./routes/contactUs');
+const astroRemedyRoutes = require('./routes/astroRemedy');
 const blogRoutes = require('./routes/blog');
 const bannerRoutes = require('./routes/banners');
 const callBackRoutes = require('./routes/callback');
@@ -83,6 +84,7 @@ app.use('/support-ticket', supportTicketRoutes);
 app.use('/agora', agoraRoutes);
 app.use('/call', callRoutes);
 app.use('/live-stream', liveStreamingRoutes);
+app.use('/astro-remedy', astroRemedyRoutes);
 
 
 app.use((err, req, res, next) => {
