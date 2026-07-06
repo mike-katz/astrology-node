@@ -203,12 +203,12 @@ async function login(req, res) {
             return res.status(400).json({ success: false, message: 'Oops! Your account is inactive right now. Please contact support.' });
         }
         if (!user) {
-            if (device_id) {
-                const devices = await db('users').where({ device_id }).first();
-                if (devices) {
-                    return res.status(400).json({ success: false, message: 'This device is already linked to another account. Please sign in using the existing account or contact support if you need assistance.' });
-                }
-            }
+            // if (device_id) {
+            //     const devices = await db('users').where({ device_id }).first();
+            //     if (devices) {
+            //         return res.status(400).json({ success: false, message: 'This device is already linked to another account. Please sign in using the existing account or contact support if you need assistance.' });
+            //     }
+            // }
         }
         let newMobile = mobile
         console.log("mobile.length", mobile.length);
@@ -341,7 +341,7 @@ async function verifyOtp(req, res) {
                 console.log("currency", currency);
                 currency = currency?.currency
             }
-            [existing] = await db('users').insert({ mobile, country_code, status: "active", balance: 0, ad_set_id: set_id, utm_source, ad_id, mode, version, is_free_order_available: true, default_currency: currency, permanent_currency: currency, device_id }).returning(['id', 'mobile', 'avatar', 'country_code', 'otp', 'is_free_order_available', 'permanent_currency', 'default_currency']);
+            [existing] = await db('users').insert({ mobile, country_code, status: "active", balance: 0, ad_set_id: set_id, utm_source, ad_id, mode, version, is_free_order_available: true, default_currency: currency, permanent_currency: currency }).returning(['id', 'mobile', 'avatar', 'country_code', 'otp', 'is_free_order_available', 'permanent_currency', 'default_currency']);
         }
         if (Object.keys(upd).length > 0) {
             await db('users').where({ id: Number(existing?.id) }).update(upd)
@@ -531,10 +531,10 @@ async function googleLogin(req, res) {
         currency = existing?.default_currency || 'INR';
 
         if (!existing) {
-            if (device_id) {
-                const devices = await db('users').where({ device_id }).first();
-                if (devices) return res.status(400).json({ success: false, message: 'This device is already linked to another account. Please sign in using the existing account or contact support if you need assistance.' });
-            }
+            // if (device_id) {
+            //     const devices = await db('users').where({ device_id }).first();
+            //     if (devices) return res.status(400).json({ success: false, message: 'This device is already linked to another account. Please sign in using the existing account or contact support if you need assistance.' });
+            // }
             const insertRow = {
                 // google_id: sub,
                 email,
@@ -658,10 +658,10 @@ async function verifyAppleIdentityToken(identityToken, audiences) {
 async function appleLogin(req, res) {
     try {
         const { ad_set_id, utm_source, ad_id, type, version, referrer, token: userToken, device_id } = req.query;
-        const devices = await db('users').where({ device_id }).first();
-        if (devices) {
-            if (devices?.email != userToken) { return res.status(400).json({ success: false, message: 'This device is already linked to another account. Please sign in using the existing account or contact support if you need assistance.' }); }
-        }
+        // const devices = await db('users').where({ device_id }).first();
+        // if (devices) {
+        //     if (devices?.email != userToken) { return res.status(400).json({ success: false, message: 'This device is already linked to another account. Please sign in using the existing account or contact support if you need assistance.' }); }
+        // }
         let existing = await db('users').whereNull('deleted_at').where({ email: userToken }).first();
 
         if (existing?.status === 'block') {
@@ -707,10 +707,10 @@ async function appleLogin(req, res) {
         currency = existing?.default_currency || 'INR';
 
         if (!existing) {
-            if (device_id) {
-                const devices = await db('users').where({ device_id }).first();
-                if (devices) return res.status(400).json({ success: false, message: 'This device is already linked to another account. Please sign in using the existing account or contact support if you need assistance.' });
-            }
+            // if (device_id) {
+            //     const devices = await db('users').where({ device_id }).first();
+            //     if (devices) return res.status(400).json({ success: false, message: 'This device is already linked to another account. Please sign in using the existing account or contact support if you need assistance.' });
+            // }
             const insertRow = {
                 // google_id: sub,
                 email: userToken,

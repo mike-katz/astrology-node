@@ -216,8 +216,8 @@ async function listLive(req, res) {
             rows.map(async (r) => {
                 const isFollow = followData.find(i => i.pandit_id == r.pandit_id);
                 const userCurrency = await db('users').where({ id: Number(req.userId) }).select('default_currency').first();
-                const currency = await getCurrencySymbolByCurrency(userCurrency?.default_currency);
-                const currencyData = await db('currency').select('currency_name', 'pandit_inr_rate').where({ currency_name: userCurrency?.default_currency }).first();
+                const currency = await getCurrencySymbolByCurrency(userCurrency?.default_currency || "INR");
+                const currencyData = await db('currency').select('currency_name', 'pandit_inr_rate').where({ currency_name: userCurrency?.default_currency || 'INR' }).first();
 
                 return {
                     channel_id: r.channel_id,
@@ -571,7 +571,7 @@ async function createMediaOrder(req, res) {
                 count = 0;
             }
         }
-        const currencyData = await db('currency').select('currency_name', 'user_inr_rate', 'pandit_inr_rate').where({ currency_name: user?.default_currency }).first();
+        const currencyData = await db('currency').select('currency_name', 'user_inr_rate', 'pandit_inr_rate').where({ currency_name: user?.default_currency || "INR" }).first();
         let panditRate = convertCurrency(pandit?.final_chat_call_rate, (currencyData?.pandit_inr_rate || 1));
         panditRate = Number(panditRate) * Number(currencyData?.user_inr_rate || 1)
         const userBalance = user?.balance
@@ -641,7 +641,7 @@ async function createMediaOrder(req, res) {
             deduction,
             type,
             profile_id,
-            currency: user?.default_currency,
+            currency: user?.default_currency || 'INR',
             is_free: false,
         }
 
