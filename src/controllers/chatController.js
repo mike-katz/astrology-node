@@ -1091,6 +1091,9 @@ async function newCreateOrder(req, res) {
         if (token) {
             const waiting_time = pandit?.waiting_time == null ? true : false
             rate = rate.toFixed(2)
+            if (ins.is_offer) {
+                rate = settings?.free_chat_amount_per_minute
+            }
             await sendNotification(token, user?.name, rate, panditId, type, waiting_time, orderId, user?.id, user?.profile, user?.avatar, 'INR')
         }
         // socket.emit("emit_to_user_for_register", {
