@@ -169,6 +169,7 @@ async function initXpayPayment({ user, userId, amount, currencyRate, from }) {
         currency: dbCurrency,
         type: 'recharge',
         offer_amount,
+        device: user?.mode
     });
 
     return {
@@ -213,6 +214,7 @@ async function initRazorpayPayment({ user, userId, amount, currencyRate, gateway
         currency: dbCurrency,
         type: 'recharge',
         offer_amount,
+        device: user?.mode
     });
 
     return {
