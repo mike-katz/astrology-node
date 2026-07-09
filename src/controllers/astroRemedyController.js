@@ -77,6 +77,7 @@ async function getRemedyList(req, res) {
 async function getRemedyItems(req, res) {
     try {
         const { remedy_id, name } = req.query;
+        console.log("req.query", req.query);
         if (!remedy_id) {
             return res.status(400).json({ success: false, message: 'Remedy id is required.' });
         }
