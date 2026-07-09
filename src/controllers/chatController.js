@@ -1094,7 +1094,7 @@ async function newCreateOrder(req, res) {
             if (ins.is_offer) {
                 rate = settings?.free_chat_amount_per_minute
             }
-            await sendNotification(token, user?.name, rate, panditId, type, waiting_time, orderId, user?.id, user?.profile, user?.avatar, 'INR')
+            await sendNotification(token, user?.name, rate, panditId, type, ins.is_offer, orderId, user?.id, user?.profile, user?.avatar, 'INR')
         }
         // socket.emit("emit_to_user_for_register", {
         //     key: `user_${req?.userId}`,
