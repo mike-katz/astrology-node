@@ -1,5 +1,6 @@
 const db = require('../db');
 const { deepParse } = require('../utils/decodeJWT');
+const { createOrder } = require('./remedyOrderController');
 
 function getFirstImage(image) {
     if (!image) return null;
@@ -218,4 +219,30 @@ async function getRemedyDetail(req, res) {
     }
 }
 
-module.exports = { getRemedyList, getRemedyItems, getRemedyDetail };
+async function getRemedyOrderCreate(req, res) {
+    try {
+        const { id, join_mode } = req.body;
+        if (!id) {
+            return res.status(400).json({ success: false, message: 'Item id is required.' });
+        }
+        if (!join_mode) {
+            return res.status(400).json({ success: false, message: 'Join mode is required.' });
+        }
+
+        const item = await db('astroremedypoojas')
+            .where({ id: Number(id), status: true })
+            .whereNull('deleted_at')
+            .first();
+        if (!item) {
+            return res.status(400).json({ success: false, message: 'Remedy item not found.' });
+        }
+
+        req.body.pooja_id = Number(id);
+        return createOrder(req, res);
+    } catch (err) {
+        console.error('getRemedyOrderCreate:', err);
+        return res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
+module.exports = { getRemedyList, getRemedyItems, getRemedyDetail, getRemedyOrderCreate };
