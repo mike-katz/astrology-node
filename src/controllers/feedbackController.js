@@ -30,6 +30,7 @@ async function createFeedback(req, res) {
             subject: String(subject).trim(),
             content: String(content).trim(),
             device_id: device_id || null,
+            status: "pending"
         }).returning(['id', 'mobile', 'email', 'name', 'subject', 'content', 'device_id', 'created_at']);
 
         return res.status(200).json({
