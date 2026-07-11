@@ -191,6 +191,19 @@ async function getRemedyDetail(req, res) {
             return res.status(400).json({ success: false, message: 'Remedy item not found.' });
         }
 
+        const reviews = await db('astroremedireviews as ar')
+            .leftJoin('users as u', 'u.id', 'ar.user_id')
+            .select(
+                'ar.id',
+                'ar.rating',
+                'ar.message',
+                'ar.created_at',
+                'u.name',
+                'u.profile'
+            )
+            .where({ 'ar.remedy_id': Number(id) })
+            .orderBy('ar.id', 'desc');
+
         const data = {
             id: item.id,
             remedy_id: item.remedy_id,
@@ -208,6 +221,7 @@ async function getRemedyDetail(req, res) {
             images: parseImageList(item.image),
             image: getFirstImage(item.image),
             created_at: item.created_at,
+            reviews,
         };
         if (item?.pooja_type == 'spells') {
             const panditIds = parsePanditIds(item.pandit_id);
