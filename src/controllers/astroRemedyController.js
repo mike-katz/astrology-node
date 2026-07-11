@@ -188,9 +188,6 @@ async function getRemedyDetail(req, res) {
             return res.status(400).json({ success: false, message: 'Remedy item not found.' });
         }
 
-        const panditIds = parsePanditIds(item.pandit_id);
-        const pandit = await getPanditFromIds(panditIds);
-
         const data = {
             id: item.id,
             remedy_id: item.remedy_id,
@@ -202,13 +199,19 @@ async function getRemedyDetail(req, res) {
             discount: Number(item.discount || 0),
             tag: deepParse(item.tag),
             duration: item.duration,
-            pandit_id: panditIds,
-            pandit,
+            pooja_type: item.pooja_type,
+            highlight: item.highlight,
             description: item.description,
             images: parseImageList(item.image),
             image: getFirstImage(item.image),
             created_at: item.created_at,
         };
+        if (item?.pooja_type == 'spells') {
+            const panditIds = parsePanditIds(item.pandit_id);
+            const pandit = await getPanditFromIds(panditIds);
+            data.pandit_id = panditIds
+            data.pandit = pandit
+        }
 
         return res.status(200).json({
             success: true,
