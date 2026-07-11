@@ -180,13 +180,13 @@ async function notifyPandit(panditId, title, body, data = {}) {
 
 async function createOrder(req, res) {
     try {
-        const { pooja_id, join_mode } = req.body;
-        if (!pooja_id || !join_mode) {
+        const { pooja_id, pandit_id } = req.body;
+        if (!pooja_id) {
             return res.status(400).json({ success: false, message: 'Pooja id and join mode are required.' });
         }
-        if (!JOIN_MODES.includes(join_mode)) {
-            return res.status(400).json({ success: false, message: 'Join mode must be call, video or audio.' });
-        }
+        // if (!JOIN_MODES.includes(join_mode)) {
+        //     return res.status(400).json({ success: false, message: 'Join mode must be call, video or audio.' });
+        // }
 
         const pooja = await db('astroremedypoojas as p')
             .leftJoin('astroremedies as r', 'r.id', 'p.remedy_id')
@@ -203,8 +203,11 @@ async function createOrder(req, res) {
         if (!panditIds.length) {
             return res.status(400).json({ success: false, message: 'No pandit assigned to this pooja.' });
         }
-        const panditId = panditIds[0];
 
+        let panditId = panditIds[0];
+        if (pandit_id) {
+            panditId = pandit_id
+        }
         const activeOrder = await db('remedy_orders')
             .where({ user_id: req.userId, pooja_id: Number(pooja_id) })
             .whereIn('status', ACTIVE_STATUSES)
@@ -254,7 +257,6 @@ async function createOrder(req, res) {
                 discount,
                 final_amount: finalAmount,
                 currency,
-                join_mode,
                 status: 'pending',
             }).returning('*');
         });
