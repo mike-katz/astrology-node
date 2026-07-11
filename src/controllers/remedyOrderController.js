@@ -713,20 +713,12 @@ async function getUserOrders(req, res) {
         const total = parseInt(count, 10);
 
         const orderIds = rows.map((row) => row.id);
-        const feedbacks = orderIds.length
-            ? await db('remedy_order_feedbacks').whereIn('remedy_order_id', orderIds).where({ user_id: req.userId })
-            : [];
-        const feedbackMap = feedbacks.reduce((acc, item) => {
-            if (!acc[item.remedy_order_id]) acc[item.remedy_order_id] = {};
-            acc[item.remedy_order_id][item.type] = item;
-            return acc;
-        }, {});
+
 
         const results = rows.map((row) => ({
             ...formatOrderRow(row),
             pandit_name: row.pandit_name,
             pandit_profile: row.pandit_profile,
-            feedback: feedbackMap[row.id] || null,
         }));
 
         return res.status(200).json({
