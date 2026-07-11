@@ -42,18 +42,21 @@ async function getPanditFromIds(panditIds) {
         .select('id', 'profile', 'display_name', 'rating_1', 'rating_2', 'rating_3', 'rating_4', 'rating_5', 'total_orders')
         .whereIn('id', panditIds)
         .whereNull('deleted_at')
-        .orderByRaw(`array_position(ARRAY[${panditIds.join(',')}]::int[], id)`)
-        .first();
+        .orderByRaw(`array_position(ARRAY[${panditIds.join(',')}]::int[], id)`);
 
     if (!pandit) return null;
 
-    return {
-        id: pandit.id,
-        profile: pandit.profile,
-        display_name: pandit.display_name,
-        rating: calculateRating(pandit),
-        total_orders: Number(pandit.total_orders || 0),
-    };
+    const result = []
+    pandit.map(item => {
+        result.push({
+            id: item.id,
+            profile: item.profile,
+            display_name: item.display_name,
+            rating: calculateRating(item),
+            total_orders: Number(item.total_orders || 0),
+        })
+    })
+    return result
 }
 
 async function getRemedyList(req, res) {
