@@ -171,6 +171,8 @@ async function getRemedyDetail(req, res) {
                 'p.pandit_id',
                 'p.amount',
                 'p.discount',
+                'p.pooja_type',
+                'p.highlight',
                 'p.description',
                 'p.created_at',
                 'r.name as remedy_name',
