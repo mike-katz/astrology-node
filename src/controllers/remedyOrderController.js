@@ -832,11 +832,7 @@ async function getOrderDetail(req, res) {
             return res.status(400).json({ success: false, message: 'Order not found.' });
         }
 
-        const feedbacks = await db('remedy_order_feedbacks').where({ remedy_order_id: order.id });
-        const feedback = feedbacks.reduce((acc, item) => {
-            acc[item.type] = item;
-            return acc;
-        }, {});
+        const feedbacks = await db('remedy_order_chat').where({ remedy_order_id: order.id });
 
         return res.status(200).json({
             success: true,
@@ -846,9 +842,7 @@ async function getOrderDetail(req, res) {
                 pandit_profile: order.pandit_profile,
                 user_name: order.user_name,
                 user_profile: order.user_profile,
-                feedback: isUser ? feedback : undefined,
-                can_join: isUser && order.status === 'in-progress',
-                can_feedback: isUser && order.status === 'completed',
+                chat: feedbacks,
             },
             message: 'Remedy order detail fetched successfully.',
         });
