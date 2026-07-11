@@ -92,6 +92,7 @@ function formatOrderRow(order) {
 }
 
 async function deductUserBalance(trx, userId, amount, message, orderId, panditId) {
+    console.log("userId, amount, message, orderId, panditId", userId, amount, message, orderId, panditId);
     const user = await trx('users').where({ id: userId }).forUpdate().first();
     if (!user || Number(user.balance) < amount) {
         throw new Error('INSUFFICIENT_BALANCE');
@@ -227,8 +228,9 @@ async function createOrder(req, res) {
         const amount = Number(pooja.amount);
         const discount = Number(pooja.discount || 0);
         const finalAmountInr = Math.max(amount - discount, 0);
+        console.log("finalAmountInr", finalAmountInr);
         const finalAmount = convertCurrency(finalAmountInr, currencyData?.user_inr_rate || 1);
-
+        console.log("finalAmount", finalAmount);
         if (Number(user?.balance) < finalAmount) {
             return res.status(400).json({ success: false, message: 'Insufficient wallet balance. Please recharge.' });
         }
