@@ -199,7 +199,8 @@ async function getRemedyDetail(req, res) {
                 'ar.message',
                 'ar.created_at',
                 'u.name',
-                'u.profile'
+                'u.profile',
+                'u.avatar'
             )
             .where({ 'ar.remedy_id': Number(id) })
             .orderBy('ar.id', 'desc');
