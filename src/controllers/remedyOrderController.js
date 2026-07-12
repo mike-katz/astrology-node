@@ -88,6 +88,7 @@ function formatOrderRow(order) {
         join_mode: order.join_mode,
         status: order.status,
         pandit_instructions: order.pandit_instructions,
+        user_instruction: order.user_instruction,
         scheduled_date: order.scheduled_date,
         scheduled_time: order.scheduled_time,
         scheduled_at: order.scheduled_at,
@@ -287,6 +288,37 @@ async function createOrder(req, res) {
             return res.status(400).json({ success: false, message: 'Insufficient wallet balance. Please recharge.' });
         }
         console.error('createOrder:', err);
+        return res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
+async function addUserInstruction(req, res) {
+    try {
+        const { order_id, user_instruction } = req.body;
+        if (!order_id || !user_instruction?.trim()) {
+            return res.status(400).json({ success: false, message: 'Order id and user instruction are required.' });
+        }
+
+        const order = await getOrderByQuery(order_id);
+        if (!order || order.user_id !== Number(req.userId)) {
+            return res.status(400).json({ success: false, message: 'Order not found.' });
+        }
+        if (!['pending', 'approved'].includes(order.status)) {
+            return res.status(400).json({ success: false, message: 'Instruction can only be added for pending or approved orders.' });
+        }
+
+        const [updated] = await db('remedy_orders').where({ id: order.id }).update({
+            user_instruction: user_instruction.trim(),
+            updated_at: new Date(),
+        }).returning('*');
+
+        return res.status(200).json({
+            success: true,
+            data: formatOrderRow(updated),
+            message: 'User instruction added successfully.',
+        });
+    } catch (err) {
+        console.error('addUserInstruction:', err);
         return res.status(500).json({ success: false, message: 'Server error' });
     }
 }
@@ -866,6 +898,7 @@ async function getOrderDetail(req, res) {
 
 module.exports = {
     createOrder,
+    addUserInstruction,
     approveOrder,
     startOrder,
     completeOrder,
