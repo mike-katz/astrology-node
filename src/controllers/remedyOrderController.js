@@ -825,7 +825,15 @@ async function getOrderDetail(req, res) {
         }
 
         const feedbacks = await db('remedy_order_chat').where({ remedy_order_id: order.id });
-        const logs = await db('remedy_order_logs').where({ order_id: order.order_id });
+        const logs = await db('remedy_order_logs as rol')
+            .leftJoin('pandits as p', 'p.id', 'rol.pandit_id')
+            .select(
+                'rol.*',
+                'p.display_name',
+                'p.profile'
+            )
+            .where({ "rol.order_id": order.order_id });
+        const pooja = await db('astroremedypoojas').where({ order_id: order.order_id }).first();
 
         return res.status(200).json({
             success: true,
@@ -836,7 +844,9 @@ async function getOrderDetail(req, res) {
                 user_name: order.user_name,
                 user_profile: order.user_profile,
                 chat: feedbacks,
-                logs
+                logs,
+                pooja_type: pooja?.pooja_type,
+                image: getFirstImage(pooja?.image),
             },
             message: 'Remedy order detail fetched successfully.',
         });
