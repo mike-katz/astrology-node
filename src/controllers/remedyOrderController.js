@@ -3,13 +3,20 @@ const axios = require('axios');
 const { deepParse, convertCurrency } = require('../utils/decodeJWT');
 const { callEvent } = require('../socket');
 const { RtcTokenBuilder, RtcRole } = require('agora-access-token');
-const { getFirstImage } = require('./astroRemedyController');
 require('dotenv').config();
 
 const AGORA_APP_ID = process.env.AGORA_APP_ID;
 const AGORA_APP_CERT = process.env.AGORA_APP_CERTIFICATE;
 const JOIN_MODES = ['call', 'video', 'audio'];
 const ACTIVE_STATUSES = ['pending', 'approved', 'in-progress'];
+
+function getFirstImage(image) {
+    if (!image) return null;
+    const parsed = deepParse(image);
+    if (Array.isArray(parsed) && parsed.length > 0) return parsed[0];
+    if (typeof parsed === 'string' && parsed.trim()) return parsed.trim();
+    return null;
+}
 
 function generateOrderId() {
     return `REM${Date.now()}${Math.floor(100000 + Math.random() * 900000)}`;
