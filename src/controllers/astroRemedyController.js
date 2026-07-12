@@ -265,4 +265,4 @@ async function getRemedyOrderCreate(req, res) {
     }
 }
 
-module.exports = { getRemedyList, getRemedyItems, getRemedyDetail, getRemedyOrderCreate };
+module.exports = { getRemedyList, getRemedyItems, getRemedyDetail, getRemedyOrderCreate, getFirstImage };

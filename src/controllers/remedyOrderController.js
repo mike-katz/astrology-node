@@ -3,6 +3,7 @@ const axios = require('axios');
 const { deepParse, convertCurrency } = require('../utils/decodeJWT');
 const { callEvent } = require('../socket');
 const { RtcTokenBuilder, RtcRole } = require('agora-access-token');
+const { getFirstImage } = require('./astroRemedyController');
 require('dotenv').config();
 
 const AGORA_APP_ID = process.env.AGORA_APP_ID;
