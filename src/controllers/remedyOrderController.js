@@ -546,7 +546,7 @@ async function cancelOrder(req, res) {
         if (!order || order.user_id !== Number(req.userId)) {
             return res.status(400).json({ success: false, message: 'Order not found.' });
         }
-        if (!['pending', 'approved'].includes(order.status)) {
+        if (!['pending'].includes(order.status)) {
             return res.status(400).json({ success: false, message: 'This order cannot be cancelled.' });
         }
 
@@ -825,6 +825,7 @@ async function getOrderDetail(req, res) {
         }
 
         const feedbacks = await db('remedy_order_chat').where({ remedy_order_id: order.id });
+        const logs = await db('remedy_order_logs').where({ order_id: order.order_id });
 
         return res.status(200).json({
             success: true,
@@ -835,6 +836,7 @@ async function getOrderDetail(req, res) {
                 user_name: order.user_name,
                 user_profile: order.user_profile,
                 chat: feedbacks,
+                logs
             },
             message: 'Remedy order detail fetched successfully.',
         });

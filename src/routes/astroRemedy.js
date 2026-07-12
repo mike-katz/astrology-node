@@ -7,6 +7,7 @@ router.get('/', astroRemedy.getRemedyList);
 router.get('/product', astroRemedy.getRemedyItems);
 router.get('/detail', astroRemedy.getRemedyDetail);
 router.post('/order/create', astroRemedy.getRemedyOrderCreate);
+router.post('/order/cancel', remedyOrder.cancelOrder);
 router.get('/order/list', remedyOrder.getUserOrders);
 router.get('/order/detail', remedyOrder.getOrderDetail);
 module.exports = router;
