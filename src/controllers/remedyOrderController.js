@@ -260,7 +260,7 @@ async function createOrder(req, res) {
             [savedOrder] = await trx('remedy_orders').insert({
                 order_id: orderId,
                 user_id: req.userId,
-                pandit_id: panditId,
+                pandit_id,
                 pooja_id: Number(pooja_id),
                 remedy_id: pooja.remedy_id,
                 pooja_name: pooja.name,
