@@ -833,7 +833,7 @@ async function getOrderDetail(req, res) {
                 'p.profile'
             )
             .where({ "rol.order_id": order.order_id });
-        const pooja = await db('astroremedypoojas').where({ order_id: order.order_id }).first();
+        const pooja = await db('astroremedypoojas').where({ id: order.pooja_id }).first();
 
         return res.status(200).json({
             success: true,
