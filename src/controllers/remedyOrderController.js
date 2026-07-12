@@ -214,7 +214,7 @@ async function createOrder(req, res) {
             return res.status(400).json({ success: false, message: 'No pandit assigned to this pooja.' });
         }
 
-        let panditId = panditIds[0];
+        let panditId = null;
         if (pandit_id) {
             panditId = pandit_id
         }
