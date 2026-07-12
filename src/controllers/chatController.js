@@ -1025,7 +1025,7 @@ async function newCreateOrder(req, res) {
             // );
 
             duration = Math.floor(Number(Number(user?.offer_amount)) / Number(panditRate));
-            deduction = Number(duration) * Number(pandit?.final_chat_call_rate)
+            deduction = Number(user?.offer_amount)
 
             // if ((user?.balance) < currencyItem?.amount) {
             //     logger.info('order_create fail', { userId: req.userId, message: 'Please recharge your wallet.' });
