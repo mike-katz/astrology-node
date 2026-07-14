@@ -329,6 +329,12 @@ async function verifyOtp(req, res) {
                 }
             }
         }
+        const ips = await getClientIp(req);
+        if (ips) {
+            console.log("ips", ips);
+            const geoss = await geoip.lookup(ips);
+            console.log("geoss", geoss);
+        }
         let currency = existing?.default_currency || 'INR';
         if (!existing) {
             const ip = await getClientIp(req);
