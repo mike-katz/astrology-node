@@ -309,6 +309,9 @@ async function verifyOtp(req, res) {
         if (mode) {
             upd.mode = mode
         }
+        if (existing) {
+            upd.last_login_at = new Date();
+        }
         let set_id = ad_set_id ?? referrer ?? null;
 
         if (set_id != null) {
@@ -341,7 +344,7 @@ async function verifyOtp(req, res) {
                 console.log("currency", currency);
                 currency = currency?.currency
             }
-            [existing] = await db('users').insert({ mobile, country_code, status: "active", balance: 0, ad_set_id: set_id, utm_source, ad_id, mode, version, is_free_order_available: true, default_currency: currency, permanent_currency: currency }).returning(['id', 'mobile', 'avatar', 'country_code', 'otp', 'is_free_order_available', 'permanent_currency', 'default_currency']);
+            [existing] = await db('users').insert({ mobile, country_code, status: "active", balance: 0, ad_set_id: set_id, utm_source, ad_id, mode, version, is_free_order_available: true, default_currency: currency, permanent_currency: currency, last_login_at: new Date() }).returning(['id', 'mobile', 'avatar', 'country_code', 'otp', 'is_free_order_available', 'permanent_currency', 'default_currency']);
         }
         if (Object.keys(upd).length > 0) {
             await db('users').where({ id: Number(existing?.id) }).update(upd)
@@ -507,6 +510,9 @@ async function googleLogin(req, res) {
         if (mode) {
             upd.mode = mode;
         }
+        if (existing) {
+            upd.last_login_at = new Date();
+        }
 
         let set_id = ad_set_id ?? referrer ?? null;
         if (set_id != null) {
@@ -551,6 +557,7 @@ async function googleLogin(req, res) {
                 permanent_currency: currency,
                 default_currency: currency,
                 ad_set_id: set_id != null && isNumber(set_id) ? Number(set_id) : null,
+                last_login_at: new Date(),
             };
             [existing] = await db('users').insert(insertRow).returning([
                 'id',
@@ -682,6 +689,9 @@ async function appleLogin(req, res) {
         if (mode) {
             upd.mode = mode;
         }
+        if (existing) {
+            upd.last_login_at = new Date();
+        }
 
         let set_id = ad_set_id ?? referrer ?? null;
         if (set_id != null) {
@@ -727,6 +737,7 @@ async function appleLogin(req, res) {
                 default_currency: currency,
                 ad_id: ad_id || null,
                 ad_set_id: set_id != null && isNumber(set_id) ? Number(set_id) : null,
+                last_login_at: new Date(),
             };
             [existing] = await db('users').insert(insertRow).returning([
                 'id',
