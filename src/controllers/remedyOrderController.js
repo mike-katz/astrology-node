@@ -219,12 +219,12 @@ async function createOrder(req, res) {
             panditId = pandit_id
         }
         const activeOrder = await db('remedy_orders')
-            .where({ user_id: req.userId, pooja_id: Number(pooja_id) })
-            .whereIn('status', ACTIVE_STATUSES)
+            .where({ user_id: req.userId })
+            .whereNotIn('status', ['cancelled', 'completed'])
             .whereNull('deleted_at')
             .first();
         if (activeOrder) {
-            return res.status(400).json({ success: false, message: 'You already have an active order for this pooja.' });
+            return res.status(400).json({ success: false, message: 'Please wait while complete your on going order.' });
         }
 
         const user = await db('users').where({ id: req.userId }).first();
