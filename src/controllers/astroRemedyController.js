@@ -265,4 +265,25 @@ async function getRemedyOrderCreate(req, res) {
     }
 }
 
-module.exports = { getRemedyList, getRemedyItems, getRemedyDetail, getRemedyOrderCreate };
+async function getRemedyFaq(req, res) {
+    try {
+        const { type } = req.query;
+        if (!type) {
+            return res.status(400).json({ success: false, message: 'Item id is required.' });
+        }
+
+        const reviews = await db('remedy_faqs')
+            .where({ type })
+            .orderBy(id, 'desc');
+        return res.status(200).json({
+            success: true,
+            data: reviews,
+            message: 'Remedy faq fetched successfully.',
+        });
+    } catch (err) {
+        console.error('getRemedyDetail:', err);
+        return res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
+module.exports = { getRemedyList, getRemedyItems, getRemedyDetail, getRemedyOrderCreate, getRemedyFaq };
