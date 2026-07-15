@@ -608,7 +608,7 @@ async function cancelOrder(req, res) {
             );
         });
 
-        notifyPandit(order?.pandit_id, 'Remedy Order Canceled', ``, { order_id: order.order_id });
+        notifyPandit(order?.pandit_id, 'Remedy Order Cancelled', ``, { order_id: order.order_id });
         return res.status(200).json({
             success: true,
             data: formatOrderRow(updated),
