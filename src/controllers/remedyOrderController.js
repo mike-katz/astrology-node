@@ -748,7 +748,7 @@ async function getUserOrders(req, res) {
 
         let query = db('remedy_orders as ro')
             .leftJoin('pandits as p', 'p.id', 'ro.pandit_id')
-            .leftJoin('astroremedypoojas as ap', 'p.id', 'ro.pooja_id')
+            .leftJoin('astroremedypoojas as ap', 'ap.id', 'ro.pooja_id')
             .select(
                 'ro.*',
                 'p.display_name as pandit_name',
