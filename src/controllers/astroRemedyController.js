@@ -202,7 +202,7 @@ async function getRemedyDetail(req, res) {
                 'u.profile',
                 'u.avatar'
             )
-            .where({ 'ar.pooja_id': Number(id) })
+            .where({ 'ar.pooja_id': Number(id), status: 'approved' })
             .orderBy('ar.id', 'desc');
 
         const data = {

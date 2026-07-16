@@ -698,6 +698,7 @@ async function addFeedback(req, res) {
             await db('astroremedireviews').where({ id: existing?.id }).update({
                 rating: Number(rating),
                 message,
+                status: 'pending'
             })
         } else {
             await db('astroremedireviews').insert({
@@ -705,7 +706,7 @@ async function addFeedback(req, res) {
                 pandit_id: order.pandit_id,
                 rating: Number(rating),
                 message,
-                status: false,
+                status: 'pending',
                 pooja_id: order.pooja_id,
                 order_id: order.order_id,
             });
