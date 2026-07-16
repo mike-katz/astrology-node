@@ -3,6 +3,7 @@ const axios = require('axios');
 const { deepParse, convertCurrency } = require('../utils/decodeJWT');
 const { callEvent } = require('../socket');
 const { RtcTokenBuilder, RtcRole } = require('agora-access-token');
+const { calculateRating } = require('./astroRemedyController');
 require('dotenv').config();
 
 const AGORA_APP_ID = process.env.AGORA_APP_ID;
@@ -736,7 +737,17 @@ async function getUserOrders(req, res) {
 
         let query = db('remedy_orders as ro')
             .leftJoin('pandits as p', 'p.id', 'ro.pandit_id')
-            .select('ro.*', 'p.display_name as pandit_name', 'p.profile as pandit_profile')
+            .select(
+                'ro.*',
+                'p.display_name as pandit_name',
+                'p.profile as pandit_profile',
+                'p.rating_1',
+                'p.rating_2',
+                'p.rating_3',
+                'p.rating_4',
+                'p.rating_5',
+                'p.total_orders',
+            )
             .where({ 'ro.user_id': req.userId })
             .whereNull('ro.deleted_at')
             .orderBy('ro.id', 'desc')
@@ -760,6 +771,8 @@ async function getUserOrders(req, res) {
             ...formatOrderRow(row),
             pandit_name: row.pandit_name,
             pandit_profile: row.pandit_profile,
+            rating: calculateRating(row),
+            total_orders: Number(row.total_orders || 0),
         }));
 
         return res.status(200).json({
@@ -845,6 +858,12 @@ async function getOrderDetail(req, res) {
                 'ro.*',
                 'p.display_name as pandit_name',
                 'p.profile as pandit_profile',
+                'p.rating_1',
+                'p.rating_2',
+                'p.rating_3',
+                'p.rating_4',
+                'p.rating_5',
+                'p.total_orders',
                 'u.name as user_name',
                 'u.profile as user_profile'
             )
@@ -884,6 +903,8 @@ async function getOrderDetail(req, res) {
                 pandit_profile: order.pandit_profile,
                 user_name: order.user_name,
                 user_profile: order.user_profile,
+                rating: calculateRating(order),
+                total_orders: Number(order.total_orders || 0),
                 chat: feedbacks,
                 logs,
                 pooja_type: pooja?.pooja_type,

@@ -286,4 +286,4 @@ async function getRemedyFaq(req, res) {
     }
 }
 
-module.exports = { getRemedyList, getRemedyItems, getRemedyDetail, getRemedyOrderCreate, getRemedyFaq };
+module.exports = { getRemedyList, getRemedyItems, getRemedyDetail, getRemedyOrderCreate, getRemedyFaq, calculateRating };
