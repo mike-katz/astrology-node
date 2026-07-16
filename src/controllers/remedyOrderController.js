@@ -680,56 +680,47 @@ async function joinOrder(req, res) {
 
 async function addFeedback(req, res) {
     try {
-        const { order_id, type, rating, message } = req.body;
-        if (!order_id || !type) {
-            return res.status(400).json({ success: false, message: 'Order id and type are required.' });
+        const { order_id, rating, message } = req.body;
+        if (!order_id || !rating || !message) {
+            return res.status(400).json({ success: false, message: 'message and rating are required.' });
         }
-        if (!['review', 'complain'].includes(type)) {
-            return res.status(400).json({ success: false, message: 'Type must be review or complain.' });
-        }
-        if (type === 'review' && !rating) {
-            return res.status(400).json({ success: false, message: 'Rating is required for review.' });
-        }
-        if (type === 'complain' && !message?.trim()) {
-            return res.status(400).json({ success: false, message: 'Message is required for complaint.' });
-        }
-
-        const order = await getOrderByQuery(order_id);
-        if (!order || order.user_id !== Number(req.userId)) {
-            return res.status(400).json({ success: false, message: 'Order not found.' });
-        }
+        const order = await db('remedy_orders').where({ order_id, user_id: Number(req.userId) }).first();
+        if (!order) return res.status(400).json({ success: false, message: 'order not found.' });
         if (order.status !== 'completed') {
             return res.status(400).json({ success: false, message: 'Feedback is allowed only after order completion.' });
         }
 
-        const existing = await db('remedy_order_feedbacks')
-            .where({ remedy_order_id: order.id, user_id: req.userId, type })
+        console.log("{ order_id: order.order_id, user_id: req.userId }", { order_id: order.order_id, user_id: req.userId });
+        const existing = await db('astroremedireviews')
+            .where({ order_id: order.order_id, user_id: Number(req.userId) })
             .first();
         if (existing) {
-            return res.status(400).json({ success: false, message: `You already submitted a ${type} for this order.` });
+            await db('astroremedireviews').where({ id: existing?.id }).update({
+                rating: Number(rating),
+                message,
+            })
+        } else {
+            await db('astroremedireviews').insert({
+                user_id: req.userId,
+                pandit_id: order.pandit_id,
+                rating: Number(rating),
+                message,
+                status: false,
+                pooja_id: order.pooja_id,
+                order_id: order.order_id,
+            });
         }
-
-        const [saved] = await db('remedy_order_feedbacks').insert({
-            remedy_order_id: order.id,
-            user_id: req.userId,
-            pandit_id: order.pandit_id,
-            type,
-            rating: type === 'review' ? Number(rating) : null,
-            message: message?.trim() || null,
-            status: type === 'review' ? 'pending' : 'open',
-        }).returning('*');
-
-        if (type === 'review' && rating) {
-            const ratingKey = `rating_${Number(rating)}`;
-            if (['rating_1', 'rating_2', 'rating_3', 'rating_4', 'rating_5'].includes(ratingKey)) {
-                await db('pandits').where({ id: order.pandit_id }).increment(ratingKey, 1);
-            }
-        }
+        // if (type === 'review' && rating) {
+        //     const ratingKey = `rating_${Number(rating)}`;
+        //     if (['rating_1', 'rating_2', 'rating_3', 'rating_4', 'rating_5'].includes(ratingKey)) {
+        //         await db('pandits').where({ id: order.pandit_id }).increment(ratingKey, 1);
+        //     }
+        // }
 
         return res.status(200).json({
             success: true,
-            data: saved,
-            message: type === 'review' ? 'Review submitted successfully.' : 'Complaint submitted successfully.',
+            data: null,
+            message: 'Review submitted successfully.'
         });
     } catch (err) {
         console.error('addFeedback:', err);

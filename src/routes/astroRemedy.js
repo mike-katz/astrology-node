@@ -13,4 +13,6 @@ router.post('/order/cancel', remedyOrder.cancelOrder);
 router.post('/order/instruction', remedyOrder.addUserInstruction);
 router.get('/order/list', remedyOrder.getUserOrders);
 router.get('/order/detail', remedyOrder.getOrderDetail);
+router.post('/order/feedback', remedyOrder.addFeedback);
+
 module.exports = router;
