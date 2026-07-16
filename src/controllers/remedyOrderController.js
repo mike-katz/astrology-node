@@ -3,13 +3,24 @@ const axios = require('axios');
 const { deepParse, convertCurrency } = require('../utils/decodeJWT');
 const { callEvent } = require('../socket');
 const { RtcTokenBuilder, RtcRole } = require('agora-access-token');
-const { calculateRating } = require('./astroRemedyController');
 require('dotenv').config();
 
 const AGORA_APP_ID = process.env.AGORA_APP_ID;
 const AGORA_APP_CERT = process.env.AGORA_APP_CERTIFICATE;
 const JOIN_MODES = ['call', 'video', 'audio'];
 const ACTIVE_STATUSES = ['pending', 'approved', 'in-progress'];
+
+function calculateRating(pandit) {
+    const r1 = Number(pandit.rating_1 || 0);
+    const r2 = Number(pandit.rating_2 || 0);
+    const r3 = Number(pandit.rating_3 || 0);
+    const r4 = Number(pandit.rating_4 || 0);
+    const r5 = Number(pandit.rating_5 || 0);
+    const total = r1 + r2 + r3 + r4 + r5;
+    if (total === 0) return 0;
+    const weighted = (r1 + r2 * 2 + r3 * 3 + r4 * 4 + r5 * 5) / total;
+    return Number(weighted.toFixed(1));
+}
 
 function getFirstImage(image) {
     if (!image) return null;
@@ -737,16 +748,12 @@ async function getUserOrders(req, res) {
 
         let query = db('remedy_orders as ro')
             .leftJoin('pandits as p', 'p.id', 'ro.pandit_id')
+            .leftJoin('astroremedypoojas as ap', 'p.id', 'ro.pooja_id')
             .select(
                 'ro.*',
                 'p.display_name as pandit_name',
                 'p.profile as pandit_profile',
-                'p.rating_1',
-                'p.rating_2',
-                'p.rating_3',
-                'p.rating_4',
-                'p.rating_5',
-                'p.total_orders',
+                'ap.duration'
             )
             .where({ 'ro.user_id': req.userId })
             .whereNull('ro.deleted_at')
@@ -771,8 +778,7 @@ async function getUserOrders(req, res) {
             ...formatOrderRow(row),
             pandit_name: row.pandit_name,
             pandit_profile: row.pandit_profile,
-            rating: calculateRating(row),
-            total_orders: Number(row.total_orders || 0),
+            duration: row.duration
         }));
 
         return res.status(200).json({
@@ -908,6 +914,7 @@ async function getOrderDetail(req, res) {
                 chat: feedbacks,
                 logs,
                 pooja_type: pooja?.pooja_type,
+                duration: pooja?.duration,
                 image: getFirstImage(pooja?.image),
             },
             message: 'Remedy order detail fetched successfully.',
