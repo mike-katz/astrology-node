@@ -274,7 +274,7 @@ async function getRemedyFaq(req, res) {
 
         const reviews = await db('remedy_faqs')
             .where({ type })
-            .orderBy(id, 'desc');
+            .orderBy('id', 'desc');
         return res.status(200).json({
             success: true,
             data: reviews,
@@ -286,4 +286,20 @@ async function getRemedyFaq(req, res) {
     }
 }
 
-module.exports = { getRemedyList, getRemedyItems, getRemedyDetail, getRemedyOrderCreate, getRemedyFaq };
+async function getRemedyHowItWorks(req, res) {
+    try {
+        const reviews = await db('remedyhowitworks')
+            .orderBy('id', 'desc');
+        return res.status(200).json({
+            success: true,
+            data: reviews,
+            message: 'fetched successfully.',
+        });
+    } catch (err) {
+        console.error('remedyhowitworks:', err);
+        return res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
+
+module.exports = { getRemedyList, getRemedyItems, getRemedyDetail, getRemedyOrderCreate, getRemedyFaq, getRemedyHowItWorks };
