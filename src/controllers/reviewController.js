@@ -185,6 +185,10 @@ async function getReviewDetail(req, res) {
             .orderBy('r.id', 'desc')
             .first()
 
+        if (!reviews) {
+            return res.status(400).json({ success: false, message: 'Order not found.' });
+        }
+
         const currency = await db('currency').where({ currency_name: reviews?.currency || "INR" }).first();
         reviews.rate = convertCurrency(reviews.rate, (currency?.user_inr_rate || 1));
         reviews.deduction = convertCurrency(reviews.deduction, (currency?.user_inr_rate || 1));
