@@ -516,14 +516,18 @@ async function balanceCut(user_id, order, end_time, place) {
             if (newBalance < 0) throw new Error('INSUFFICIENT_BALANCE');
 
             // 5. Key guard — only 1 request pass thase
+
+            const updOrder = {
+                status: 'completed',
+                duration: diffMinutes,
+                end_time: new Date(end_time),
+            }
+            if (!isFreeOrder) {
+                updOrder.deduction = deduction
+            }
             const rowsUpdated = await trx('orders')
                 .where({ id: lockedOrder.id, status: 'continue' })
-                .update({
-                    status: 'completed',
-                    deduction,
-                    duration: diffMinutes,
-                    end_time: new Date(end_time),
-                });
+                .update(updOrder);
 
             // 6. rowsUpdated = 0 → second request → skip
             if (!rowsUpdated) {
