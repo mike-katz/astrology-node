@@ -612,7 +612,7 @@ async function createMediaOrder(req, res) {
         } else {
             const payment = await db('payments').where({ user_id: req.userId, status: "success" }).whereNot('offer_amount', 0).first();
             duration = Math.floor(Number(Number(user?.offer_amount)) / Number(panditRate));
-            deduction = Number(duration) * Number(payment?.amount)
+            deduction = Number(payment?.amount)
         }
 
         const orderId = `${new Date().getTime().toString()}${Math.floor(100000 + Math.random() * 900000).toString()}`;
