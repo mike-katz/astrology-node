@@ -1023,9 +1023,9 @@ async function newCreateOrder(req, res) {
             // const currencyItem = JSON.parse(settings?.currency_amount || '[]').find(
             //     item => item?.currency === (user?.default_currency || 'INR')
             // );
-
+            const payment = await db('payments').where({ user_id: req.userId, status: "success" }).whereNot('offer_amount', 0).first();
             duration = Math.floor(Number(Number(user?.offer_amount)) / Number(panditRate));
-            deduction = Number(duration) * Number(pandit?.final_chat_call_rate)
+            deduction = Number(duration) * Number(payment?.amount)
 
             // if ((user?.balance) < currencyItem?.amount) {
             //     logger.info('order_create fail', { userId: req.userId, message: 'Please recharge your wallet.' });
