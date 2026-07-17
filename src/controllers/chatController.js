@@ -582,6 +582,50 @@ async function balanceCut(user_id, order, end_time, place) {
                 }
             }
 
+            if (lockedOrder.type == 'call') {
+                const [saved] = await trx('chats').insert({
+                    sender_type: "user",
+                    sender_id: Number(user_id),
+                    receiver_type: "pandit",
+                    order_id: lockedOrder?.order_id,
+                    receiver_id: Number(lockedOrder?.pandit_id),
+                    message: `Your 📞 Call has been completed.`,
+                    conversion_id: `${user_id}-${lockedOrder?.pandit_id}`,
+                    status: "send",
+                    type: "text",
+                    is_system_generate: true
+                });
+            }
+
+            if (lockedOrder.type == 'audio') {
+                const [saved] = await trx('chats').insert({
+                    sender_type: "user",
+                    sender_id: Number(user_id),
+                    receiver_type: "pandit",
+                    order_id: lockedOrder?.order_id,
+                    receiver_id: Number(lockedOrder?.pandit_id),
+                    message: `Your 🎙️ Live Audio call stream has ended..`,
+                    conversion_id: `${user_id}-${lockedOrder?.pandit_id}`,
+                    status: "send",
+                    type: "text",
+                    is_system_generate: true
+                });
+            }
+
+            if (lockedOrder.type == 'video') {
+                const [saved] = await trx('chats').insert({
+                    sender_type: "user",
+                    sender_id: Number(user_id),
+                    receiver_type: "pandit",
+                    order_id: lockedOrder?.order_id,
+                    receiver_id: Number(lockedOrder?.pandit_id),
+                    message: `Your 📹 Live Video call stream has ended..`,
+                    conversion_id: `${user_id}-${lockedOrder?.pandit_id}`,
+                    status: "send",
+                    type: "text",
+                    is_system_generate: true
+                });
+            }
             // 10. Pandit balance + stats increment
             await trx('pandits')
                 .where({ id: lockedOrder.pandit_id })
