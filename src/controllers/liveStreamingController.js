@@ -619,8 +619,9 @@ async function createMediaOrder(req, res) {
             //     return res.status(400).json({ success: false, message: 'Please recharge your wallet.' });
             // }
             // deduction = currencyItem?.amount
+            const payment = await db('payments').where({ user_id: req.userId, status: "success" }).whereNot('offer_amount', 0).first();
             duration = Math.floor(Number(Number(user?.offer_amount)) / Number(panditRate));
-            deduction = Number(user?.offer_amount)
+            deduction = Number(payment?.amount)
         }
 
         const orderId = `${new Date().getTime().toString()}${Math.floor(100000 + Math.random() * 900000).toString()}`;
