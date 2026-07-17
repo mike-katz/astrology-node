@@ -610,6 +610,15 @@ async function createMediaOrder(req, res) {
                 return res.status(400).json({ success: false, message: 'Balance could not be NaN.' });
             }
         } else {
+            // const currencyItem = JSON.parse(settings?.currency_amount || '[]').find(
+            //     item => item?.currency === (user?.default_currency || 'INR')
+            // );
+
+            // if ((user?.balance) < currencyItem?.amount) {
+            //     logger.info('order_create fail', { userId: req.userId, message: 'Please recharge your wallet.' });
+            //     return res.status(400).json({ success: false, message: 'Please recharge your wallet.' });
+            // }
+            // deduction = currencyItem?.amount
             const payment = await db('payments').where({ user_id: req.userId, status: "success" }).whereNot('offer_amount', 0).first();
             duration = Math.floor(Number(Number(user?.offer_amount)) / Number(panditRate));
             deduction = Number(payment?.amount)

@@ -221,6 +221,7 @@ async function razorpay(req, res) {
             message: `Purchase of AG-Money via Razorpay (${razorpayPaymentId})`,
             amount: paymentRow?.amount,
             currency: paymentRow?.currency,
+            type: "recharge",
             gst,
         }).returning('*');
         await db('payments').where({ id: paymentRow.id }).update({
@@ -240,6 +241,7 @@ async function razorpay(req, res) {
                 amount: extra,
                 currency: paymentRow?.currency,
                 gst: 0,
+                type: "cashback",
                 invoice: "",
             });
         }
@@ -253,6 +255,7 @@ async function razorpay(req, res) {
                 amount: Number(paymentRow?.offer_amount) - Number(paymentRow?.amount),
                 currency: paymentRow?.currency,
                 gst: 0,
+                type: "bonus",
                 invoice: "",
             });
         }
@@ -383,6 +386,7 @@ async function xpay(req, res) {
             user_id: user.id,
             message: `Purchase of AG-Money via xpay (${receiptId})`,
             amount: paymentRow?.amount,
+            type: "recharge",
             currency: paymentRow?.currency,
             gst,
         }).returning('*');
@@ -403,6 +407,7 @@ async function xpay(req, res) {
                 message: `Cashback Order(${receiptId})`,
                 amount: extra,
                 currency: paymentRow?.currency,
+                type: "cashback",
                 gst: 0,
                 invoice: "",
             });
@@ -417,6 +422,7 @@ async function xpay(req, res) {
                 amount: Number(paymentRow?.offer_amount) - Number(paymentRow?.amount),
                 currency: paymentRow?.currency,
                 gst: 0,
+                type: "bonus",
                 invoice: "",
             });
         }
