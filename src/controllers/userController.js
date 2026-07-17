@@ -498,9 +498,14 @@ async function getUserStats(req, res) {
     try {
         const userId = req.userId;
 
-        const rechargeBase = db('payments')
-            .where({ user_id: userId, status: 'success', type: 'recharge' })
-            .whereNull('deleted_at');
+
+        const [{ count }] = await db('payments')
+            .where({
+                user_id: Number(userId),
+                status: 'success',
+            })
+            .whereNull('deleted_at')
+            .count('* as count');
 
         // const [
         //     rechargeAgg,
@@ -575,7 +580,7 @@ async function getUserStats(req, res) {
         // };
 
         const data = {
-            recharge_count: 0,
+            recharge_count: Number(count),
             total_recharge_amount: 0,
             last_recharge_date: '2026-06-10',
             total_favourite_astrologers: 0,
