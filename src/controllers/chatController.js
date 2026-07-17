@@ -583,7 +583,7 @@ async function balanceCut(user_id, order, end_time, place) {
             }
 
             if (lockedOrder.type == 'call') {
-                const [saved] = await trx('chats').insert({
+                await trx('chats').insert({
                     sender_type: "user",
                     sender_id: Number(user_id),
                     receiver_type: "pandit",
@@ -598,7 +598,7 @@ async function balanceCut(user_id, order, end_time, place) {
             }
 
             if (lockedOrder.type == 'audio') {
-                const [saved] = await trx('chats').insert({
+                await trx('chats').insert({
                     sender_type: "user",
                     sender_id: Number(user_id),
                     receiver_type: "pandit",
@@ -613,7 +613,7 @@ async function balanceCut(user_id, order, end_time, place) {
             }
 
             if (lockedOrder.type == 'video') {
-                const [saved] = await trx('chats').insert({
+                await trx('chats').insert({
                     sender_type: "user",
                     sender_id: Number(user_id),
                     receiver_type: "pandit",
