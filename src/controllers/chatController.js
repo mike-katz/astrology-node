@@ -1004,11 +1004,11 @@ async function newCreateOrder(req, res) {
             }
             if (duration < minTime) {
                 logger.info('order_create fail', { userId: req.userId, message: 'Min. 5 min balance required.' });
-                return res.status(400).json({ success: false, message: 'Min. 5 min balance required.' });
+                return res.status(400).json({ success: false, message: `Min. ${minTime} min balance required.` });
             }
             if (Number(user?.balance) < deduction) {
                 logger.info('order_create fail', { userId: req.userId, message: 'Min. 5 min balance required.' });
-                return res.status(400).json({ success: false, message: 'Min. 5 min balance required.' });
+                return res.status(400).json({ success: false, message: `Min. ${minTime} min balance required.` });
             }
 
             // }
@@ -1016,7 +1016,7 @@ async function newCreateOrder(req, res) {
             // console.log("duration", duration);
             if (!Number.isFinite(duration)) {
                 logger.info('order_create fail', { userId: req.userId, message: 'Min. 5 min balance required.' });
-                return res.status(400).json({ success: false, message: 'Min. 5 min balance required.' });
+                return res.status(400).json({ success: false, message: `Min. ${minTime} min balance required.` });
             }
 
             if (isNaN(deduction)) {
@@ -1373,12 +1373,12 @@ async function orderAccept(req, res) {
             // console.log("duration", duration);
             if (!Number.isFinite(duration)) {
                 logger.info('order_acceptOrder fail', { userId: req.userId, orderId, message: 'Min. 5 min balance required.' });
-                return res.status(400).json({ success: false, message: 'Min. 5 min balance required.' });
+                return res.status(400).json({ success: false, message: 'Balance could not be NaN.' });
             }
 
             if (duration < 1) {
                 logger.info('order_acceptOrder fail', { userId: req.userId, orderId, message: 'Min. 5 min balance required.' });
-                return res.status(400).json({ success: false, message: 'Min. 5 min balance required.' });
+                return res.status(400).json({ success: false, message: 'Balance could not be NaN.' });
             }
             deduction = Number(duration) * Number(order?.rate)
             if (isNaN(deduction)) {

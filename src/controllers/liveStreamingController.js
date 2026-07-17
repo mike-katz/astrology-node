@@ -590,11 +590,11 @@ async function createMediaOrder(req, res) {
             }
             if (duration < minTime) {
                 logger.info('order_create fail', { userId: req.userId, message: 'Min. 5 min balance required.' });
-                return res.status(400).json({ success: false, message: 'Min. 5 min balance required.' });
+                return res.status(400).json({ success: false, message: `Min. ${minTime} min balance required.` });
             }
             if (Number(user?.balance) < deduction) {
                 logger.info('order_create fail', { userId: req.userId, message: 'Min. 5 min balance required.' });
-                return res.status(400).json({ success: false, message: 'Min. 5 min balance required.' });
+                return res.status(400).json({ success: false, message: `Min. ${minTime} min balance required.` });
             }
 
             // }
@@ -602,7 +602,7 @@ async function createMediaOrder(req, res) {
             // console.log("duration", duration);
             if (!Number.isFinite(duration)) {
                 logger.info('order_create fail', { userId: req.userId, message: 'Min. 5 min balance required.' });
-                return res.status(400).json({ success: false, message: 'Min. 5 min balance required.' });
+                return res.status(400).json({ success: false, message: `Min. ${minTime} min balance required.` });
             }
 
             if (isNaN(deduction)) {
@@ -618,7 +618,7 @@ async function createMediaOrder(req, res) {
         const orderId = `${new Date().getTime().toString()}${Math.floor(100000 + Math.random() * 900000).toString()}`;
         if (!Number.isFinite(duration)) {
             logger.info('order_createMedia fail', { userId: req.userId, message: 'Min. 5 min balance required.' });
-            return res.status(400).json({ success: false, message: 'Min. 5 min balance required.' });
+            return res.status(400).json({ success: false, message: 'Balance could not be NaN.' });
         }
         if (isNaN(deduction)) {
             logger.info('order_createMedia fail', { userId: req.userId, message: 'Balance could not be NaN.' });
