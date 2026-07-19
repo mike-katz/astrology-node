@@ -101,6 +101,13 @@ function formatOrderRow(order) {
         status: order.status,
         pandit_instructions: order.pandit_instructions,
         user_instruction: order.user_instruction,
+        is_ashirvad: !!order.is_ashirvad,
+        pincode: order.pincode || null,
+        city: order.city || null,
+        state: order.state || null,
+        address: order.address || null,
+        landmark: order.landmark || null,
+        person: order.person != null ? Number(order.person) : null,
         scheduled_date: order.scheduled_date,
         scheduled_time: order.scheduled_time,
         scheduled_at: order.scheduled_at,
@@ -202,13 +209,19 @@ async function notifyPandit(panditId, title, body, data = {}) {
 
 async function createOrder(req, res) {
     try {
-        const { pooja_id, pandit_id } = req.body;
+        const {
+            pooja_id,
+            pandit_id,
+            pincode,
+            city,
+            state,
+            address,
+            landmark,
+            person,
+        } = req.body;
         if (!pooja_id) {
-            return res.status(400).json({ success: false, message: 'Pooja id and join mode are required.' });
+            return res.status(400).json({ success: false, message: 'Pooja id is required.' });
         }
-        // if (!JOIN_MODES.includes(join_mode)) {
-        //     return res.status(400).json({ success: false, message: 'Join mode must be call, video or audio.' });
-        // }
 
         const pooja = await db('astroremedypoojas as p')
             .leftJoin('astroremedies as r', 'r.id', 'p.remedy_id')
@@ -221,15 +234,38 @@ async function createOrder(req, res) {
             return res.status(400).json({ success: false, message: 'Pooja not found.' });
         }
 
-        const panditIds = parsePanditIds(pooja.pandit_id);
-        if (!panditIds.length) {
-            return res.status(400).json({ success: false, message: 'No pandit assigned to this pooja.' });
+        const isAshirvad = pooja.is_ashirvad === true || pooja.is_ashirvad === 'true' || pooja.is_ashirvad === 1;
+        if (isAshirvad) {
+            if (!pincode?.toString().trim() || !city?.trim() || !state?.trim() || !address?.trim()) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Pincode, city, state and address are required for ashirvad orders.',
+                });
+            }
         }
 
+        const isSamuhik = String(pooja.pooja_type || '').toLowerCase() === 'samuhik';
+        let personCount = null;
+        if (isSamuhik) {
+            personCount = Number(person);
+            if (!person || Number.isNaN(personCount) || personCount <= 0) {
+                return res.status(400).json({ success: false, message: 'Person count is required for samuhik pooja.' });
+            }
+        }
+
+        const panditIds = parsePanditIds(pooja.pandit_id);
         let panditId = null;
         if (pandit_id) {
-            panditId = pandit_id
+            const requestedPanditId = Number(pandit_id);
+            if (Number.isNaN(requestedPanditId) || requestedPanditId <= 0) {
+                return res.status(400).json({ success: false, message: 'Invalid pandit id.' });
+            }
+            if (panditIds.length && !panditIds.includes(requestedPanditId)) {
+                return res.status(400).json({ success: false, message: 'Selected pandit is not assigned to this pooja.' });
+            }
+            panditId = requestedPanditId;
         }
+
         const activeOrder = await db('remedy_orders')
             .where({ user_id: req.userId, pooja_id: Number(pooja_id) })
             .whereNotIn('status', ['cancelled', 'completed'])
@@ -246,12 +282,27 @@ async function createOrder(req, res) {
             .where({ currency_name: currency })
             .first();
 
-        const amount = Number(pooja.amount);
+        let amount = Number(pooja.amount);
         const discount = Number(pooja.discount || 0);
+
+        // samuhik: amount from price_array by person count when available
+        if (isSamuhik && pooja.price_array) {
+            const priceList = deepParse(pooja.price_array);
+            if (Array.isArray(priceList) && priceList.length) {
+                const matched = priceList.find((item) => Number(item?.person || item?.persons || item?.count) === personCount)
+                    || priceList.find((item) => Number(item?.person || item?.persons || item?.count) >= personCount);
+                if (matched?.amount != null || matched?.price != null) {
+                    amount = Number(matched.amount ?? matched.price);
+                } else {
+                    amount = amount * personCount;
+                }
+            } else {
+                amount = amount * personCount;
+            }
+        }
+
         const finalAmountInr = Math.max(amount - discount, 0);
-        console.log("finalAmountInr", finalAmountInr);
         const finalAmount = convertCurrency(finalAmountInr, currencyData?.user_inr_rate || 1);
-        console.log("finalAmount", finalAmount);
         if (Number(user?.balance) < finalAmount) {
             return res.status(400).json({ success: false, message: 'Insufficient wallet balance. Please recharge.' });
         }
@@ -272,7 +323,7 @@ async function createOrder(req, res) {
             [savedOrder] = await trx('remedy_orders').insert({
                 order_id: orderId,
                 user_id: req.userId,
-                pandit_id,
+                pandit_id: panditId,
                 pooja_id: Number(pooja_id),
                 remedy_id: pooja.remedy_id,
                 pooja_name: pooja.name,
@@ -281,14 +332,23 @@ async function createOrder(req, res) {
                 final_amount: finalAmount,
                 currency,
                 status: 'pending',
+                is_ashirvad: isAshirvad,
+                pincode: isAshirvad ? String(pincode).trim() : null,
+                city: isAshirvad ? city.trim() : null,
+                state: isAshirvad ? state.trim() : null,
+                address: isAshirvad ? address.trim() : null,
+                landmark: isAshirvad && landmark ? String(landmark).trim() : null,
+                person: personCount,
             }).returning('*');
         });
 
-        callEvent('emit_to_remedy_order_pending', {
-            key: `pandit_${panditId}`,
-            payload: { order_id: orderId, pandit_id: panditId },
-        });
-        notifyPandit(panditId, 'New Remedy Order', `New remedy order for ${pooja.name}`, { order_id: orderId, type: 'remedy_order' });
+        if (panditId) {
+            callEvent('emit_to_remedy_order_pending', {
+                key: `pandit_${panditId}`,
+                payload: { order_id: orderId, pandit_id: panditId },
+            });
+            notifyPandit(panditId, 'New Remedy Order', `New remedy order for ${pooja.name}`, { order_id: orderId, type: 'remedy_order' });
+        }
 
         return res.status(200).json({
             success: true,
