@@ -153,6 +153,7 @@ function formatPanditResults(user, currency, currencyData) {
 async function getPandits(req, res) {
     try {
         const ip = getClientIp(req);
+        console.log("ip", ip);
         let currency = "INR";
         if (ip) {
             const geo = geoip.lookup(ip);
