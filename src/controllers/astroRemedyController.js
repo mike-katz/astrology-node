@@ -212,7 +212,7 @@ async function getRemedyDetail(req, res) {
             .where({ 'ar.pooja_id': Number(id), 'ar.status': 'approved' })
             .orderBy('ar.id', 'desc');
 
-        const faqs = await db('faqs').where({ type: item.pooja_type })
+        const faqs = await db('faqs').where({ type: 'pooja' })
         const data = {
             id: item.id,
             remedy_id: item.remedy_id,
