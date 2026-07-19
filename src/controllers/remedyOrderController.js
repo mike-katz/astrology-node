@@ -101,13 +101,14 @@ function formatOrderRow(order) {
         status: order.status,
         pandit_instructions: order.pandit_instructions,
         user_instruction: order.user_instruction,
-        is_ashirvad: !!order.is_ashirvad,
+        is_ashirvad: order.is_ashirvad || false,
+        person: order.person != null ? Number(order.person) : null,
         pincode: order.pincode || null,
         city: order.city || null,
         state: order.state || null,
         address: order.address || null,
         landmark: order.landmark || null,
-        person: order.person != null ? Number(order.person) : null,
+        mobile: order.mobile || null,
         scheduled_date: order.scheduled_date,
         scheduled_time: order.scheduled_time,
         scheduled_at: order.scheduled_at,
@@ -207,50 +208,53 @@ async function notifyPandit(panditId, title, body, data = {}) {
     }
 }
 
+function getPriceArray(priceArray) {
+    if (!priceArray) return [];
+    const parsed = deepParse(priceArray);
+    return Array.isArray(parsed) ? parsed : [];
+}
+
+function getSamuhikPrice(priceArray, person) {
+    const prices = getPriceArray(priceArray);
+    const match = prices.find((item) => Number(item?.person) === Number(person));
+    if (!match) return null;
+    const amount = Number(match.amount || 0);
+    const discount = Number(match.discount || 0);
+    return {
+        amount,
+        discount,
+        finalAmountInr: Math.max(amount - discount, 0),
+    };
+}
+
 async function createOrder(req, res) {
     try {
         const {
             pooja_id,
             pandit_id,
+            is_ashirvad,
+            person,
             pincode,
             city,
             state,
             address,
             landmark,
-            person,
+            mobile,
         } = req.body;
+
         if (!pooja_id) {
             return res.status(400).json({ success: false, message: 'Pooja id is required.' });
         }
 
         const pooja = await db('astroremedypoojas as p')
             .leftJoin('astroremedies as r', 'r.id', 'p.remedy_id')
-            .select('p.*', 'r.name as remedy_name')
+            .select('p.*', 'r.name as remedy_name', 'r.is_ashirvad as category_is_ashirvad')
             .where({ 'p.id': Number(pooja_id), 'p.status': true })
             .whereNull('p.deleted_at')
             .whereNull('r.deleted_at')
             .first();
         if (!pooja) {
             return res.status(400).json({ success: false, message: 'Pooja not found.' });
-        }
-
-        const isAshirvad = pooja.is_ashirvad === true || pooja.is_ashirvad === 'true' || pooja.is_ashirvad === 1;
-        if (isAshirvad) {
-            if (!pincode?.toString().trim() || !city?.trim() || !state?.trim() || !address?.trim()) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'Pincode, city, state and address are required for ashirvad orders.',
-                });
-            }
-        }
-
-        const isSamuhik = String(pooja.pooja_type || '').toLowerCase() === 'samuhik';
-        let personCount = null;
-        if (isSamuhik) {
-            personCount = Number(person);
-            if (!person || Number.isNaN(personCount) || personCount <= 0) {
-                return res.status(400).json({ success: false, message: 'Person count is required for samuhik pooja.' });
-            }
         }
 
         const panditIds = parsePanditIds(pooja.pandit_id);
@@ -264,6 +268,65 @@ async function createOrder(req, res) {
                 return res.status(400).json({ success: false, message: 'Selected pandit is not assigned to this pooja.' });
             }
             panditId = requestedPanditId;
+        }
+
+        const isAshirvad = is_ashirvad === true
+            || is_ashirvad === 'true'
+            || is_ashirvad === 1
+            || is_ashirvad === '1'
+            || pooja.is_ashirvad === true
+            || pooja.category_is_ashirvad === true;
+
+        let ashirvadData = {
+            is_ashirvad: false,
+            pincode: null,
+            city: null,
+            state: null,
+            address: null,
+            landmark: null,
+            mobile: null,
+        };
+
+        if (isAshirvad) {
+            if (!pincode || !city || !state || !address || !landmark || !mobile) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Pincode, city, state, address, landmark and mobile are required for ashirvad.',
+                });
+            }
+            ashirvadData = {
+                is_ashirvad: true,
+                pincode: String(pincode).trim(),
+                city: String(city).trim(),
+                state: String(state).trim(),
+                address: String(address).trim(),
+                landmark: String(landmark).trim(),
+                mobile: String(mobile).trim(),
+            };
+        }
+
+        const isSamuhik = String(pooja.pooja_type || '').toLowerCase() === 'samuhik';
+        let personCount = null;
+        let amount = Number(pooja.amount);
+        let discount = Number(pooja.discount || 0);
+        let finalAmountInr = Math.max(amount - discount, 0);
+
+        if (isSamuhik) {
+            if (person == null || person === '') {
+                return res.status(400).json({ success: false, message: 'Person count is required for samuhik pooja.' });
+            }
+            personCount = Number(person);
+            if (Number.isNaN(personCount) || personCount <= 0) {
+                return res.status(400).json({ success: false, message: 'Invalid person count.' });
+            }
+
+            const matchedPrice = getSamuhikPrice(pooja.price_array, personCount);
+            if (!matchedPrice) {
+                return res.status(400).json({ success: false, message: 'Price not found for selected person count.' });
+            }
+            amount = matchedPrice.amount;
+            discount = matchedPrice.discount;
+            finalAmountInr = matchedPrice.finalAmountInr;
         }
 
         const activeOrder = await db('remedy_orders')
@@ -282,26 +345,6 @@ async function createOrder(req, res) {
             .where({ currency_name: currency })
             .first();
 
-        let amount = Number(pooja.amount);
-        const discount = Number(pooja.discount || 0);
-
-        // samuhik: amount from price_array by person count when available
-        if (isSamuhik && pooja.price_array) {
-            const priceList = deepParse(pooja.price_array);
-            if (Array.isArray(priceList) && priceList.length) {
-                const matched = priceList.find((item) => Number(item?.person || item?.persons || item?.count) === personCount)
-                    || priceList.find((item) => Number(item?.person || item?.persons || item?.count) >= personCount);
-                if (matched?.amount != null || matched?.price != null) {
-                    amount = Number(matched.amount ?? matched.price);
-                } else {
-                    amount = amount * personCount;
-                }
-            } else {
-                amount = amount * personCount;
-            }
-        }
-
-        const finalAmountInr = Math.max(amount - discount, 0);
         const finalAmount = convertCurrency(finalAmountInr, currencyData?.user_inr_rate || 1);
         if (Number(user?.balance) < finalAmount) {
             return res.status(400).json({ success: false, message: 'Insufficient wallet balance. Please recharge.' });
@@ -332,13 +375,8 @@ async function createOrder(req, res) {
                 final_amount: finalAmount,
                 currency,
                 status: 'pending',
-                is_ashirvad: isAshirvad,
-                pincode: isAshirvad ? String(pincode).trim() : null,
-                city: isAshirvad ? city.trim() : null,
-                state: isAshirvad ? state.trim() : null,
-                address: isAshirvad ? address.trim() : null,
-                landmark: isAshirvad && landmark ? String(landmark).trim() : null,
                 person: personCount,
+                ...ashirvadData,
             }).returning('*');
         });
 

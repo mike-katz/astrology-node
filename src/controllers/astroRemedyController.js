@@ -213,13 +213,6 @@ async function getRemedyDetail(req, res) {
             .orderBy('ar.id', 'desc');
 
         const faqs = await db('faqs').where({ type: item.pooja_type })
-
-        const limit = Math.floor(Math.random() * 3) + 9; // 5, 6, or 7
-
-        const users = await db('users')
-            .select('name', 'profile', 'avatar')
-            .orderByRaw('RANDOM()')
-            .limit(limit);
         const data = {
             id: item.id,
             remedy_id: item.remedy_id,
@@ -245,8 +238,7 @@ async function getRemedyDetail(req, res) {
             location: item.location,
             pooja_time: item.pooja_time,
             reviews,
-            faqs,
-            recent_orders: users
+            faqs
         };
         if (item?.pooja_type == 'spells') {
             const panditIds = parsePanditIds(item.pandit_id);
@@ -268,7 +260,7 @@ async function getRemedyDetail(req, res) {
 
 async function getRemedyOrderCreate(req, res) {
     try {
-        const { id } = req.body;
+        const { id, pandit_id, is_ashirvad, person, pincode, city, state, address, landmark, mobile } = req.body;
         if (!id) {
             return res.status(400).json({ success: false, message: 'Item id is required.' });
         }
@@ -282,6 +274,15 @@ async function getRemedyOrderCreate(req, res) {
         }
 
         req.body.pooja_id = Number(id);
+        req.body.pandit_id = pandit_id;
+        req.body.is_ashirvad = is_ashirvad;
+        req.body.person = person;
+        req.body.pincode = pincode;
+        req.body.city = city;
+        req.body.state = state;
+        req.body.address = address;
+        req.body.landmark = landmark;
+        req.body.mobile = mobile;
         return createOrder(req, res);
     } catch (err) {
         console.error('getRemedyOrderCreate:', err);
