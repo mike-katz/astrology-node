@@ -604,8 +604,8 @@ async function completeOrder(req, res) {
         if (!order || order.pandit_id !== Number(req.userId)) {
             return res.status(400).json({ success: false, message: 'Order not found.' });
         }
-        if (order.status !== 'in-progress') {
-            return res.status(400).json({ success: false, message: 'Only in-progress orders can be completed.' });
+        if (order.status !== 'work-complete') {
+            return res.status(400).json({ success: false, message: 'Only work-complete orders can be completed.' });
         }
 
         const pandit = await db('pandits').where({ id: order.pandit_id }).first();
