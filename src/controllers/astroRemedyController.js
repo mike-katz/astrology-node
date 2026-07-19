@@ -176,11 +176,16 @@ async function getRemedyDetail(req, res) {
                 'p.discount',
                 'p.pooja_type',
                 'p.highlight',
+                'p.call_type',
+                'p.is_ashirvad',
+                'p.price_array',
                 'p.description',
                 'p.created_at',
                 'r.name as remedy_name',
                 'r.image as remedy_image',
-                'r.tag as remedy_tag'
+                'r.tag as remedy_tag',
+                'r.call_type as category_call_type',
+                'r.is_ashirvad as category_is_ashirvad',
             )
             .where({ 'p.id': Number(id), 'p.status': true })
             .whereNull('p.deleted_at')
