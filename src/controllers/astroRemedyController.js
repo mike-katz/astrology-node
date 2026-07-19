@@ -180,6 +180,8 @@ async function getRemedyDetail(req, res) {
                 'p.is_ashirvad',
                 'p.price_array',
                 'p.description',
+                'p.location',
+                'p,pooja_time',
                 'p.created_at',
                 'r.name as remedy_name',
                 'r.image as remedy_image',
@@ -226,7 +228,14 @@ async function getRemedyDetail(req, res) {
             description: item.description,
             images: parseImageList(item.image),
             image: getFirstImage(item.image),
+            call_type: item.call_type,
+            is_ashirvad: item.is_ashirvad,
+            price_array: item.price_array,
+            category_call_type: item.category_call_type,
+            category_is_ashirvad: item.category_is_ashirvad,
             created_at: item.created_at,
+            location: item.location,
+            pooja_time: item.pooja_time,
             reviews,
         };
         if (item?.pooja_type == 'spells') {
