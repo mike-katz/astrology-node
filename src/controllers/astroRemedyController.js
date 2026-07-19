@@ -181,7 +181,7 @@ async function getRemedyDetail(req, res) {
                 'p.price_array',
                 'p.description',
                 'p.location',
-                'p,pooja_time',
+                'p.pooja_time',
                 'p.created_at',
                 'r.name as remedy_name',
                 'r.image as remedy_image',
