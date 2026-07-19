@@ -212,6 +212,7 @@ async function getRemedyDetail(req, res) {
             .where({ 'ar.pooja_id': Number(id), 'ar.status': 'approved' })
             .orderBy('ar.id', 'desc');
 
+        const faqs = await db('faqs').where({ type: item.pooja_type })
         const data = {
             id: item.id,
             remedy_id: item.remedy_id,
@@ -237,6 +238,7 @@ async function getRemedyDetail(req, res) {
             location: item.location,
             pooja_time: item.pooja_time,
             reviews,
+            faqs
         };
         if (item?.pooja_type == 'spells') {
             const panditIds = parsePanditIds(item.pandit_id);
