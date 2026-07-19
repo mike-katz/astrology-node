@@ -156,6 +156,7 @@ async function getPandits(req, res) {
         let currency = "INR";
         if (ip) {
             const geo = geoip.lookup(ip);
+            console.log("geo", geo);
             const country = geo ? geo.country : 'IN';
             currency = getCurrencyByCountry(country);
             currency = currency?.currency
