@@ -258,6 +258,7 @@ async function createOrder(req, res) {
             address,
             landmark,
             mobile,
+            person_name
         } = req.body;
 
         if (!pooja_id) {
@@ -305,6 +306,9 @@ async function createOrder(req, res) {
             mobile: null,
         };
 
+        if (person_name) {
+            ashirvadData.person_name = JSON.stringify(person_name)
+        }
         if (isAshirvad) {
             if (!pincode || !city || !state || !address || !landmark || !mobile) {
                 return res.status(400).json({
