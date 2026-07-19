@@ -178,6 +178,24 @@ async function creditPanditBalance(trx, panditId, amount, message, orderId, user
     });
 }
 
+const DEFAULT_REMEDY_SHARE = 1;
+
+function getPanditShareByPoojaType(pandit, poojaType) {
+    const type = String(poojaType || '').toLowerCase().trim();
+    let share;
+    if (type === 'spells') {
+        share = pandit?.spells_share;
+    } else if (type === 'samuhik') {
+        share = pandit?.samuhik_share;
+    } else {
+        // epooja and any other remedy pooja type
+        share = pandit?.epooja_share;
+    }
+    const parsed = Number(share);
+    if (!Number.isFinite(parsed) || parsed <= 0) return DEFAULT_REMEDY_SHARE;
+    return parsed;
+}
+
 async function notifyUser(userId, title, body, data = {}) {
     const user = await db('users').where({ id: userId }).select('token').first();
     if (!user?.token) return;
@@ -592,7 +610,11 @@ async function completeOrder(req, res) {
 
         const pandit = await db('pandits').where({ id: order.pandit_id }).first();
         const user = await db('users').where({ id: order.user_id }).first();
-        const panditShare = Number(pandit?.chat_call_share || 100);
+        const pooja = await db('astroremedypoojas')
+            .where({ id: order.pooja_id })
+            .select('pooja_type', 'name')
+            .first();
+        const panditShare = getPanditShareByPoojaType(pandit, pooja?.pooja_type);
         const panditAmount = (Number(order.final_amount) * panditShare) / 100;
 
         let updated;
