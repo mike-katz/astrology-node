@@ -1158,7 +1158,8 @@ async function newCreateOrder(req, res) {
                 id: pandit?.id,
                 mobile: pandit?.mobile,
                 order_id: orderId,
-                type: "astrologer"
+                type: "astrologer",
+                order_type: type
             }
         });
         logger.info('order_create success', { userId: req.userId, orderId, panditId, type });
