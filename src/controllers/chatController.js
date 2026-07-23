@@ -1202,6 +1202,7 @@ async function sendNotification(token, username, chat_call_rate, panditId, type,
         })
         logger.info("messages", messages);
         if (token) {
+            token = String(token).trim();
             const profileUrl = profile ? profile : `https://astroguruji-cdn-fdezcxeab6ghfgh8.z01.azurefd.net/avatars/${avatar}.png`
             console.log("profileUrl", profileUrl);
             // console.log("start push notification");
@@ -1249,10 +1250,14 @@ async function sendNotification(token, username, chat_call_rate, panditId, type,
                     // 🔔 iOS
                     apns: {
                         headers: {
-                            "apns-priority": "10"
+                            "apns-priority": "10",
+                            "apns-push-type": "alert"
                         },
                         payload: {
                             aps: {
+                                alert: {
+                                    title: messages
+                                },
                                 sound: 'default'
                             }
                         }
@@ -1269,11 +1274,11 @@ async function sendNotification(token, username, chat_call_rate, panditId, type,
 
                     data: {
                         type: type == 'chat' ? "incoming_chat" : "incoming_call",
-                        title: messages,
+                        title: String(messages || ''),
                         orderId: String(order_id),
                         userId: String(user_id),
-                        profile: profileUrl,
-                        userName: username
+                        profile: String(profileUrl || ''),
+                        userName: String(username || '')
                     },
                 };
             }
@@ -1298,30 +1303,29 @@ async function sendNotification(token, username, chat_call_rate, panditId, type,
                             title: messages,
                         },
                     },
-                    // Add this for iOS
+                    // iOS: FCM token = alert only (voip + fake .voip topic → NotRegistered)
                     apns: {
                         headers: {
                             "apns-priority": "10",
-                            "apns-push-type": "voip", // CRITICAL: This tells iOS it's a call
-                            "apns-topic": "com.your.bundleid.voip" // Must end in .voip
+                            "apns-push-type": "alert"
                         },
                         payload: {
                             aps: {
-                                "content-available": 1
-                            },
-                            // Your custom data
-                            type: type == 'chat' ? "incoming_chat" : "incoming_call",
-                            title: messages,
-                            // ... other data
+                                alert: {
+                                    title: messages
+                                },
+                                sound: "default"
+                            }
                         }
                     },
                     data: {
                         type: type == 'chat' ? "incoming_chat" : "incoming_call",
-                        title: messages,
+                        title: String(messages || ''),
                         order_id: String(order_id),
+                        orderId: String(order_id),
                         userId: String(user_id),
-                        profile: profileUrl,
-                        userName: username
+                        profile: String(profileUrl || ''),
+                        userName: String(username || '')
                     },
                 };
             }
