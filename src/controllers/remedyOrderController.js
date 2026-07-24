@@ -204,6 +204,28 @@ async function notifyUser(userId, title, body, data = {}) {
         await admin.messaging().send({
             token: user.token,
             notification: { title, body },
+            // 🔔 Android
+            android: {
+                notification: {
+                    sound: 'default'
+                }
+            },
+
+            // 🔔 iOS
+            apns: {
+                headers: {
+                    "apns-priority": "10",
+                    "apns-push-type": "alert"
+                },
+                payload: {
+                    aps: {
+                        alert: {
+                            title: messages
+                        },
+                        sound: 'default'
+                    }
+                }
+            },
             data: Object.fromEntries(Object.entries(data).map(([k, v]) => [String(k), String(v)])),
         });
     } catch (err) {
@@ -219,6 +241,28 @@ async function notifyPandit(panditId, title, body, data = {}) {
         await admin.messaging().send({
             token: pandit.token,
             notification: { title, body },
+            // 🔔 Android
+            android: {
+                notification: {
+                    sound: 'default'
+                }
+            },
+
+            // 🔔 iOS
+            apns: {
+                headers: {
+                    "apns-priority": "10",
+                    "apns-push-type": "alert"
+                },
+                payload: {
+                    aps: {
+                        alert: {
+                            title: messages
+                        },
+                        sound: 'default'
+                    }
+                }
+            },
             data: Object.fromEntries(Object.entries(data).map(([k, v]) => [String(k), String(v)])),
         });
     } catch (err) {

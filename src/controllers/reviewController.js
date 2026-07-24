@@ -25,6 +25,28 @@ async function sendBulkPush(tokens, title, body, data = {}) {
         token,
         notification: { title, body: bodyStr },
         data: dataStr,
+        // 🔔 Android
+        android: {
+            notification: {
+                sound: 'default'
+            }
+        },
+
+        // 🔔 iOS
+        apns: {
+            headers: {
+                "apns-priority": "10",
+                "apns-push-type": "alert"
+            },
+            payload: {
+                aps: {
+                    alert: {
+                        title: messages
+                    },
+                    sound: 'default'
+                }
+            }
+        },
     }));
     try {
         const response = await admin.messaging().sendEach(messages);
