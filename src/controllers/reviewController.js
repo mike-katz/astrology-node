@@ -41,7 +41,7 @@ async function sendBulkPush(tokens, title, body, data = {}) {
             payload: {
                 aps: {
                     alert: {
-                        title: messages
+                        title: title
                     },
                     sound: 'default'
                 }

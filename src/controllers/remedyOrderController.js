@@ -220,7 +220,7 @@ async function notifyUser(userId, title, body, data = {}) {
                 payload: {
                     aps: {
                         alert: {
-                            title: messages
+                            title: title
                         },
                         sound: 'default'
                     }
@@ -257,7 +257,7 @@ async function notifyPandit(panditId, title, body, data = {}) {
                 payload: {
                     aps: {
                         alert: {
-                            title: messages
+                            title: title
                         },
                         sound: 'default'
                     }
