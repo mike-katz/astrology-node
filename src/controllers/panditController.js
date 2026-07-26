@@ -638,7 +638,7 @@ async function basicOnboard(req, res) {
         }
 
         if (secondary_expertise) {
-            ins.secondary_expertise = JSON.stringify(secondary_expertise)
+            ins.secondary_expertise = secondary_expertise // JSON.stringify(secondary_expertise)
         }
         if (!is18OrAbove(dob)) return res.status(400).json({ success: false, message: 'Enter DOB above 18+ year.' });
 
@@ -647,10 +647,10 @@ async function basicOnboard(req, res) {
             ins.profile = `${process.env.AZURE_STORAGE_BASE_URL}${image?.data?.key}`;
         }
         if (languages) {
-            ins.languages = JSON.stringify(languages)
+            ins.languages = languages // JSON.stringify(languages)
         }
         if (primary_expertise) {
-            ins.primary_expertise = JSON.stringify(primary_expertise)
+            ins.primary_expertise = primary_expertise // JSON.stringify(primary_expertise)
         }
         const [result] = await db('onboardings').where({ id: user?.id }).update(ins).returning("*")
 
@@ -760,7 +760,6 @@ async function onboard(req, res) {
         // console.log("tokenData", JSON.stringify(tokenData));
         const user = await db('onboardings').where({ "mobile": tokenData?.data?.mobile, country_code: tokenData?.data?.country_code, deleted_at: null }).first();
         if (!user) return res.status(400).json({ message: 'Wrong mobile number.' });
-
         // if (display_name) {
         //     if (display_name.length > 15) return res.status(400).json({ success: false, message: 'Max 15 character accept.' });
         //     const onboard = await db('onboardings').where({ "display_name": display_name, deleted_at: null }).whereNot({ id: user?.id }).first();
@@ -814,7 +813,7 @@ async function onboard(req, res) {
         //     ins.id_number = id_number
         // }
         if (govt_id) {
-            ins.govt_id = JSON.stringify(govt_id)
+            ins.govt_id = govt_id //JSON.stringify(govt_id)
         }
         if (guru_name) {
             ins.guru_name = guru_name
@@ -848,16 +847,18 @@ async function onboard(req, res) {
         //     ins.offer_live_session = offer_live_session
         // }
         if (available_for) {
-            ins.available_for = JSON.stringify(available_for)
+            // ins.available_for = JSON.stringify(available_for)
+            ins.available_for = available_for
         }
         // if (consaltance_language) {
         //     ins.consaltance_language = JSON.stringify(consaltance_language)
         // }
         if (languages) {
-            ins.languages = JSON.stringify(languages)
+            // ins.languages = JSON.stringify(languages)
+            ins.languages = languages
         }
         if (address) {
-            ins.address = JSON.stringify(address)
+            ins.address = address// JSON.stringify(address)
         }
         if (step > user?.step) {
             ins.step = step
@@ -866,16 +867,16 @@ async function onboard(req, res) {
         //     ins.daily_horoscope = daily_horoscope
         // }
         if (other_working) {
-            ins.other_working = JSON.stringify(other_working)
+            ins.other_working = other_working //JSON.stringify(other_working)
         }
         if (secondary_expertise) {
-            ins.secondary_expertise = JSON.stringify(secondary_expertise)
+            ins.secondary_expertise = secondary_expertise //JSON.stringify(secondary_expertise)
         }
         if (primary_expertise) {
-            ins.primary_expertise = JSON.stringify(primary_expertise)
+            ins.primary_expertise = primary_expertise //JSON.stringify(primary_expertise)
         }
         if (certificate) {
-            ins.certificate = JSON.stringify(certificate)
+            ins.certificate = certificate //JSON.stringify(certificate)
         }
         if (experience) {
             ins.experience = experience
@@ -922,7 +923,7 @@ async function onboard(req, res) {
             ins.selfie = `${process.env.AZURE_STORAGE_BASE_URL}${image?.data?.key}`;
         }
 
-        // console.log("ins", ins);
+        console.log("ins", ins);
         await db('onboardings').where({ id: user?.id }).update(ins);
 
         return res.status(200).json({
@@ -1126,7 +1127,7 @@ async function uploadImage(req, res) {
                     if (result?.length == 0) {
                         updateData.certificate = null
                     } else {
-                        updateData.certificate = JSON.stringify(result)
+                        updateData.certificate = result // JSON.stringify(result)
                     }
                 } catch (e) {
                     console.error('Error parsing certificate:', e);
@@ -1137,7 +1138,7 @@ async function uploadImage(req, res) {
             if (onboarding.govt_id) {
                 const govt_id = deepParse(onboarding.govt_id);
                 const returns = removeMatchedUrl(govt_id, file)
-                updateData.govt_id = JSON.stringify(returns);
+                updateData.govt_id = returns // JSON.stringify(returns);
 
             }
             // console.log("updateData", updateData);
