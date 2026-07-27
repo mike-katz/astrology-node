@@ -811,6 +811,169 @@ async function appleLogin(req, res) {
     }
 }
 
+/**
+ * Send OTP via Firebase Phone Auth (Identity Toolkit).
+ * POST body: { mobile, country_code, recaptchaToken?, safetyNetToken?, playIntegrityToken?, iosReceipt?, iosSecret? }
+ * Requires FIREBASE_WEB_API_KEY in env (Firebase Console → Project settings → Web API Key).
+ * Client must pass one attestation token (reCAPTCHA / Play Integrity / iOS receipt).
+ */
+async function sendFirebaseOtp(req, res) {
+    try {
+        let { mobile, country_code = '+91', recaptchaToken, safetyNetToken, playIntegrityToken, iosReceipt, iosSecret } = req.body || {};
+        if (!mobile || !country_code) {
+            return res.status(400).json({ success: false, message: 'Mobile number required.' });
+        }
+
+        const apiKey = process.env.FIREBASE_WEB_API_KEY;
+        if (!apiKey) {
+            logger.error('FIREBASE_WEB_API_KEY missing');
+            return res.status(500).json({ success: false, message: 'Firebase OTP not configured.' });
+        }
+
+        if (!isValidMobile(mobile)) {
+            return res.status(400).json({ success: false, message: 'Enter valid mobile number.' });
+        }
+
+        if (String(mobile).length === 12 && country_code === '+91') {
+            mobile = String(mobile).slice(2);
+        }
+
+        const phoneNumber = `${country_code}${mobile}`.replace(/\s+/g, '');
+        if (!/^\+\d{8,15}$/.test(phoneNumber)) {
+            return res.status(400).json({ success: false, message: 'Invalid phone number format.' });
+        }
+
+        const latestRecord = await db('otpmanages').where({ mobile, country_code }).first();
+        if (latestRecord?.sendattempt === 3 && latestRecord.sendexpiry > new Date()) {
+            return res.status(400).json({ success: false, message: 'Your otp attempt is over. Please try after sometimes.' });
+        }
+
+        const payload = { phoneNumber };
+        if (recaptchaToken) payload.recaptchaToken = recaptchaToken;
+        if (safetyNetToken) payload.safetyNetToken = safetyNetToken;
+        if (playIntegrityToken) payload.playIntegrityToken = playIntegrityToken;
+        if (iosReceipt) payload.iosReceipt = iosReceipt;
+        if (iosSecret) payload.iosSecret = iosSecret;
+
+        if (!payload.recaptchaToken && !payload.safetyNetToken && !payload.playIntegrityToken && !payload.iosReceipt) {
+            return res.status(400).json({
+                success: false,
+                message: 'Client attestation required (recaptchaToken / playIntegrityToken / iosReceipt).'
+            });
+        }
+
+        const { data } = await axios.post(
+            `https://identitytoolkit.googleapis.com/v1/accounts:sendVerificationCode?key=${apiKey}`,
+            payload,
+            { timeout: 20000 }
+        );
+
+        const sessionInfo = data?.sessionInfo;
+        if (!sessionInfo) {
+            logger.error('Firebase sendVerificationCode empty sessionInfo', data);
+            return res.status(400).json({ success: false, message: 'Failed to send OTP.' });
+        }
+
+        const currentDate = new Date();
+        let sendattempt = 1;
+        if (latestRecord) {
+            sendattempt = latestRecord.sendattempt < 3 ? latestRecord.sendattempt + 1 : 1;
+        }
+        const sendexpiry = new Date(currentDate.getTime() + 4 * 60 * 60 * 1000);
+        const upd = {
+            mobile,
+            country_code,
+            otp: sessionInfo,
+            sendattempt,
+            sendexpiry,
+        };
+
+        if (latestRecord) {
+            await db('otpmanages').where({ mobile, country_code }).update(upd);
+        } else {
+            await db('otpmanages').insert(upd);
+        }
+
+        return res.status(200).json({
+            success: true,
+            message: 'OTP Send successful.',
+            data: { sessionInfo },
+        });
+    } catch (err) {
+        const fbError = err?.response?.data?.error;
+        logger.error('sendFirebaseOtp error', fbError || err?.message || err);
+        return res.status(400).json({
+            success: false,
+            message: fbError?.message || 'Something Wrong in generate otp.',
+            data: fbError || null,
+        });
+    }
+}
+
+/**
+ * Verify Firebase phone OTP and return session (same shape helpers as needed).
+ * POST body: { mobile, country_code, otp, sessionInfo? }
+ */
+async function verifyFirebaseOtp(req, res) {
+    try {
+        let { mobile, country_code = '+91', otp, sessionInfo } = req.body || {};
+        if (!mobile || !otp || !country_code) {
+            return res.status(400).json({ success: false, message: 'Mobile number and otp required.' });
+        }
+
+        const apiKey = process.env.FIREBASE_WEB_API_KEY;
+        if (!apiKey) {
+            return res.status(500).json({ success: false, message: 'Firebase OTP not configured.' });
+        }
+
+        if (!isValidMobile(mobile)) {
+            return res.status(400).json({ success: false, message: 'Enter valid mobile number.' });
+        }
+
+        if (String(mobile).length === 12 && country_code === '+91') {
+            mobile = String(mobile).slice(2);
+        }
+
+        const latestRecord = await db('otpmanages').where({ mobile, country_code }).first();
+        const session = sessionInfo || latestRecord?.otp;
+        if (!session) {
+            return res.status(400).json({ success: false, message: 'OTP session expired. Please resend OTP.' });
+        }
+
+        const { data } = await axios.post(
+            `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPhoneNumber?key=${apiKey}`,
+            { sessionInfo: session, code: String(otp) },
+            { timeout: 20000 }
+        );
+
+        if (!data?.idToken) {
+            return res.status(400).json({ success: false, message: 'Wrong OTP! Please Enter Right OTP.' });
+        }
+
+        await db('otpmanages').where({ mobile, country_code }).del();
+
+        return res.status(200).json({
+            success: true,
+            message: 'OTP Matched Successfully!',
+            data: {
+                idToken: data.idToken,
+                refreshToken: data.refreshToken || null,
+                localId: data.localId || null,
+                phoneNumber: data.phoneNumber || `${country_code}${mobile}`,
+                isNewUser: data.isNewUser === true,
+            },
+        });
+    } catch (err) {
+        const fbError = err?.response?.data?.error;
+        logger.error('verifyFirebaseOtp error', fbError || err?.message || err);
+        return res.status(400).json({
+            success: false,
+            message: fbError?.message || 'Wrong OTP! Please Enter Right OTP.',
+            data: fbError || null,
+        });
+    }
+}
+
 module.exports = {
     register,
     login,
@@ -823,4 +986,6 @@ module.exports = {
     verifySMS,
     googleLogin,
     appleLogin,
+    sendFirebaseOtp,
+    verifyFirebaseOtp,
 };
