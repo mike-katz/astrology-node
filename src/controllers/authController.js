@@ -817,14 +817,14 @@ async function appleLogin(req, res) {
 async function verifyRecaptchaV3Token(token, remoteip) {
     const secret = process.env.RECAPTCHA_V3_SECRET_KEY;
     if (!secret) {
-        return { ok: true, skipped: true };
+        return { ok: false, message: 'RECAPTCHA_V3_SECRET_KEY not configured.', skipped: true };
     }
     const minScore = Number(process.env.RECAPTCHA_V3_MIN_SCORE || 0.5);
     const expectedAction = process.env.RECAPTCHA_V3_ACTION || '';
 
     const params = new URLSearchParams();
     params.append('secret', secret);
-    params.append('response', token);
+    params.append('response', String(token || '').trim());
     if (remoteip) params.append('remoteip', remoteip);
 
     const { data } = await axios.post(
@@ -861,16 +861,14 @@ async function verifyRecaptchaV3Token(token, remoteip) {
 }
 
 /**
- * Send OTP via Firebase Phone Auth (Identity Toolkit) with reCAPTCHA v3.
- * POST body: {
- *   mobile, country_code,
- *   recaptchaToken | captchaResponse,   // v3 token from frontend grecaptcha.execute()
- *   clientType?,                        // CLIENT_TYPE_WEB | CLIENT_TYPE_ANDROID | CLIENT_TYPE_IOS
- *   recaptchaVersion?,                  // RECAPTCHA_V3 (default) | ENTERPRISE | RECAPTCHA_V2
- *   safetyNetToken?, playIntegrityToken?, iosReceipt?, iosSecret?
- * }
- * Requires FIREBASE_WEB_API_KEY.
- * Optional: RECAPTCHA_V3_SECRET_KEY, RECAPTCHA_V3_MIN_SCORE, RECAPTCHA_V3_ACTION
+ * Send OTP after verifying frontend reCAPTCHA v3 token.
+ *
+ * Custom Google reCAPTCHA v3 tokens CANNOT be sent to Firebase Identity Toolkit
+ * (causes CAPTCHA_CHECK_FAILED / MALFORMED). Flow:
+ * 1) Verify v3 token with Google siteverify
+ * 2) Send OTP via existing SMS providers
+ *
+ * POST body: { mobile, country_code, recaptchaToken }
  */
 async function sendFirebaseOtp(req, res) {
     try {
@@ -879,24 +877,12 @@ async function sendFirebaseOtp(req, res) {
             country_code = '+91',
             recaptchaToken,
             captchaResponse,
-            clientType,
-            recaptchaVersion,
-            safetyNetToken,
-            playIntegrityToken,
-            iosReceipt,
-            iosSecret,
         } = req.body || {};
 
         if (!mobile || !country_code) {
             return res.status(400).json({ success: false, message: 'Mobile number required.' });
         }
 
-        const apiKey = process.env.FIREBASE_WEB_API_KEY;
-        if (!apiKey) {
-            logger.error('FIREBASE_WEB_API_KEY missing');
-            return res.status(500).json({ success: false, message: 'Firebase OTP not configured.' });
-        }
-
         if (!isValidMobile(mobile)) {
             return res.status(400).json({ success: false, message: 'Enter valid mobile number.' });
         }
@@ -905,113 +891,50 @@ async function sendFirebaseOtp(req, res) {
             mobile = String(mobile).slice(2);
         }
 
-        const phoneNumber = `${country_code}${mobile}`.replace(/\s+/g, '');
-        if (!/^\+\d{8,15}$/.test(phoneNumber)) {
-            return res.status(400).json({ success: false, message: 'Invalid phone number format.' });
+        const v3Token = String(captchaResponse || recaptchaToken || '').trim();
+        if (!v3Token) {
+            return res.status(400).json({ success: false, message: 'recaptchaToken is required.' });
         }
 
-        const latestRecord = await db('otpmanages').where({ mobile, country_code }).first();
-        if (latestRecord?.sendattempt === 3 && latestRecord.sendexpiry > new Date()) {
-            return res.status(400).json({ success: false, message: 'Your otp attempt is over. Please try after sometimes.' });
+        const captchaCheck = await verifyRecaptchaV3Token(v3Token, getClientIp(req));
+        if (!captchaCheck.ok) {
+            return res.status(400).json({
+                success: false,
+                message: captchaCheck.message,
+                data: captchaCheck.data || null,
+            });
         }
 
-        const v3Token = captchaResponse || recaptchaToken;
-        const payload = { phoneNumber };
-
-        if (v3Token) {
-            // reCAPTCHA v3 / Enterprise path (frontend grecaptcha.execute token)
-            const version = (recaptchaVersion || 'RECAPTCHA_V3').toUpperCase();
-            const type = (clientType || 'CLIENT_TYPE_WEB').toUpperCase();
-
-            payload.captchaResponse = v3Token;
-            payload.clientType = type;
-            payload.recaptchaVersion = version;
-
-            const captchaCheck = await verifyRecaptchaV3Token(v3Token, getClientIp(req));
-            if (!captchaCheck.ok) {
-                return res.status(400).json({
-                    success: false,
-                    message: captchaCheck.message,
-                    data: captchaCheck.data || null,
-                });
-            }
-        } else {
-            // Native attestation fallbacks
-            if (safetyNetToken) payload.safetyNetToken = safetyNetToken;
-            if (playIntegrityToken) payload.playIntegrityToken = playIntegrityToken;
-            if (iosReceipt) payload.iosReceipt = iosReceipt;
-            if (iosSecret) payload.iosSecret = iosSecret;
-
-            if (!payload.safetyNetToken && !payload.playIntegrityToken && !payload.iosReceipt) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'recaptchaToken (v3) is required.',
-                });
-            }
-        }
-
-        const { data } = await axios.post(
-            `https://identitytoolkit.googleapis.com/v1/accounts:sendVerificationCode?key=${apiKey}`,
-            payload,
-            { timeout: 20000 }
-        );
-
-        const sessionInfo = data?.sessionInfo;
-        if (!sessionInfo) {
-            logger.error('Firebase sendVerificationCode empty sessionInfo', data);
-            return res.status(400).json({ success: false, message: 'Failed to send OTP.' });
-        }
-
-        const currentDate = new Date();
-        let sendattempt = 1;
-        if (latestRecord) {
-            sendattempt = latestRecord.sendattempt < 3 ? latestRecord.sendattempt + 1 : 1;
-        }
-        const sendexpiry = new Date(currentDate.getTime() + 4 * 60 * 60 * 1000);
-        const upd = {
-            mobile,
-            country_code,
-            otp: sessionInfo,
-            sendattempt,
-            sendexpiry,
-        };
-
-        if (latestRecord) {
-            await db('otpmanages').where({ mobile, country_code }).update(upd);
-        } else {
-            await db('otpmanages').insert(upd);
+        // v3 OK → send OTP via SMS (do NOT pass v3 token to Firebase phone API)
+        const response = await sendSMS(mobile, country_code);
+        if (!response.return) {
+            return res.status(400).json({ success: false, message: response?.message });
         }
 
         return res.status(200).json({
             success: true,
             message: 'OTP Send successful.',
-            data: { sessionInfo },
+            data: null,
         });
     } catch (err) {
-        const fbError = err?.response?.data?.error;
-        logger.error('sendFirebaseOtp error', fbError || err?.message || err);
+        logger.error('sendFirebaseOtp error', err?.response?.data || err?.message || err);
         return res.status(400).json({
             success: false,
-            message: fbError?.message || 'Something Wrong in generate otp.',
-            data: fbError || null,
+            message: err?.response?.data?.error?.message || err?.message || 'Something Wrong in generate otp.',
+            data: err?.response?.data || null,
         });
     }
 }
 
 /**
- * Verify Firebase phone OTP and return session (same shape helpers as needed).
- * POST body: { mobile, country_code, otp, sessionInfo? }
+ * Verify OTP sent after reCAPTCHA v3 (stored in otpmanages).
+ * POST body: { mobile, country_code, otp }
  */
 async function verifyFirebaseOtp(req, res) {
     try {
-        let { mobile, country_code = '+91', otp, sessionInfo } = req.body || {};
+        let { mobile, country_code = '+91', otp } = req.body || {};
         if (!mobile || !otp || !country_code) {
             return res.status(400).json({ success: false, message: 'Mobile number and otp required.' });
-        }
-
-        const apiKey = process.env.FIREBASE_WEB_API_KEY;
-        if (!apiKey) {
-            return res.status(500).json({ success: false, message: 'Firebase OTP not configured.' });
         }
 
         if (!isValidMobile(mobile)) {
@@ -1022,42 +945,24 @@ async function verifyFirebaseOtp(req, res) {
             mobile = String(mobile).slice(2);
         }
 
-        const latestRecord = await db('otpmanages').where({ mobile, country_code }).first();
-        const session = sessionInfo || latestRecord?.otp;
-        if (!session) {
-            return res.status(400).json({ success: false, message: 'OTP session expired. Please resend OTP.' });
+        const response = await verifySMS(mobile, country_code, otp);
+        if (!response.return) {
+            return res.status(400).json({ success: false, message: response?.message });
         }
-
-        const { data } = await axios.post(
-            `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPhoneNumber?key=${apiKey}`,
-            { sessionInfo: session, code: String(otp) },
-            { timeout: 20000 }
-        );
-
-        if (!data?.idToken) {
-            return res.status(400).json({ success: false, message: 'Wrong OTP! Please Enter Right OTP.' });
-        }
-
-        await db('otpmanages').where({ mobile, country_code }).del();
 
         return res.status(200).json({
             success: true,
-            message: 'OTP Matched Successfully!',
+            message: response.message || 'OTP Matched Successfully!',
             data: {
-                idToken: data.idToken,
-                refreshToken: data.refreshToken || null,
-                localId: data.localId || null,
-                phoneNumber: data.phoneNumber || `${country_code}${mobile}`,
-                isNewUser: data.isNewUser === true,
+                phoneNumber: `${country_code}${mobile}`,
             },
         });
     } catch (err) {
-        const fbError = err?.response?.data?.error;
-        logger.error('verifyFirebaseOtp error', fbError || err?.message || err);
+        logger.error('verifyFirebaseOtp error', err?.message || err);
         return res.status(400).json({
             success: false,
-            message: fbError?.message || 'Wrong OTP! Please Enter Right OTP.',
-            data: fbError || null,
+            message: err?.message || 'Wrong OTP! Please Enter Right OTP.',
+            data: null,
         });
     }
 }
