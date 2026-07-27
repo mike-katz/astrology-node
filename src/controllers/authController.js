@@ -812,14 +812,81 @@ async function appleLogin(req, res) {
 }
 
 /**
- * Send OTP via Firebase Phone Auth (Identity Toolkit).
- * POST body: { mobile, country_code, recaptchaToken?, safetyNetToken?, playIntegrityToken?, iosReceipt?, iosSecret? }
- * Requires FIREBASE_WEB_API_KEY in env (Firebase Console → Project settings → Web API Key).
- * Client must pass one attestation token (reCAPTCHA / Play Integrity / iOS receipt).
+ * Optional server-side reCAPTCHA v3 score check (when RECAPTCHA_V3_SECRET_KEY is set).
+ */
+async function verifyRecaptchaV3Token(token, remoteip) {
+    const secret = process.env.RECAPTCHA_V3_SECRET_KEY;
+    if (!secret) {
+        return { ok: true, skipped: true };
+    }
+    const minScore = Number(process.env.RECAPTCHA_V3_MIN_SCORE || 0.5);
+    const expectedAction = process.env.RECAPTCHA_V3_ACTION || '';
+
+    const params = new URLSearchParams();
+    params.append('secret', secret);
+    params.append('response', token);
+    if (remoteip) params.append('remoteip', remoteip);
+
+    const { data } = await axios.post(
+        'https://www.google.com/recaptcha/api/siteverify',
+        params.toString(),
+        {
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            timeout: 15000,
+        }
+    );
+
+    if (!data?.success) {
+        return {
+            ok: false,
+            message: 'reCAPTCHA verification failed.',
+            data,
+        };
+    }
+    if (typeof data.score === 'number' && data.score < minScore) {
+        return {
+            ok: false,
+            message: 'reCAPTCHA score too low.',
+            data,
+        };
+    }
+    if (expectedAction && data.action && data.action !== expectedAction) {
+        return {
+            ok: false,
+            message: 'reCAPTCHA action mismatch.',
+            data,
+        };
+    }
+    return { ok: true, data };
+}
+
+/**
+ * Send OTP via Firebase Phone Auth (Identity Toolkit) with reCAPTCHA v3.
+ * POST body: {
+ *   mobile, country_code,
+ *   recaptchaToken | captchaResponse,   // v3 token from frontend grecaptcha.execute()
+ *   clientType?,                        // CLIENT_TYPE_WEB | CLIENT_TYPE_ANDROID | CLIENT_TYPE_IOS
+ *   recaptchaVersion?,                  // RECAPTCHA_V3 (default) | ENTERPRISE | RECAPTCHA_V2
+ *   safetyNetToken?, playIntegrityToken?, iosReceipt?, iosSecret?
+ * }
+ * Requires FIREBASE_WEB_API_KEY.
+ * Optional: RECAPTCHA_V3_SECRET_KEY, RECAPTCHA_V3_MIN_SCORE, RECAPTCHA_V3_ACTION
  */
 async function sendFirebaseOtp(req, res) {
     try {
-        let { mobile, country_code = '+91', recaptchaToken, safetyNetToken, playIntegrityToken, iosReceipt, iosSecret } = req.body || {};
+        let {
+            mobile,
+            country_code = '+91',
+            recaptchaToken,
+            captchaResponse,
+            clientType,
+            recaptchaVersion,
+            safetyNetToken,
+            playIntegrityToken,
+            iosReceipt,
+            iosSecret,
+        } = req.body || {};
+
         if (!mobile || !country_code) {
             return res.status(400).json({ success: false, message: 'Mobile number required.' });
         }
@@ -848,18 +915,39 @@ async function sendFirebaseOtp(req, res) {
             return res.status(400).json({ success: false, message: 'Your otp attempt is over. Please try after sometimes.' });
         }
 
+        const v3Token = captchaResponse || recaptchaToken;
         const payload = { phoneNumber };
-        if (recaptchaToken) payload.recaptchaToken = recaptchaToken;
-        if (safetyNetToken) payload.safetyNetToken = safetyNetToken;
-        if (playIntegrityToken) payload.playIntegrityToken = playIntegrityToken;
-        if (iosReceipt) payload.iosReceipt = iosReceipt;
-        if (iosSecret) payload.iosSecret = iosSecret;
 
-        if (!payload.recaptchaToken && !payload.safetyNetToken && !payload.playIntegrityToken && !payload.iosReceipt) {
-            return res.status(400).json({
-                success: false,
-                message: 'Client attestation required (recaptchaToken / playIntegrityToken / iosReceipt).'
-            });
+        if (v3Token) {
+            // reCAPTCHA v3 / Enterprise path (frontend grecaptcha.execute token)
+            const version = (recaptchaVersion || 'RECAPTCHA_V3').toUpperCase();
+            const type = (clientType || 'CLIENT_TYPE_WEB').toUpperCase();
+
+            payload.captchaResponse = v3Token;
+            payload.clientType = type;
+            payload.recaptchaVersion = version;
+
+            const captchaCheck = await verifyRecaptchaV3Token(v3Token, getClientIp(req));
+            if (!captchaCheck.ok) {
+                return res.status(400).json({
+                    success: false,
+                    message: captchaCheck.message,
+                    data: captchaCheck.data || null,
+                });
+            }
+        } else {
+            // Native attestation fallbacks
+            if (safetyNetToken) payload.safetyNetToken = safetyNetToken;
+            if (playIntegrityToken) payload.playIntegrityToken = playIntegrityToken;
+            if (iosReceipt) payload.iosReceipt = iosReceipt;
+            if (iosSecret) payload.iosSecret = iosSecret;
+
+            if (!payload.safetyNetToken && !payload.playIntegrityToken && !payload.iosReceipt) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'recaptchaToken (v3) is required.',
+                });
+            }
         }
 
         const { data } = await axios.post(
