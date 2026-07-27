@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { body } = require('express-validator');
-const { register, login, verifyOtp, socialUrl, getSettings, sendCall, test, googleLogin, appleLogin, sendFirebaseOtp, verifyFirebaseOtp } = require('../controllers/authController');
+const { register, login, verifyOtp, socialUrl, getSettings, sendCall, test, googleLogin, appleLogin, sendFirebaseOtp, verifyFirebaseOtp, getFirebaseRecaptchaParams } = require('../controllers/authController');
 
 router.get('/setting', getSettings);
 
@@ -17,7 +17,8 @@ router.post('/register', [
 router.post('/login', login);
 
 router.post('/verifyOtP', verifyOtp);
-// Firebase Phone Auth OTP
+// Firebase Phone Auth OTP (Firebase only)
+router.get('/firebase/recaptcha-params', getFirebaseRecaptchaParams);
 router.post('/firebase/send-otp', sendFirebaseOtp);
 router.post('/firebase/verify-otp', verifyFirebaseOtp);
 // POST /auth/google — body: { id_token } or { idToken } from Google Sign-In; optional: type, version, ad_set_id, utm_source, ad_id, referrer
