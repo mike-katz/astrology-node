@@ -812,8 +812,11 @@ async function appleLogin(req, res) {
 }
 
 /**
- * Firebase reCAPTCHA site key for frontend (use this site key to generate token).
- * GET /auth/firebase/recaptcha-params
+ * Firebase reCAPTCHA params for frontend.
+ * - version=v3|enterprise (default): Identity Toolkit v2 Enterprise config
+ * - version=v2: legacy v1 recaptchaParams (checkbox)
+ *
+ * GET /auth/firebase/recaptcha-params?clientType=CLIENT_TYPE_WEB
  */
 async function getFirebaseRecaptchaParams(req, res) {
     try {
@@ -821,16 +824,86 @@ async function getFirebaseRecaptchaParams(req, res) {
         if (!apiKey) {
             return res.status(500).json({ success: false, message: 'FIREBASE_WEB_API_KEY not configured.' });
         }
+
+        const versionQ = String(req.query.version || req.body?.version || 'v3').toLowerCase();
+        const clientType = String(
+            req.query.clientType || req.body?.clientType || 'CLIENT_TYPE_WEB'
+        ).toUpperCase().startsWith('CLIENT_TYPE_')
+            ? String(req.query.clientType || req.body?.clientType || 'CLIENT_TYPE_WEB').toUpperCase()
+            : `CLIENT_TYPE_${String(req.query.clientType || 'WEB').toUpperCase()}`;
+
+        // Legacy v2 checkbox key (NOT for grecaptcha.execute v3)
+        if (versionQ === 'v2' || versionQ === 'classic') {
+            const { data } = await axios.get(
+                `https://identitytoolkit.googleapis.com/v1/recaptchaParams?key=${apiKey}`,
+                { timeout: 15000 }
+            );
+            return res.status(200).json({
+                success: true,
+                message: 'OK',
+                data: {
+                    version: 'v2',
+                    recaptchaSiteKey: data?.recaptchaSiteKey || null,
+                    recaptchaStoken: data?.recaptchaStoken || null,
+                },
+            });
+        }
+
+        // v3 / Enterprise (score-based) — required for grecaptcha.enterprise / v3 phone auth
         const { data } = await axios.get(
-            `https://identitytoolkit.googleapis.com/v1/recaptchaParams?key=${apiKey}`,
+            `https://identitytoolkit.googleapis.com/v2/recaptchaConfig?key=${apiKey}&clientType=${clientType}&version=RECAPTCHA_ENTERPRISE`,
             { timeout: 15000 }
         );
+
+        const phoneState = (data?.recaptchaEnforcementState || []).find(
+            (x) => x.provider === 'PHONE_PROVIDER'
+        );
+        const enforcement = phoneState?.enforcementState || 'ENFORCEMENT_STATE_UNSPECIFIED';
+        const enterpriseEnabled =
+            enforcement === 'AUDIT' ||
+            enforcement === 'ENFORCE' ||
+            enforcement === 'ENFORCEMENT_STATE_AUDIT' ||
+            enforcement === 'ENFORCEMENT_STATE_ENFORCE';
+
+        // Firebase returns resource name: projects/{project}/keys/{keyId}
+        const recaptchaKeyResource = data?.recaptchaKey || null;
+        const keyId = recaptchaKeyResource
+            ? String(recaptchaKeyResource).split('/').pop()
+            : null;
+
+        // Optional: your own v3 site key (must be linked in Firebase / reCAPTCHA Enterprise)
+        const envSiteKey = String(process.env.RECAPTCHA_V3_SITE_KEY || '').trim() || null;
+
+        if (!enterpriseEnabled || (!keyId && !envSiteKey)) {
+            return res.status(400).json({
+                success: false,
+                message:
+                    'Firebase Phone Auth reCAPTCHA Enterprise/v3 is not enabled. Enable it in Firebase Console → Authentication → Settings → App verification / reCAPTCHA (Phone provider AUDIT or ENFORCE). Until then only v2 checkbox key works via ?version=v2.',
+                data: {
+                    version: 'v3',
+                    clientType,
+                    phoneEnforcementState: enforcement,
+                    recaptchaKeyResource,
+                    recaptchaSiteKey: envSiteKey,
+                    useSmsBotScore: data?.useSmsBotScore === true,
+                    useSmsTollFraudProtection: data?.useSmsTollFraudProtection === true,
+                },
+            });
+        }
+
         return res.status(200).json({
             success: true,
             message: 'OK',
             data: {
-                recaptchaSiteKey: data?.recaptchaSiteKey || null,
-                recaptchaStoken: data?.recaptchaStoken || null,
+                version: 'v3',
+                clientType,
+                // Use with: grecaptcha.enterprise.execute(siteKey, {action:'login'})
+                // or Firebase-managed enterprise site key id
+                recaptchaSiteKey: envSiteKey || keyId,
+                recaptchaKeyResource,
+                phoneEnforcementState: enforcement,
+                useSmsBotScore: data?.useSmsBotScore === true,
+                useSmsTollFraudProtection: data?.useSmsTollFraudProtection === true,
             },
         });
     } catch (err) {
@@ -845,13 +918,9 @@ async function getFirebaseRecaptchaParams(req, res) {
 }
 
 /**
- * Send OTP via Firebase Phone Auth only (Identity Toolkit).
- * POST body: {
- *   mobile, country_code,
- *   recaptchaToken,                 // from frontend (Firebase recaptchaSiteKey)
- *   clientType?,                    // only for Enterprise
- *   recaptchaVersion?               // only "RECAPTCHA_ENTERPRISE" when using Enterprise
- * }
+ * Send OTP via Firebase Phone Auth (v3 / Enterprise captcha only).
+ * POST body: { mobile, country_code, recaptchaToken, clientType? }
+ * recaptchaToken = token from grecaptcha.enterprise.execute(v3SiteKey)
  */
 async function sendFirebaseOtp(req, res) {
     try {
@@ -861,11 +930,6 @@ async function sendFirebaseOtp(req, res) {
             recaptchaToken,
             captchaResponse,
             clientType,
-            recaptchaVersion,
-            playIntegrityToken,
-            safetyNetToken,
-            iosReceipt,
-            iosSecret,
         } = req.body || {};
 
         if (!mobile || !country_code) {
@@ -896,109 +960,42 @@ async function sendFirebaseOtp(req, res) {
         }
 
         const token = String(captchaResponse || recaptchaToken || '').trim();
-        if (!token && !playIntegrityToken && !safetyNetToken && !(iosReceipt && iosSecret)) {
-            return res.status(400).json({
-                success: false,
-                message: 'recaptchaToken is required.',
-            });
+        if (!token) {
+            return res.status(400).json({ success: false, message: 'recaptchaToken is required.' });
         }
 
-        const normalizeClientType = (value) => {
-            const v = String(value || 'WEB').toUpperCase().replace(/^CLIENT_TYPE_/, '');
+        const type = (() => {
+            const v = String(clientType || 'WEB').toUpperCase().replace(/^CLIENT_TYPE_/, '');
             if (v === 'ANDROID') return 'CLIENT_TYPE_ANDROID';
             if (v === 'IOS') return 'CLIENT_TYPE_IOS';
             return 'CLIENT_TYPE_WEB';
-        };
+        })();
 
-        const buildPayload = (mode) => {
-            const body = { phoneNumber };
-            if (playIntegrityToken && mode === 'playIntegrity') {
-                body.playIntegrityToken = playIntegrityToken;
-                return body;
-            }
-            if (safetyNetToken && mode === 'safetyNet') {
-                body.safetyNetToken = safetyNetToken;
-                return body;
-            }
-            if (iosReceipt && iosSecret && mode === 'ios') {
-                body.iosReceipt = iosReceipt;
-                body.iosSecret = iosSecret;
-                return body;
-            }
-            if (mode === 'enterprise') {
-                // Firebase reCAPTCHA v3 / Enterprise (score-based)
-                body.captchaResponse = token;
-                body.clientType = normalizeClientType(clientType);
-                body.recaptchaVersion = 'RECAPTCHA_ENTERPRISE';
-                return body;
-            }
-            // Classic checkbox / getRecaptchaParams token
-            body.recaptchaToken = token;
-            return body;
-        };
-
-        const versionRaw = String(recaptchaVersion || 'RECAPTCHA_ENTERPRISE').toUpperCase();
-        const preferClassic =
-            versionRaw === 'CLASSIC' ||
-            versionRaw === 'RECAPTCHA_V2' ||
-            versionRaw === 'V2';
-
-        // Default for frontend v3 = Enterprise path; fallback to classic on MALFORMED
-        const modes = preferClassic
-            ? ['classic', 'enterprise']
-            : ['enterprise', 'classic'];
-
-        if (!token && playIntegrityToken) modes.length = 0;
-        if (!token && safetyNetToken) modes.length = 0;
-        if (!token && iosReceipt && iosSecret) modes.length = 0;
-
-        let data = null;
-        let lastError = null;
-        const tryModes = token
-            ? modes
-            : playIntegrityToken
-                ? ['playIntegrity']
-                : safetyNetToken
-                    ? ['safetyNet']
-                    : ['ios'];
-
-        logger.info('sendFirebaseOtp captcha', {
-            tokenLen: token.length,
-            modes: tryModes,
+        // Firebase Phone Auth + reCAPTCHA v3 => Enterprise fields only
+        // (RECAPTCHA_V3 enum does not exist; use RECAPTCHA_ENTERPRISE)
+        const payload = {
             phoneNumber,
+            captchaResponse: token,
+            clientType: type,
+            recaptchaVersion: 'RECAPTCHA_ENTERPRISE',
+        };
+
+        logger.info('sendFirebaseOtp v3/enterprise', {
+            phoneNumber,
+            clientType: type,
+            tokenLen: token.length,
         });
 
-        for (const mode of tryModes) {
-            const fbPayload = buildPayload(mode);
-            try {
-                const resFb = await axios.post(
-                    `https://identitytoolkit.googleapis.com/v1/accounts:sendVerificationCode?key=${apiKey}`,
-                    fbPayload,
-                    { timeout: 20000 }
-                );
-                data = resFb.data;
-                logger.info('sendFirebaseOtp success mode', mode);
-                break;
-            } catch (e) {
-                lastError = e?.response?.data?.error || e;
-                const msg = String(lastError?.message || '');
-                logger.error('sendFirebaseOtp mode failed', { mode, message: msg });
-                // retry other mode only for captcha malformed / mismatch
-                if (!/CAPTCHA_CHECK_FAILED|MALFORMED|SITE_MISMATCH/i.test(msg)) {
-                    break;
-                }
-            }
-        }
+        const { data } = await axios.post(
+            `https://identitytoolkit.googleapis.com/v1/accounts:sendVerificationCode?key=${apiKey}`,
+            payload,
+            { timeout: 20000 }
+        );
 
-        if (!data?.sessionInfo) {
-            return res.status(400).json({
-                success: false,
-                message: lastError?.message || 'Failed to send OTP.',
-                data: lastError || null,
-            });
+        const sessionInfo = data?.sessionInfo;
+        if (!sessionInfo) {
+            return res.status(400).json({ success: false, message: 'Failed to send OTP.', data });
         }
-
-        const sessionInfo = data.sessionInfo;
 
         const currentDate = new Date();
         let sendattempt = 1;
@@ -1025,10 +1022,21 @@ async function sendFirebaseOtp(req, res) {
         });
     } catch (err) {
         const fbError = err?.response?.data?.error;
+        const msg = String(fbError?.message || err?.message || '');
         logger.error('sendFirebaseOtp error', fbError || err?.message || err);
+
+        let hint = msg || 'Something Wrong in generate otp.';
+        if (/MISSING_CLIENT_IDENTIFIER/i.test(msg)) {
+            hint =
+                'MISSING_CLIENT_IDENTIFIER: Phone Auth reCAPTCHA Enterprise/v3 is not enabled on this Firebase project. Enable Phone provider AUDIT/ENFORCE in Firebase Console, then use site key from GET /auth/firebase/recaptcha-params (v3).';
+        } else if (/MALFORMED/i.test(msg)) {
+            hint =
+                'MALFORMED: Token is not a valid Enterprise/v3 token for this project. Generate with grecaptcha.enterprise.execute(siteKey) using key from /auth/firebase/recaptcha-params.';
+        }
+
         return res.status(400).json({
             success: false,
-            message: fbError?.message || 'Something Wrong in generate otp.',
+            message: hint,
             data: fbError || null,
         });
     }
