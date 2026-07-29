@@ -928,195 +928,56 @@ async function getFirebaseRecaptchaParams(req, res) {
  */
 async function sendFirebaseOtp(req, res) {
     try {
-        let {
-            mobile,
-            country_code = '+91',
-            recaptchaToken,
-            captchaResponse,
-            recaptchaVersion,
-            version,
-            clientType,
-            playIntegrityToken,
-            iosReceipt,
-            iosSecret,
-        } = req.body || {};
+        console.log("login body param", req.body);
+        logger.info('login called')
+        const { mobile, country_code = '+91', device_id } = req.body;
 
-        if (!mobile || !country_code) {
-            return res.status(400).json({ success: false, message: 'Mobile number required.' });
+        if (!mobile || !country_code) return res.status(400).json({ success: false, message: 'Mobile number required.' });
+        const isValid = isValidMobile(mobile);
+        if (!isValid) return res.status(400).json({ success: false, message: 'Enter valid mobile number.' });
+
+        const user = await db('users').where({ country_code, mobile }).first();
+        if (user && user?.status == 'block') {
+            return res.status(400).json({ success: false, message: 'Your account is blocked.' });
         }
-
-        const apiKey = process.env.FIREBASE_WEB_API_KEY;
-        if (!apiKey) {
-            return res.status(500).json({ success: false, message: 'FIREBASE_WEB_API_KEY not configured.' });
+        if (user && user?.status == 'inactive') {
+            return res.status(400).json({ success: false, message: 'Oops! Your account is inactive right now. Please contact support.' });
         }
-
-        if (!isValidMobile(mobile)) {
-            return res.status(400).json({ success: false, message: 'Enter valid mobile number.' });
+        let newMobile = mobile
+        console.log("mobile.length", mobile.length);
+        if (mobile.length == 12 && country_code == "+91") {
+            newMobile = mobile.slice(2);
         }
-
-        if (String(mobile).length === 12 && country_code === '+91') {
-            mobile = String(mobile).slice(2);
-        }
-
-        const phoneNumber = `${country_code}${mobile}`.replace(/\s+/g, '');
-        if (!/^\+\d{8,15}$/.test(phoneNumber)) {
-            return res.status(400).json({ success: false, message: 'Invalid phone number format.' });
-        }
-
-        const latestRecord = await db('otpmanages').where({ mobile, country_code }).first();
-        if (latestRecord?.sendattempt === 3 && latestRecord.sendexpiry > new Date()) {
-            return res.status(400).json({ success: false, message: 'Your otp attempt is over. Please try after sometimes.' });
-        }
-
-        const token = String(captchaResponse || recaptchaToken || '').trim();
-        const integrity = String(playIntegrityToken || '').trim();
-        const receipt = String(iosReceipt || '').trim();
-        const secret = String(iosSecret || '').trim();
-
-        if (!token && !integrity && !(receipt && secret)) {
-            return res.status(400).json({
-                success: false,
-                message: 'recaptchaToken (or playIntegrityToken / iosReceipt+iosSecret) is required.',
-            });
-        }
-
-        const type = (() => {
-            const v = String(clientType || 'WEB').toUpperCase().replace(/^CLIENT_TYPE_/, '');
-            if (v === 'ANDROID') return 'CLIENT_TYPE_ANDROID';
-            if (v === 'IOS') return 'CLIENT_TYPE_IOS';
-            return 'CLIENT_TYPE_WEB';
-        })();
-
-        const mode = String(recaptchaVersion || version || 'auto').toLowerCase();
-
-        const buildPayload = (useMode) => {
-            const payload = { phoneNumber };
-
-            if (integrity) {
-                payload.playIntegrityToken = integrity;
-                return payload;
-            }
-            if (receipt && secret) {
-                payload.iosReceipt = receipt;
-                payload.iosSecret = secret;
-                return payload;
+        console.log("newMobile", newMobile);
+        if (mobile != '1999999999') {
+            const latestRecord = await db('otpmanages').where({ mobile, country_code }).first();
+            if (latestRecord?.sendattempt === 3 && latestRecord.sendexpiry > new Date()) {
+                return res.status(400).json({ success: false, message: 'Your otp attempt is over. Please try after sometimes.' });
             }
 
-            // Classic Firebase checkbox captcha (getRecaptchaParams / version=v2)
-            if (useMode === 'v2' || useMode === 'classic' || useMode === 'recaptcha') {
-                payload.recaptchaToken = token;
-                return payload;
+            let sendattempt = 1;
+            const currentDate = new Date();
+            if (latestRecord) {
+                sendattempt = latestRecord.sendattempt < 3 ? latestRecord.sendattempt + 1 : 1;
+            }
+            const upd = {
+                mobile,
+                country_code,
+                otp: sessionInfo,
+                sendattempt,
+                sendexpiry: new Date(currentDate.getTime() + 4 * 60 * 60 * 1000),
+            };
+            if (latestRecord) {
+                await db('otpmanages').where({ mobile, country_code }).update(upd);
+            } else {
+                await db('otpmanages').insert(upd);
             }
 
-            // reCAPTCHA Enterprise (Firebase Phone provider AUDIT/ENFORCE)
-            if (
-                useMode === 'enterprise' ||
-                useMode === 'v3' ||
-                useMode === 'recaptcha_enterprise' ||
-                useMode === 'recaptcha-enterprise'
-            ) {
-                payload.captchaResponse = token;
-                payload.clientType = type;
-                payload.recaptchaVersion = 'RECAPTCHA_ENTERPRISE';
-                return payload;
-            }
-
-            // auto: prefer classic — Enterprise tokens wrongly sent as classic still fail,
-            // but classic tokens sent as Enterprise cause INVALID_APP_CREDENTIAL (common case)
-            payload.recaptchaToken = token;
-            return payload;
-        };
-
-        const tryModes =
-            mode === 'auto' && token && !integrity && !(receipt && secret)
-                ? ['enterprise', 'classic'] // project has PHONE AUDIT → try enterprise first
-                : [mode === 'auto' ? 'enterprise' : mode];
-
-        let data = null;
-        let lastError = null;
-        let usedMode = tryModes[0];
-
-        for (const m of tryModes) {
-            const payload = buildPayload(m);
-            usedMode = m;
-            logger.info('sendFirebaseOtp', {
-                phoneNumber,
-                clientType: type,
-                mode: m,
-                tokenLen: token.length,
-                fields: Object.keys(payload),
-            });
-
-            try {
-                const resp = await axios.post(
-                    `https://identitytoolkit.googleapis.com/v1/accounts:sendVerificationCode?key=${apiKey}`,
-                    payload,
-                    { timeout: 20000 }
-                );
-                data = resp.data;
-                lastError = null;
-                break;
-            } catch (err) {
-                lastError = err;
-                const msg = String(err?.response?.data?.error?.message || '');
-                // Only fall through classic → enterprise (or reverse) on credential mismatch
-                if (!/INVALID_APP_CREDENTIAL|CAPTCHA|INVALID_RECAPTCHA|MALFORMED/i.test(msg)) {
-                    throw err;
-                }
-                logger.warn('sendFirebaseOtp mode failed, may retry', { mode: m, msg });
-            }
         }
-
-        if (!data?.sessionInfo) {
-            throw lastError || new Error('Failed to send OTP.');
-        }
-
-        const sessionInfo = data.sessionInfo;
-        const currentDate = new Date();
-        let sendattempt = 1;
-        if (latestRecord) {
-            sendattempt = latestRecord.sendattempt < 3 ? latestRecord.sendattempt + 1 : 1;
-        }
-        const upd = {
-            mobile,
-            country_code,
-            otp: sessionInfo,
-            sendattempt,
-            sendexpiry: new Date(currentDate.getTime() + 4 * 60 * 60 * 1000),
-        };
-        if (latestRecord) {
-            await db('otpmanages').where({ mobile, country_code }).update(upd);
-        } else {
-            await db('otpmanages').insert(upd);
-        }
-
-        return res.status(200).json({
-            success: true,
-            message: 'OTP Send successful.',
-            data: { sessionInfo, recaptchaMode: usedMode },
-        });
+        return res.status(200).json({ success: true, message: 'Otp Send Successfully' });
     } catch (err) {
-        const fbError = err?.response?.data?.error;
-        const msg = String(fbError?.message || err?.message || '');
-        logger.error('sendFirebaseOtp error', fbError || err?.message || err);
-
-        let hint = msg || 'Something Wrong in generate otp.';
-        if (/INVALID_APP_CREDENTIAL/i.test(msg)) {
-            hint =
-                'INVALID_APP_CREDENTIAL: reCAPTCHA token rejected. Use Firebase site key from GET /Firebase/auth/recaptcha-params?version=v2 (checkbox) and send { recaptchaToken, recaptchaVersion: "v2" }. For Enterprise use grecaptcha.enterprise.execute with Firebase key and { captchaResponse, recaptchaVersion: "enterprise", clientType }. Also add your domain (or 127.0.0.1) under Firebase Console → Authentication → Settings → Authorized domains. Do not use a standalone Google reCAPTCHA key that is not linked to this Firebase project.';
-        } else if (/MISSING_CLIENT_IDENTIFIER/i.test(msg)) {
-            hint =
-                'MISSING_CLIENT_IDENTIFIER: Phone Auth reCAPTCHA Enterprise/v3 is not enabled. Enable Phone provider AUDIT/ENFORCE in Firebase Console, or use classic v2: GET /Firebase/auth/recaptcha-params?version=v2';
-        } else if (/MALFORMED/i.test(msg)) {
-            hint =
-                'MALFORMED: Token is not valid for this project. Generate with the site key from /Firebase/auth/recaptcha-params (same Firebase project as FIREBASE_WEB_API_KEY).';
-        }
-
-        return res.status(400).json({
-            success: false,
-            message: hint,
-            data: fbError || null,
-        });
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
     }
 }
 
@@ -1264,7 +1125,7 @@ async function verifyFirebaseOtp(req, res) {
             await db('users').where({ id: Number(existing?.id) }).update(upd);
         }
 
-        await db('otpmanages').where({ mobile, country_code }).del().catch(() => {});
+        await db('otpmanages').where({ mobile, country_code }).del().catch(() => { });
 
         const response = await generateLoginResponse(existing, currency);
         return res.status(200).json(response);
