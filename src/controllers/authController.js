@@ -15,6 +15,7 @@ const logger = require('../utils/logger').getLogger('authController');
 const geoip = require('geoip-lite');
 const { getClientIp } = require('../utils/getClientIp');
 const { getCurrencyByCountry } = require('../utils/countryCurrencyMap');
+const admin = require('../config/firebase');
 
 async function register(req, res) {
     try {
@@ -1120,67 +1121,161 @@ async function sendFirebaseOtp(req, res) {
 }
 
 /**
- * Verify OTP via Firebase Phone Auth only.
+ * Verify Firebase Phone Auth idToken, then same user/session flow as verifyOtp.
  * POST /Firebase/auth/verify-otp
- * body: { mobile, country_code, otp, sessionInfo? }
+ * body: { idToken, mobile?, country_code?, type?, version?, referrer?, device_id?, ad_set_id?, utm_source?, ad_id? }
  */
 async function verifyFirebaseOtp(req, res) {
     try {
-        let { mobile, country_code = '+91', otp, sessionInfo } = req.body || {};
-        if (!mobile || !otp || !country_code) {
-            return res.status(400).json({ success: false, message: 'Mobile number and otp required.' });
+        let {
+            idToken,
+            mobile,
+            country_code = '+91',
+            ad_set_id,
+            utm_source,
+            ad_id,
+            type,
+            version,
+            referrer,
+            device_id,
+        } = req.body || {};
+
+        if (!idToken) {
+            return res.status(400).json({ success: false, message: 'idToken is required.' });
         }
 
-        const apiKey = process.env.FIREBASE_WEB_API_KEY;
-        if (!apiKey) {
-            return res.status(500).json({ success: false, message: 'FIREBASE_WEB_API_KEY not configured.' });
+        const decoded = await admin.auth().verifyIdToken(idToken);
+        const phone = decoded?.phone_number;
+        if (!phone) {
+            return res.status(400).json({ success: false, message: 'Phone not verified.' });
         }
 
+        // Prefer Firebase-verified phone; fall back to body after match check
+        if (mobile && country_code) {
+            if (!isValidMobile(mobile)) {
+                return res.status(400).json({ success: false, message: 'Enter valid mobile number.' });
+            }
+            if (String(mobile).length === 8 && country_code === '+91') {
+                mobile = `91${mobile}`;
+            }
+            if (String(mobile).length === 12 && country_code === '+91') {
+                mobile = String(mobile).slice(2);
+            }
+            const dial = String(country_code).startsWith('+') ? String(country_code) : `+${country_code}`;
+            const expected = `${dial}${String(mobile).replace(/\D/g, '')}`;
+            if (phone !== expected) {
+                return res.status(400).json({ success: false, message: 'Phone mismatch.' });
+            }
+        } else if (phone.startsWith('+91') && phone.length === 13) {
+            country_code = '+91';
+            mobile = phone.slice(3);
+        } else if (phone.startsWith('+1') && phone.length === 12) {
+            country_code = '+1';
+            mobile = phone.slice(2);
+        } else {
+            // generic: last 10 digits as mobile when country_code provided, else +91-style split
+            const digits = phone.replace(/\D/g, '');
+            if (country_code && String(country_code).replace(/\D/g, '')) {
+                const ccDigits = String(country_code).replace(/\D/g, '');
+                mobile = digits.startsWith(ccDigits) ? digits.slice(ccDigits.length) : digits;
+                country_code = String(country_code).startsWith('+') ? String(country_code) : `+${country_code}`;
+            } else {
+                country_code = `+${digits.slice(0, digits.length - 10)}` || '+91';
+                mobile = digits.slice(-10);
+            }
+        }
+
+        if (!mobile || !country_code) {
+            return res.status(400).json({ success: false, message: 'Mobile number required.' });
+        }
         if (!isValidMobile(mobile)) {
             return res.status(400).json({ success: false, message: 'Enter valid mobile number.' });
         }
 
-        if (String(mobile).length === 12 && country_code === '+91') {
-            mobile = String(mobile).slice(2);
+        let existing = await db('users').whereNull('deleted_at').where({ mobile, country_code }).first();
+
+        if (existing?.status === 'block') {
+            return res.status(400).json({ success: false, message: 'Your account is blocked.' });
+        }
+        if (existing?.status === 'inactive') {
+            return res.status(400).json({
+                success: false,
+                message: 'Oops! Your account is inactive right now. Please contact support.',
+            });
         }
 
-        const latestRecord = await db('otpmanages').where({ mobile, country_code }).first();
-        const session = sessionInfo || latestRecord?.otp;
-        if (!session) {
-            return res.status(400).json({ success: false, message: 'OTP session expired. Please resend OTP.' });
+        const mode = type ? type : 'APP';
+        const upd = {};
+        if (existing && version) {
+            upd.version = version;
+        }
+        if (mode) {
+            upd.mode = mode;
+        }
+        let set_id = ad_set_id ?? referrer ?? null;
+
+        if (set_id != null) {
+            if (!isNumber(set_id)) {
+                set_id = null;
+                if (existing) {
+                    upd.ad_set_id = null;
+                }
+            } else if (existing) {
+                upd.ad_set_id = Number(set_id);
+            }
         }
 
-        const { data } = await axios.post(
-            `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPhoneNumber?key=${apiKey}`,
-            { sessionInfo: session, code: String(otp) },
-            { timeout: 20000 }
-        );
-
-        if (!data?.idToken) {
-            return res.status(400).json({ success: false, message: 'Wrong OTP! Please Enter Right OTP.' });
+        let currency = existing?.default_currency || 'INR';
+        if (!existing) {
+            const ip = await getClientIp(req);
+            if (ip) {
+                const geo = await geoip.lookup(ip);
+                const country = geo ? geo.country : 'IN';
+                currency = await getCurrencyByCountry(country);
+                currency = currency?.currency;
+            }
+            [existing] = await db('users')
+                .insert({
+                    mobile,
+                    country_code,
+                    status: 'active',
+                    balance: 0,
+                    ad_set_id: set_id,
+                    utm_source,
+                    ad_id,
+                    mode,
+                    version,
+                    is_free_order_available: true,
+                    default_currency: currency,
+                    permanent_currency: currency,
+                })
+                .returning([
+                    'id',
+                    'mobile',
+                    'avatar',
+                    'country_code',
+                    'otp',
+                    'is_free_order_available',
+                    'permanent_currency',
+                    'default_currency',
+                ]);
+        }
+        if (Object.keys(upd).length > 0) {
+            await db('users').where({ id: Number(existing?.id) }).update(upd);
         }
 
-        await db('otpmanages').where({ mobile, country_code }).del();
+        await db('otpmanages').where({ mobile, country_code }).del().catch(() => {});
 
-        return res.status(200).json({
-            success: true,
-            message: 'OTP Matched Successfully!',
-            data: {
-                idToken: data.idToken,
-                refreshToken: data.refreshToken || null,
-                localId: data.localId || null,
-                phoneNumber: data.phoneNumber || `${country_code}${mobile}`,
-                isNewUser: data.isNewUser === true,
-            },
-        });
+        const response = await generateLoginResponse(existing, currency);
+        return res.status(200).json(response);
     } catch (err) {
-        const fbError = err?.response?.data?.error;
-        logger.error('verifyFirebaseOtp error', fbError || err?.message || err);
-        return res.status(400).json({
-            success: false,
-            message: fbError?.message || 'Wrong OTP! Please Enter Right OTP.',
-            data: fbError || null,
-        });
+        logger.error('verifyFirebaseOtp error', err?.message || err);
+        const code = err?.code || '';
+        const message =
+            /id-token|argument-error|auth\//i.test(String(code) + String(err?.message))
+                ? 'Invalid or expired idToken.'
+                : err?.message || 'Server error';
+        return res.status(400).json({ success: false, message });
     }
 }
 
