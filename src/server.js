@@ -10,6 +10,7 @@ const auth = require('./middleware/authMiddleware.js');
 // require('./workers/emailWorker');
 
 const authRoutes = require('./routes/auth');
+const firebaseAuthRoutes = require('./routes/firebaseAuth');
 const panditRoutes = require('./routes/pandit');
 const followRoutes = require('./routes/follow');
 const reviewRoutes = require('./routes/review');
@@ -59,6 +60,7 @@ RedisCache.initializeRedis();
 
 // app.use(cors());
 app.use('/auth', authRoutes);
+app.use('/firebase/auth', firebaseAuthRoutes);
 app.use('/pandit', panditRoutes);
 app.use('/upload', panditRoutes);
 app.use('/kundli', kundliRoutes);

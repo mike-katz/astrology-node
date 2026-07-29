@@ -202,14 +202,6 @@ async function login(req, res) {
         if (user && user?.status == 'inactive') {
             return res.status(400).json({ success: false, message: 'Oops! Your account is inactive right now. Please contact support.' });
         }
-        if (!user) {
-            // if (device_id) {
-            //     const devices = await db('users').where({ device_id }).first();
-            //     if (devices) {
-            //         return res.status(400).json({ success: false, message: 'This device is already linked to another account. Please sign in using the existing account or contact support if you need assistance.' });
-            //     }
-            // }
-        }
         let newMobile = mobile
         console.log("mobile.length", mobile.length);
         if (mobile.length == 12 && country_code == "+91") {
@@ -230,7 +222,6 @@ async function login(req, res) {
                 let otpResponse;
                 try {
                     otpResponse = await axios.get(url);
-                    // console.log("otpResponse", otpResponse);
                     otpResponse = otpResponse.data
                 } catch (error) {
                     console.error('Acquire API failed:', error.message);
@@ -813,10 +804,7 @@ async function appleLogin(req, res) {
 
 /**
  * Firebase reCAPTCHA params for frontend.
- * - version=v3|enterprise (default): Identity Toolkit v2 Enterprise config
- * - version=v2: legacy v1 recaptchaParams (checkbox)
- *
- * GET /auth/firebase/recaptcha-params?clientType=CLIENT_TYPE_WEB
+ * GET /Firebase/auth/recaptcha-params?clientType=CLIENT_TYPE_WEB
  */
 async function getFirebaseRecaptchaParams(req, res) {
     try {
@@ -832,7 +820,6 @@ async function getFirebaseRecaptchaParams(req, res) {
             ? String(req.query.clientType || req.body?.clientType || 'CLIENT_TYPE_WEB').toUpperCase()
             : `CLIENT_TYPE_${String(req.query.clientType || 'WEB').toUpperCase()}`;
 
-        // Legacy v2 checkbox key (NOT for grecaptcha.execute v3)
         if (versionQ === 'v2' || versionQ === 'classic') {
             const { data } = await axios.get(
                 `https://identitytoolkit.googleapis.com/v1/recaptchaParams?key=${apiKey}`,
@@ -849,7 +836,6 @@ async function getFirebaseRecaptchaParams(req, res) {
             });
         }
 
-        // v3 / Enterprise (score-based) — required for grecaptcha.enterprise / v3 phone auth
         const { data } = await axios.get(
             `https://identitytoolkit.googleapis.com/v2/recaptchaConfig?key=${apiKey}&clientType=${clientType}&version=RECAPTCHA_ENTERPRISE`,
             { timeout: 15000 }
@@ -865,13 +851,13 @@ async function getFirebaseRecaptchaParams(req, res) {
             enforcement === 'ENFORCEMENT_STATE_AUDIT' ||
             enforcement === 'ENFORCEMENT_STATE_ENFORCE';
 
-        // Firebase returns resource name: projects/{project}/keys/{keyId}
         const recaptchaKeyResource = data?.recaptchaKey || null;
         const keyId = recaptchaKeyResource
             ? String(recaptchaKeyResource).split('/').pop()
             : null;
 
-        // Optional: your own v3 site key (must be linked in Firebase / reCAPTCHA Enterprise)
+        // Prefer Firebase-managed Enterprise key.
+        // Wrong RECAPTCHA_V3_SITE_KEY in .env causes INVALID_APP_CREDENTIAL.
         const envSiteKey = String(process.env.RECAPTCHA_V3_SITE_KEY || '').trim() || null;
 
         if (!enterpriseEnabled || (!keyId && !envSiteKey)) {
@@ -884,11 +870,20 @@ async function getFirebaseRecaptchaParams(req, res) {
                     clientType,
                     phoneEnforcementState: enforcement,
                     recaptchaKeyResource,
-                    recaptchaSiteKey: envSiteKey,
+                    recaptchaSiteKey: keyId || envSiteKey,
+                    firebaseSiteKey: keyId,
+                    envSiteKey,
                     useSmsBotScore: data?.useSmsBotScore === true,
                     useSmsTollFraudProtection: data?.useSmsTollFraudProtection === true,
                 },
             });
+        }
+
+        if (envSiteKey && keyId && envSiteKey !== keyId) {
+            logger.info(
+                'RECAPTCHA_V3_SITE_KEY does not match Firebase Enterprise key; using Firebase key to avoid INVALID_APP_CREDENTIAL',
+                { envSiteKey, firebaseSiteKey: keyId }
+            );
         }
 
         return res.status(200).json({
@@ -897,9 +892,8 @@ async function getFirebaseRecaptchaParams(req, res) {
             data: {
                 version: 'v3',
                 clientType,
-                // Use with: grecaptcha.enterprise.execute(siteKey, {action:'login'})
-                // or Firebase-managed enterprise site key id
-                recaptchaSiteKey: envSiteKey || keyId,
+                // Must be Firebase project key (grecaptcha.enterprise.execute)
+                recaptchaSiteKey: keyId,
                 recaptchaKeyResource,
                 phoneEnforcementState: enforcement,
                 useSmsBotScore: data?.useSmsBotScore === true,
@@ -918,9 +912,18 @@ async function getFirebaseRecaptchaParams(req, res) {
 }
 
 /**
- * Send OTP via Firebase Phone Auth (v3 / Enterprise captcha only).
- * POST body: { mobile, country_code, recaptchaToken, clientType? }
- * recaptchaToken = token from grecaptcha.enterprise.execute(v3SiteKey)
+ * Send OTP via Firebase Phone Auth only.
+ * POST /Firebase/auth/login
+ * body: {
+ *   mobile, country_code,
+ *   recaptchaToken | captchaResponse,
+ *   recaptchaVersion?: 'v2' | 'classic' | 'enterprise' | 'v3' | 'auto',
+ *   clientType?: 'WEB' | 'ANDROID' | 'IOS',
+ *   playIntegrityToken?, iosReceipt?, iosSecret?
+ * }
+ *
+ * Classic v2 checkbox  → field `recaptchaToken` (from Firebase recaptchaParams)
+ * Enterprise / v3      → fields `captchaResponse` + clientType + RECAPTCHA_ENTERPRISE
  */
 async function sendFirebaseOtp(req, res) {
     try {
@@ -929,7 +932,12 @@ async function sendFirebaseOtp(req, res) {
             country_code = '+91',
             recaptchaToken,
             captchaResponse,
+            recaptchaVersion,
+            version,
             clientType,
+            playIntegrityToken,
+            iosReceipt,
+            iosSecret,
         } = req.body || {};
 
         if (!mobile || !country_code) {
@@ -960,8 +968,15 @@ async function sendFirebaseOtp(req, res) {
         }
 
         const token = String(captchaResponse || recaptchaToken || '').trim();
-        if (!token) {
-            return res.status(400).json({ success: false, message: 'recaptchaToken is required.' });
+        const integrity = String(playIntegrityToken || '').trim();
+        const receipt = String(iosReceipt || '').trim();
+        const secret = String(iosSecret || '').trim();
+
+        if (!token && !integrity && !(receipt && secret)) {
+            return res.status(400).json({
+                success: false,
+                message: 'recaptchaToken (or playIntegrityToken / iosReceipt+iosSecret) is required.',
+            });
         }
 
         const type = (() => {
@@ -971,32 +986,91 @@ async function sendFirebaseOtp(req, res) {
             return 'CLIENT_TYPE_WEB';
         })();
 
-        // Firebase Phone Auth + reCAPTCHA v3 => Enterprise fields only
-        // (RECAPTCHA_V3 enum does not exist; use RECAPTCHA_ENTERPRISE)
-        const payload = {
-            phoneNumber,
-            captchaResponse: token,
-            clientType: type,
-            recaptchaVersion: 'RECAPTCHA_ENTERPRISE',
+        const mode = String(recaptchaVersion || version || 'auto').toLowerCase();
+
+        const buildPayload = (useMode) => {
+            const payload = { phoneNumber };
+
+            if (integrity) {
+                payload.playIntegrityToken = integrity;
+                return payload;
+            }
+            if (receipt && secret) {
+                payload.iosReceipt = receipt;
+                payload.iosSecret = secret;
+                return payload;
+            }
+
+            // Classic Firebase checkbox captcha (getRecaptchaParams / version=v2)
+            if (useMode === 'v2' || useMode === 'classic' || useMode === 'recaptcha') {
+                payload.recaptchaToken = token;
+                return payload;
+            }
+
+            // reCAPTCHA Enterprise (Firebase Phone provider AUDIT/ENFORCE)
+            if (
+                useMode === 'enterprise' ||
+                useMode === 'v3' ||
+                useMode === 'recaptcha_enterprise' ||
+                useMode === 'recaptcha-enterprise'
+            ) {
+                payload.captchaResponse = token;
+                payload.clientType = type;
+                payload.recaptchaVersion = 'RECAPTCHA_ENTERPRISE';
+                return payload;
+            }
+
+            // auto: prefer classic — Enterprise tokens wrongly sent as classic still fail,
+            // but classic tokens sent as Enterprise cause INVALID_APP_CREDENTIAL (common case)
+            payload.recaptchaToken = token;
+            return payload;
         };
 
-        logger.info('sendFirebaseOtp v3/enterprise', {
-            phoneNumber,
-            clientType: type,
-            tokenLen: token.length,
-        });
+        const tryModes =
+            mode === 'auto' && token && !integrity && !(receipt && secret)
+                ? ['enterprise', 'classic'] // project has PHONE AUDIT → try enterprise first
+                : [mode === 'auto' ? 'enterprise' : mode];
 
-        const { data } = await axios.post(
-            `https://identitytoolkit.googleapis.com/v1/accounts:sendVerificationCode?key=${apiKey}`,
-            payload,
-            { timeout: 20000 }
-        );
+        let data = null;
+        let lastError = null;
+        let usedMode = tryModes[0];
 
-        const sessionInfo = data?.sessionInfo;
-        if (!sessionInfo) {
-            return res.status(400).json({ success: false, message: 'Failed to send OTP.', data });
+        for (const m of tryModes) {
+            const payload = buildPayload(m);
+            usedMode = m;
+            logger.info('sendFirebaseOtp', {
+                phoneNumber,
+                clientType: type,
+                mode: m,
+                tokenLen: token.length,
+                fields: Object.keys(payload),
+            });
+
+            try {
+                const resp = await axios.post(
+                    `https://identitytoolkit.googleapis.com/v1/accounts:sendVerificationCode?key=${apiKey}`,
+                    payload,
+                    { timeout: 20000 }
+                );
+                data = resp.data;
+                lastError = null;
+                break;
+            } catch (err) {
+                lastError = err;
+                const msg = String(err?.response?.data?.error?.message || '');
+                // Only fall through classic → enterprise (or reverse) on credential mismatch
+                if (!/INVALID_APP_CREDENTIAL|CAPTCHA|INVALID_RECAPTCHA|MALFORMED/i.test(msg)) {
+                    throw err;
+                }
+                logger.warn('sendFirebaseOtp mode failed, may retry', { mode: m, msg });
+            }
         }
 
+        if (!data?.sessionInfo) {
+            throw lastError || new Error('Failed to send OTP.');
+        }
+
+        const sessionInfo = data.sessionInfo;
         const currentDate = new Date();
         let sendattempt = 1;
         if (latestRecord) {
@@ -1018,7 +1092,7 @@ async function sendFirebaseOtp(req, res) {
         return res.status(200).json({
             success: true,
             message: 'OTP Send successful.',
-            data: { sessionInfo },
+            data: { sessionInfo, recaptchaMode: usedMode },
         });
     } catch (err) {
         const fbError = err?.response?.data?.error;
@@ -1026,12 +1100,15 @@ async function sendFirebaseOtp(req, res) {
         logger.error('sendFirebaseOtp error', fbError || err?.message || err);
 
         let hint = msg || 'Something Wrong in generate otp.';
-        if (/MISSING_CLIENT_IDENTIFIER/i.test(msg)) {
+        if (/INVALID_APP_CREDENTIAL/i.test(msg)) {
             hint =
-                'MISSING_CLIENT_IDENTIFIER: Phone Auth reCAPTCHA Enterprise/v3 is not enabled on this Firebase project. Enable Phone provider AUDIT/ENFORCE in Firebase Console, then use site key from GET /auth/firebase/recaptcha-params (v3).';
+                'INVALID_APP_CREDENTIAL: reCAPTCHA token rejected. Use Firebase site key from GET /Firebase/auth/recaptcha-params?version=v2 (checkbox) and send { recaptchaToken, recaptchaVersion: "v2" }. For Enterprise use grecaptcha.enterprise.execute with Firebase key and { captchaResponse, recaptchaVersion: "enterprise", clientType }. Also add your domain (or 127.0.0.1) under Firebase Console → Authentication → Settings → Authorized domains. Do not use a standalone Google reCAPTCHA key that is not linked to this Firebase project.';
+        } else if (/MISSING_CLIENT_IDENTIFIER/i.test(msg)) {
+            hint =
+                'MISSING_CLIENT_IDENTIFIER: Phone Auth reCAPTCHA Enterprise/v3 is not enabled. Enable Phone provider AUDIT/ENFORCE in Firebase Console, or use classic v2: GET /Firebase/auth/recaptcha-params?version=v2';
         } else if (/MALFORMED/i.test(msg)) {
             hint =
-                'MALFORMED: Token is not a valid Enterprise/v3 token for this project. Generate with grecaptcha.enterprise.execute(siteKey) using key from /auth/firebase/recaptcha-params.';
+                'MALFORMED: Token is not valid for this project. Generate with the site key from /Firebase/auth/recaptcha-params (same Firebase project as FIREBASE_WEB_API_KEY).';
         }
 
         return res.status(400).json({
@@ -1044,7 +1121,8 @@ async function sendFirebaseOtp(req, res) {
 
 /**
  * Verify OTP via Firebase Phone Auth only.
- * POST body: { mobile, country_code, otp, sessionInfo? }
+ * POST /Firebase/auth/verify-otp
+ * body: { mobile, country_code, otp, sessionInfo? }
  */
 async function verifyFirebaseOtp(req, res) {
     try {
