@@ -1286,9 +1286,9 @@ function resolveDocTypeNames(type) {
 }
 
 /**
- * Verify if a govt document already exists in onboardings.govt_id / pandits.govt_id
- * POST body: { token, type: 'Aadhaar Card'|'Passport'|'PAN Card'|'DL', value: '<document_number>' }
- * token → decode → mobile, country_code (used to scope onboarding search)
+ * Verify if a govt document already exists on another onboarding / pandit
+ * (excludes the caller's own mobile + country_code from token).
+ * POST body: { token, type, value }
  */
 async function verifyDocument(req, res) {
     try {
@@ -1359,16 +1359,24 @@ async function verifyDocument(req, res) {
             return matches;
         };
 
+        // Exclude caller's own record — only other users' docs count as duplicate
+        const excludeSelf = (qb) => {
+            qb.whereNot(function () {
+                this.where({ mobile, country_code });
+            });
+        };
+
         const onboardingRows = await db('onboardings')
             .select('id', 'mobile', 'country_code', 'display_name', 'status', 'govt_id')
             .whereNull('deleted_at')
-            .where({ mobile, country_code })
-            .whereNotNull('govt_id');
+            .whereNotNull('govt_id')
+            .modify(excludeSelf);
 
         const panditRows = await db('pandits')
             .select('id', 'mobile', 'country_code', 'display_name', 'status', 'govt_id')
             .whereNull('deleted_at')
-            .whereNotNull('govt_id');
+            .whereNotNull('govt_id')
+            .modify(excludeSelf);
 
         const matches = [
             ...collectMatches(onboardingRows, 'onboarding'),
