@@ -1286,14 +1286,28 @@ function resolveDocTypeNames(type) {
 }
 
 /**
- * Verify if a govt document already exists in onboardings.govt_id
- * POST body: { type: 'Aadhaar Card'|'Passport'|'PAN Card'|'DL', value: '<document_number>' }
+ * Verify if a govt document already exists in onboardings.govt_id / pandits.govt_id
+ * POST body: { token, type: 'Aadhaar Card'|'Passport'|'PAN Card'|'DL', value: '<document_number>' }
+ * token → decode → mobile, country_code (used to scope onboarding search)
  */
 async function verifyDocument(req, res) {
     try {
-        const { type, value } = req.body || {};
+        const { type, value, token } = req.body || {};
+        if (!token) {
+            return res.status(400).json({ success: false, message: 'token is required.' });
+        }
         if (!type || value === undefined || value === null || String(value).trim() === '') {
             return res.status(400).json({ success: false, message: 'type and value are required.' });
+        }
+
+        const tokenData = decodeJWT(`Bearer ${token}`);
+        if (!tokenData?.success) {
+            return res.status(400).json({ success: false, message: 'Invalid token.' });
+        }
+        const mobile = tokenData?.data?.mobile;
+        const country_code = tokenData?.data?.country_code;
+        if (!mobile || !country_code) {
+            return res.status(400).json({ success: false, message: 'Invalid token payload.' });
         }
 
         const allowedTypes = ['Aadhaar Card', 'Passport', 'PAN Card', 'DL'];
@@ -1313,38 +1327,53 @@ async function verifyDocument(req, res) {
             return res.status(400).json({ success: false, message: 'value is required.' });
         }
 
-        const rows = await db('onboardings')
+        const collectMatches = (rows, source) => {
+            const matches = [];
+            for (const row of rows) {
+                let docs = [];
+                try {
+                    docs = row.govt_id ? deepParse(row.govt_id) : [];
+                } catch (e) {
+                    continue;
+                }
+                if (!Array.isArray(docs)) continue;
+
+                for (const doc of docs) {
+                    const docName = String(doc?.document_name || doc?.label || '').trim().toLowerCase();
+                    const docNumber = normalizeDocNumber(doc?.document_number || doc?.value);
+                    if (!docName || !docNumber) continue;
+                    if (typeNames.includes(docName) && docNumber === valueNorm) {
+                        matches.push({
+                            source,
+                            id: row.id,
+                            mobile: row.mobile,
+                            country_code: row.country_code,
+                            display_name: row.display_name,
+                            status: row.status,
+                            document_name: doc.document_name || doc.label,
+                            document_number: doc.document_number || doc.value,
+                        });
+                    }
+                }
+            }
+            return matches;
+        };
+
+        const onboardingRows = await db('onboardings')
+            .select('id', 'mobile', 'country_code', 'display_name', 'status', 'govt_id')
+            .whereNull('deleted_at')
+            .where({ mobile, country_code })
+            .whereNotNull('govt_id');
+
+        const panditRows = await db('pandits')
             .select('id', 'mobile', 'country_code', 'display_name', 'status', 'govt_id')
             .whereNull('deleted_at')
             .whereNotNull('govt_id');
 
-        const matches = [];
-        for (const row of rows) {
-            let docs = [];
-            try {
-                docs = row.govt_id ? deepParse(row.govt_id) : [];
-            } catch (e) {
-                continue;
-            }
-            if (!Array.isArray(docs)) continue;
-
-            for (const doc of docs) {
-                const docName = String(doc?.document_name || doc?.label || '').trim().toLowerCase();
-                const docNumber = normalizeDocNumber(doc?.document_number || doc?.value);
-                if (!docName || !docNumber) continue;
-                if (typeNames.includes(docName) && docNumber === valueNorm) {
-                    matches.push({
-                        onboarding_id: row.id,
-                        mobile: row.mobile,
-                        country_code: row.country_code,
-                        display_name: row.display_name,
-                        status: row.status,
-                        document_name: doc.document_name || doc.label,
-                        document_number: doc.document_number,
-                    });
-                }
-            }
-        }
+        const matches = [
+            ...collectMatches(onboardingRows, 'onboarding'),
+            ...collectMatches(panditRows, 'pandit'),
+        ];
 
         if (matches.length === 0) {
             return res.status(200).json({
