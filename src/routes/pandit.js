@@ -33,6 +33,7 @@ router.get('/detail', pandits.getPanditDetail);
 router.post('/signup', pandits.signup);
 router.post('/verifyOtp', pandits.verifyOtp);
 router.post('/reSendOtp', pandits.reSendOtp);
+router.post('/verifyDocument', pandits.verifyDocument);
 router.post('/submitOnboard', pandits.submitOnboard);
 
 router.post('/basicOnboard',

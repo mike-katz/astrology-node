@@ -1260,4 +1260,109 @@ async function submitOnboard(req, res) {
         res.status(500).json({ success: false, message: 'Server error' });
     }
 }
-module.exports = { getPandits, onboard, signup, verifyOtp, reSendOtp, getPanditDetail, getReviewList, uploadImage, submitOnboard, basicOnboard };
+
+const GOVT_DOC_TYPE_ALIASES = {
+    'aadhaar card': ['aadhaar card', 'aadhar card', 'aadhaar', 'aadhar'],
+    'pan card': ['pan card', 'pan'],
+    'passport': ['passport'],
+    'dl': ['dl', 'driving license', 'driving licence', 'driving license card', 'driving licence card'],
+};
+
+function normalizeDocNumber(value) {
+    return String(value || '')
+        .replace(/\s+/g, '')
+        .replace(/-/g, '')
+        .toUpperCase();
+}
+
+function resolveDocTypeNames(type) {
+    const key = String(type || '').trim().toLowerCase();
+    if (GOVT_DOC_TYPE_ALIASES[key]) return GOVT_DOC_TYPE_ALIASES[key];
+    // allow exact labels like "Aadhaar Card"
+    for (const aliases of Object.values(GOVT_DOC_TYPE_ALIASES)) {
+        if (aliases.includes(key)) return aliases;
+    }
+    return key ? [key] : [];
+}
+
+/**
+ * Verify if a govt document already exists in onboardings.govt_id
+ * POST body: { type: 'Aadhaar Card'|'Passport'|'PAN Card'|'DL', value: '<document_number>' }
+ */
+async function verifyDocument(req, res) {
+    try {
+        const { type, value } = req.body || {};
+        if (!type || value === undefined || value === null || String(value).trim() === '') {
+            return res.status(400).json({ success: false, message: 'type and value are required.' });
+        }
+
+        const allowedTypes = ['Aadhaar Card', 'Passport', 'PAN Card', 'DL'];
+        const typeNorm = String(type).trim();
+        const isAllowed = allowedTypes.some((t) => t.toLowerCase() === typeNorm.toLowerCase())
+            || Object.keys(GOVT_DOC_TYPE_ALIASES).includes(typeNorm.toLowerCase());
+        if (!isAllowed) {
+            return res.status(400).json({
+                success: false,
+                message: 'type must be one of: Aadhaar Card, Passport, PAN Card, DL',
+            });
+        }
+
+        const typeNames = resolveDocTypeNames(typeNorm);
+        const valueNorm = normalizeDocNumber(value);
+        if (!valueNorm) {
+            return res.status(400).json({ success: false, message: 'value is required.' });
+        }
+
+        const rows = await db('onboardings')
+            .select('id', 'mobile', 'country_code', 'display_name', 'status', 'govt_id')
+            .whereNull('deleted_at')
+            .whereNotNull('govt_id');
+
+        const matches = [];
+        for (const row of rows) {
+            let docs = [];
+            try {
+                docs = row.govt_id ? deepParse(row.govt_id) : [];
+            } catch (e) {
+                continue;
+            }
+            if (!Array.isArray(docs)) continue;
+
+            for (const doc of docs) {
+                const docName = String(doc?.document_name || doc?.label || '').trim().toLowerCase();
+                const docNumber = normalizeDocNumber(doc?.document_number || doc?.value);
+                if (!docName || !docNumber) continue;
+                if (typeNames.includes(docName) && docNumber === valueNorm) {
+                    matches.push({
+                        onboarding_id: row.id,
+                        mobile: row.mobile,
+                        country_code: row.country_code,
+                        display_name: row.display_name,
+                        status: row.status,
+                        document_name: doc.document_name || doc.label,
+                        document_number: doc.document_number,
+                    });
+                }
+            }
+        }
+
+        if (matches.length === 0) {
+            return res.status(200).json({
+                success: true,
+                data: { exists: false, matches: [] },
+                message: 'Document not found.',
+            });
+        }
+
+        return res.status(200).json({
+            success: true,
+            data: { exists: true, matches },
+            message: 'Document already exists.',
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
+module.exports = { getPandits, onboard, signup, verifyOtp, reSendOtp, getPanditDetail, getReviewList, uploadImage, submitOnboard, basicOnboard, verifyDocument };
