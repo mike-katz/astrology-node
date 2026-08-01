@@ -1120,6 +1120,8 @@ async function getOrderDetail(req, res) {
                 chat: feedbacks,
                 logs,
                 pooja_type: pooja?.pooja_type,
+                pooja_time: pooja?.pooja_time,
+                location: pooja?.location,
                 duration: pooja?.duration,
                 image: getFirstImage(pooja?.image),
             },
