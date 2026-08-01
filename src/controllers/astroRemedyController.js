@@ -181,7 +181,7 @@ async function getRemedyDetail(req, res) {
                 'p.price_array',
                 'p.description',
                 'p.location',
-                'p,pooja_time',
+                'p.pooja_time',
                 'p.created_at',
                 'r.name as remedy_name',
                 'r.image as remedy_image',
@@ -212,7 +212,10 @@ async function getRemedyDetail(req, res) {
             .where({ 'ar.pooja_id': Number(id), 'ar.status': 'approved' })
             .orderBy('ar.id', 'desc');
 
-        const faqs = await db('faqs').where({ type: item.pooja_type })
+        const faqs = await db('remedy_faqs')
+            .where({ type: item.pooja_type })
+            .whereNull('deleted_at')
+            .orderBy('id', 'desc');
         const data = {
             id: item.id,
             remedy_id: item.remedy_id,
