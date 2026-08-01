@@ -413,7 +413,12 @@ async function createOrder(req, res) {
             .first();
 
         const finalAmount = convertCurrency(finalAmountInr, currencyData?.user_inr_rate || 1);
-        if (Number(user?.balance) < finalAmount) {
+        let ashirvadAmt = 0
+        if (isAshirvad) {
+            const setting = await db('settings').select('ashirvad_price').first();
+            ashirvadAmt = convertCurrency(setting?.ashirvad_price, currencyData?.user_inr_rate || 1);
+        }
+        if (Number(user?.balance) < (Number(finalAmount) + Number(ashirvadAmt))) {
             return res.status(400).json({ success: false, message: 'Insufficient wallet balance. Please recharge.' });
         }
 
@@ -429,7 +434,16 @@ async function createOrder(req, res) {
                 orderId,
                 panditId
             );
-
+            if (ashirvadAmt > 0) {
+                await deductUserBalance(
+                    trx,
+                    req.userId,
+                    ashirvadAmt,
+                    `Remedy Ashirvad - ${pooja.name}`,
+                    orderId,
+                    panditId
+                );
+            }
             [savedOrder] = await trx('remedy_orders').insert({
                 order_id: orderId,
                 user_id: req.userId,
