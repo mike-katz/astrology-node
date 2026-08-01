@@ -119,6 +119,8 @@ function formatOrderRow(order) {
         completed_at: order.completed_at,
         cancelled_at: order.cancelled_at,
         created_at: order.created_at,
+        ashirvad_amount: order.ashirvad_amount,
+        is_ashirvad: order.is_ashirvad,
     };
 }
 
