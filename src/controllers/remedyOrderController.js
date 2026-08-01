@@ -338,9 +338,7 @@ async function createOrder(req, res) {
         const isAshirvad = is_ashirvad === true
             || is_ashirvad === 'true'
             || is_ashirvad === 1
-            || is_ashirvad === '1'
-            || pooja.is_ashirvad === true
-            || pooja.category_is_ashirvad === true;
+            || is_ashirvad === '1';
 
         let ashirvadData = {
             is_ashirvad: false,
