@@ -373,6 +373,7 @@ async function createOrder(req, res) {
                 mobile: String(mobile).trim(),
             };
         }
+        let status = 'pending';
 
         const isSamuhik = String(pooja.pooja_type || '').toLowerCase() === 'samuhik';
         let personCount = null;
@@ -381,6 +382,7 @@ async function createOrder(req, res) {
         let finalAmountInr = Math.max(amount - discount, 0);
 
         if (isSamuhik) {
+            status = 'accepted'
             if (person == null || person === '') {
                 return res.status(400).json({ success: false, message: 'Person count is required for samuhik pooja.' });
             }
@@ -458,7 +460,7 @@ async function createOrder(req, res) {
                 final_amount: finalAmount,
                 currency,
                 ashirvad_amount: ashirvadAmt,
-                status: 'pending',
+                status,
                 person: personCount,
                 is_user_chat_allow: true,
                 is_pandit_chat_allow: true,
