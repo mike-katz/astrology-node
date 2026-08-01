@@ -455,6 +455,7 @@ async function createOrder(req, res) {
                 discount,
                 final_amount: finalAmount,
                 currency,
+                ashirvad_amount: ashirvadAmt,
                 status: 'pending',
                 person: personCount,
                 is_user_chat_allow: true,
