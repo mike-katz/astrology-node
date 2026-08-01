@@ -514,9 +514,9 @@ async function addUserInstruction(req, res) {
         if (!order || order.user_id !== Number(req.userId)) {
             return res.status(400).json({ success: false, message: 'Order not found.' });
         }
-        if (!['pending', 'approved'].includes(order.status)) {
-            return res.status(400).json({ success: false, message: 'Instruction can only be added for pending or approved orders.' });
-        }
+        // if (!['pending', 'approved'].includes(order.status)) {
+        //     return res.status(400).json({ success: false, message: 'Instruction can only be added for pending or approved orders.' });
+        // }
         if (order.is_user_chat_allow === false) {
             return res.status(400).json({ success: false, message: 'Chat is not allowed for this order.' });
         }

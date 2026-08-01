@@ -296,7 +296,7 @@ async function verifyOtp(req, res) {
         const mode = type ? type : 'APP';
         const upd = {}
         if (existing && version) {
-            upd.version = version
+            upd.version = Math.round(Number(version));
         }
         if (mode) {
             upd.mode = mode
