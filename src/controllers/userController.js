@@ -607,7 +607,7 @@ async function getCurrencyList(req, res) {
         const authHeader = req.headers.authorization;
         const tokenData = decodeJWT(authHeader);
         const result = tokenData?.currency !== 'INR'
-            ? await db('currency').select('*').whereNull('deleted_at')
+            ? await db('currency').select('*').where({ status: "active" }).whereNull('deleted_at')
             : [];
 
         result?.map(item => {
