@@ -304,7 +304,8 @@ async function createOrder(req, res) {
             address,
             landmark,
             mobile,
-            person_name
+            person_name,
+            message
         } = req.body;
 
         if (!pooja_id) {
@@ -445,6 +446,18 @@ async function createOrder(req, res) {
                 is_user_chat_allow: true,
                 is_pandit_chat_allow: true,
                 ...ashirvadData,
+            }).returning('*');
+
+            await trx('remedy_order_chat').insert({
+                remedy_order_id: savedOrder.id,
+                user_id: Number(req.userId),
+                pandit_id: null,
+                admin_id: null,
+                type: 'text',
+                user_type: 'user',
+                message,
+                created_at: new Date(),
+                updated_at: new Date(),
             }).returning('*');
         });
 
