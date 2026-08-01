@@ -101,6 +101,8 @@ function formatOrderRow(order) {
         status: order.status,
         pandit_instructions: order.pandit_instructions,
         user_instruction: order.user_instruction,
+        is_user_chat_allow: order.is_user_chat_allow !== false,
+        is_pandit_chat_allow: order.is_pandit_chat_allow !== false,
         is_ashirvad: order.is_ashirvad || false,
         person: order.person != null ? Number(order.person) : null,
         pincode: order.pincode || null,
@@ -442,6 +444,8 @@ async function createOrder(req, res) {
                 currency,
                 status: 'pending',
                 person: personCount,
+                is_user_chat_allow: true,
+                is_pandit_chat_allow: true,
                 ...ashirvadData,
             }).returning('*');
         });
@@ -470,9 +474,10 @@ async function createOrder(req, res) {
 
 async function addUserInstruction(req, res) {
     try {
-        const { order_id, user_instruction } = req.body;
-        if (!order_id || !user_instruction?.trim()) {
-            return res.status(400).json({ success: false, message: 'Order id and user instruction are required.' });
+        const { order_id, message } = req.body;
+        const text = String(message || '').trim();
+        if (!order_id || !text) {
+            return res.status(400).json({ success: false, message: 'Order id and message are required.' });
         }
 
         const order = await getOrderByQuery(order_id);
@@ -482,15 +487,27 @@ async function addUserInstruction(req, res) {
         if (!['pending', 'approved'].includes(order.status)) {
             return res.status(400).json({ success: false, message: 'Instruction can only be added for pending or approved orders.' });
         }
+        if (order.is_user_chat_allow === false) {
+            return res.status(400).json({ success: false, message: 'Chat is not allowed for this order.' });
+        }
 
-        const [updated] = await db('remedy_orders').where({ id: order.id }).update({
-            user_instruction: user_instruction.trim(),
+        const [chat] = await db('remedy_order_chat').insert({
+            remedy_order_id: order.id,
+            user_id: Number(req.userId),
+            pandit_id: null,
+            admin_id: null,
+            type: 'user',
+            message: text,
+            created_at: new Date(),
             updated_at: new Date(),
         }).returning('*');
 
         return res.status(200).json({
             success: true,
-            data: formatOrderRow(updated),
+            data: {
+                ...formatOrderRow(order),
+                chat,
+            },
             message: 'User instruction added successfully.',
         });
     } catch (err) {
