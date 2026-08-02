@@ -504,7 +504,7 @@ async function createOrder(req, res) {
 
 async function addUserInstruction(req, res) {
     try {
-        const { order_id, message } = req.body;
+        const { order_id, message, type = "text" } = req.body;
         const text = String(message || '').trim();
         if (!order_id || !text) {
             return res.status(400).json({ success: false, message: 'Order id and message are required.' });
@@ -526,7 +526,7 @@ async function addUserInstruction(req, res) {
             user_id: Number(req.userId),
             pandit_id: null,
             admin_id: null,
-            type: 'text',
+            type,
             user_type: 'user',
             message: text,
             created_at: new Date(),
