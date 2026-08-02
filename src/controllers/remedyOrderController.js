@@ -214,7 +214,7 @@ async function refundUserBalance(trx, userId, amount, message, orderId, panditId
 async function creditPanditBalance(trx, panditId, amount, message, orderId, userId, userName) {
     const pandit = await trx('pandits').where({ id: panditId }).forUpdate().first();
     if (!pandit) throw new Error('PANDIT_NOT_FOUND');
-    const newBalance = Number(pandit.balance || 0) + amount;
+    const newBalance = Number(pandit.balance || 0) + Number(amount);
     await trx('pandits').where({ id: panditId }).update({ balance: newBalance });
     await trx('balancelogs').where({ order_id: orderId })
         .andWhere('message', 'ilike', `%Remedy order%`)
