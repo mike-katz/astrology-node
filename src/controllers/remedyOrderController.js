@@ -474,6 +474,8 @@ async function createOrder(req, res) {
         // wallet cut: (inr / pandit_inr_rate) * user_inr_rate
         const finalCharge = calculateUserChargeAmount(finalAmountInr, panditInrRate, userInrRate);
         const ashirvadCharge = calculateUserChargeAmount(ashirvadAmtInr, panditInrRate, userInrRate);
+        const amt = calculateUserChargeAmount(amount, panditInrRate, userInrRate);
+        const less = calculateUserChargeAmount(discount, panditInrRate, userInrRate);
         const totalCharge = Number(finalCharge) + Number(ashirvadCharge);
 
         if (Number(user?.balance) < totalCharge) {
@@ -512,9 +514,9 @@ async function createOrder(req, res) {
                 remedy_id: pooja.remedy_id,
                 pooja_name: pooja.name,
                 pooja_type: pooja.pooja_type || null,
-                amount,
-                discount,
-                final_amount: finalAmountInr,
+                amount: amt,
+                discount: less,
+                final_amount: finalCharge,
                 currency: displayCurrency || 'INR',
                 ashirvad_amount: ashirvadAmtInr,
                 status,
