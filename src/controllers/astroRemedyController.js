@@ -222,7 +222,7 @@ async function getRemedyDetail(req, res) {
             .select('currency_name', 'user_inr_rate', 'pandit_inr_rate')
             .where({ currency_name: currency })
             .first();
-        const rate = currencyData?.user_inr_rate || currencyData?.pandit_inr_rate || 1;
+        const rate = currencyData?.pandit_inr_rate || 1;
         const symbol = getCurrencySymbolByCurrency(currency);
 
         const reviews = await db('astroremedireviews as ar')
