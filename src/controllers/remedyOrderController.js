@@ -1102,7 +1102,8 @@ async function getOrderDetail(req, res) {
             return res.status(400).json({ success: false, message: 'Order not found.' });
         }
 
-        const feedbacks = await db('remedy_order_chat').where({ remedy_order_id: order.id });
+
+        const feedbacks = await db('remedy_order_chat').where({ remedy_order_id: order.id }).orderBy('id', 'desc');
         const logs = await db('remedy_order_logs as rol')
             .leftJoin('pandits as p', 'p.id', 'rol.pandit_id')
             .select(
