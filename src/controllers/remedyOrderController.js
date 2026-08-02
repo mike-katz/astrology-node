@@ -1058,11 +1058,11 @@ async function getUserOrders(req, res) {
 
         const currencyCodes = [...new Set(rows.map((r) => r.currency || 'INR'))];
         const currencyRows = await db('currency')
-            .select('currency_name', 'pandit_inr_rate')
+            .select('currency_name', 'user_inr_rate')
             .whereIn('currency_name', currencyCodes);
         const rateMap = {};
         for (const c of currencyRows) {
-            rateMap[c.currency_name] = Number(c.pandit_inr_rate || 1);
+            rateMap[c.currency_name] = Number(c.user_inr_rate || 1);
         }
 
         const results = rows.map((row) => {
@@ -1203,12 +1203,12 @@ async function getOrderDetail(req, res) {
         if (isUser) {
             const code = order.currency || 'INR';
             const currencyData = await db('currency')
-                .select('pandit_inr_rate')
+                .select('user_inr_rate')
                 .where({ currency_name: code })
                 .first();
             orderData = formatOrderRowDisplay(
                 order,
-                currencyData?.pandit_inr_rate || 1,
+                currencyData?.user_inr_rate || 1,
                 getCurrencySymbolByCurrency(code)
             );
         }
