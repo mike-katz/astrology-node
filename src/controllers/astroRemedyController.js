@@ -1,6 +1,14 @@
 const db = require('../db');
-const { deepParse } = require('../utils/decodeJWT');
+const { deepParse, convertCurrency } = require('../utils/decodeJWT');
 const { createOrder } = require('./remedyOrderController');
+const { getCurrencySymbolByCurrency } = require('../utils/countryCurrencyMap');
+require('dotenv').config();
+
+async function resolveUserCurrency(req) {
+    if (!req.userId) return 'INR';
+    const userData = await db('users').select('default_currency').where({ id: Number(req.userId) }).first();
+    return userData?.default_currency || 'INR';
+}
 
 function getFirstImage(image) {
     if (!image) return null;
@@ -100,6 +108,15 @@ async function getRemedyItems(req, res) {
             return res.status(400).json({ success: false, message: 'Astro remedy not found.' });
         }
 
+        const currency = await resolveUserCurrency(req);
+        const currencyData = await db('currency')
+            .select('currency_name', 'user_inr_rate', 'pandit_inr_rate')
+            .where({ currency_name: currency })
+            .first();
+        // same convert pattern as pandit list; user-facing prices use user_inr_rate (checkout)
+        const rate = currencyData?.user_inr_rate || currencyData?.pandit_inr_rate || 1;
+        const symbol = getCurrencySymbolByCurrency(currency);
+
         const filter = {
             remedy_id: Number(remedy_id),
             status: true,
@@ -127,8 +144,9 @@ async function getRemedyItems(req, res) {
             id: item.id,
             remedy_id: item.remedy_id,
             name: item.name,
-            amount: Number(item.amount),
-            discount: Number(item.discount || 0),
+            amount: convertCurrency(item.amount, rate),
+            discount: convertCurrency(item.discount || 0, rate),
+            currency: symbol,
             image: getFirstImage(item.image),
         }));
 
@@ -139,6 +157,7 @@ async function getRemedyItems(req, res) {
                 limit,
                 total,
                 totalPages,
+                currency: symbol,
                 remedy: {
                     id: remedy.id,
                     name: remedy.name,
