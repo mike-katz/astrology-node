@@ -126,6 +126,33 @@ function formatOrderRow(order) {
     };
 }
 
+/** DB amounts are INR — convert for API display */
+function formatOrderRowDisplay(order, rate = 1, symbol = '₹') {
+    const row = formatOrderRow(order);
+    return {
+        ...row,
+        amount: convertCurrency(row.amount, rate),
+        discount: convertCurrency(row.discount || 0, rate),
+        final_amount: convertCurrency(row.final_amount || 0, rate),
+        ashirvad_amount: convertCurrency(row.ashirvad_amount || 0, rate),
+        currency: symbol,
+    };
+}
+
+async function getUserDisplayRate(userId) {
+    const user = await db('users').select('default_currency').where({ id: Number(userId) }).first();
+    const currency = user?.default_currency || 'INR';
+    const currencyData = await db('currency')
+        .select('currency_name', 'user_inr_rate')
+        .where({ currency_name: currency })
+        .first();
+    return {
+        currency,
+        rate: currencyData?.user_inr_rate || 1,
+        symbol: getCurrencySymbolByCurrency(currency),
+    };
+}
+
 async function deductUserBalance(trx, userId, amount, message, orderId, panditId, currency = 'INR') {
     console.log("userId, amount, message, orderId, panditId", userId, amount, message, orderId, panditId);
     const user = await trx('users').where({ id: userId }).forUpdate().first();
@@ -411,19 +438,21 @@ async function createOrder(req, res) {
         }
 
         const user = await db('users').where({ id: req.userId }).first();
-        const currency = user?.default_currency || 'INR';
+        const displayCurrency = user?.default_currency || 'INR';
         const currencyData = await db('currency')
             .select('currency_name', 'user_inr_rate')
-            .where({ currency_name: currency })
+            .where({ currency_name: displayCurrency })
             .first();
+        const rate = currencyData?.user_inr_rate || 1;
 
-        const finalAmount = convertCurrency(finalAmountInr, currencyData?.user_inr_rate || 1);
-        let ashirvadAmt = 0
+        let ashirvadAmtInr = 0;
         if (isAshirvad) {
             const setting = await db('settings').select('ashirvad_price').first();
-            ashirvadAmt = convertCurrency(setting?.ashirvad_price, currencyData?.user_inr_rate || 1);
+            ashirvadAmtInr = Number(setting?.ashirvad_price || 0);
         }
-        if (Number(user?.balance) < (Number(finalAmount) + Number(ashirvadAmt))) {
+
+        const totalInr = Number(finalAmountInr) + Number(ashirvadAmtInr);
+        if (Number(user?.balance) < totalInr) {
             return res.status(400).json({ success: false, message: 'Insufficient wallet balance. Please recharge.' });
         }
 
@@ -434,21 +463,21 @@ async function createOrder(req, res) {
             await deductUserBalance(
                 trx,
                 req.userId,
-                finalAmount,
+                finalAmountInr,
                 `Remedy order - ${pooja.name}`,
                 orderId,
                 panditId,
-                currency
+                'INR'
             );
-            if (ashirvadAmt > 0) {
+            if (ashirvadAmtInr > 0) {
                 await deductUserBalance(
                     trx,
                     req.userId,
-                    ashirvadAmt,
+                    ashirvadAmtInr,
                     `Remedy Ashirvad - ${pooja.name}`,
                     orderId,
                     panditId,
-                    currency
+                    'INR'
                 );
             }
             [savedOrder] = await trx('remedy_orders').insert({
@@ -461,9 +490,9 @@ async function createOrder(req, res) {
                 pooja_type: pooja.pooja_type || null,
                 amount,
                 discount,
-                final_amount: finalAmount,
-                currency,
-                ashirvad_amount: ashirvadAmt,
+                final_amount: finalAmountInr,
+                currency: 'INR',
+                ashirvad_amount: ashirvadAmtInr,
                 status,
                 person: personCount,
                 is_user_chat_allow: true,
@@ -494,7 +523,7 @@ async function createOrder(req, res) {
 
         return res.status(200).json({
             success: true,
-            data: formatOrderRow(savedOrder),
+            data: formatOrderRowDisplay(savedOrder, rate, getCurrencySymbolByCurrency(displayCurrency)),
             message: 'Remedy order created successfully.',
         });
     } catch (err) {
@@ -791,7 +820,7 @@ async function rejectOrder(req, res) {
                 `Remedy order refund - ${order.pooja_name}`,
                 order.order_id,
                 order.pandit_id,
-                order.currency || 'INR'
+                'INR'
             );
         });
 
@@ -838,7 +867,7 @@ async function cancelOrder(req, res) {
                 `Remedy order cancelled - ${order.pooja_name}`,
                 order.order_id,
                 order.pandit_id,
-                order.currency || 'INR'
+                'INR'
             );
 
             if (order?.ashirvad_amount > 0) {
@@ -849,7 +878,7 @@ async function cancelOrder(req, res) {
                     `Refund Ashirvad - ${order.pooja_name}`,
                     order.order_id,
                     order.pandit_id,
-                    order.currency || 'INR'
+                    'INR'
                 );
             }
         });
@@ -1007,21 +1036,13 @@ async function getUserOrders(req, res) {
         const [{ count }] = await countQuery.count('* as count');
         const total = parseInt(count, 10);
 
-        const results = rows.map((row) => {
-            const formatted = formatOrderRow(row);
-            return {
-                ...formatted,
-                amount: convertCurrency(row.amount, rate),
-                discount: convertCurrency(row.discount || 0, rate),
-                final_amount: convertCurrency(row.final_amount || 0, rate),
-                ashirvad_amount: convertCurrency(row.ashirvad_amount || 0, rate),
-                currency: symbol,
-                pandit_name: row.pandit_name,
-                pandit_profile: row.pandit_profile,
-                duration: row.duration,
-                image: getFirstImage(row.image),
-            };
-        });
+        const results = rows.map((row) => ({
+            ...formatOrderRowDisplay(row, rate, symbol),
+            pandit_name: row.pandit_name,
+            pandit_profile: row.pandit_profile,
+            duration: row.duration,
+            image: getFirstImage(row.image),
+        }));
 
         return res.status(200).json({
             success: true,
@@ -1145,10 +1166,16 @@ async function getOrderDetail(req, res) {
             .where({ "rol.order_id": order.order_id });
         const pooja = await db('astroremedypoojas').where({ id: order.pooja_id }).first();
 
+        let orderData = formatOrderRow(order);
+        if (isUser) {
+            const { rate, symbol } = await getUserDisplayRate(req.userId);
+            orderData = formatOrderRowDisplay(order, rate, symbol);
+        }
+
         return res.status(200).json({
             success: true,
             data: {
-                ...formatOrderRow(order),
+                ...orderData,
                 pandit_name: order.pandit_name,
                 pandit_profile: order.pandit_profile,
                 user_name: order.user_name,
@@ -1157,7 +1184,7 @@ async function getOrderDetail(req, res) {
                 total_orders: Number(order.total_orders || 0),
                 chat: feedbacks,
                 logs,
-                pooja_type: pooja?.pooja_type,
+                pooja_type: pooja?.pooja_type || order.pooja_type,
                 pooja_time: pooja?.pooja_time,
                 location: pooja?.location,
                 duration: pooja?.duration,
