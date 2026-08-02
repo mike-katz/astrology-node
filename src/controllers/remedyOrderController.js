@@ -126,7 +126,7 @@ function formatOrderRow(order) {
     };
 }
 
-async function deductUserBalance(trx, userId, amount, message, orderId, panditId) {
+async function deductUserBalance(trx, userId, amount, message, orderId, panditId, currency = 'INR') {
     console.log("userId, amount, message, orderId, panditId", userId, amount, message, orderId, panditId);
     const user = await trx('users').where({ id: userId }).forUpdate().first();
     if (!user || Number(user.balance) < amount) {
@@ -137,17 +137,18 @@ async function deductUserBalance(trx, userId, amount, message, orderId, panditId
     await trx('balancelogs').insert({
         order_id: orderId,
         user_id: userId,
+        pandit_id: panditId || null,
         user_old_balance: Number(user.balance),
         user_new_balance: newBalance,
         amount: -amount,
         message,
-        currency: user.default_currency || 'INR',
-        type: "remedy"
+        currency: currency || user.default_currency || 'INR',
+        type: 'remedy',
     });
     return { user, newBalance };
 }
 
-async function refundUserBalance(trx, userId, amount, message, orderId, panditId) {
+async function refundUserBalance(trx, userId, amount, message, orderId, panditId, currency = 'INR') {
     const user = await trx('users').where({ id: userId }).forUpdate().first();
     if (!user) throw new Error('USER_NOT_FOUND');
     const newBalance = Number(user.balance) + amount;
@@ -155,11 +156,13 @@ async function refundUserBalance(trx, userId, amount, message, orderId, panditId
     await trx('balancelogs').insert({
         order_id: orderId,
         user_id: userId,
+        pandit_id: panditId || null,
         user_old_balance: Number(user.balance),
         user_new_balance: newBalance,
         amount,
         message,
-        currency: user.default_currency || 'INR',
+        currency: currency || user.default_currency || 'INR',
+        type: 'remedy',
     });
     return { user, newBalance };
 }
@@ -434,7 +437,8 @@ async function createOrder(req, res) {
                 finalAmount,
                 `Remedy order - ${pooja.name}`,
                 orderId,
-                panditId
+                panditId,
+                currency
             );
             if (ashirvadAmt > 0) {
                 await deductUserBalance(
@@ -443,7 +447,8 @@ async function createOrder(req, res) {
                     ashirvadAmt,
                     `Remedy Ashirvad - ${pooja.name}`,
                     orderId,
-                    panditId
+                    panditId,
+                    currency
                 );
             }
             [savedOrder] = await trx('remedy_orders').insert({
@@ -785,7 +790,8 @@ async function rejectOrder(req, res) {
                 Number(order.final_amount),
                 `Remedy order refund - ${order.pooja_name}`,
                 order.order_id,
-                order.pandit_id
+                order.pandit_id,
+                order.currency || 'INR'
             );
         });
 
@@ -831,7 +837,8 @@ async function cancelOrder(req, res) {
                 Number(order.final_amount),
                 `Remedy order cancelled - ${order.pooja_name}`,
                 order.order_id,
-                order.pandit_id
+                order.pandit_id,
+                order.currency || 'INR'
             );
 
             if (order?.ashirvad_amount > 0) {
@@ -841,7 +848,8 @@ async function cancelOrder(req, res) {
                     Number(order.ashirvad_amount),
                     `Refund Ashirvad - ${order.pooja_name}`,
                     order.order_id,
-                    order.pandit_id
+                    order.pandit_id,
+                    order.currency || 'INR'
                 );
             }
         });
