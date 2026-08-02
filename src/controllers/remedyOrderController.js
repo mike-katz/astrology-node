@@ -886,26 +886,25 @@ async function cancelOrder(req, res) {
                 updated_at: new Date(),
             }).returning('*');
 
-            const { finalCharge, ashirvadCharge, currency } = await getOrderChargeAmounts(order);
             await refundUserBalance(
                 trx,
                 order.user_id,
-                finalCharge,
+                order.final_amount,
                 `Remedy order cancelled - ${order.pooja_name}`,
                 order.order_id,
                 order.pandit_id,
-                currency
+                order?.currency
             );
 
-            if (ashirvadCharge > 0) {
+            if (order?.ashirvad_amount > 0) {
                 await refundUserBalance(
                     trx,
                     order.user_id,
-                    ashirvadCharge,
+                    order?.ashirvad_amount,
                     `Refund Ashirvad - ${order.pooja_name}`,
                     order.order_id,
                     order.pandit_id,
-                    currency
+                    order?.currency
                 );
             }
         });
