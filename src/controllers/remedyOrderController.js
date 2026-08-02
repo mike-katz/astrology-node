@@ -836,6 +836,17 @@ async function cancelOrder(req, res) {
                 order.order_id,
                 order.pandit_id
             );
+
+            if (ashirvad_amount > 0) {
+                await refundUserBalance(
+                    trx,
+                    order.user_id,
+                    Number(order.ashirvad_amount),
+                    `Refund Ashirvad - ${order.pooja_name}`,
+                    order.order_id,
+                    order.pandit_id
+                );
+            }
         });
 
         notifyPandit(order?.pandit_id, 'Remedy Order Cancelled', ``, { order_id: order.order_id });
