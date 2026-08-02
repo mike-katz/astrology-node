@@ -169,15 +169,15 @@ async function creditPanditBalance(trx, panditId, amount, message, orderId, user
     if (!pandit) throw new Error('PANDIT_NOT_FOUND');
     const newBalance = Number(pandit.balance || 0) + amount;
     await trx('pandits').where({ id: panditId }).update({ balance: newBalance });
-    await trx('balancelogs').where({
-        order_id: orderId,
-    }).update({
-        pandit_id: panditId,
-        pandit_old_balance: Number(pandit.balance || 0),
-        pandit_new_balance: newBalance,
-        pandit_amount: amount,
-        pandit_message: message,
-    });
+    await trx('balancelogs').where({ order_id: orderId })
+        .andWhere('message', 'ilike', `%Remedy order%`)
+        .update({
+            pandit_id: panditId,
+            pandit_old_balance: Number(pandit.balance || 0),
+            pandit_new_balance: newBalance,
+            pandit_amount: amount,
+            pandit_message: message,
+        });
 }
 
 const DEFAULT_REMEDY_SHARE = 1;
