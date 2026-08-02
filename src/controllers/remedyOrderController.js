@@ -491,7 +491,7 @@ async function createOrder(req, res) {
                 amount,
                 discount,
                 final_amount: finalAmountInr,
-                currency: 'INR',
+                currency: displayCurrency || 'INR',
                 ashirvad_amount: ashirvadAmtInr,
                 status,
                 person: personCount,
@@ -1002,15 +1002,6 @@ async function getUserOrders(req, res) {
         if (limit < 1) limit = 20;
         const offset = (page - 1) * limit;
 
-        const user = await db('users').select('default_currency').where({ id: Number(req.userId) }).first();
-        const currency = user?.default_currency || 'INR';
-        const currencyData = await db('currency')
-            .select('currency_name', 'user_inr_rate', 'pandit_inr_rate')
-            .where({ currency_name: currency })
-            .first();
-        const rate = currencyData?.user_inr_rate || currencyData?.pandit_inr_rate || 1;
-        const symbol = getCurrencySymbolByCurrency(currency);
-
         let query = db('remedy_orders as ro')
             .leftJoin('pandits as p', 'p.id', 'ro.pandit_id')
             .leftJoin('astroremedypoojas as ap', 'ap.id', 'ro.pooja_id')
@@ -1037,13 +1028,27 @@ async function getUserOrders(req, res) {
         const [{ count }] = await countQuery.count('* as count');
         const total = parseInt(count, 10);
 
-        const results = rows.map((row) => ({
-            ...formatOrderRowDisplay(row, rate, symbol),
-            pandit_name: row.pandit_name,
-            pandit_profile: row.pandit_profile,
-            duration: row.duration,
-            image: getFirstImage(row.image),
-        }));
+        const currencyCodes = [...new Set(rows.map((r) => r.currency || 'INR'))];
+        const currencyRows = await db('currency')
+            .select('currency_name', 'user_inr_rate')
+            .whereIn('currency_name', currencyCodes);
+        const rateMap = {};
+        for (const c of currencyRows) {
+            rateMap[c.currency_name] = Number(c.user_inr_rate || 1);
+        }
+
+        const results = rows.map((row) => {
+            const code = row.currency || 'INR';
+            const rate = rateMap[code] || 1;
+            const symbol = getCurrencySymbolByCurrency(code);
+            return {
+                ...formatOrderRowDisplay(row, rate, symbol),
+                pandit_name: row.pandit_name,
+                pandit_profile: row.pandit_profile,
+                duration: row.duration,
+                image: getFirstImage(row.image),
+            };
+        });
 
         return res.status(200).json({
             success: true,
@@ -1052,7 +1057,6 @@ async function getUserOrders(req, res) {
                 limit,
                 total,
                 totalPages: Math.ceil(total / limit),
-                currency: symbol,
                 results,
             },
             message: 'Remedy orders fetched successfully.',
@@ -1169,8 +1173,16 @@ async function getOrderDetail(req, res) {
 
         let orderData = formatOrderRow(order);
         if (isUser) {
-            const { rate, symbol } = await getUserDisplayRate(req.userId);
-            orderData = formatOrderRowDisplay(order, rate, symbol);
+            const code = order.currency || 'INR';
+            const currencyData = await db('currency')
+                .select('user_inr_rate')
+                .where({ currency_name: code })
+                .first();
+            orderData = formatOrderRowDisplay(
+                order,
+                currencyData?.user_inr_rate || 1,
+                getCurrencySymbolByCurrency(code)
+            );
         }
 
         return res.status(200).json({
