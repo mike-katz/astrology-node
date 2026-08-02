@@ -154,7 +154,6 @@ async function refundUserBalance(trx, userId, amount, message, orderId, panditId
     await trx('balancelogs').insert({
         order_id: orderId,
         user_id: userId,
-        pandit_id: panditId,
         user_old_balance: Number(user.balance),
         user_new_balance: newBalance,
         amount,
