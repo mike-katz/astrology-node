@@ -195,7 +195,7 @@ async function deductUserBalance(trx, userId, amount, message, orderId, panditId
 async function refundUserBalance(trx, userId, amount, message, orderId, panditId, currency = 'INR') {
     const user = await trx('users').where({ id: userId }).forUpdate().first();
     if (!user) throw new Error('USER_NOT_FOUND');
-    const newBalance = Number(user.balance) + amount;
+    const newBalance = Number(user.balance) + Number(amount);
     await trx('users').where({ id: userId }).update({ balance: newBalance });
     await trx('balancelogs').insert({
         order_id: orderId,
