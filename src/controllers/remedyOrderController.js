@@ -169,17 +169,14 @@ async function creditPanditBalance(trx, panditId, amount, message, orderId, user
     if (!pandit) throw new Error('PANDIT_NOT_FOUND');
     const newBalance = Number(pandit.balance || 0) + amount;
     await trx('pandits').where({ id: panditId }).update({ balance: newBalance });
-    await trx('balancelogs').insert({
+    await trx('balancelogs').where({
         order_id: orderId,
-        user_id: userId,
+    }).update({
         pandit_id: panditId,
         pandit_old_balance: Number(pandit.balance || 0),
         pandit_new_balance: newBalance,
         pandit_amount: amount,
         pandit_message: message,
-        amount: 0,
-        message: `Remedy order completed with ${userName}`,
-        currency: 'INR',
     });
 }
 
