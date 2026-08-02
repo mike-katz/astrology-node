@@ -963,7 +963,8 @@ async function getUserOrders(req, res) {
                 'ro.*',
                 'p.display_name as pandit_name',
                 'p.profile as pandit_profile',
-                'ap.duration'
+                'ap.duration',
+                'ap.image',
             )
             .where({ 'ro.user_id': req.userId })
             .whereNull('ro.deleted_at')
@@ -988,7 +989,8 @@ async function getUserOrders(req, res) {
             ...formatOrderRow(row),
             pandit_name: row.pandit_name,
             pandit_profile: row.pandit_profile,
-            duration: row.duration
+            duration: row.duration,
+            image: getFirstImage(row.image),
         }));
 
         return res.status(200).json({
