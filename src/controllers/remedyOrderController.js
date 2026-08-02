@@ -770,8 +770,7 @@ async function completeOrder(req, res) {
             .select('pooja_type', 'name')
             .first();
         const panditShare = getPanditShareByPoojaType(pandit, pooja?.pooja_type);
-        const panditAmount = (Number(order.final_amount) * panditShare) / 100;
-
+        const panditAmount = ((Number(order.final_amount) * panditShare) / 100).toFixed(2);
         let updated;
         await db.transaction(async (trx) => {
             [updated] = await trx('remedy_orders').where({ id: order.id }).update({
