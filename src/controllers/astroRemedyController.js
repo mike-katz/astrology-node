@@ -281,7 +281,8 @@ async function getRemedyDetail(req, res) {
             location: item.location,
             pooja_time: item.pooja_time,
             reviews,
-            faqs
+            faqs,
+            pandit_inr_rate: rate
         };
         if (item?.pooja_type == 'spells') {
             const panditIds = parsePanditIds(item.pandit_id);
