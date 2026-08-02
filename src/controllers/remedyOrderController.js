@@ -1013,7 +1013,8 @@ async function getUserOrders(req, res) {
                 ...formatted,
                 amount: convertCurrency(row.amount, rate),
                 discount: convertCurrency(row.discount || 0, rate),
-                // final_amount / ashirvad_amount already stored in user currency at create
+                final_amount: convertCurrency(row.final_amount || 0, rate),
+                ashirvad_amount: convertCurrency(row.ashirvad_amount || 0, rate),
                 currency: symbol,
                 pandit_name: row.pandit_name,
                 pandit_profile: row.pandit_profile,
