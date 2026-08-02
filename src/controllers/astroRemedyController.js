@@ -114,7 +114,7 @@ async function getRemedyItems(req, res) {
             .where({ currency_name: currency })
             .first();
         // same convert pattern as pandit list; user-facing prices use user_inr_rate (checkout)
-        const rate = currencyData?.user_inr_rate || currencyData?.pandit_inr_rate || 1;
+        const rate = currencyData?.pandit_inr_rate || 1;
         const symbol = getCurrencySymbolByCurrency(currency);
 
         const filter = {
