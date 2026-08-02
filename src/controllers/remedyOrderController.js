@@ -837,7 +837,7 @@ async function cancelOrder(req, res) {
                 order.pandit_id
             );
 
-            if (ashirvad_amount > 0) {
+            if (order?.ashirvad_amount > 0) {
                 await refundUserBalance(
                     trx,
                     order.user_id,
