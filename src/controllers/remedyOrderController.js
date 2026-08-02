@@ -1,6 +1,6 @@
 const db = require('../db');
 const axios = require('axios');
-const { deepParse, convertCurrency } = require('../utils/decodeJWT');
+const { deepParse, convertCurrency, calculateUserChargeAmount } = require('../utils/decodeJWT');
 const { callEvent } = require('../socket');
 const { RtcTokenBuilder, RtcRole } = require('agora-access-token');
 const { getCurrencySymbolByCurrency } = require('../utils/countryCurrencyMap');
@@ -143,13 +143,30 @@ async function getUserDisplayRate(userId) {
     const user = await db('users').select('default_currency').where({ id: Number(userId) }).first();
     const currency = user?.default_currency || 'INR';
     const currencyData = await db('currency')
-        .select('currency_name', 'user_inr_rate')
+        .select('currency_name', 'user_inr_rate', 'pandit_inr_rate')
         .where({ currency_name: currency })
         .first();
     return {
         currency,
         rate: currencyData?.user_inr_rate || 1,
+        panditInrRate: currencyData?.pandit_inr_rate || 1,
+        userInrRate: currencyData?.user_inr_rate || 1,
         symbol: getCurrencySymbolByCurrency(currency),
+    };
+}
+
+async function getOrderChargeAmounts(order) {
+    const code = order.currency || 'INR';
+    const currencyData = await db('currency')
+        .select('user_inr_rate', 'pandit_inr_rate')
+        .where({ currency_name: code })
+        .first();
+    const panditInrRate = Number(currencyData?.pandit_inr_rate || 1);
+    const userInrRate = Number(currencyData?.user_inr_rate || 1);
+    return {
+        currency: code,
+        finalCharge: calculateUserChargeAmount(order.final_amount, panditInrRate, userInrRate),
+        ashirvadCharge: calculateUserChargeAmount(order.ashirvad_amount || 0, panditInrRate, userInrRate),
     };
 }
 
@@ -440,10 +457,13 @@ async function createOrder(req, res) {
         const user = await db('users').where({ id: req.userId }).first();
         const displayCurrency = user?.default_currency || 'INR';
         const currencyData = await db('currency')
-            .select('currency_name', 'user_inr_rate')
+            .select('currency_name', 'user_inr_rate', 'pandit_inr_rate')
             .where({ currency_name: displayCurrency })
             .first();
-        const rate = currencyData?.user_inr_rate || 1;
+        const userInrRate = Number(currencyData?.user_inr_rate || 1);
+        const panditInrRate = Number(currencyData?.pandit_inr_rate || 1);
+        // display: INR → user currency
+        const displayRate = userInrRate;
 
         let ashirvadAmtInr = 0;
         if (isAshirvad) {
@@ -451,8 +471,12 @@ async function createOrder(req, res) {
             ashirvadAmtInr = Number(setting?.ashirvad_price || 0);
         }
 
-        const totalInr = Number(finalAmountInr) + Number(ashirvadAmtInr);
-        if (Number(user?.balance) < totalInr) {
+        // wallet cut: (inr / pandit_inr_rate) * user_inr_rate
+        const finalCharge = calculateUserChargeAmount(finalAmountInr, panditInrRate, userInrRate);
+        const ashirvadCharge = calculateUserChargeAmount(ashirvadAmtInr, panditInrRate, userInrRate);
+        const totalCharge = Number(finalCharge) + Number(ashirvadCharge);
+
+        if (Number(user?.balance) < totalCharge) {
             return res.status(400).json({ success: false, message: 'Insufficient wallet balance. Please recharge.' });
         }
 
@@ -463,21 +487,21 @@ async function createOrder(req, res) {
             await deductUserBalance(
                 trx,
                 req.userId,
-                finalAmountInr,
+                finalCharge,
                 `Remedy order - ${pooja.name}`,
                 orderId,
                 panditId,
-                'INR'
+                displayCurrency
             );
-            if (ashirvadAmtInr > 0) {
+            if (ashirvadCharge > 0) {
                 await deductUserBalance(
                     trx,
                     req.userId,
-                    ashirvadAmtInr,
+                    ashirvadCharge,
                     `Remedy Ashirvad - ${pooja.name}`,
                     orderId,
                     panditId,
-                    'INR'
+                    displayCurrency
                 );
             }
             [savedOrder] = await trx('remedy_orders').insert({
@@ -523,7 +547,7 @@ async function createOrder(req, res) {
 
         return res.status(200).json({
             success: true,
-            data: formatOrderRowDisplay(savedOrder, rate, getCurrencySymbolByCurrency(displayCurrency)),
+            data: formatOrderRowDisplay(savedOrder, displayRate, getCurrencySymbolByCurrency(displayCurrency)),
             message: 'Remedy order created successfully.',
         });
     } catch (err) {
@@ -813,14 +837,15 @@ async function rejectOrder(req, res) {
                 updated_at: new Date(),
             }).returning('*');
 
+            const { finalCharge, currency } = await getOrderChargeAmounts(order);
             await refundUserBalance(
                 trx,
                 order.user_id,
-                Number(order.final_amount),
+                finalCharge,
                 `Remedy order refund - ${order.pooja_name}`,
                 order.order_id,
                 order.pandit_id,
-                'INR'
+                currency
             );
         });
 
@@ -860,25 +885,26 @@ async function cancelOrder(req, res) {
                 updated_at: new Date(),
             }).returning('*');
 
+            const { finalCharge, ashirvadCharge, currency } = await getOrderChargeAmounts(order);
             await refundUserBalance(
                 trx,
                 order.user_id,
-                Number(order.final_amount),
+                finalCharge,
                 `Remedy order cancelled - ${order.pooja_name}`,
                 order.order_id,
                 order.pandit_id,
-                'INR'
+                currency
             );
 
-            if (order?.ashirvad_amount > 0) {
+            if (ashirvadCharge > 0) {
                 await refundUserBalance(
                     trx,
                     order.user_id,
-                    Number(order.ashirvad_amount),
+                    ashirvadCharge,
                     `Refund Ashirvad - ${order.pooja_name}`,
                     order.order_id,
                     order.pandit_id,
-                    'INR'
+                    currency
                 );
             }
         });

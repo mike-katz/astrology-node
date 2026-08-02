@@ -76,6 +76,13 @@ function convertCurrency(amount, rate) {
     return Number((Number(amount) / Number(rate)).toFixed(2));
 }
 
+/** User wallet cut: (inrAmount / pandit_inr_rate) * user_inr_rate */
+function calculateUserChargeAmount(inrAmount, panditInrRate, userInrRate) {
+    const pRate = Number(panditInrRate) || 1;
+    const uRate = Number(userInrRate) || 1;
+    return Number(((Number(inrAmount || 0) / pRate) * uRate).toFixed(2));
+}
+
 const generateLoginResponse = async (existing, currency) => {
     const token = jwt.sign({ userId: existing.id, username: existing.name, mobile: existing.mobile, currency }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '1h' });
     // hide password
@@ -113,4 +120,4 @@ const generateLoginResponse = async (existing, currency) => {
     }
 }
 
-module.exports = { decodeJWT, checkOrders, socketParseEventData, isValidMobile, deepParse, convertCurrency, generateLoginResponse };
+module.exports = { decodeJWT, checkOrders, socketParseEventData, isValidMobile, deepParse, convertCurrency, calculateUserChargeAmount, generateLoginResponse };
