@@ -217,6 +217,14 @@ async function getRemedyDetail(req, res) {
             return res.status(400).json({ success: false, message: 'Remedy item not found.' });
         }
 
+        const currency = await resolveUserCurrency(req);
+        const currencyData = await db('currency')
+            .select('currency_name', 'user_inr_rate', 'pandit_inr_rate')
+            .where({ currency_name: currency })
+            .first();
+        const rate = currencyData?.user_inr_rate || currencyData?.pandit_inr_rate || 1;
+        const symbol = getCurrencySymbolByCurrency(currency);
+
         const reviews = await db('astroremedireviews as ar')
             .leftJoin('users as u', 'u.id', 'ar.user_id')
             .select(
@@ -235,6 +243,18 @@ async function getRemedyDetail(req, res) {
             .where({ type: item.pooja_type })
             .whereNull('deleted_at')
             .orderBy('id', 'desc');
+
+        let priceArray = deepParse(item.price_array);
+        if (Array.isArray(priceArray)) {
+            priceArray = priceArray.map((p) => ({
+                ...p,
+                amount: convertCurrency(p?.amount || 0, rate),
+                discount: convertCurrency(p?.discount || 0, rate),
+            }));
+        } else {
+            priceArray = item.price_array;
+        }
+
         const data = {
             id: item.id,
             remedy_id: item.remedy_id,
@@ -242,8 +262,9 @@ async function getRemedyDetail(req, res) {
             remedy_image: item.remedy_image,
             remedy_tag: item.remedy_tag,
             name: item.name,
-            amount: Number(item.amount),
-            discount: Number(item.discount || 0),
+            amount: convertCurrency(item.amount, rate),
+            discount: convertCurrency(item.discount || 0, rate),
+            currency: symbol,
             tag: deepParse(item.tag),
             duration: item.duration,
             pooja_type: item.pooja_type,
@@ -253,7 +274,7 @@ async function getRemedyDetail(req, res) {
             image: getFirstImage(item.image),
             call_type: item.call_type,
             is_ashirvad: item.is_ashirvad,
-            price_array: item.price_array,
+            price_array: priceArray,
             category_call_type: item.category_call_type,
             category_is_ashirvad: item.category_is_ashirvad,
             created_at: item.created_at,
