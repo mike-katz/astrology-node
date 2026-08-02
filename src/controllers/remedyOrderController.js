@@ -518,7 +518,7 @@ async function createOrder(req, res) {
                 discount: less,
                 final_amount: finalCharge,
                 currency: displayCurrency || 'INR',
-                ashirvad_amount: ashirvadAmtInr,
+                ashirvad_amount: ashirvadCharge,
                 status,
                 person: personCount,
                 is_user_chat_allow: true,
