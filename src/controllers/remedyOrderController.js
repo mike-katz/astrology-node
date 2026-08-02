@@ -1103,7 +1103,7 @@ async function getOrderDetail(req, res) {
         }
 
 
-        const feedbacks = await db('remedy_order_chat').where({ remedy_order_id: order.id }).orderBy('id', 'desc');
+        const feedbacks = await db('remedy_order_chat').where({ remedy_order_id: order.id }).orderBy('id', 'asc');
         const logs = await db('remedy_order_logs as rol')
             .leftJoin('pandits as p', 'p.id', 'rol.pandit_id')
             .select(
