@@ -93,6 +93,7 @@ function formatOrderRow(order) {
         pooja_id: order.pooja_id,
         remedy_id: order.remedy_id,
         pooja_name: order.pooja_name,
+        pooja_type: order.pooja_type || null,
         amount: Number(order.amount),
         discount: Number(order.discount || 0),
         final_amount: Number(order.final_amount),
@@ -455,6 +456,7 @@ async function createOrder(req, res) {
                 pooja_id: Number(pooja_id),
                 remedy_id: pooja.remedy_id,
                 pooja_name: pooja.name,
+                pooja_type: pooja.pooja_type || null,
                 amount,
                 discount,
                 final_amount: finalAmount,
@@ -697,7 +699,7 @@ async function completeOrder(req, res) {
         }
 
         const order = await getOrderByQuery(order_id);
-        if (!order || order.pandit_id !== Number(req.userId)) {
+        if (!order || order.user_id !== Number(req.userId)) {
             return res.status(400).json({ success: false, message: 'Order not found.' });
         }
         if (order.status !== 'work-complete') {
