@@ -239,7 +239,7 @@ async function getRemedyDetail(req, res) {
             .where({ 'ar.pooja_id': Number(id), 'ar.status': 'approved' })
             .orderBy('ar.id', 'desc');
 
-        const faqs = await db('remedy_faqs')
+        const faqs = await db('faqs')
             .where({ type: item.pooja_type })
             .whereNull('deleted_at')
             .orderBy('id', 'desc');
