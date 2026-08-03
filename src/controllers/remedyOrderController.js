@@ -592,6 +592,10 @@ async function addUserInstruction(req, res) {
             updated_at: new Date(),
         }).returning('*');
 
+        if (order?.pandit_id != "") {
+            notifyPandit(order?.pandit_id, 'New Remedy Update', `User has sent message for remedy order`, {});
+        }
+
         return res.status(200).json({
             success: true,
             data: {
@@ -796,12 +800,12 @@ async function completeOrder(req, res) {
             key: `user_${order.user_id}`,
             payload: { order_id: order.order_id },
         });
-        notifyUser(
-            order.user_id,
-            'Remedy Session Completed',
-            'Please share your feedback or raise a complaint if needed.',
-            { order_id: order.order_id, type: 'remedy_order_feedback' }
-        );
+        // notifyUser(
+        //     order.user_id,
+        //     'Remedy Session Completed',
+        //     'Please share your feedback or raise a complaint if needed.',
+        //     { order_id: order.order_id, type: 'remedy_order_feedback' }
+        // );
 
         return res.status(200).json({
             success: true,
