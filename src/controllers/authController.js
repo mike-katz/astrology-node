@@ -209,13 +209,13 @@ async function login(req, res) {
             newMobile = mobile.slice(2);
         }
         console.log("newMobile", newMobile);
-        if (mobile != '1999999999') {
+        if (mobile != '1999999999' && country_code == '+91') {
             const setting = await db('settings').select('otp_provider').first();
-            if (country_code != "+91") {
-                const response = await sendSMS(newMobile, country_code)
-                if (!response.return) return res.status(400).json({ success: false, message: response?.message });
-            }
-            else if (setting?.otp_provider == 'bulksms') {
+            // if (country_code != "+91") {
+            //     const response = await sendSMS(newMobile, country_code)
+            //     if (!response.return) return res.status(400).json({ success: false, message: response?.message });
+            // }
+            if (setting?.otp_provider == 'bulksms') {
                 const response = await sendSMS(newMobile, country_code)
                 if (!response.return) return res.status(400).json({ success: false, message: response?.message });
             } else {
