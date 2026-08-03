@@ -1004,6 +1004,9 @@ async function addFeedback(req, res) {
                 pooja_id: order.pooja_id,
                 order_id: order.order_id,
             });
+            if (order?.pandit_id && Number(rating) == 5) {
+                notifyPandit(order?.pandit_id, "⭐ You're a Star", `${req.user} rated your remedy 5 stars⭐ "Very satisfied with the remedy". This will boost your profile visibility.`, {});
+            }
         }
         // if (type === 'review' && rating) {
         //     const ratingKey = `rating_${Number(rating)}`;
