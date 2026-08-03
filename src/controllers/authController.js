@@ -987,6 +987,7 @@ async function sendFirebaseOtp(req, res) {
  * body: { idToken, mobile?, country_code?, type?, version?, referrer?, device_id?, ad_set_id?, utm_source?, ad_id? }
  */
 async function verifyFirebaseOtp(req, res) {
+    console.log("verifyFirebaseOtp api called", req.body);
     try {
         let {
             idToken,
