@@ -779,7 +779,10 @@ async function onboard(req, res) {
 
 
         // profile_image
-        const ins = {}
+        const ins = {
+            spell_type: null,
+            spell_type_other: null
+        }
 
         const oldStatus = await db('onboardlogs').where({ "onboard_id": Number(user?.id) }).orderBy('id', 'desc').first();
         if (oldStatus) {
