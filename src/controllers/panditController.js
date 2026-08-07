@@ -561,7 +561,7 @@ async function verifyOtp(req, res) {
             languages, available_for,
             chat_call_rate, training_type, guru_name, certificate,
             govt_id, about, achievement_url, address, selfie, achievement_file,
-            terms, no_false, consent_profile, step = 0, application_id, remark, reject_proof, status
+            terms, no_false, consent_profile, step = 0, application_id, remark, reject_proof, status, spell_type, spell_type_other
         } = user
         if (status == 'blocked') {
             return res.status(400).json({ success: false, message: 'Your account is blocked.' });
@@ -589,6 +589,8 @@ async function verifyOtp(req, res) {
                 training_type: training_type || "",
                 guru_name: guru_name || "",
                 certificate: certificate ? deepParse(certificate) : [],
+                spell_type: spell_type || "",
+                spell_type_other: spell_type_other || "",
                 // response_time: response_time || ""
             },
             "step3": {
