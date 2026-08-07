@@ -732,7 +732,8 @@ async function onboard(req, res) {
             languages, available_for,
             chat_call_rate, training_type, guru_name, certificate,
             govt_id, about, achievement_url, address, achievement_file,
-            terms, no_false, consent_profile, token
+            terms, no_false, consent_profile, token,
+            spell_type, spell_type_other
         } = req.body;
         if (!step || !token) return res.status(400).json({ success: false, message: 'Missing params.' });
 
@@ -902,6 +903,12 @@ async function onboard(req, res) {
         }
         if (name) {
             ins.name = name
+        }
+        if (spell_type != undefined && spell_type !== null) {
+            ins.spell_type = String(spell_type)
+        }
+        if (spell_type_other != undefined && spell_type_other !== null) {
+            ins.spell_type_other = String(spell_type_other)
         }
         // if (phone_type) {
         //     const selected = phone_type.split(",").map(l => l.trim());
