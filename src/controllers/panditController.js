@@ -745,18 +745,18 @@ async function onboard(req, res) {
 
         const language = ["english", "hindi", "tamil", "panjabi", "marathi", "gujarati", "bangali", "french", "odia", "telugu", "kannada", "malayalam", "sanskrit", "assamese", "german", "spanish", "marwari", "manipuri", "urdu", "sindhi", "kashmiri", "bodo", "nepali", "konkani", "maithili", "arabic", "bhojpuri", "dutch", "rajasthanii"]
         const { files } = req
-        if (step == 1) {
+        if (Number(step) == 1) {
             if (!name || !dob || !email || !city || !country || !gender || !primary_expertise || !experience) return res.status(400).json({ success: false, message: 'Missing params.' });
             // if (other_working == 'other' && !other_working_text) return res.status(400).json({ success: false, message: 'Missing params.' });
             if (!is18OrAbove(dob)) return res.status(400).json({ success: false, message: 'Enter DOB above 18+ year.' });
         }
-        if (step == 2) {
+        if (Number(step) == 2) {
             if (!languages || !available_for || !chat_call_rate || !training_type || !guru_name) return res.status(400).json({ success: false, message: 'Missing params.' });
         }
-        if (step == 3) {
+        if (Number(step) == 3) {
             if (!govt_id) return res.status(400).json({ success: false, message: 'Missing params.' });
         }
-        if (step == 4) {
+        if (Number(step) == 4) {
             if (!terms || !no_false || !consent_profile) return res.status(400).json({ success: false, message: 'Missing params.' });
         }
 
@@ -781,7 +781,7 @@ async function onboard(req, res) {
         // profile_image
         const ins = {}
 
-        if (step == 2) {
+        if (Number(step) == 2) {
             ins.spell_type = null
             ins.spell_type_other = null
         }
