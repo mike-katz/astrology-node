@@ -526,6 +526,7 @@ async function createOrder(req, res) {
                 ...ashirvadData,
             }).returning('*');
 
+            await trx('astroremedypoojas').where({ id: Number(pooja_id) }).increment('total_orders', 1);
             await trx('remedy_order_chat').insert({
                 remedy_order_id: savedOrder.id,
                 user_id: Number(req.userId),

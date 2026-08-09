@@ -131,7 +131,7 @@ async function getRemedyItems(req, res) {
         }
 
         const rows = await query
-            .select('id', 'remedy_id', 'name', 'amount', 'discount', 'image')
+            .select('id', 'remedy_id', 'name', 'amount', 'discount', 'image', 'total_orders')
             .orderBy('id', 'desc')
             .limit(limit)
             .offset(offset);
@@ -147,6 +147,7 @@ async function getRemedyItems(req, res) {
             amount: convertCurrency(item.amount, rate),
             discount: convertCurrency(item.discount || 0, rate),
             currency: symbol,
+            total_orders: Number(item.total_orders || 0),
             image: getFirstImage(item.image),
         }));
 
@@ -201,6 +202,7 @@ async function getRemedyDetail(req, res) {
                 'p.description',
                 'p.location',
                 'p.pooja_time',
+                'p.total_orders',
                 'p.created_at',
                 'r.name as remedy_name',
                 'r.image as remedy_image',
@@ -225,24 +227,34 @@ async function getRemedyDetail(req, res) {
         const rate = currencyData?.pandit_inr_rate || 1;
         const symbol = getCurrencySymbolByCurrency(currency);
 
-        const reviews = await db('astroremedireviews as ar')
-            .leftJoin('users as u', 'u.id', 'ar.user_id')
-            .select(
-                'ar.id',
-                'ar.rating',
-                'ar.message',
-                'ar.created_at',
-                'u.name',
-                'u.profile',
-                'u.avatar'
-            )
-            .where({ 'ar.pooja_id': Number(id), 'ar.status': 'approved' })
-            .orderBy('ar.id', 'desc');
+        const [reviews, faqs, recentOrderRows] = await Promise.all([
+            db('astroremedireviews as ar')
+                .leftJoin('users as u', 'u.id', 'ar.user_id')
+                .select(
+                    'ar.id',
+                    'ar.rating',
+                    'ar.message',
+                    'ar.created_at',
+                    'u.name',
+                    'u.profile',
+                    'u.avatar'
+                )
+                .where({ 'ar.pooja_id': Number(id), 'ar.status': 'approved' })
+                .orderBy('ar.id', 'desc'),
+            db('faqs')
+                .where({ type: 'pooja' })
+                .whereNull('deleted_at')
+                .orderBy('id', 'desc'),
+            db('remedy_orders as ro')
+                .leftJoin('users as u', 'u.id', 'ro.user_id')
+                .select('u.name')
+                .where({ 'ro.pooja_id': Number(id) })
+                .whereNull('ro.deleted_at')
+                .orderBy('ro.id', 'desc')
+                .limit(5),
+        ]);
 
-        const faqs = await db('faqs')
-            .where({ type: 'pooja' })
-            .whereNull('deleted_at')
-            .orderBy('id', 'desc');
+        const recent_orders = recentOrderRows.map((row) => String(row?.name || '').trim() || 'User');
 
         let priceArray = deepParse(item.price_array);
         if (Array.isArray(priceArray)) {
@@ -280,6 +292,8 @@ async function getRemedyDetail(req, res) {
             created_at: item.created_at,
             location: item.location,
             pooja_time: item.pooja_time,
+            total_orders: Number(item.total_orders || 0),
+            recent_orders,
             reviews,
             faqs,
             pandit_inr_rate: rate
