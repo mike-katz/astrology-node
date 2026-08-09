@@ -426,7 +426,7 @@ async function xpay(req, res) {
                 invoice: "",
             });
         }
-
+        data.template = 'usdinvoice'
         const invoice = await generateInvoicePDF(data);
         logger.info("payment invoice", invoice);
         await db('payments').where({ id: paymentRow.id }).update({
