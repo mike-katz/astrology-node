@@ -8,6 +8,7 @@ require('dotenv').config();
 const { deleteKey } = require('../config/redisClient');
 const { uploadImageToAzure, deleteFileFromAzure } = require('../utils/azureUploader');
 const { getCurrencySymbolByCurrency, getCurrencyIconByCurrency } = require('../utils/countryCurrencyMap');
+const { notifyPanditsOnNewUserProfile } = require('../utils/newUserPanditNotify');
 
 async function makeAvtarString(user, gender) {
     if (!user || !gender) return null;
@@ -178,6 +179,19 @@ async function updateProfile(req, res) {
             update.user_id = req.userId
             await db('userprofiles')
                 .insert(update);
+
+            try {
+                const languageField = language?.length > 0
+                    ? JSON.stringify(language)
+                    : user?.language;
+                await notifyPanditsOnNewUserProfile(
+                    req.userId,
+                    name || user?.name,
+                    languageField
+                );
+            } catch (notifyErr) {
+                console.error('updateProfile new-user pandit notify error:', notifyErr?.message || notifyErr);
+            }
         }
         return res.status(200).json({ success: true, message: 'Profile update Successfully' });
     } catch (err) {
