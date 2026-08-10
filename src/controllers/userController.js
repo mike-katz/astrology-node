@@ -698,6 +698,57 @@ async function getGiftList(req, res) {
     }
 }
 
+async function getInboxMessages(req, res) {
+    try {
+        let page = parseInt(req.query.page) || 1;
+        let limit = parseInt(req.query.limit) || 20;
+        if (page < 1) page = 1;
+        if (limit < 1) limit = 20;
+
+        const offset = (page - 1) * limit;
+        const userId = Number(req.userId);
+
+        const [{ count }] = await db('inbox_messages')
+            .count('* as count')
+            .where({ user_id: userId });
+
+        const results = await db('inbox_messages as im')
+            .leftJoin('pandits as p', 'p.id', 'im.pandit_id')
+            .select(
+                'im.id',
+                'im.user_id',
+                'im.pandit_id',
+                'im.message',
+                'im.is_read',
+                'im.created_at',
+                'im.updated_at',
+                'p.display_name as pandit_name',
+                'p.profile as pandit_profile',
+                'p.online as pandit_online'
+            )
+            .where('im.user_id', userId)
+            .orderBy('im.created_at', 'desc')
+            .limit(limit)
+            .offset(offset);
+
+        const total = parseInt(count) || 0;
+        return res.status(200).json({
+            success: true,
+            data: {
+                page,
+                limit,
+                total,
+                totalPages: Math.ceil(total / limit),
+                results,
+            },
+            message: 'Inbox messages fetched successfully',
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
 
 
-module.exports = { updateProfile, getProfile, getBalance, updateToken, profileUpdate, makeAvtarString, deleteMyAccount, getRecharge, getRechargeBanner, getCookie, getRecommendations, findIsFree, getUserStats, getCurrencyList, updateCurrency, getGiftList };
+
+module.exports = { updateProfile, getProfile, getBalance, updateToken, profileUpdate, makeAvtarString, deleteMyAccount, getRecharge, getRechargeBanner, getCookie, getRecommendations, findIsFree, getUserStats, getCurrencyList, updateCurrency, getGiftList, getInboxMessages };
