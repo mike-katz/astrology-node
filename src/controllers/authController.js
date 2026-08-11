@@ -1141,6 +1141,24 @@ async function verifyFirebaseOtp(req, res) {
     }
 }
 
+async function getCountryByIp(req, res) {
+    console.log("getCountryByIp api called", req.query);
+    try {
+        let country = 'IN'
+        const ips = await getClientIp(req);
+        if (ips) {
+            console.log("ips", ips);
+            const geo = await geoip.lookup(ips);
+            country = geo ? geo.country : 'IN';
+            console.log("country", country);
+        }
+        return res.status(200).json({ success: true, country });
+    }
+    catch (err) {
+        logger.error('verifyFirebaseOtp error', err?.message || err);
+        return res.status(400).json({ success: false, message: "Server error" });
+    }
+}
 module.exports = {
     register,
     login,
@@ -1156,4 +1174,5 @@ module.exports = {
     sendFirebaseOtp,
     verifyFirebaseOtp,
     getFirebaseRecaptchaParams,
+    getCountryByIp
 };

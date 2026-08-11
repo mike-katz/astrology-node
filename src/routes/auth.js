@@ -24,5 +24,6 @@ router.get('/apple', appleLogin);
 router.get('/config', socialUrl);
 router.post('/test-call', sendCall);
 router.get('/test', test);
+router.get('/get-ip-country', getCountryByIp);
 
 module.exports = router;
