@@ -14,6 +14,7 @@ const { emitCallDurationUpdate } = require('../callSocket');
 const { replaceTemplate } = require('../utils/replaceTemplate');
 const admin = require('../config/firebase');
 const { sendAutoMessage } = require('./orderController');
+const { consumeUserOfferRemaining } = require('../utils/userOfferBalance');
 
 async function getRoom(req, res) {
     logger.info('chat_getRoom', { userId: req.userId });
@@ -545,6 +546,9 @@ async function balanceCut(user_id, order, end_time, place) {
                 updUser.offer_amount = 0
             }
             await trx('users').where({ id: user_id }).update(updUser);
+            if (Number(deduction) > 0) {
+                await consumeUserOfferRemaining(trx, user_id, deduction);
+            }
 
             // 9. Chat system messages — transaction ANDAR
             let chatSystemMessage = null;

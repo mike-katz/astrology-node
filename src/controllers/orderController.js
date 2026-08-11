@@ -11,6 +11,7 @@ const { replaceTemplate } = require('../utils/replaceTemplate');
 const { readJoinedUserIds, emitLiveChatMessage } = require('./liveStreamingController');
 const { convertCurrency } = require('../utils/decodeJWT');
 const { getCurrencySymbolByCurrency } = require('../utils/countryCurrencyMap');
+const { consumeUserOfferRemaining } = require('../utils/userOfferBalance');
 
 async function sendAutoMessage(profile, userId, orderId, panditId) {
     const panditIdNum = panditId != null && panditId !== '' ? Number(panditId) : null;
@@ -996,6 +997,7 @@ async function sendGift(req, res) {
         const panditAmount = (Number(final) * Number(pandit?.gift_share)) / 100
         await db('pandits').where({ id: pandit.id }).increment({ balance: Number(panditAmount) });
         await db('users').where({ id: user?.id }).increment({ balance: -Number(final) });
+        await consumeUserOfferRemaining(db, user?.id, final);
         const newBalance = Number(user.balance) - Number(final)
         const pandit_new_balance = Number(pandit.balance) + Number(panditAmount)
         await db('balancelogs').insert({ type: "gift", currency: user?.default_currency, pandit_old_balance: Number(pandit?.balance), pandit_new_balance, user_old_balance: Number(user.balance), user_new_balance: Number(newBalance), user_id: req.userId, message: `Send gift to ${pandit?.display_name} (${name}) - ${qty}`, pandit_id: pandit?.id, pandit_message: `Receive gift from ${user?.name} (${name}) - ${qty}`, pandit_amount: panditAmount, amount: - final, currency: user?.default_currency });
