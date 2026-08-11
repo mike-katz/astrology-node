@@ -708,30 +708,33 @@ async function getInboxMessages(req, res) {
         const offset = (page - 1) * limit;
         const userId = Number(req.userId);
 
-        const [{ count }] = await db('inbox_messages')
-            .count('* as count')
-            .where({ user_id: userId });
+        const countRow = await db('inbox_messages')
+            .where({ user_id: userId })
+            .countDistinct('pandit_id as count')
+            .first();
 
         const results = await db('inbox_messages as im')
             .leftJoin('pandits as p', 'p.id', 'im.pandit_id')
             .select(
-                'im.id',
-                'im.user_id',
                 'im.pandit_id',
-                'im.message',
-                'im.is_read',
-                'im.created_at',
-                'im.updated_at',
                 'p.display_name as pandit_name',
                 'p.profile as pandit_profile',
-                'p.online as pandit_online'
+                'p.online as pandit_online',
+                db.raw('MAX(im.id) as id'),
+                db.raw('(ARRAY_AGG(im.message ORDER BY im.created_at DESC))[1] as message'),
+                db.raw('BOOL_OR(im.is_read = false) as has_unread'),
+                db.raw('COUNT(im.id)::int as message_count'),
+                db.raw('COUNT(im.id) FILTER (WHERE im.is_read = false)::int as unread_count'),
+                db.raw('MAX(im.created_at) as created_at'),
+                db.raw('MAX(im.updated_at) as updated_at')
             )
             .where('im.user_id', userId)
-            .orderBy('im.created_at', 'desc')
+            .groupBy('im.pandit_id', 'p.display_name', 'p.profile', 'p.online')
+            .orderByRaw('MAX(im.created_at) DESC')
             .limit(limit)
             .offset(offset);
 
-        const total = parseInt(count) || 0;
+        const total = parseInt(countRow?.count) || 0;
         return res.status(200).json({
             success: true,
             data: {
