@@ -749,6 +749,74 @@ async function getInboxMessages(req, res) {
     }
 }
 
+async function getInboxDetail(req, res) {
+    try {
+        const panditId = Number(req.query.pandit_id);
+        if (!panditId) {
+            return res.status(400).json({ success: false, message: 'pandit_id is required.' });
+        }
+
+        let page = parseInt(req.query.page) || 1;
+        let limit = parseInt(req.query.limit) || 20;
+        if (page < 1) page = 1;
+        if (limit < 1) limit = 20;
+
+        const offset = (page - 1) * limit;
+        const userId = Number(req.userId);
+
+        const pandit = await db('pandits')
+            .select('id', 'display_name as name', 'profile', 'online')
+            .where({ id: panditId })
+            .whereNull('deleted_at')
+            .first();
+
+        if (!pandit) {
+            return res.status(404).json({ success: false, message: 'Pandit not found.' });
+        }
+
+        const [{ count }] = await db('inbox_messages')
+            .count('* as count')
+            .where({ user_id: userId, pandit_id: panditId });
+
+        const results = await db('inbox_messages')
+            .select(
+                'id',
+                'user_id',
+                'pandit_id',
+                'message',
+                'is_read',
+                'created_at',
+                'updated_at'
+            )
+            .where({ user_id: userId, pandit_id: panditId })
+            .orderBy('created_at', 'desc')
+            .limit(limit)
+            .offset(offset);
+
+        // mark unread as read when opening chat
+        await db('inbox_messages')
+            .where({ user_id: userId, pandit_id: panditId, is_read: false })
+            .update({ is_read: true, updated_at: new Date() });
+
+        const total = parseInt(count) || 0;
+        return res.status(200).json({
+            success: true,
+            data: {
+                pandit,
+                page,
+                limit,
+                total,
+                totalPages: Math.ceil(total / limit),
+                results,
+            },
+            message: 'Inbox detail fetched successfully',
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
 
 
-module.exports = { updateProfile, getProfile, getBalance, updateToken, profileUpdate, makeAvtarString, deleteMyAccount, getRecharge, getRechargeBanner, getCookie, getRecommendations, findIsFree, getUserStats, getCurrencyList, updateCurrency, getGiftList, getInboxMessages };
+
+module.exports = { updateProfile, getProfile, getBalance, updateToken, profileUpdate, makeAvtarString, deleteMyAccount, getRecharge, getRechargeBanner, getCookie, getRecommendations, findIsFree, getUserStats, getCurrencyList, updateCurrency, getGiftList, getInboxMessages, getInboxDetail };
