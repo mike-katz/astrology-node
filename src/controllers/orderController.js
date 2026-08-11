@@ -12,6 +12,7 @@ const { readJoinedUserIds, emitLiveChatMessage } = require('./liveStreamingContr
 const { convertCurrency } = require('../utils/decodeJWT');
 const { getCurrencySymbolByCurrency } = require('../utils/countryCurrencyMap');
 const { consumeUserOfferRemaining } = require('../utils/userOfferBalance');
+const { addOrderLog } = require('../utils/orderLog');
 
 async function sendAutoMessage(profile, userId, orderId, panditId) {
     const panditIdNum = panditId != null && panditId !== '' ? Number(panditId) : null;
@@ -219,6 +220,16 @@ async function create(req, res) {
         await db('users').where({ id: Number(req.userId) }).update(upd);
 
         const [saved] = await db('orders').insert(ins).returning('*');
+        await addOrderLog({
+            order: saved,
+            action: 'created',
+            status: saved?.status || 'pending',
+            message: 'Order created',
+            performed_by_type: 'user',
+            performed_by_id: req.userId,
+            place: 'user -> create order',
+            meta: { type: saved?.type, is_free: saved?.is_free },
+        });
         // console.log("order inserted", saved);
 
         // console.log("start socket call");
@@ -366,6 +377,15 @@ async function createFreeChat(req, res) {
             is_free: true,
             requested_pandits: JSON.stringify(requestedPanditIds),
         }).returning('*');
+        await addOrderLog({
+            order: saved,
+            action: 'created',
+            status: saved?.status || 'pending',
+            message: 'Private order created',
+            performed_by_type: 'user',
+            performed_by_id: req.userId,
+            place: 'user -> create private order',
+        });
 
         const panditRecords = await db('pandits').whereIn('id', requestedPanditIds).select('id', 'token', 'waiting_time', 'display_name', 'profile', 'final_chat_call_rate');
 
@@ -763,6 +783,16 @@ async function acceptOrder(req, res) {
         const startTime = new Date()
         const endTime = new Date(Date.now() + `${duration}` * 60 * 1000);
         await db('orders').where({ id: order?.id }).update({ status: "continue", duration, deduction, start_time: startTime, end_time: endTime });
+        await addOrderLog({
+            order,
+            action: 'accepted_by_user',
+            status: 'continue',
+            message: 'Order accepted by user',
+            performed_by_type: 'user',
+            performed_by_id: req.userId,
+            place: 'user -> accept order',
+            meta: { duration, deduction, start_time: startTime, end_time: endTime },
+        });
         await db('pandits').where({ id: order?.pandit_id }).update({ waiting_time: endTime });
 
         if (order?.profile_id && order.type == 'chat') {
@@ -904,6 +934,16 @@ async function cancelOrder(req, res) {
         }
         upd.status = status
         await db('orders').where({ id: order?.id }).update(upd);
+        await addOrderLog({
+            order,
+            action: status == 'rejected' ? 'rejected' : 'cancelled',
+            status,
+            message: status == 'rejected' ? 'Order rejected by user' : 'Order cancelled by user',
+            performed_by_type: 'user',
+            performed_by_id: req.userId,
+            place: 'user -> cancel order',
+            meta: upd,
+        });
 
         callEvent("emit_to_pending_order", {
             key: `pandit_${order?.pandit_id}`,
@@ -945,6 +985,15 @@ async function deleteOrder(req, res) {
         }
 
         await db('orders').where({ id: order?.id }).update({ deleted_at: new Date() });
+        await addOrderLog({
+            order,
+            action: 'deleted',
+            status: order?.status,
+            message: 'Order soft deleted',
+            performed_by_type: 'user',
+            performed_by_id: req.userId,
+            place: 'user -> delete order',
+        });
         await db('chats').where({ order_id }).update({ deleted_at: new Date() });
         logger.info('order_deleteOrder success', { userId: req.userId, order_id });
         return res.status(200).json({ success: true, message: 'Order cancel Successfully' });
@@ -1078,6 +1127,15 @@ async function callReject(req, res) {
     }
     if (order?.type == "call" && order?.status == "pending") {
         await db('orders').where({ id: order?.id }).update({ status: "cancel", order_action: "user" });
+        await addOrderLog({
+            order,
+            action: 'cancelled',
+            status: 'cancel',
+            message: 'Call order cancelled by user',
+            performed_by_type: 'user',
+            performed_by_id: req.userId,
+            place: 'user -> call reject',
+        });
     }
     callEvent("emit_to_call_rejected", {
         key: `pandit_${pandit_id}`,

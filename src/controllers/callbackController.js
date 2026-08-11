@@ -1,4 +1,5 @@
 const db = require('../db');
+const { addOrderLog } = require('../utils/orderLog');
 const crypto = require('crypto');
 require('dotenv').config();
 const generateInvoicePDF = require('../utils/generatepdf');
@@ -268,6 +269,15 @@ async function razorpay(req, res) {
             const rate = order?.rate || order?.final_chat_call_rate;
             const deduction = Number(duration) * Number(rate);
             await db('orders').where({ id: order.id }).update({ duration, deduction, end_time: endTime });
+            await addOrderLog({
+                order,
+                action: 'extended',
+                status: order.status,
+                message: 'Order extended after recharge',
+                performed_by_type: 'system',
+                place: 'payment callback -> extend order',
+                meta: { duration, deduction, end_time: endTime, minute },
+            });
             if (order.type === 'chat') {
                 callEvent('emit_to_user_chat_end_time', { key: `pandit_${order.pandit_id}`, payload: { startTime: order.start_time, endTime, orderId: order.order_id, user_id: order?.user_id } });
                 callEvent('emit_to_user_chat_end_time', { key: `user_${order.user_id}`, payload: { startTime: order.start_time, endTime, orderId: order.order_id, pandit_id: order?.pandit_id } });
