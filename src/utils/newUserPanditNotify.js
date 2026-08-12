@@ -4,11 +4,7 @@ const { sendBulkPush } = require('../controllers/reviewController');
 const ASTRO_INBOX_MESSAGES = [
     'Namaste! Looking at your kundli, would you like guidance on career or relationships first?',
     'Welcome to AstroGuruji. Shall I check your current dasha and suggest the right remedies?',
-    'Hi! Your planetary positions look interesting. Want a quick insight on love or money?',
-    'Blessings! Would you like me to analyze your birth chart for upcoming opportunities?',
     'Hello! I can help with marriage timing, career path, or health concerns — what should we start with?',
-    'Welcome! Based on your stars, a short consultation can bring clarity. Shall we connect?',
-    'Namaste! Do you want remedies for peace of mind, or insights about your future plans?',
 ];
 
 function parseUserLanguages(languageField) {
@@ -27,8 +23,7 @@ function parseUserLanguages(languageField) {
     return [];
 }
 
-async function findRandomAvailablePandits(userLanguages = []) {
-    const limit = 3 + Math.floor(Math.random() * 3); // 3–5
+async function findRandomAvailablePandits(userLanguages = [], limit = 5) {
     let query = db('pandits')
         .select('id', 'token', 'display_name', 'languages')
         .whereNull('deleted_at')
@@ -63,33 +58,40 @@ async function notifyNewUserToPandits(pandits, userName) {
     });
 }
 
-async function insertAstroInboxMessage(userId, panditId) {
-    const message = ASTRO_INBOX_MESSAGES[Math.floor(Math.random() * ASTRO_INBOX_MESSAGES.length)];
-    await db('inbox_messages').insert({
-        user_id: Number(userId),
-        pandit_id: Number(panditId),
-        message,
-        is_read: false,
-        created_at: new Date(),
-        updated_at: new Date(),
-    });
-    return message;
+async function insertAstroInboxMessagesForPandits(userId, pandits) {
+    const now = new Date();
+    const rows = [];
+    for (const pandit of pandits) {
+        for (const message of ASTRO_INBOX_MESSAGES) {
+            rows.push({
+                user_id: Number(userId),
+                pandit_id: Number(pandit.id),
+                message,
+                is_read: false,
+                created_at: now,
+                updated_at: now,
+            });
+        }
+    }
+    if (!rows.length) return 0;
+    await db('inbox_messages').insert(rows);
+    return rows.length;
 }
 
 async function notifyPanditsOnNewUserProfile(userId, userName, languageField) {
     const userLanguages = parseUserLanguages(languageField);
-    const pandits = await findRandomAvailablePandits(userLanguages);
+    const pandits = await findRandomAvailablePandits(userLanguages, 5);
     if (!pandits.length) return;
 
     await notifyNewUserToPandits(pandits, userName);
-    const inboxPandit = pandits[Math.floor(Math.random() * pandits.length)];
-    await insertAstroInboxMessage(userId, inboxPandit.id);
+    // 5 pandits × 3 messages = 15 inbox entries
+    await insertAstroInboxMessagesForPandits(userId, pandits);
 }
 
 module.exports = {
     parseUserLanguages,
     findRandomAvailablePandits,
     notifyNewUserToPandits,
-    insertAstroInboxMessage,
+    insertAstroInboxMessagesForPandits,
     notifyPanditsOnNewUserProfile,
 };
