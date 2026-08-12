@@ -122,8 +122,23 @@ async function getRemedyItems(req, res) {
             status: true,
         };
 
-        let query = db('astroremedypoojas').where(filter).whereNull('deleted_at');
-        let countQuery = db('astroremedypoojas').where(filter).whereNull('deleted_at');
+        const now = new Date();
+        const applySamuhikTimeFilter = (q) => q.andWhere(function () {
+            // non-samuhik: always show
+            this.whereRaw("LOWER(COALESCE(pooja_type, '')) <> ?", ['samuhik'])
+                // samuhik: only if pooja_time is still in the future
+                .orWhere(function () {
+                    this.whereRaw("LOWER(pooja_type) = ?", ['samuhik'])
+                        .andWhere('pooja_time', '>', now);
+                });
+        });
+
+        let query = applySamuhikTimeFilter(
+            db('astroremedypoojas').where(filter).whereNull('deleted_at')
+        );
+        let countQuery = applySamuhikTimeFilter(
+            db('astroremedypoojas').where(filter).whereNull('deleted_at')
+        );
 
         if (name?.trim()) {
             query = query.where('name', 'ilike', `%${name.trim()}%`);
@@ -131,7 +146,7 @@ async function getRemedyItems(req, res) {
         }
 
         const rows = await query
-            .select('id', 'remedy_id', 'name', 'amount', 'discount', 'image', 'total_orders')
+            .select('id', 'remedy_id', 'name', 'amount', 'discount', 'image', 'total_orders', 'pooja_type', 'pooja_time')
             .orderBy('id', 'desc')
             .limit(limit)
             .offset(offset);
@@ -148,6 +163,8 @@ async function getRemedyItems(req, res) {
             discount: convertCurrency(item.discount || 0, rate),
             currency: symbol,
             total_orders: Number(item.total_orders || 0),
+            pooja_type: item.pooja_type,
+            pooja_time: item.pooja_time,
             image: getFirstImage(item.image),
         }));
 
