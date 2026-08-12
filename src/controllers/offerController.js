@@ -1,32 +1,42 @@
 const db = require('../db');
 const { expireDueUserOffers } = require('../utils/userOfferBalance');
 
-async function userHasSuccessfulPayment(userId) {
-    const payment = await db('payments')
-        .where({ user_id: Number(userId), status: 'success' })
+async function userHasCompletedOrder(userId) {
+    const order = await db('orders')
+        .where({ user_id: Number(userId), status: 'completed' })
+        .whereNull('deleted_at')
         .first();
-    return Boolean(payment);
+    return Boolean(order);
 }
 
 async function getOfferList(req, res) {
     try {
         const userId = Number(req.userId);
-        const hasPaid = await userHasSuccessfulPayment(userId);
-        if (hasPaid) {
+        const hasCompletedOrder = await userHasCompletedOrder(userId);
+        if (!hasCompletedOrder) {
             return res.status(200).json({
                 success: true,
                 data: [],
-                message: 'Offers available only for users with no payment.',
+                message: 'Offers available only after at least 1 completed order.',
             });
         }
 
+        const usedOfferIds = await db('user_offers')
+            .where({ user_id: userId })
+            .pluck('offer_id');
+
         const now = new Date();
-        const offers = await db('offers')
+        let query = db('offers')
             .where({ status: true })
             .whereNull('deleted_at')
             .andWhere('start_at', '<=', now)
-            .andWhere('end_at', '>=', now)
-            .orderBy('id', 'desc');
+            .andWhere('end_at', '>=', now);
+
+        if (usedOfferIds.length > 0) {
+            query = query.whereNotIn('id', usedOfferIds);
+        }
+
+        const offers = await query.orderBy('id', 'desc');
 
         return res.status(200).json({
             success: true,
@@ -47,11 +57,11 @@ async function applyOffer(req, res) {
             return res.status(400).json({ success: false, message: 'offer_id is required.' });
         }
 
-        const hasPaid = await userHasSuccessfulPayment(userId);
-        if (hasPaid) {
+        const hasCompletedOrder = await userHasCompletedOrder(userId);
+        if (!hasCompletedOrder) {
             return res.status(400).json({
                 success: false,
-                message: 'Offers available only for users with no payment.',
+                message: 'Offers available only after at least 1 completed order.',
             });
         }
 

@@ -1926,16 +1926,16 @@ async function createCall(req, res) {
             order_id,
         });
         await db('orders').where({ order_id }).update({ call_id: response?.data?.call_id, call_from: "user" })
-    await addOrderLog({
-        order_id,
-        action: 'call_linked',
-        status: 'pending',
-        message: 'Call id linked to order',
-        performed_by_type: 'user',
-        performed_by_id: req.userId,
-        place: 'user -> agora call',
-        meta: { call_id: response?.data?.call_id, call_from: 'user' },
-    });
+        await addOrderLog({
+            order_id,
+            action: 'call_linked',
+            status: 'pending',
+            message: 'Call id linked to order',
+            performed_by_type: 'user',
+            performed_by_id: req.userId,
+            place: 'user -> agora call',
+            meta: { call_id: response?.data?.call_id, call_from: 'user' },
+        });
         await db('order_call_log').insert({ call_id: response?.data?.call_id, order_id, pandit_id, user_id: req.userId, status: "Call Initiated" })
         res.status(200).json({ success: true, message: "Call initiated" });
 
