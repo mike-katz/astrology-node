@@ -87,6 +87,13 @@ async function getOfferList(req, res) {
             .andWhere('start_at', '<=', now)
             .andWhere('end_at', '>=', now);
 
+        // INR users → india scope only; other currencies → non-india offers
+        if (String(userCurrency).toUpperCase() === 'INR') {
+            query = query.whereRaw("LOWER(TRIM(scope)) = ?", ['india']);
+        } else {
+            query = query.whereRaw("LOWER(TRIM(scope)) <> ?", ['india']);
+        }
+
         if (usedOfferIds.length > 0) {
             query = query.whereNotIn('id', usedOfferIds);
         }
@@ -141,6 +148,17 @@ async function applyOffer(req, res) {
 
         if (!offer) {
             return res.status(400).json({ success: false, message: 'Invalid or expired offer.' });
+        }
+
+        const userRow = await db('users').select('default_currency').where({ id: userId }).first();
+        const userCurrencyCheck = String(userRow?.default_currency || 'INR').toUpperCase();
+        const offerScope = String(offer.scope || '').toLowerCase().trim();
+        const isIndiaOffer = offerScope === 'india';
+        if (userCurrencyCheck === 'INR' && !isIndiaOffer) {
+            return res.status(400).json({ success: false, message: 'This offer is not available for INR users.' });
+        }
+        if (userCurrencyCheck !== 'INR' && isIndiaOffer) {
+            return res.status(400).json({ success: false, message: 'This offer is only available for INR users.' });
         }
 
         const rawAmount = Number(offer.amount);
