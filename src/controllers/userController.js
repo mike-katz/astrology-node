@@ -788,6 +788,7 @@ async function getInboxDetail(req, res) {
                 'pandit_id',
                 'message',
                 'is_read',
+                'type',
                 'created_at',
                 'updated_at'
             )
