@@ -547,7 +547,14 @@ async function createOrder(req, res) {
                 key: `pandit_${panditId}`,
                 payload: { order_id: orderId, pandit_id: panditId },
             });
-            notifyPandit(panditId, 'New Remedy Order', `New remedy order for ${pooja.name}`, { order_id: orderId, type: 'remedy_order' });
+            let title = '🔮 New Remedy Order Assigned';
+            let body = 'Please review the order and begin the remedy soon. 🙏✨';
+
+            if (pooja.pooja_type === 'spells') {
+                title = `🔮 New ${pooja.name} Order`;
+                body = 'Please review the order and begin the remedy. 🙏';
+            }
+            notifyPandit(panditId, title, body, { order_id: orderId, type: 'remedy_order' });
         }
 
         return res.status(200).json({
@@ -596,7 +603,7 @@ async function addUserInstruction(req, res) {
         }).returning('*');
 
         if (order?.pandit_id != "") {
-            notifyPandit(order?.pandit_id, 'New Remedy Update', `User has sent message for remedy order`, {});
+            notifyPandit(order?.pandit_id, '💬 New Message from User', `The user has sent you a message regarding their Pooja order. Please check and respond. 🙏`, {});
         }
 
         return res.status(200).json({

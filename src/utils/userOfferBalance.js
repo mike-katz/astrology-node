@@ -91,7 +91,7 @@ async function expireDueUserOffers() {
                     user_old_balance: Number(user.balance || 0),
                     user_new_balance: newBalance,
                     amount: -remove,
-                    message: `Offer expired (offer_id=${locked.offer_id}, user_offer_id=${locked.id})`,
+                    message: `Offer expired `,
                     currency: locked.currency || user.default_currency || 'INR',
                     type: 'offer_expire',
                     gst: 0,
