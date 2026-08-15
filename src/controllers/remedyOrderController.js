@@ -603,7 +603,12 @@ async function addUserInstruction(req, res) {
         }).returning('*');
 
         if (order?.pandit_id != "") {
-            notifyPandit(order?.pandit_id, '💬 New Message from User', `The user has sent you a message regarding their Pooja order. Please check and respond. 🙏`, {});
+            let title = '💬 New Message from User';
+            let body = 'The user has sent you a message regarding their Pooja order. Please check and respond. 🙏';
+            if (order?.pooja_type == 'spells') {
+                body = 'The user has sent you a message regarding their Spell order. Please check and respond. 🙏';
+            }
+            notifyPandit(order?.pandit_id, title, body, {});
         }
 
         return res.status(200).json({
