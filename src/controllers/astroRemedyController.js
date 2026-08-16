@@ -220,6 +220,7 @@ async function getRemedyDetail(req, res) {
                 'p.location',
                 'p.pooja_time',
                 'p.total_orders',
+                'p.recent_orders',
                 'p.created_at',
                 'r.name as remedy_name',
                 'r.image as remedy_image',
@@ -271,7 +272,28 @@ async function getRemedyDetail(req, res) {
                 .limit(5),
         ]);
 
-        const recent_orders = recentOrderRows.map((row) => String(row?.name || '').trim() || 'User');
+        // total 5: real order users first, then fill from pooja.recent_orders (skip first)
+        const recent_orders = [];
+        for (const row of recentOrderRows) {
+            if (recent_orders.length >= 5) break;
+            recent_orders.push(String(row?.name || '').trim() || 'User');
+        }
+
+        let storedRecent = item.recent_orders;
+        if (typeof storedRecent === 'string') {
+            try {
+                storedRecent = JSON.parse(storedRecent);
+            } catch (e) {
+                storedRecent = [];
+            }
+        }
+        if (!Array.isArray(storedRecent)) storedRecent = [];
+
+        // first skip, then fill remaining slots up to 5
+        for (const name of storedRecent.slice(1)) {
+            if (recent_orders.length >= 5) break;
+            recent_orders.push(String(name || '').trim() || 'User');
+        }
 
         let priceArray = deepParse(item.price_array);
         if (Array.isArray(priceArray)) {
