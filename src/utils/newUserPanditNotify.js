@@ -2,9 +2,21 @@ const db = require('../db');
 const { sendBulkPush } = require('../controllers/reviewController');
 
 const ASTRO_INBOX_MESSAGES = [
+    'Hi! Now that your profile is complete, would you like to explore your career growth or love life?',
+    'Welcome to AstroGuruji! I can look at your planetary positions and guide you on the challenges you may be facing.',
+    'Hello! Would you like me to check what your kundli indicates about marriage, career, or finances?',
+    'Namaste! Your birth details can reveal important patterns — would you like to start with career, marriage, or personal growth?',
+    'Hello and welcome! Shall I take a look at your kundli and help you understand your current planetary influences?',
+    'Hi! If something has been on your mind lately, tell me about it and I can guide you through what your chart indicates.',
+    'Namaste! I would love to help you understand your kundli. What would you like guidance on first — love, career, or money?',
+    'Welcome! Your planetary periods can reveal a lot about the phase you are going through. Shall we explore them together?',
+    'Hello! Looking for clarity about your future? We can start with marriage, career, finances, or any concern on your mind.',
+    'Hi! I have your birth details. Would you like me to check your upcoming opportunities or challenges first?',
     'Namaste! Looking at your kundli, would you like guidance on career or relationships first?',
     'Welcome to AstroGuruji. Shall I check your current dasha and suggest the right remedies?',
     'Hello! I can help with marriage timing, career path, or health concerns — what should we start with?',
+    'Namaste! Let us explore what your kundli says about your current life phase. Which area would you like to understand better?',
+    'Welcome to AstroGuruji! Whether it is relationships, career, or finances, I can help you find clarity through your kundli.'
 ];
 
 function parseUserLanguages(languageField) {
@@ -70,11 +82,24 @@ async function notifyUserAboutNewAstrologer(userToken, pandit) {
     });
 }
 
+function pickRandomInboxMessages(countMin = 2, countMax = 3) {
+    const pool = [...ASTRO_INBOX_MESSAGES];
+    for (let i = pool.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [pool[i], pool[j]] = [pool[j], pool[i]];
+    }
+    const max = Math.min(countMax, pool.length);
+    const min = Math.min(countMin, max);
+    const count = min + Math.floor(Math.random() * (max - min + 1));
+    return pool.slice(0, count);
+}
+
 async function insertAstroInboxMessagesForPandits(userId, pandits) {
     const now = new Date();
     const rows = [];
     for (const pandit of pandits) {
-        for (const message of ASTRO_INBOX_MESSAGES) {
+        const messages = pickRandomInboxMessages(2, 3);
+        for (const message of messages) {
             rows.push({
                 user_id: Number(userId),
                 pandit_id: Number(pandit.id),
@@ -95,8 +120,8 @@ function wait(ms) {
 }
 
 /**
- * 1 pandit: notify pandit + notify user + 3 inbox msgs, then wait 2 min, next...
- * Runs in background so profile API does not hang (~8 min for 5 pandits).
+ * 1 pandit: notify pandit + notify user + random 2–3 inbox msgs, then wait, next...
+ * Runs in background so profile API does not hang.
  */
 async function processPanditsWithDelay(userId, userName, pandits) {
     const delayMs = 1 * 60 * 1000;
