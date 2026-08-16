@@ -76,7 +76,7 @@ async function sendSMS(mobile, country_code) {
                 headers: {},
             };
             const data = await axios.request(config);
-            console.log("otp response data", data);
+            // console.log("otp response data", data);
         } else {
             const otpMessage = `${OTP} is the One Time Password (OTP) for AstroGuruji Application.`;
             const phone = `${country_code}${mobile}`;
