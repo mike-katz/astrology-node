@@ -8,6 +8,7 @@ require('dotenv').config();
 const { deleteKey } = require('../config/redisClient');
 const { uploadImageToAzure, deleteFileFromAzure } = require('../utils/azureUploader');
 const { getCurrencySymbolByCurrency, getCurrencyIconByCurrency } = require('../utils/countryCurrencyMap');
+const { notifyPanditsOnNewUserProfile } = require('../utils/newUserPanditNotify');
 
 async function makeAvtarString(user, gender) {
     if (!user || !gender) return null;
@@ -178,6 +179,19 @@ async function updateProfile(req, res) {
             update.user_id = req.userId
             await db('userprofiles')
                 .insert(update);
+
+            try {
+                const languageField = language?.length > 0
+                    ? JSON.stringify(language)
+                    : user?.language;
+                await notifyPanditsOnNewUserProfile(
+                    req.userId,
+                    name || user?.name,
+                    languageField
+                );
+            } catch (notifyErr) {
+                console.error('updateProfile new-user pandit notify error:', notifyErr?.message || notifyErr);
+            }
         }
         return res.status(200).json({ success: true, message: 'Profile update Successfully' });
     } catch (err) {
@@ -684,6 +698,129 @@ async function getGiftList(req, res) {
     }
 }
 
+async function getInboxMessages(req, res) {
+    try {
+        let page = parseInt(req.query.page) || 1;
+        let limit = parseInt(req.query.limit) || 20;
+        if (page < 1) page = 1;
+        if (limit < 1) limit = 20;
+
+        const offset = (page - 1) * limit;
+        const userId = Number(req.userId);
+
+        const countRow = await db('inbox_messages')
+            .where({ user_id: userId })
+            .countDistinct('pandit_id as count')
+            .first();
+
+        const results = await db('inbox_messages as im')
+            .leftJoin('pandits as p', 'p.id', 'im.pandit_id')
+            .select(
+                'im.pandit_id',
+                'p.display_name as pandit_name',
+                'p.profile as pandit_profile',
+                'p.online as pandit_online',
+                db.raw('MAX(im.id) as id'),
+                db.raw('(ARRAY_AGG(im.message ORDER BY im.created_at DESC))[1] as message'),
+                db.raw('BOOL_OR(im.is_read = false) as has_unread'),
+                db.raw('COUNT(im.id)::int as message_count'),
+                db.raw('COUNT(im.id) FILTER (WHERE im.is_read = false)::int as unread_count'),
+                db.raw('MAX(im.created_at) as created_at'),
+                db.raw('MAX(im.updated_at) as updated_at')
+            )
+            .where('im.user_id', userId)
+            .groupBy('im.pandit_id', 'p.display_name', 'p.profile', 'p.online')
+            .orderByRaw('MAX(im.created_at) DESC')
+            .limit(limit)
+            .offset(offset);
+
+        const total = parseInt(countRow?.count) || 0;
+        return res.status(200).json({
+            success: true,
+            data: {
+                page,
+                limit,
+                total,
+                totalPages: Math.ceil(total / limit),
+                results,
+            },
+            message: 'Inbox messages fetched successfully',
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
+async function getInboxDetail(req, res) {
+    try {
+        const panditId = Number(req.query.pandit_id);
+        if (!panditId) {
+            return res.status(400).json({ success: false, message: 'pandit_id is required.' });
+        }
+
+        let page = parseInt(req.query.page) || 1;
+        let limit = parseInt(req.query.limit) || 20;
+        if (page < 1) page = 1;
+        if (limit < 1) limit = 20;
+
+        const offset = (page - 1) * limit;
+        const userId = Number(req.userId);
+
+        const pandit = await db('pandits')
+            .select('id', 'display_name as name', 'profile', 'online')
+            .where({ id: panditId })
+            .whereNull('deleted_at')
+            .first();
+
+        if (!pandit) {
+            return res.status(404).json({ success: false, message: 'Pandit not found.' });
+        }
+
+        const [{ count }] = await db('inbox_messages')
+            .count('* as count')
+            .where({ user_id: userId, pandit_id: panditId });
+
+        const results = await db('inbox_messages')
+            .select(
+                'id',
+                'user_id',
+                'pandit_id',
+                'message',
+                'is_read',
+                'type',
+                'created_at',
+                'updated_at'
+            )
+            .where({ user_id: userId, pandit_id: panditId })
+            .orderBy('created_at', 'desc')
+            .limit(limit)
+            .offset(offset);
+
+        // mark unread as read when opening chat
+        await db('inbox_messages')
+            .where({ user_id: userId, pandit_id: panditId, is_read: false })
+            .update({ is_read: true, updated_at: new Date() });
+
+        const total = parseInt(count) || 0;
+        return res.status(200).json({
+            success: true,
+            data: {
+                pandit,
+                page,
+                limit,
+                total,
+                totalPages: Math.ceil(total / limit),
+                results,
+            },
+            message: 'Inbox detail fetched successfully',
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
 
 
-module.exports = { updateProfile, getProfile, getBalance, updateToken, profileUpdate, makeAvtarString, deleteMyAccount, getRecharge, getRechargeBanner, getCookie, getRecommendations, findIsFree, getUserStats, getCurrencyList, updateCurrency, getGiftList };
+
+module.exports = { updateProfile, getProfile, getBalance, updateToken, profileUpdate, makeAvtarString, deleteMyAccount, getRecharge, getRechargeBanner, getCookie, getRecommendations, findIsFree, getUserStats, getCurrencyList, updateCurrency, getGiftList, getInboxMessages, getInboxDetail };

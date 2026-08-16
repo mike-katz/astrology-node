@@ -4,6 +4,7 @@ const { deepParse, convertCurrency, calculateUserChargeAmount } = require('../ut
 const { callEvent } = require('../socket');
 const { RtcTokenBuilder, RtcRole } = require('agora-access-token');
 const { getCurrencySymbolByCurrency } = require('../utils/countryCurrencyMap');
+const { consumeUserOfferRemaining } = require('../utils/userOfferBalance');
 require('dotenv').config();
 
 const AGORA_APP_ID = process.env.AGORA_APP_ID;
@@ -178,6 +179,7 @@ async function deductUserBalance(trx, userId, amount, message, orderId, panditId
     }
     const newBalance = Number(user.balance) - amount;
     await trx('users').where({ id: userId }).update({ balance: newBalance });
+    await consumeUserOfferRemaining(trx, userId, amount);
     await trx('balancelogs').insert({
         order_id: orderId,
         user_id: userId,
@@ -526,6 +528,7 @@ async function createOrder(req, res) {
                 ...ashirvadData,
             }).returning('*');
 
+            await trx('astroremedypoojas').where({ id: Number(pooja_id) }).increment('total_orders', 1);
             await trx('remedy_order_chat').insert({
                 remedy_order_id: savedOrder.id,
                 user_id: Number(req.userId),
@@ -544,7 +547,14 @@ async function createOrder(req, res) {
                 key: `pandit_${panditId}`,
                 payload: { order_id: orderId, pandit_id: panditId },
             });
-            notifyPandit(panditId, 'New Remedy Order', `New remedy order for ${pooja.name}`, { order_id: orderId, type: 'remedy_order' });
+            let title = '🔮 New Remedy Order Assigned';
+            let body = 'Please review the order and begin the remedy soon. 🙏✨';
+
+            if (pooja.pooja_type === 'spells') {
+                title = `🔮 New ${pooja.name} Order`;
+                body = 'Please review the order and begin the remedy. 🙏';
+            }
+            notifyPandit(panditId, title, body, { order_id: orderId, type: 'remedy_order' });
         }
 
         return res.status(200).json({
@@ -593,7 +603,12 @@ async function addUserInstruction(req, res) {
         }).returning('*');
 
         if (order?.pandit_id != "") {
-            notifyPandit(order?.pandit_id, 'New Remedy Update', `User has sent message for remedy order`, {});
+            let title = '💬 New Message from User';
+            let body = 'The user has sent you a message regarding their Pooja order. Please check and respond. 🙏';
+            if (order?.pooja_type == 'spells') {
+                body = 'The user has sent you a message regarding their Spell order. Please check and respond. 🙏';
+            }
+            notifyPandit(order?.pandit_id, title, body, {});
         }
 
         return res.status(200).json({

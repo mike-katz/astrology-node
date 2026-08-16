@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const db = require('../db');
+const { addOrderLog } = require('../utils/orderLog');
 const RedisCache = require('../config/redisClient');
 const { callEvent } = require('../socket');
 const logger = require('../utils/logger').getLogger('liveStreamingController');
@@ -653,7 +654,16 @@ async function createMediaOrder(req, res) {
             ins.is_offer = true
         }
         await db('users').where({ id: Number(req.userId) }).update(upd);
-        await db('orders').insert(ins).returning('*');
+        const [savedLiveOrder] = await db('orders').insert(ins).returning('*');
+        await addOrderLog({
+            order: savedLiveOrder,
+            action: 'created',
+            status: savedLiveOrder?.status || 'pending',
+            message: 'Live order created',
+            performed_by_type: 'user',
+            performed_by_id: req.userId,
+            place: 'user -> create live order',
+        });
         callEvent('emit_to_live_call_receive', {
             key: `pandit_${pandit?.id}`,
             payload: { order_id: orderId, type, user_id: req.userId, username: user?.name, profile: user?.profile, avatar: user?.avatar },
@@ -764,6 +774,16 @@ async function rejectOrder(req, res) {
         upd.order_action = "user -> order rejected";
         upd.canceled_at = new Date()
         await db('orders').where({ id: order?.id }).update(upd);
+        await addOrderLog({
+            order,
+            action: 'rejected',
+            status,
+            message: 'Live order rejected by user',
+            performed_by_type: 'user',
+            performed_by_id: req.userId,
+            place: 'user -> reject live order',
+            meta: upd,
+        });
 
         callEvent("emit_to_live_call_reject", {
             key: `pandit_${order?.pandit_id}`,

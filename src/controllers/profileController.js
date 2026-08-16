@@ -2,6 +2,7 @@ const db = require('../db');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { makeAvtarString } = require('./userController');
+const { notifyPanditsOnNewUserProfile } = require('../utils/newUserPanditNotify');
 require('dotenv').config();
 
 const MARITAL_STATUS = ['single', 'married', 'divorced', 'separated', 'widowed'];
@@ -60,6 +61,17 @@ async function addProfile(req, res) {
             const avatar = await makeAvtarString(name, gender)
             ins.avatar = avatar
             await db('users').where({ id: req.userId }).update(ins);
+
+            try {
+                const userRow = await db('users').select('language', 'name').where({ id: req.userId }).first();
+                await notifyPanditsOnNewUserProfile(
+                    req.userId,
+                    name || userRow?.name,
+                    userRow?.language
+                );
+            } catch (notifyErr) {
+                console.error('addProfile new-user pandit notify error:', notifyErr?.message || notifyErr);
+            }
         }
         return res.status(200).json({ success: true, data: response, message: 'Profile Successfully' });
     } catch (err) {

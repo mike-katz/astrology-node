@@ -41,6 +41,8 @@ router.get('/check-is-free', user.findIsFree);
 router.get('/statistics-count', user.getUserStats);
 router.get('/currency-list', user.getCurrencyList);
 router.get('/gift', user.getGiftList);
+router.get('/inbox', user.getInboxMessages);
+router.get('/inbox/detail', user.getInboxDetail);
 router.post('/profileUpdate',
     upload.fields([
         { name: 'profile', maxCount: 1 },

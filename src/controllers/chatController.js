@@ -14,6 +14,8 @@ const { emitCallDurationUpdate } = require('../callSocket');
 const { replaceTemplate } = require('../utils/replaceTemplate');
 const admin = require('../config/firebase');
 const { sendAutoMessage } = require('./orderController');
+const { consumeUserOfferRemaining } = require('../utils/userOfferBalance');
+const { addOrderLog } = require('../utils/orderLog');
 
 async function getRoom(req, res) {
     logger.info('chat_getRoom', { userId: req.userId });
@@ -536,6 +538,16 @@ async function balanceCut(user_id, order, end_time, place) {
                 return;
             }
 
+            await addOrderLog({
+                order: lockedOrder,
+                action: 'completed',
+                status: 'completed',
+                message: 'Order completed',
+                performed_by_type: 'system',
+                place,
+                meta: updOrder,
+            }, trx);
+
             // 7. User balance cut — only if paid
             const updUser = { is_free_order_available: false }
             // if (!isFreeOrder) {
@@ -545,6 +557,9 @@ async function balanceCut(user_id, order, end_time, place) {
                 updUser.offer_amount = 0
             }
             await trx('users').where({ id: user_id }).update(updUser);
+            if (Number(deduction) > 0) {
+                await consumeUserOfferRemaining(trx, user_id, deduction);
+            }
 
             // 9. Chat system messages — transaction ANDAR
             let chatSystemMessage = null;
@@ -1114,6 +1129,16 @@ async function newCreateOrder(req, res) {
         await db('users').where({ id: Number(req.userId) }).update(upd);
 
         const [saved] = await db('orders').insert(ins).returning('*');
+        await addOrderLog({
+            order: saved,
+            action: 'created',
+            status: saved?.status || 'pending',
+            message: 'Order created',
+            performed_by_type: 'user',
+            performed_by_id: req.userId,
+            place: 'user -> create chat/call order',
+            meta: { type: saved?.type, is_offer: saved?.is_offer },
+        });
         // console.log("order inserted", saved);
 
         // console.log("start socket call");
@@ -1441,6 +1466,16 @@ async function orderAccept(req, res) {
         const endTime = new Date(Date.now() + `${duration}` * 60 * 1000);
         logger.info('order_acceptOrder update', { orderId, status: "continue", duration, deduction, start_time: startTime, end_time: endTime });
         await db('orders').where({ id: order?.id }).update({ status: "continue", duration, deduction, start_time: startTime, end_time: endTime });
+        await addOrderLog({
+            order,
+            action: 'accepted_by_user',
+            status: 'continue',
+            message: 'Order accepted by user',
+            performed_by_type: 'user',
+            performed_by_id: req.userId,
+            place: 'user -> accept chat order',
+            meta: { duration, deduction, start_time: startTime, end_time: endTime },
+        });
         await db('pandits').where({ id: order?.pandit_id }).update({ waiting_time: endTime });
 
         if (order?.profile_id && order.type == 'chat') {
@@ -1584,6 +1619,16 @@ async function orderCancel(req, res) {
         upd.order_action = "user -> order canceled";
         upd.canceled_at = new Date()
         await db('orders').where({ id: order?.id }).update(upd);
+        await addOrderLog({
+            order,
+            action: 'cancelled',
+            status,
+            message: 'Order cancelled by user',
+            performed_by_type: 'user',
+            performed_by_id: req.userId,
+            place: 'user -> cancel chat order',
+            meta: upd,
+        });
         await db('pandits').where({ id: order.pandit_id }).update({ waiting_time: null });
 
         callEvent("emit_to_pending_order", {
@@ -1636,6 +1681,16 @@ async function orderReject(req, res) {
         upd.order_action = "user -> order rejected";
         upd.canceled_at = new Date()
         await db('orders').where({ id: order?.id }).update(upd);
+        await addOrderLog({
+            order,
+            action: 'rejected',
+            status,
+            message: 'Order rejected by user',
+            performed_by_type: 'user',
+            performed_by_id: req.userId,
+            place: 'user -> reject chat order',
+            meta: upd,
+        });
         await db('pandits').where({ id: order.pandit_id }).update({ waiting_time: null });
         callEvent("emit_to_pending_order", {
             key: `pandit_${order?.pandit_id}`,
@@ -1871,6 +1926,16 @@ async function createCall(req, res) {
             order_id,
         });
         await db('orders').where({ order_id }).update({ call_id: response?.data?.call_id, call_from: "user" })
+        await addOrderLog({
+            order_id,
+            action: 'call_linked',
+            status: 'pending',
+            message: 'Call id linked to order',
+            performed_by_type: 'user',
+            performed_by_id: req.userId,
+            place: 'user -> agora call',
+            meta: { call_id: response?.data?.call_id, call_from: 'user' },
+        });
         await db('order_call_log').insert({ call_id: response?.data?.call_id, order_id, pandit_id, user_id: req.userId, status: "Call Initiated" })
         res.status(200).json({ success: true, message: "Call initiated" });
 
@@ -1979,6 +2044,16 @@ async function rejectAgoraCall(req, res) {
     if (!order) return res.status(400).json({ success: false, message: 'Missing params.' });
 
     await db('orders').where({ order_id }).update({ status: "rejected" });
+    await addOrderLog({
+        order_id,
+        order,
+        action: 'rejected',
+        status: 'rejected',
+        message: 'Agora call order rejected',
+        performed_by_type: 'user',
+        performed_by_id: req.userId,
+        place: 'user -> reject agora call',
+    });
     callEvent("emit_to_u_call_order_reject", {
         key: `pandit_${order?.pandit_id}`,
         payload: { order_id }

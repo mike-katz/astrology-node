@@ -1,5 +1,6 @@
 const { io } = require('socket.io-client');
 const db = require('./db');
+const { addOrderLog } = require('./utils/orderLog');
 const { callEvent } = require("./socket");
 
 // Socket.IO uses http(s) URL; use env or default
@@ -83,6 +84,15 @@ function connect() {
                 createdAt = (new Date(endTime))
                 console.log("upd params", { status: "continue", duration, deduction, start_time: startTime, end_time: endTime });
                 await db('orders').where({ id: order?.id }).update({ status: "continue", duration, deduction, start_time: startTime, end_time: endTime });
+                await addOrderLog({
+                    order,
+                    action: 'accepted_by_user',
+                    status: 'continue',
+                    message: 'Order accepted via call socket',
+                    performed_by_type: 'system',
+                    place: 'callSocket -> source-answered',
+                    meta: { duration, deduction, start_time: startTime, end_time: endTime },
+                });
                 await db('pandits').where({ id: order?.pandit_id }).update({ waiting_time: endTime });
             }
             let diffSeconds = Math.floor((createdAt.getTime() - Date.now()) / 1000);
@@ -141,6 +151,14 @@ function connect() {
                 if (call?.status == 'Call Initiated') {
                     status = 'Astrologer Rejected'
                     await db('orders').where({ id: order?.id }).update({ status: "cancel" });
+                    await addOrderLog({
+                        order,
+                        action: 'cancelled',
+                        status: 'cancel',
+                        message: 'Order cancelled via call socket',
+                        performed_by_type: 'system',
+                        place: 'callSocket -> cancel',
+                    });
                     callEvent("emit_to_pending_order", {
                         key: `pandit_${pandit_id}`,
                         payload: { pandit_id: pandit_id }
@@ -152,6 +170,14 @@ function connect() {
                 if (call?.status == 'Astrologer Accepted') {
                     status = 'User Rejected'
                     await db('orders').where({ id: order?.id }).update({ status: "rejected" });
+                    await addOrderLog({
+                        order,
+                        action: 'rejected',
+                        status: 'rejected',
+                        message: 'Order rejected via call socket',
+                        performed_by_type: 'system',
+                        place: 'callSocket -> rejected',
+                    });
                     callEvent("emit_to_pending_order", {
                         key: `pandit_${pandit_id}`,
                         payload: { pandit_id: pandit_id }

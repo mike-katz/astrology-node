@@ -53,9 +53,9 @@ function getStateShortCode(address) {
 }
 
 async function generateInvoicePDF(data) {
-    const { transaction_id, } = data;
+    const { transaction_id, template = 'invoice' } = data;
     console.log("data", data);
-    const templatePath = path.join(__dirname, 'invoice.html');
+    const templatePath = path.join(__dirname, `${template}.html`);
     let html = fs.readFileSync(templatePath, 'utf8');
     const stateCode = getStateShortCode(data?.city);
     data.place = stateCode || ''
