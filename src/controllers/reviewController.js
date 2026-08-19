@@ -43,7 +43,8 @@ async function sendBulkPush(tokens, title, body, data = {}) {
                     alert: {
                         title: title
                     },
-                    sound: 'default'
+                    sound: 'default',
+                    badge: 1,
                 }
             }
         },

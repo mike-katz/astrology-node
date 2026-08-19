@@ -1283,7 +1283,8 @@ async function sendNotification(token, username, chat_call_rate, panditId, type,
                                 alert: {
                                     title: messages
                                 },
-                                sound: 'default'
+                                sound: 'default',
+                                badge: 1,
                             }
                         }
                     },
@@ -1339,7 +1340,8 @@ async function sendNotification(token, username, chat_call_rate, panditId, type,
                                 alert: {
                                     title: messages
                                 },
-                                sound: "default"
+                                sound: "default",
+                                badge: 1,
                             }
                         }
                     },

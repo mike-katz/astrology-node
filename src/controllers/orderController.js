@@ -511,7 +511,8 @@ async function sendNotification(token, username, chat_call_rate, panditId, type,
                     },
                     payload: {
                         aps: {
-                            "content-available": 1
+                            "content-available": 1,
+                            badge: 1,
                         },
                         // Your custom data
                         type: type == 'chat' ? "incoming_chat" : "incoming_call",
