@@ -273,7 +273,8 @@ async function notifyUser(userId, title, body, data = {}) {
                         alert: {
                             title: title
                         },
-                        sound: 'default'
+                        sound: 'default',
+                        badge: 1,
                     }
                 }
             },
@@ -310,7 +311,8 @@ async function notifyPandit(panditId, title, body, data = {}) {
                         alert: {
                             title: title
                         },
-                        sound: 'default'
+                        sound: 'default',
+                        badge: 1,
                     }
                 }
             },
