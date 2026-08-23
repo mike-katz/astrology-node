@@ -8,7 +8,8 @@
     "start:socket": "pm2 start src/socket3.js --name ASTRO_SOCKET_API",
     "dev": "nodemon src/server.js",
     "migrate": "knex migrate:latest --knexfile knexfile.js",
-    "migrate:rollback": "knex migrate:rollback --knexfile knexfile.js"
+    "migrate:rollback": "knex migrate:rollback --knexfile knexfile.js",
+    "start:expire-offers": "pm2 start src/cron/expireOffers.js --name ASTRO_EXPIRE_OFFERS --time"
   },
   "dependencies": {
     "@azure/storage-blob": "^12.31.0",
