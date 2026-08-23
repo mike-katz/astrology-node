@@ -74,6 +74,7 @@ app.use('/blog', blogRoutes);
 app.use('/banners', bannerRoutes);
 app.use('/call', authRoutes);
 // app.use('/agora', agoraRoutes);
+app.use('/remedy', astroRemedyRoutes);
 
 app.use(auth)
 app.use('/chat', chatRoutes);
