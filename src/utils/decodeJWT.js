@@ -113,6 +113,7 @@ const generateLoginResponse = async (existing, currency) => {
             profile: existing?.profile,
             avatar: existing?.avatar,
             mobile: existing?.mobile,
+            allow_notification: existing?.allow_notification,
             country_code: existing?.country_code,
             token: encryptToken,
             is_free

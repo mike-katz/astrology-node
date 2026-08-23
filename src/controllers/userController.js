@@ -237,6 +237,38 @@ async function updateToken(req, res) {
     }
 }
 
+async function updateAllowNotification(req, res) {
+    try {
+        let { allow_notification } = req.body || {};
+        if (allow_notification === undefined || allow_notification === null) {
+            return res.status(400).json({ success: false, message: 'allow_notification is required.' });
+        }
+
+        if (typeof allow_notification === 'string') {
+            const normalized = allow_notification.trim().toLowerCase();
+            if (normalized === 'true' || normalized === '1') allow_notification = true;
+            else if (normalized === 'false' || normalized === '0') allow_notification = false;
+        }
+
+        if (typeof allow_notification !== 'boolean') {
+            return res.status(400).json({ success: false, message: 'allow_notification must be true or false.' });
+        }
+
+        const user = await db('users').where({ id: req.userId }).first();
+        if (!user) return res.status(400).json({ success: false, message: 'User not found.' });
+
+        await db('users').where({ id: req.userId }).update({ allow_notification });
+        return res.status(200).json({
+            success: true,
+            data: { allow_notification },
+            message: 'Notification preference updated successfully',
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
 async function profileUpdate(req, res) {
     try {
         const order = await db('users').where({ id: req.userId }).first();
@@ -823,4 +855,4 @@ async function getInboxDetail(req, res) {
 
 
 
-module.exports = { updateProfile, getProfile, getBalance, updateToken, profileUpdate, makeAvtarString, deleteMyAccount, getRecharge, getRechargeBanner, getCookie, getRecommendations, findIsFree, getUserStats, getCurrencyList, updateCurrency, getGiftList, getInboxMessages, getInboxDetail };
+module.exports = { updateProfile, getProfile, getBalance, updateToken, updateAllowNotification, profileUpdate, makeAvtarString, deleteMyAccount, getRecharge, getRechargeBanner, getCookie, getRecommendations, findIsFree, getUserStats, getCurrencyList, updateCurrency, getGiftList, getInboxMessages, getInboxDetail };
