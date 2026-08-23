@@ -269,6 +269,25 @@ async function updateAllowNotification(req, res) {
     }
 }
 
+async function getAllowNotification(req, res) {
+    try {
+        const user = await db('users')
+            .select('allow_notification')
+            .where({ id: req.userId })
+            .first();
+        if (!user) return res.status(400).json({ success: false, message: 'User not found.' });
+
+        return res.status(200).json({
+            success: true,
+            data: { allow_notification: Boolean(user.allow_notification) },
+            message: 'Notification preference fetched successfully',
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
 async function profileUpdate(req, res) {
     try {
         const order = await db('users').where({ id: req.userId }).first();
@@ -855,4 +874,4 @@ async function getInboxDetail(req, res) {
 
 
 
-module.exports = { updateProfile, getProfile, getBalance, updateToken, updateAllowNotification, profileUpdate, makeAvtarString, deleteMyAccount, getRecharge, getRechargeBanner, getCookie, getRecommendations, findIsFree, getUserStats, getCurrencyList, updateCurrency, getGiftList, getInboxMessages, getInboxDetail };
+module.exports = { updateProfile, getProfile, getBalance, updateToken, updateAllowNotification, getAllowNotification, profileUpdate, makeAvtarString, deleteMyAccount, getRecharge, getRechargeBanner, getCookie, getRecommendations, findIsFree, getUserStats, getCurrencyList, updateCurrency, getGiftList, getInboxMessages, getInboxDetail };
