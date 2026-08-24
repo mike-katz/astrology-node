@@ -74,7 +74,6 @@ app.use('/blog', blogRoutes);
 app.use('/banners', bannerRoutes);
 app.use('/call', authRoutes);
 // app.use('/agora', agoraRoutes);
-app.use('/astro-remedy', astroRemedyRoutes);
 app.use('/remedy', astroRemedyRoutes);
 app.use(auth)
 app.use('/chat', chatRoutes);
@@ -89,7 +88,7 @@ app.use('/support-ticket', supportTicketRoutes);
 app.use('/agora', agoraRoutes);
 app.use('/call', callRoutes);
 app.use('/live-stream', liveStreamingRoutes);
-
+app.use('/astro-remedy', astroRemedyRoutes);
 
 
 app.use((err, req, res, next) => {
