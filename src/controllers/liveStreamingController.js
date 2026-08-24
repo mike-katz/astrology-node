@@ -578,7 +578,7 @@ async function createMediaOrder(req, res) {
         const userBalance = user?.balance
 
         let duration = Math.floor(Number(Number(userBalance)) / Number(panditRate));
-        let deduction = Number(duration) * Number(pandit?.final_chat_call_rate)
+        let deduction = Number(duration) * Number(panditRate)
         let rate = panditRate;
         const settings = await db('settings').first();
         const isFreeOrderAvail = user?.is_free_order_available || false
