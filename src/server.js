@@ -64,7 +64,7 @@ app.use('/auth', authRoutes);
 app.use('/firebase/auth', firebaseAuthRoutes);
 app.use('/pandit', panditRoutes);
 app.use('/upload', panditRoutes);
-// app.use('/kundli', kundliRoutes);
+app.use('/kundli', kundliRoutes);
 app.use('/cancel-callback', callBackRoutes);
 app.use('/freeKundli', freeKundliRoutes);
 app.use('/faq', faqRoutes);
@@ -75,6 +75,7 @@ app.use('/banners', bannerRoutes);
 app.use('/call', authRoutes);
 // app.use('/agora', agoraRoutes);
 app.use('/astro-remedy', astroRemedyRoutes);
+app.use('/remedy', astroRemedyRoutes);
 app.use(auth)
 app.use('/chat', chatRoutes);
 app.use('/order', orderRoutes);
