@@ -64,7 +64,7 @@ app.use('/auth', authRoutes);
 app.use('/firebase/auth', firebaseAuthRoutes);
 app.use('/pandit', panditRoutes);
 app.use('/upload', panditRoutes);
-// app.use('/kundli', kundliRoutes);
+app.use('/kundli', kundliRoutes);
 app.use('/cancel-callback', callBackRoutes);
 app.use('/freeKundli', freeKundliRoutes);
 app.use('/faq', faqRoutes);
