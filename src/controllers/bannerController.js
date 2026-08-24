@@ -1,4 +1,7 @@
 const db = require('../db');
+const geoip = require('geoip-lite');
+const { getClientIp } = require('../utils/getClientIp');
+const { getCurrencyByCountry } = require('../utils/countryCurrencyMap');
 require('dotenv').config();
 
 async function getList(req, res) {
@@ -6,7 +9,22 @@ async function getList(req, res) {
         let platform = req.query.platform;
         if (!platform) return res.status(400).json({ success: false, message: 'Missing params.' });
 
-        let query = db('banners').whereNull('deleted_at').orderBy('id', 'asc');
+        const ip = getClientIp(req);
+        let currency = null;
+        if (ip) {
+            const geo = geoip.lookup(ip);
+            if (geo?.country) {
+                currency = getCurrencyByCountry(geo.country)?.currency || null;
+            }
+        }
+
+        let query = db('banners')
+            .whereNull('deleted_at')
+            .andWhere(function () {
+                this.whereNull('currency').orWhere('currency', '');
+                if (currency) this.orWhere('currency', currency);
+            })
+            .orderBy('id', 'asc');
 
         if (platform !== undefined && platform !== null && platform !== '') {
             const platforms = Array.isArray(platform) ? platform : [platform];
