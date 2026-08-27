@@ -83,8 +83,13 @@ function getXpayBaseUrl() {
     return (process.env.XPAY_URL || 'https://api.xpaycheckout.com').replace(/\/$/, '');
 }
 
-function buildRechargeAmounts(amount, currencyRate) {
-    const taxPercent = Number(currencyRate?.user_tax_percentage || 0);
+function normalizePoojaId(pooja_id) {
+    if (pooja_id === undefined || pooja_id === null || String(pooja_id).trim() === '') return null;
+    return pooja_id;
+}
+
+function buildRechargeAmounts(amount, currencyRate, { skipGst } = {}) {
+    const taxPercent = skipGst ? 0 : Number(currencyRate?.user_tax_percentage || 0);
     const currencyTax = taxPercent + 100;
     const gatewayCurrency = currencyRate?.currency_name || 'INR';
     const inrRate = Number(currencyRate?.user_inr_rate || 1);
@@ -108,7 +113,7 @@ function buildRechargeAmounts(amount, currencyRate) {
     };
 }
 
-async function initXpayPayment({ user, userId, amount, currencyRate, from }) {
+async function initXpayPayment({ user, userId, amount, currencyRate, from, pooja_id }) {
     const publicKey = process.env.XPAY_PUBLIC_KEY;
     const secretKey = process.env.XPAY_SECRET_KEY;
     let callbackUrl = process.env.XPAY_CALLBACK_URL;
@@ -124,7 +129,7 @@ async function initXpayPayment({ user, userId, amount, currencyRate, from }) {
         return { error: { status: 500, message: 'xPay callback URL is not configured.' } };
     }
 
-    const { dbAmount, dbGst, dbCurrency, gatewayAmountMinor, gatewayCurrency } = buildRechargeAmounts(amount, currencyRate);
+    const { dbAmount, dbGst, dbCurrency, gatewayAmountMinor, gatewayCurrency } = buildRechargeAmounts(amount, currencyRate, { skipGst: !!pooja_id });
     const receiptId = `rcpt_${userId}_${Date.now()}`;
     const contactNumber = `${user.country_code || '+91'}${user.mobile}`;
     const { data: intent } = await axios.post(
@@ -159,7 +164,7 @@ async function initXpayPayment({ user, userId, amount, currencyRate, from }) {
         }
     );
 
-    const offer_amount = await getFirstRechargeOfferAmount(user, dbAmount);
+    const offer_amount = pooja_id ? 0 : await getFirstRechargeOfferAmount(user, dbAmount);
     await db('payments').insert({
         user_id: userId,
         order_id: intent.xIntentId,
@@ -169,7 +174,8 @@ async function initXpayPayment({ user, userId, amount, currencyRate, from }) {
         currency: dbCurrency,
         type: 'recharge',
         offer_amount,
-        device: user?.mode
+        device: user?.mode,
+        pooja_id: pooja_id || null,
     });
 
     return {
@@ -183,14 +189,14 @@ async function initXpayPayment({ user, userId, amount, currencyRate, from }) {
     };
 }
 
-async function initRazorpayPayment({ user, userId, amount, currencyRate, gateway }) {
+async function initRazorpayPayment({ user, userId, amount, currencyRate, gateway, pooja_id }) {
     const keyId = gateway?.credentials?.key_id || "rzp_test_S9nToUfWEFILCz";
     const keySecret = gateway?.credentials?.key_secret || "HTbBCXlFb7xEa2rVltcKIvNy";
     if (!keyId || !keySecret) {
         return { error: { status: 500, message: 'Razorpay is not configured.' } };
     }
 
-    let { dbAmount, dbGst, dbCurrency, gatewayAmountMinor, gatewayCurrency } = buildRechargeAmounts(amount, currencyRate);
+    let { dbAmount, dbGst, dbCurrency, gatewayAmountMinor, gatewayCurrency } = buildRechargeAmounts(amount, currencyRate, { skipGst: !!pooja_id });
     const receipt = `rcpt_${userId}_${Date.now()}`;
     const instance = new Razorpay({ key_id: keyId, key_secret: keySecret });
     const order = await instance.orders.create({
@@ -200,7 +206,7 @@ async function initRazorpayPayment({ user, userId, amount, currencyRate, gateway
         notes: { user_id: String(userId) },
     });
 
-    const offer_amount = await getFirstRechargeOfferAmount(user, amount);
+    const offer_amount = pooja_id ? 0 : await getFirstRechargeOfferAmount(user, amount);
     if (offer_amount > 0) {
         dbGst = 0;
         dbAmount = amount
@@ -214,7 +220,8 @@ async function initRazorpayPayment({ user, userId, amount, currencyRate, gateway
         currency: dbCurrency,
         type: 'recharge',
         offer_amount,
-        device: user?.mode
+        device: user?.mode,
+        pooja_id: pooja_id || null,
     });
 
     return {
@@ -254,7 +261,8 @@ async function getFirstRechargeOfferAmount(user, userAmount) {
 
 /** Create payment order – INR → Razorpay, other currency → xPay */
 async function createRazorpayOrder(req, res) {
-    const { amount, from } = req.body || {};
+    const { amount, from, pooja_id: rawPoojaId } = req.body || {};
+    const pooja_id = normalizePoojaId(rawPoojaId);
     logger.info('payment_createOrder', { userId: req.userId, amount });
     try {
         if (!Number.isFinite(Number(amount)) || Number(amount) < 0) {
@@ -274,9 +282,9 @@ async function createRazorpayOrder(req, res) {
 
         let result;
         if (userCurrency !== 'INR') {
-            result = await initXpayPayment({ user, userId: req.userId, amount, currencyRate, from });
+            result = await initXpayPayment({ user, userId: req.userId, amount, currencyRate, from, pooja_id });
         } else {
-            result = await initRazorpayPayment({ user, userId: req.userId, amount, currencyRate, gateway });
+            result = await initRazorpayPayment({ user, userId: req.userId, amount, currencyRate, gateway, pooja_id });
         }
 
         if (result?.error) {
