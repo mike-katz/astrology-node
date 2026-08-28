@@ -64,6 +64,7 @@ const runInvoiceCron = async () => {
                     city: user?.city_state_country || '',
                     pincode: user?.pincode || '',
                     total_in_word,
+                    gstPercentage: gst > 0 ? 18 : 0,
                 };
 
                 const invoice = await generateInvoicePDF(data);

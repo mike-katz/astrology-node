@@ -211,6 +211,7 @@ async function razorpay(req, res) {
             city: user?.city_state_country || '',
             pincode: user?.pincode || '',
             total_in_word,
+            gstPercentage: gst > 0 ? 18 : 0,
         };
 
         logger.info(`user= ${user?.mobile} old balance ${user.balance} new balance ${Number(Number(paymentRow?.amount) + Number(extra))} extra bonus= ${extra} `);
@@ -386,6 +387,7 @@ async function xpay(req, res) {
             city: user?.city_state_country || '',
             pincode: user?.pincode || '',
             total_in_word,
+            gstPercentage: gst > 0 ? 18 : 0,
         };
 
         logger.info(`user= ${user?.mobile} old balance ${user.balance} new balance ${Number(Number(paymentRow?.amount) + Number(extra))} extra bonus= ${extra} `);
