@@ -207,7 +207,7 @@ async function applyOffer(req, res) {
                     offer_id: offer.id,
                     amount: creditInr,
                     remaining_amount: creditInr,
-                    expires_at: offer.end_at,
+                    expires_at: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000),
                     status: 'active',
                     currency: userCurrency,
                     created_at: new Date(),
