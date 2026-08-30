@@ -123,6 +123,14 @@ function applyPanditSort(query, { sort_by, sorting }) {
     return query;
 }
 
+function getFirstImage(image) {
+    if (!image) return null;
+    const parsed = deepParse(image);
+    if (Array.isArray(parsed) && parsed.length > 0) return parsed[0];
+    if (typeof parsed === 'string' && parsed.trim()) return parsed.trim();
+    return null;
+}
+
 function excludePanditIds(query, excludeIds) {
     if (excludeIds.length > 0) {
         query.whereNotIn('p.id', excludeIds);
@@ -201,8 +209,8 @@ async function getPandits(req, res) {
                         isFree = count == 0 ? true : false;
                         const userData = await db('users').select('language', 'default_currency').where({ id: Number(userId) }).first();
                         console.log("userData", userData?.default_currency);
-                        if (userData) {
-                            currency = userData?.default_currency
+                        if (userData?.default_currency) {
+                            currency = userData.default_currency
                         }
                         if (isFree) {
                             language = userData?.language ? deepParse(userData?.language) : [] || []
@@ -214,7 +222,7 @@ async function getPandits(req, res) {
         let sort
         let orderBy
         let sorting = []
-        const currencyData = await db('currency').select('currency_name', 'pandit_inr_rate').where({ currency_name: currency }).first();
+        const currencyData = await db('currency').select('currency_name', 'pandit_inr_rate').where({ currency_name: currency || 'INR' }).first();
 
         if (sort_by) {
             if (sort_by == 'popularity') {
@@ -361,8 +369,22 @@ async function getPanditDetail(req, res) {
     //     .orderBy('r.created_at', 'desc')
     //     .limit(3);
 
-    const gallery = await db('panditgallery').where({ pandit_id: user?.id }).orderBy('order', 'asc');
-    const isLive = await db('live_streams').where({ pandit_id: user?.id, status: "live" }).first();
+    const panditId = Number(user.id);
+    const now = new Date();
+    const [gallery, isLive, remedyRows] = await Promise.all([
+        db('panditgallery').where({ pandit_id: user?.id }).orderBy('order', 'asc'),
+        db('live_streams').where({ pandit_id: user?.id, status: "live" }).first(),
+        db('astroremedypoojas')
+            .select('id', 'remedy_id', 'name', 'amount', 'discount', 'image', 'total_orders', 'pooja_type', 'pooja_time')
+            .where({ status: true })
+            .whereNull('deleted_at')
+            .andWhere(function () {
+                this.whereRaw('pandit_id::text = ?', [String(panditId)])
+                    .orWhereRaw('pandit_id::jsonb @> to_jsonb(?::int)', [panditId])
+                    .orWhereRaw('pandit_id::jsonb @> jsonb_build_array(?::int)', [panditId]);
+            })
+            .orderBy('id', 'desc'),
+    ]);
 
     const ip = getClientIp(req);
     let currency = "INR";
@@ -422,7 +444,9 @@ async function getPanditDetail(req, res) {
         if (verified?.userId) {
             const follow = await db('follows').where({ 'pandit_id': user?.id, 'user_id': verified?.userId }).first();
             const userDetail = await db('users').where({ 'id': Number(verified?.userId) }).select('default_currency').first();
-            currency = userDetail?.default_currency
+            if (userDetail?.default_currency) {
+                currency = userDetail.default_currency
+            }
             // console.log("user", user);
             if (follow) {
                 response.isFollow = true
@@ -430,14 +454,27 @@ async function getPanditDetail(req, res) {
         }
     }
 
-    const currencyData = await db('currency').select('currency_name', 'pandit_inr_rate').where({ currency_name: currency }).first();
+    const currencyData = await db('currency').select('currency_name', 'pandit_inr_rate').where({ currency_name: currency || 'INR' }).first();
     if (currencyData) {
         response.chat_call_rate = convertCurrency(user.chat_call_rate, (currencyData?.pandit_inr_rate || 1));
         response.discounted_chat_call_rate = convertCurrency(user.discounted_chat_call_rate, (currencyData?.pandit_inr_rate || 1));
         response.final_chat_call_rate = convertCurrency(user.final_chat_call_rate, (currencyData?.pandit_inr_rate || 1));
     }
+    const rate = currencyData?.pandit_inr_rate || 1;
     const symbol = getCurrencySymbolByCurrency(currency)
     response.currency = symbol;
+    response.remedies = (remedyRows || []).map((item) => ({
+        id: item.id,
+        remedy_id: item.remedy_id,
+        name: item.name,
+        amount: convertCurrency(item.amount, rate),
+        discount: convertCurrency(item.discount || 0, rate),
+        currency: symbol,
+        total_orders: Number(item.total_orders || 0),
+        pooja_type: item.pooja_type,
+        pooja_time: item.pooja_time,
+        image: getFirstImage(item.image),
+    }));
     return res.status(200).json({ success: true, data: response, message: 'Detail success' });
 }
 
