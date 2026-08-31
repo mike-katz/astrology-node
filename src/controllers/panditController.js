@@ -154,6 +154,10 @@ function formatPanditResults(user, currency, currencyData) {
         if (item?.unlimited_free_calls_chats) {
             item.chat = true;
         }
+        item.online = false;
+        if (item?.chat || item?.call) {
+            item.online = true;
+        }
         return item;
     });
 }
