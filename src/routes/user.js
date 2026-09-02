@@ -45,6 +45,7 @@ router.get('/currency-list', user.getCurrencyList);
 router.get('/gift', user.getGiftList);
 router.get('/inbox', user.getInboxMessages);
 router.get('/inbox/detail', user.getInboxDetail);
+router.get('/referal-code', user.getReferalCode);
 router.post('/profileUpdate',
     upload.fields([
         { name: 'profile', maxCount: 1 },

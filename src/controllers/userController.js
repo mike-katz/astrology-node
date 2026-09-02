@@ -9,6 +9,7 @@ const { deleteKey } = require('../config/redisClient');
 const { uploadImageToAzure, deleteFileFromAzure } = require('../utils/azureUploader');
 const { getCurrencySymbolByCurrency, getCurrencyIconByCurrency } = require('../utils/countryCurrencyMap');
 const { notifyPanditsOnNewUserProfile } = require('../utils/newUserPanditNotify');
+const { createUniqueReferralCode } = require('../utils/referral');
 
 async function makeAvtarString(user, gender) {
     if (!user || !gender) return null;
@@ -872,6 +873,29 @@ async function getInboxDetail(req, res) {
     }
 }
 
+async function getReferalCode(req, res) {
+    try {
+        const user = await db('users')
+            .select('id', 'referal_code')
+            .where({ id: req.userId })
+            .first();
+        if (!user) return res.status(400).json({ success: false, message: 'Please enter correct user.' });
 
+        let referal_code = String(user.referal_code || '').trim();
+        if (!referal_code) {
+            referal_code = await createUniqueReferralCode();
+            await db('users').where({ id: user.id }).update({ referal_code });
+        }
 
-module.exports = { updateProfile, getProfile, getBalance, updateToken, updateAllowNotification, getAllowNotification, profileUpdate, makeAvtarString, deleteMyAccount, getRecharge, getRechargeBanner, getCookie, getRecommendations, findIsFree, getUserStats, getCurrencyList, updateCurrency, getGiftList, getInboxMessages, getInboxDetail };
+        return res.status(200).json({
+            success: true,
+            data: { referal_code },
+            message: 'Referal code fetched successfully',
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
+module.exports = { updateProfile, getProfile, getBalance, updateToken, updateAllowNotification, getAllowNotification, profileUpdate, makeAvtarString, deleteMyAccount, getRecharge, getRechargeBanner, getCookie, getRecommendations, findIsFree, getUserStats, getCurrencyList, updateCurrency, getGiftList, getInboxMessages, getInboxDetail, getReferalCode };
