@@ -50,4 +50,19 @@ async function resolveSignupReferral({ referal_code, mobile, country_code }) {
     };
 }
 
-module.exports = { createUniqueReferralCode, resolveSignupReferral };
+async function logReferralSignupBonus({ userId, amount, currency }) {
+    const credit = Number(amount || 0);
+    if (!userId || credit <= 0) return;
+    await db('balancelogs').insert({
+        user_id: userId,
+        user_old_balance: 0,
+        user_new_balance: credit,
+        amount: credit,
+        message: 'Referral bonus',
+        currency: currency || 'INR',
+        type: 'referral',
+        gst: 0,
+    });
+}
+
+module.exports = { createUniqueReferralCode, resolveSignupReferral, logReferralSignupBonus };

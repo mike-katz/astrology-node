@@ -15,7 +15,7 @@ const logger = require('../utils/logger').getLogger('authController');
 const geoip = require('geoip-lite');
 const { getClientIp } = require('../utils/getClientIp');
 const { getCurrencyByCountry } = require('../utils/countryCurrencyMap');
-const { resolveSignupReferral } = require('../utils/referral');
+const { resolveSignupReferral, logReferralSignupBonus } = require('../utils/referral');
 const admin = require('../config/firebase');
 
 async function register(req, res) {
@@ -357,6 +357,11 @@ async function verifyOtp(req, res) {
                 referal_code: referral.referal_code,
                 registered_referal: referral.registered_referal,
             }).returning(['id', 'mobile', 'avatar', 'country_code', 'otp', 'is_free_order_available', 'permanent_currency', 'default_currency', 'referal_code', 'registered_referal']);
+            await logReferralSignupBonus({
+                userId: existing?.id,
+                amount: referral.balance,
+                currency,
+            });
         }
         if (Object.keys(upd).length > 0) {
             await db('users').where({ id: Number(existing?.id) }).update(upd)
@@ -388,7 +393,7 @@ async function socialUrl(req, res) {
 
 async function getSettings(req, res) {
     try {
-        const setting = await db('settings').select('facebook', 'x', 'instagram', 'youtube', 'linkedin', 'ios_version', 'android_version', 'agora_app_id', 'agora_certificate', 'google_map_key', 'pandit_app_url', 'upload_base_url', 'user_response_time', 'call_type', 'map_api_key', 'is_live_enabled', 'min_minutes_required_balance', 'ashirvad_price','enable_ios_gift').first();
+        const setting = await db('settings').select('facebook', 'x', 'instagram', 'youtube', 'linkedin', 'ios_version', 'android_version', 'agora_app_id', 'agora_certificate', 'google_map_key', 'pandit_app_url', 'upload_base_url', 'user_response_time', 'call_type', 'map_api_key', 'is_live_enabled', 'min_minutes_required_balance', 'ashirvad_price', 'enable_ios_gift').first();
         return res.status(200).json({ success: true, data: setting, message: 'get config Successfully' });
     } catch (err) {
         console.error(err);
@@ -1144,6 +1149,11 @@ async function verifyFirebaseOtp(req, res) {
                     'referal_code',
                     'registered_referal',
                 ]);
+            await logReferralSignupBonus({
+                userId: existing?.id,
+                amount: referral.balance,
+                currency,
+            });
         }
         if (Object.keys(upd).length > 0) {
             await db('users').where({ id: Number(existing?.id) }).update(upd);
