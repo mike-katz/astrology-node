@@ -3,7 +3,7 @@ const db = require('../db');
 const REFERRAL_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
 function generateReferralCode(length = 8) {
-    let code = '';
+    let code = 'AG';
     for (let i = 0; i < length; i++) {
         code += REFERRAL_CHARS[Math.floor(Math.random() * REFERRAL_CHARS.length)];
     }
@@ -36,10 +36,8 @@ async function resolveSignupReferral({ referal_code, mobile, country_code }) {
 
     const referrer = await db('users')
         .whereRaw("UPPER(TRIM(referal_code)) = ?", [code])
+        // .where({ "referal_code": code })
         .whereNot('referal_code', '')
-        .where(function () {
-            this.whereNot({ mobile, country_code }).orWhereNull('mobile');
-        })
         .first();
     if (!referrer) {
         return { referal_code: ownCode, registered_referal: '', balance: 0 };
