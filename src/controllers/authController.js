@@ -241,10 +241,62 @@ function isNumber(str) {
     return /^-?\d+(\.\d+)?$/.test(str);
 }
 
+const REFERRAL_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+
+function generateReferralCode(length = 8) {
+    let code = '';
+    for (let i = 0; i < length; i++) {
+        code += REFERRAL_CHARS[Math.floor(Math.random() * REFERRAL_CHARS.length)];
+    }
+    return code;
+}
+
+async function createUniqueReferralCode() {
+    for (let i = 0; i < 25; i++) {
+        const code = generateReferralCode();
+        const exists = await db('users').where({ referal_code: code }).first();
+        if (!exists) return code;
+    }
+    return `AG${Date.now().toString(36).toUpperCase()}`;
+}
+
+async function resolveSignupReferral({ referal_code, mobile, country_code }) {
+    const ownCode = await createUniqueReferralCode();
+    const code = String(referal_code || '').trim().toUpperCase();
+    if (!code) {
+        return { referal_code: ownCode, registered_referal: '', balance: 0 };
+    }
+
+    const alreadyUsed = await db('users')
+        .where({ mobile, country_code })
+        .whereNot('registered_referal', '')
+        .first();
+    if (alreadyUsed) {
+        return { referal_code: ownCode, registered_referal: '', balance: 0 };
+    }
+
+    const referrer = await db('users')
+        .whereRaw("UPPER(TRIM(referal_code)) = ?", [code])
+        .whereNot('referal_code', '')
+        .where(function () {
+            this.whereNot({ mobile, country_code }).orWhereNull('mobile');
+        })
+        .first();
+    if (!referrer) {
+        return { referal_code: ownCode, registered_referal: '', balance: 0 };
+    }
+
+    return {
+        referal_code: ownCode,
+        registered_referal: referrer.referal_code,
+        balance: 25,
+    };
+}
+
 async function verifyOtp(req, res) {
     try {
         console.log("verifyOtp req.body", req.body);
-        let { mobile, country_code = '+91', otp, ad_set_id, utm_source, ad_id, type, version, referrer, device_id } = req.body;
+        let { mobile, country_code = '+91', otp, ad_set_id, utm_source, ad_id, type, version, referrer, device_id, referal_code } = req.body;
         if (!mobile || !otp || !country_code) return res.status(400).json({ success: false, message: 'Mobile number and otp required.' });
 
         const isValid = isValidMobile(mobile);
@@ -339,7 +391,23 @@ async function verifyOtp(req, res) {
                 console.log("currency", currency);
                 currency = currency?.currency
             }
-            [existing] = await db('users').insert({ mobile, country_code, status: "active", balance: 0, ad_set_id: set_id, utm_source, ad_id, mode, version, is_free_order_available: true, default_currency: currency, permanent_currency: currency }).returning(['id', 'mobile', 'avatar', 'country_code', 'otp', 'is_free_order_available', 'permanent_currency', 'default_currency']);
+            const referral = await resolveSignupReferral({ referal_code, mobile, country_code });
+            [existing] = await db('users').insert({
+                mobile,
+                country_code,
+                status: "active",
+                balance: referral.balance,
+                ad_set_id: set_id,
+                utm_source,
+                ad_id,
+                mode,
+                version,
+                is_free_order_available: true,
+                default_currency: currency,
+                permanent_currency: currency,
+                referal_code: referral.referal_code,
+                registered_referal: referral.registered_referal,
+            }).returning(['id', 'mobile', 'avatar', 'country_code', 'otp', 'is_free_order_available', 'permanent_currency', 'default_currency', 'referal_code', 'registered_referal']);
         }
         if (Object.keys(upd).length > 0) {
             await db('users').where({ id: Number(existing?.id) }).update(upd)
@@ -1000,6 +1068,7 @@ async function verifyFirebaseOtp(req, res) {
             version,
             referrer,
             device_id,
+            referal_code,
         } = req.body || {};
 
         if (!idToken) {
@@ -1096,12 +1165,13 @@ async function verifyFirebaseOtp(req, res) {
                 currency = await getCurrencyByCountry(country);
                 currency = currency?.currency;
             }
+            const referral = await resolveSignupReferral({ referal_code, mobile, country_code });
             [existing] = await db('users')
                 .insert({
                     mobile,
                     country_code,
                     status: 'active',
-                    balance: 0,
+                    balance: referral.balance,
                     ad_set_id: set_id,
                     utm_source,
                     ad_id,
@@ -1110,6 +1180,8 @@ async function verifyFirebaseOtp(req, res) {
                     is_free_order_available: true,
                     default_currency: currency,
                     permanent_currency: currency,
+                    referal_code: referral.referal_code,
+                    registered_referal: referral.registered_referal,
                 })
                 .returning([
                     'id',
@@ -1120,6 +1192,8 @@ async function verifyFirebaseOtp(req, res) {
                     'is_free_order_available',
                     'permanent_currency',
                     'default_currency',
+                    'referal_code',
+                    'registered_referal',
                 ]);
         }
         if (Object.keys(upd).length > 0) {

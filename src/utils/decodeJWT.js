@@ -116,7 +116,8 @@ const generateLoginResponse = async (existing, currency) => {
             allow_notification: existing?.allow_notification,
             country_code: existing?.country_code,
             token: encryptToken,
-            is_free
+            is_free,
+            referal_code: existing?.referal_code || '',
         }, message: 'Otp Verify Successfully'
     }
 }
