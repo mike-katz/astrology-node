@@ -876,7 +876,7 @@ async function getInboxDetail(req, res) {
 async function getReferalCode(req, res) {
     try {
         const user = await db('users')
-            .select('id', 'referal_code')
+            .select('id', 'referal_code', 'default_currency')
             .where({ id: req.userId })
             .first();
         if (!user) return res.status(400).json({ success: false, message: 'Please enter correct user.' });
@@ -887,9 +887,21 @@ async function getReferalCode(req, res) {
             await db('users').where({ id: user.id }).update({ referal_code });
         }
 
+        const win = await db('referral_bonuses')
+            .where({ currency: user.default_currency })
+            .first();
+
+        const response = { referal_code }
+        if (win) {
+            const currencyData = await db('currency').select('currency_name', 'user_inr_rate').where({ currency_name: user.default_currency || 'INR' }).first();
+            if (currencyData) {
+                response.amount = convertCurrency(win.amount, (currencyData?.user_inr_rate || 1));
+                response.symbol = getCurrencySymbolByCurrency(user.default_currency)
+            }
+        }
         return res.status(200).json({
             success: true,
-            data: { referal_code },
+            data: response,
             message: 'Referal code fetched successfully',
         });
     } catch (err) {

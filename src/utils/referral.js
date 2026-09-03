@@ -21,48 +21,62 @@ async function createUniqueReferralCode() {
 
 async function resolveSignupReferral({ referal_code, mobile, country_code }) {
     const ownCode = await createUniqueReferralCode();
+    const empty = { referal_code: ownCode, registered_referal: '', referrer: null };
     const code = String(referal_code || '').trim().toUpperCase();
-    if (!code) {
-        return { referal_code: ownCode, registered_referal: '', balance: 0 };
-    }
+    if (!code) return empty;
 
     const alreadyUsed = await db('users')
         .where({ mobile, country_code })
         .whereNot('registered_referal', '')
         .first();
-    if (alreadyUsed) {
-        return { referal_code: ownCode, registered_referal: '', balance: 0 };
-    }
+    if (alreadyUsed) return empty;
 
     const referrer = await db('users')
         .whereRaw("UPPER(TRIM(referal_code)) = ?", [code])
-        // .where({ "referal_code": code })
         .whereNot('referal_code', '')
         .first();
-    if (!referrer) {
-        return { referal_code: ownCode, registered_referal: '', balance: 0 };
-    }
+    if (!referrer) return empty;
+    if (referrer.mobile === mobile && referrer.country_code === country_code) return empty;
 
     return {
         referal_code: ownCode,
         registered_referal: referrer.referal_code,
-        balance: 25,
+        referrer,
     };
 }
 
-async function logReferralSignupBonus({ userId, amount, currency }) {
-    const credit = Number(amount || 0);
-    if (!userId || credit <= 0) return;
+async function creditReferrerBonus(referrer) {
+    if (!referrer?.id) return;
+
+    const userCurrency = referrer.default_currency || 'INR';
+    const bonus = await db('referral_bonuses')
+        .whereRaw('UPPER(TRIM(currency)) = ?', [String(userCurrency).toUpperCase()])
+        .whereNull('deleted_at')
+        .first();
+    if (!bonus) return;
+
+    const bonusAmount = Number(bonus.amount);
+    if (!Number.isFinite(bonusAmount) || bonusAmount <= 0) return;
+
+    const currencyData = await db('currency')
+        .where({ currency_name: userCurrency })
+        .first();
+    const credit = Number((bonusAmount * Number(currencyData?.user_inr_rate || 1)).toFixed(2));
+    if (!Number.isFinite(credit) || credit <= 0) return;
+
+    const oldBalance = Number(referrer.balance || 0);
+    const newBalance = oldBalance + credit;
+    await db('users').where({ id: referrer.id }).increment({ balance: credit });
     await db('balancelogs').insert({
-        user_id: userId,
-        user_old_balance: 0,
-        user_new_balance: credit,
+        user_id: referrer.id,
+        user_old_balance: oldBalance,
+        user_new_balance: newBalance,
         amount: credit,
         message: 'Referral bonus',
-        currency: currency || 'INR',
+        currency: userCurrency,
         type: 'referral',
         gst: 0,
     });
 }
 
-module.exports = { createUniqueReferralCode, resolveSignupReferral, logReferralSignupBonus };
+module.exports = { createUniqueReferralCode, resolveSignupReferral, creditReferrerBonus };

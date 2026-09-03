@@ -15,7 +15,7 @@ const logger = require('../utils/logger').getLogger('authController');
 const geoip = require('geoip-lite');
 const { getClientIp } = require('../utils/getClientIp');
 const { getCurrencyByCountry } = require('../utils/countryCurrencyMap');
-const { resolveSignupReferral, logReferralSignupBonus } = require('../utils/referral');
+const { resolveSignupReferral, creditReferrerBonus } = require('../utils/referral');
 const admin = require('../config/firebase');
 
 async function register(req, res) {
@@ -345,7 +345,7 @@ async function verifyOtp(req, res) {
                 mobile,
                 country_code,
                 status: "active",
-                balance: referral.balance,
+                balance: 0,
                 ad_set_id: set_id,
                 utm_source,
                 ad_id,
@@ -357,11 +357,7 @@ async function verifyOtp(req, res) {
                 referal_code: referral.referal_code,
                 registered_referal: referral.registered_referal,
             }).returning(['id', 'mobile', 'avatar', 'country_code', 'otp', 'is_free_order_available', 'permanent_currency', 'default_currency', 'referal_code', 'registered_referal']);
-            await logReferralSignupBonus({
-                userId: existing?.id,
-                amount: referral.balance,
-                currency,
-            });
+            await creditReferrerBonus(referral.referrer);
         }
         if (Object.keys(upd).length > 0) {
             await db('users').where({ id: Number(existing?.id) }).update(upd)
@@ -1125,7 +1121,7 @@ async function verifyFirebaseOtp(req, res) {
                     mobile,
                     country_code,
                     status: 'active',
-                    balance: referral.balance,
+                    balance: 0,
                     ad_set_id: set_id,
                     utm_source,
                     ad_id,
@@ -1149,11 +1145,7 @@ async function verifyFirebaseOtp(req, res) {
                     'referal_code',
                     'registered_referal',
                 ]);
-            await logReferralSignupBonus({
-                userId: existing?.id,
-                amount: referral.balance,
-                currency,
-            });
+            await creditReferrerBonus(referral.referrer);
         }
         if (Object.keys(upd).length > 0) {
             await db('users').where({ id: Number(existing?.id) }).update(upd);
