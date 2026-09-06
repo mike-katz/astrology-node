@@ -421,7 +421,7 @@ async function getPanditDetail(req, res) {
         experience: user?.experience,
         profile: user?.profile,
         waiting_time: user?.waiting_time,
-        online: user?.online,
+
         chat_call_rate: user?.chat_call_rate,
         available_for: user?.available_for ? deepParse(user?.available_for) : [],
         discounted_chat_call_rate: user?.discounted_chat_call_rate,
@@ -452,6 +452,7 @@ async function getPanditDetail(req, res) {
     if (user?.unlimited_free_calls_chats) {
         user.chat = true
     }
+    user.online = user?.chat || user?.call ? true : false;
     const authHeader = req.headers.authorization;
     // console.log("authHeader", authHeader);
     if (authHeader && authHeader.startsWith('Bearer ')) {
