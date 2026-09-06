@@ -201,7 +201,7 @@ async function getPandits(req, res) {
         let limit = PANDIT_LIST_MAX;
         if (page < 1) page = 1;
         const offset = (page - 1) * limit;
-        let { type = "chat", search, sort_by, skill, language, gender, country, offer, top_astrologers, secondary_expertise } = req.query
+        let { type, search, sort_by, skill, language, gender, country, offer, top_astrologers, secondary_expertise } = req.query
         const filter = {
             "p.status": "active",
             "p.deleted_at": null
