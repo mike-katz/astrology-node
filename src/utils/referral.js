@@ -46,7 +46,7 @@ async function resolveSignupReferral({ referal_code, mobile, country_code }) {
 }
 
 async function isValidReferralCode(referal_code) {
-    const code = String(referal_code || '').trim().toUpperCase();
+    const code = String(referal_code || '').trim();
     if (!code) return false;
     const referrer = await db('users')
         .whereRaw('TRIM(referal_code) = ?', [code])
