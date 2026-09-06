@@ -15,7 +15,7 @@ const logger = require('../utils/logger').getLogger('authController');
 const geoip = require('geoip-lite');
 const { getClientIp } = require('../utils/getClientIp');
 const { getCurrencyByCountry } = require('../utils/countryCurrencyMap');
-const { resolveSignupReferral, creditReferrerBonus } = require('../utils/referral');
+const { resolveSignupReferral, creditReferrerBonus, isValidReferralCode } = require('../utils/referral');
 const admin = require('../config/firebase');
 
 async function register(req, res) {
@@ -1184,6 +1184,25 @@ async function getCountryByIp(req, res) {
         return res.status(400).json({ success: false, message: "Server error" });
     }
 }
+
+async function checkReferralCode(req, res) {
+    try {
+        const referal_code = req.query?.referal_code || req.body?.referal_code;
+        if (!String(referal_code || '').trim()) {
+            return res.status(200).json({ success: true, data: { matched: false }, message: 'Referral code is required.' });
+        }
+        const matched = await isValidReferralCode(referal_code);
+        return res.status(200).json({
+            success: true,
+            data: { matched },
+            message: matched ? 'Referral code matched.' : 'Referral code not found.',
+        });
+    } catch (err) {
+        logger.error('checkReferralCode error', err?.message || err);
+        return res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
 module.exports = {
     register,
     login,
@@ -1199,5 +1218,6 @@ module.exports = {
     sendFirebaseOtp,
     verifyFirebaseOtp,
     getFirebaseRecaptchaParams,
-    getCountryByIp
+    getCountryByIp,
+    checkReferralCode,
 };

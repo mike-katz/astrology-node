@@ -1,6 +1,6 @@
 const db = require('../db');
 
-const REFERRAL_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const REFERRAL_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
 
 function generateReferralCode(length = 5) {
     let code = '';
@@ -45,6 +45,17 @@ async function resolveSignupReferral({ referal_code, mobile, country_code }) {
     };
 }
 
+async function isValidReferralCode(referal_code) {
+    const code = String(referal_code || '').trim().toUpperCase();
+    if (!code) return false;
+    const referrer = await db('users')
+        .whereRaw('TRIM(referal_code) = ?', [code])
+        .whereNot('referal_code', '')
+        .whereNull('deleted_at')
+        .first();
+    return Boolean(referrer);
+}
+
 async function creditReferrerBonus(referrer) {
     if (!referrer?.id) return;
 
@@ -79,4 +90,4 @@ async function creditReferrerBonus(referrer) {
     });
 }
 
-module.exports = { createUniqueReferralCode, resolveSignupReferral, creditReferrerBonus };
+module.exports = { createUniqueReferralCode, resolveSignupReferral, creditReferrerBonus, isValidReferralCode };

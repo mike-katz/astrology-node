@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { body } = require('express-validator');
-const { register, login, verifyOtp, socialUrl, getSettings, sendCall, test, googleLogin, appleLogin, getCountryByIp } = require('../controllers/authController');
+const { register, login, verifyOtp, socialUrl, getSettings, sendCall, test, googleLogin, appleLogin, getCountryByIp, checkReferralCode } = require('../controllers/authController');
 
 router.get('/setting', getSettings);
 
@@ -25,5 +25,6 @@ router.get('/config', socialUrl);
 router.post('/test-call', sendCall);
 router.get('/test', test);
 router.get('/get-ip-country', getCountryByIp);
+router.get('/check-referral', checkReferralCode);
 
 module.exports = router;
