@@ -67,16 +67,16 @@ async function creditReferrerBonus(referrer) {
     const oldBalance = Number(referrer.balance || 0);
     const newBalance = oldBalance + credit;
     await db('users').where({ id: referrer.id }).increment({ balance: credit });
-    // await db('balancelogs').insert({
-    //     user_id: referrer.id,
-    //     user_old_balance: oldBalance,
-    //     user_new_balance: newBalance,
-    //     amount: credit,
-    //     message: 'Referral bonus',
-    //     currency: userCurrency,
-    //     type: 'referral',
-    //     gst: 0,
-    // });
+    await db('balancelogs').insert({
+        user_id: referrer.id,
+        user_old_balance: oldBalance,
+        user_new_balance: newBalance,
+        amount: credit,
+        message: 'Referral bonus',
+        currency: userCurrency,
+        type: 'referral',
+        gst: 0,
+    });
 }
 
 module.exports = { createUniqueReferralCode, resolveSignupReferral, creditReferrerBonus };
