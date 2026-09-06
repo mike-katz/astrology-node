@@ -171,6 +171,7 @@ function formatPanditResults(user, currency, currencyData) {
         if (item?.unlimited_free_calls_chats) {
             item.chat = true;
         }
+        item.online = item.chat || item.call ? true : false
         return item;
     });
 }
