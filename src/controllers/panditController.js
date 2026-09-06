@@ -71,7 +71,7 @@ const RATING_RATIO_RAW = `
 
 function applyChatCallFilter(query, { type, isFree, search }) {
     if (search?.trim()) return query;
-    if (isFree) {
+    if (isFree || !type) {
         return query.andWhere(function () {
             this.where('p.chat', true).orWhere('p.call', true);
         });
