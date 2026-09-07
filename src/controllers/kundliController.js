@@ -144,75 +144,6 @@ async function fetchDivineData(url, location, extra) {
     return apiRes.data;
 }
 
-let panchangTablesReady = false;
-async function ensurePanchangTables() {
-    if (panchangTablesReady) return;
-
-    const hasCities = await db.schema.hasTable('cities');
-    if (!hasCities) {
-        await db.schema.createTable('cities', (t) => {
-            t.increments('id');
-            t.string('name');
-            t.string('display_name');
-            t.decimal('lat', 10, 7);
-            t.decimal('lng', 10, 7);
-            t.decimal('tzone', 6, 2);
-            t.string('timezone');
-            t.string('country');
-            t.timestamp('created_at').defaultTo(db.fn.now());
-        });
-        await db.raw('CREATE UNIQUE INDEX IF NOT EXISTS cities_name_lower_idx ON cities (LOWER(name))');
-    }
-
-    if (await db.schema.hasTable('panchangs') && await db.schema.hasColumn('panchangs', 'city_id')) {
-        await db.schema.dropTable('panchangs');
-    }
-    if (!(await db.schema.hasTable('panchangs'))) {
-        await db.schema.createTable('panchangs', (table) => {
-            table.increments('id').primary();
-            table.date('panchang_date').notNullable();
-            table.string('language', 8).notNullable();
-            table.string('place').nullable();
-            table.decimal('lat', 10, 6).nullable();
-            table.decimal('lon', 10, 6).nullable();
-            table.decimal('tzone', 4, 2).nullable();
-            table.json('panchang').nullable();
-            table.json('sun_and_moon').nullable();
-            table.json('chandramasa').nullable();
-            table.json('ritu_and_ayana').nullable();
-            table.json('samvat').nullable();
-            table.json('other_calendars').nullable();
-            table.json('uday_lagna').nullable();
-            table.timestamp('created_at').defaultTo(db.fn.now());
-            table.timestamp('updated_at').defaultTo(db.fn.now());
-            table.unique(['panchang_date', 'language', 'place'], 'panchangs_date_language_place_unique');
-            table.index(['panchang_date'], 'panchangs_date_index');
-        });
-    }
-
-    if (await db.schema.hasTable('choghdiya')) {
-        await db.schema.dropTable('choghdiya');
-    }
-    if (!(await db.schema.hasTable('choghadiyas'))) {
-        await db.schema.createTable('choghadiyas', (table) => {
-            table.increments('id').primary();
-            table.date('panchang_date').notNullable();
-            table.string('language', 8).notNullable();
-            table.string('place').nullable();
-            table.decimal('lat', 10, 6).nullable();
-            table.decimal('lon', 10, 6).nullable();
-            table.decimal('tzone', 4, 2).nullable();
-            table.json('day_choghadiyas').nullable();
-            table.json('night_choghadiyas').nullable();
-            table.timestamp('created_at').defaultTo(db.fn.now());
-            table.timestamp('updated_at').defaultTo(db.fn.now());
-            table.unique(['panchang_date', 'language', 'place'], 'choghadiyas_date_language_place_unique');
-            table.index(['panchang_date'], 'choghadiyas_date_index');
-        });
-    }
-    panchangTablesReady = true;
-}
-
 async function geocodeCity(city) {
     const setting = await db('settings').select('google_map_key', 'map_api_key').first();
     if (setting?.map_api_key) {
@@ -389,7 +320,6 @@ async function fetchPanchangBundle(location) {
 }
 
 async function getCityLocation(city) {
-    await ensurePanchangTables();
     const cityRow = await resolveCity(city);
     if (!cityRow) {
         const err = new Error('City not found.');
@@ -2309,7 +2239,7 @@ async function getFreeSookshmaDasha(req, res) {
 
 async function getFreePanchang(req, res) {
     try {
-        const { date, language = 'en', city='New Delhi' } = req.query;
+        const { date, language = 'en', city = 'New Delhi' } = req.query;
         if (!city || !String(city).trim()) {
             return res.status(400).json({ success: false, message: 'City is required.' });
         }
@@ -2330,7 +2260,7 @@ async function getFreePanchang(req, res) {
 
 async function getFreeChoghdiya(req, res) {
     try {
-        const { date, language = 'en', city='New Delhi' } = req.query;
+        const { date, language = 'en', city = 'New Delhi' } = req.query;
         if (!city || !String(city).trim()) {
             return res.status(400).json({ success: false, message: 'City is required.' });
         }
