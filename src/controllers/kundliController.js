@@ -212,8 +212,15 @@ async function resolveCity(cityName) {
     if (existing) return existing;
     const details = await geocodeCity(name);
     if (!details) return null;
-    const [saved] = await db('cities').insert(details).returning('*');
-    return saved;
+    try {
+        const [saved] = await db('cities').insert(details).returning('*');
+        return saved;
+    } catch (err) {
+        if (err?.code === '23505') {
+            return db('cities').whereRaw('LOWER(name) = LOWER(?)', [details.name || name]).first();
+        }
+        throw err;
+    }
 }
 
 function formatChoghadiyaResponse(row) {
