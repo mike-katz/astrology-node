@@ -62,6 +62,378 @@ async function basicKundliApiCall(language = 'en', lat, lng, dob, birth_time, na
     return response?.data
 }
 
+const CHOGHADIYA_URL = 'https://astroapi-2.divineapi.com/indian-api/v1/find-choghadiya';
+const PANCHANG_URLS = {
+    panchang: 'https://astroapi-1.divineapi.com/indian-api/v2/find-panchang',
+    sunAndMoon: 'https://astroapi-2.divineapi.com/indian-api/v2/find-sun-and-moon',
+    chandramasa: 'https://astroapi-3.divineapi.com/indian-api/v2/chandramasa',
+    rituAndAyana: 'https://astroapi-2.divineapi.com/indian-api/v1/find-ritu-and-anaya',
+    samvat: 'https://astroapi-2.divineapi.com/indian-api/v1/find-samvat',
+    otherCalendars: 'https://astroapi-2.divineapi.com/indian-api/v2/find-other-calendars-and-epoch',
+    udayLagna: 'https://astroapi-3.divineapi.com/indian-api/v2/uday-lagna',
+};
+
+function getIstParts(dateInput) {
+    if (dateInput && /^\d{4}-\d{2}-\d{2}$/.test(String(dateInput))) {
+        const [year, month, day] = String(dateInput).split('-');
+        return { day, month, year, dateStr: String(dateInput) };
+    }
+    const d = dateInput ? new Date(dateInput) : new Date();
+    const parts = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Kolkata',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+    }).formatToParts(d);
+    const map = {};
+    parts.forEach((p) => {
+        if (p.type !== 'literal') map[p.type] = p.value;
+    });
+    return {
+        day: map.day,
+        month: map.month,
+        year: map.year,
+        dateStr: `${map.year}-${map.month}-${map.day}`,
+    };
+}
+
+function toJson(value) {
+    return JSON.stringify(value || {});
+}
+
+function formatDateOnly(value) {
+    if (!value) return value;
+    if (typeof value === 'string') return value.slice(0, 10);
+    const y = value.getFullYear();
+    const m = String(value.getMonth() + 1).padStart(2, '0');
+    const d = String(value.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+}
+
+async function postDivinePanchang(url, { day, month, year, lat, lon, place, tzone = '5.5', language = 'en', extra = {} }) {
+    const formData = new FormData();
+    formData.append('api_key', process.env.KUNDLI_API_KEY);
+    formData.append('day', String(Number(day)));
+    formData.append('month', String(Number(month)));
+    formData.append('year', String(year));
+    formData.append('lat', String(lat));
+    formData.append('lon', String(lon));
+    formData.append('tzone', String(tzone));
+    formData.append('lan', language);
+    if (place) formData.append('place', place);
+    Object.entries(extra).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) formData.append(key, String(value));
+    });
+    const response = await axios.post(url, formData, {
+        headers: {
+            Authorization: `Bearer ${process.env.KUNDLI_API_TOKEN}`,
+            ...formData.getHeaders(),
+        },
+        timeout: 30000,
+    });
+    return response?.data;
+}
+
+async function fetchDivineData(url, location, extra) {
+    const apiRes = await postDivinePanchang(url, { ...location, extra });
+    if (!apiRes || Number(apiRes.success) !== 1 || !apiRes.data) {
+        const err = new Error(apiRes?.msg || apiRes?.message || 'Failed to fetch data.');
+        err.status = 400;
+        throw err;
+    }
+    return apiRes.data;
+}
+
+let panchangTablesReady = false;
+async function ensurePanchangTables() {
+    if (panchangTablesReady) return;
+
+    const hasCities = await db.schema.hasTable('cities');
+    if (!hasCities) {
+        await db.schema.createTable('cities', (t) => {
+            t.increments('id');
+            t.string('name');
+            t.string('display_name');
+            t.decimal('lat', 10, 7);
+            t.decimal('lng', 10, 7);
+            t.decimal('tzone', 6, 2);
+            t.string('timezone');
+            t.string('country');
+            t.timestamp('created_at').defaultTo(db.fn.now());
+        });
+        await db.raw('CREATE UNIQUE INDEX IF NOT EXISTS cities_name_lower_idx ON cities (LOWER(name))');
+    }
+
+    if (await db.schema.hasTable('panchangs') && await db.schema.hasColumn('panchangs', 'city_id')) {
+        await db.schema.dropTable('panchangs');
+    }
+    if (!(await db.schema.hasTable('panchangs'))) {
+        await db.schema.createTable('panchangs', (table) => {
+            table.increments('id').primary();
+            table.date('panchang_date').notNullable();
+            table.string('language', 8).notNullable();
+            table.string('place').nullable();
+            table.decimal('lat', 10, 6).nullable();
+            table.decimal('lon', 10, 6).nullable();
+            table.decimal('tzone', 4, 2).nullable();
+            table.json('panchang').nullable();
+            table.json('sun_and_moon').nullable();
+            table.json('chandramasa').nullable();
+            table.json('ritu_and_ayana').nullable();
+            table.json('samvat').nullable();
+            table.json('other_calendars').nullable();
+            table.json('uday_lagna').nullable();
+            table.timestamp('created_at').defaultTo(db.fn.now());
+            table.timestamp('updated_at').defaultTo(db.fn.now());
+            table.unique(['panchang_date', 'language', 'place'], 'panchangs_date_language_place_unique');
+            table.index(['panchang_date'], 'panchangs_date_index');
+        });
+    }
+
+    if (await db.schema.hasTable('choghdiya')) {
+        await db.schema.dropTable('choghdiya');
+    }
+    if (!(await db.schema.hasTable('choghadiyas'))) {
+        await db.schema.createTable('choghadiyas', (table) => {
+            table.increments('id').primary();
+            table.date('panchang_date').notNullable();
+            table.string('language', 8).notNullable();
+            table.string('place').nullable();
+            table.decimal('lat', 10, 6).nullable();
+            table.decimal('lon', 10, 6).nullable();
+            table.decimal('tzone', 4, 2).nullable();
+            table.json('day_choghadiyas').nullable();
+            table.json('night_choghadiyas').nullable();
+            table.timestamp('created_at').defaultTo(db.fn.now());
+            table.timestamp('updated_at').defaultTo(db.fn.now());
+            table.unique(['panchang_date', 'language', 'place'], 'choghadiyas_date_language_place_unique');
+            table.index(['panchang_date'], 'choghadiyas_date_index');
+        });
+    }
+    panchangTablesReady = true;
+}
+
+async function geocodeCity(city) {
+    const setting = await db('settings').select('google_map_key', 'map_api_key').first();
+    if (setting?.map_api_key) {
+        try {
+            const { data } = await axios.get('https://api.opencagedata.com/geocode/v1/json', {
+                params: { q: city, key: setting.map_api_key, limit: 1 },
+            });
+            const result = data?.results?.[0];
+            if (result?.geometry) {
+                const offsetSec = result.annotations?.timezone?.offset_sec;
+                return {
+                    name: city,
+                    display_name: result.formatted || city,
+                    lat: result.geometry.lat,
+                    lng: result.geometry.lng,
+                    tzone: offsetSec != null ? Number((offsetSec / 3600).toFixed(2)) : 5.5,
+                    timezone: result.annotations?.timezone?.name || null,
+                    country: result.components?.country || null,
+                };
+            }
+        } catch (err) {
+            console.error('opencage geocode:', err?.message || err);
+        }
+    }
+    if (!setting?.google_map_key) return null;
+    const geo = await axios.get('https://maps.googleapis.com/maps/api/geocode/json', {
+        params: { address: city, key: setting.google_map_key },
+    });
+    const result = geo.data?.results?.[0];
+    if (!result?.geometry?.location) return null;
+    const lat = result.geometry.location.lat;
+    const lng = result.geometry.location.lng;
+    let tzone = 5.5;
+    let timezone = null;
+    try {
+        const tz = await axios.get('https://maps.googleapis.com/maps/api/timezone/json', {
+            params: {
+                location: `${lat},${lng}`,
+                timestamp: Math.floor(Date.now() / 1000),
+                key: setting.google_map_key,
+            },
+        });
+        if (tz.data?.status === 'OK') {
+            tzone = Number(((Number(tz.data.rawOffset || 0) + Number(tz.data.dstOffset || 0)) / 3600).toFixed(2));
+            timezone = tz.data.timeZoneId || null;
+        }
+    } catch (err) {
+        console.error('google timezone:', err?.message || err);
+    }
+    const country = result.address_components?.find((c) => c.types?.includes('country'))?.long_name || null;
+    return {
+        name: city,
+        display_name: result.formatted_address || city,
+        lat,
+        lng,
+        tzone,
+        timezone,
+        country,
+    };
+}
+
+async function resolveCity(cityName) {
+    const name = String(cityName || '').trim();
+    if (!name) return null;
+    const existing = await db('cities').whereRaw('LOWER(name) = LOWER(?)', [name]).first();
+    if (existing) return existing;
+    const details = await geocodeCity(name);
+    if (!details) return null;
+    const [saved] = await db('cities').insert(details).returning('*');
+    return saved;
+}
+
+function formatChoghadiyaResponse(row) {
+    return {
+        date: formatDateOnly(row.panchang_date),
+        language: row.language,
+        place: row.place,
+        lat: row.lat,
+        lon: row.lon,
+        tzone: row.tzone,
+        day_choghadiyas: safeParse(row.day_choghadiyas) || {},
+        night_choghadiyas: safeParse(row.night_choghadiyas) || {},
+    };
+}
+
+function formatPanchangResponse(row) {
+    return {
+        date: formatDateOnly(row.panchang_date),
+        language: row.language,
+        place: row.place,
+        lat: row.lat,
+        lon: row.lon,
+        tzone: row.tzone,
+        panchang: safeParse(row.panchang) || {},
+        sun_and_moon: safeParse(row.sun_and_moon) || {},
+        chandramasa: safeParse(row.chandramasa) || {},
+        ritu_and_ayana: safeParse(row.ritu_and_ayana) || {},
+        samvat: safeParse(row.samvat) || {},
+        other_calendars: safeParse(row.other_calendars) || {},
+        uday_lagna: safeParse(row.uday_lagna) || {},
+    };
+}
+
+async function findStoredDaily(table, dateStr, language, place) {
+    return db(table)
+        .where({ panchang_date: dateStr, language })
+        .andWhereRaw('LOWER(place) = LOWER(?)', [place])
+        .first();
+}
+
+async function upsertChoghadiya(dateStr, language, cityRow, payload) {
+    const now = new Date();
+    const place = cityRow.name;
+    const row = {
+        panchang_date: dateStr,
+        language,
+        place,
+        lat: cityRow.lat,
+        lon: cityRow.lng,
+        tzone: cityRow.tzone || 5.5,
+        day_choghadiyas: toJson(payload?.day_choghadiyas),
+        night_choghadiyas: toJson(payload?.night_choghadiyas),
+        updated_at: now,
+    };
+    const existing = await findStoredDaily('choghadiyas', dateStr, language, place);
+    if (existing) {
+        await db('choghadiyas').where({ id: existing.id }).update(row);
+        return { ...existing, ...row };
+    }
+    const [saved] = await db('choghadiyas').insert({ ...row, created_at: now }).returning('*');
+    return saved;
+}
+
+async function upsertPanchang(dateStr, language, cityRow, payload) {
+    const now = new Date();
+    const place = cityRow.name;
+    const row = {
+        panchang_date: dateStr,
+        language,
+        place,
+        lat: cityRow.lat,
+        lon: cityRow.lng,
+        tzone: cityRow.tzone || 5.5,
+        panchang: toJson(payload.panchang),
+        sun_and_moon: toJson(payload.sunAndMoon),
+        chandramasa: toJson(payload.chandramasa),
+        ritu_and_ayana: toJson(payload.rituAndAyana),
+        samvat: toJson(payload.samvat),
+        other_calendars: toJson(payload.otherCalendars),
+        uday_lagna: toJson(payload.udayLagna),
+        updated_at: now,
+    };
+    const existing = await findStoredDaily('panchangs', dateStr, language, place);
+    if (existing) {
+        await db('panchangs').where({ id: existing.id }).update(row);
+        return { ...existing, ...row };
+    }
+    const [saved] = await db('panchangs').insert({ ...row, created_at: now }).returning('*');
+    return saved;
+}
+
+async function fetchPanchangBundle(location) {
+    const [panchang, sunAndMoon, chandramasa, rituAndAyana, samvat, otherCalendars, udayLagna] =
+        await Promise.all([
+            fetchDivineData(PANCHANG_URLS.panchang, location),
+            fetchDivineData(PANCHANG_URLS.sunAndMoon, location),
+            fetchDivineData(PANCHANG_URLS.chandramasa, location, { month_type: 'both' }),
+            fetchDivineData(PANCHANG_URLS.rituAndAyana, location),
+            fetchDivineData(PANCHANG_URLS.samvat, location),
+            fetchDivineData(PANCHANG_URLS.otherCalendars, location),
+            fetchDivineData(PANCHANG_URLS.udayLagna, location),
+        ]);
+    return { panchang, sunAndMoon, chandramasa, rituAndAyana, samvat, otherCalendars, udayLagna };
+}
+
+async function getCityLocation(city) {
+    await ensurePanchangTables();
+    const cityRow = await resolveCity(city);
+    if (!cityRow) {
+        const err = new Error('City not found.');
+        err.status = 400;
+        throw err;
+    }
+    return cityRow;
+}
+
+async function getStoredOrFetchChoghadiya(city, date, language) {
+    const cityRow = await getCityLocation(city);
+    const { day, month, year, dateStr } = getIstParts(date);
+    const existing = await findStoredDaily('choghadiyas', dateStr, language, cityRow.name);
+    if (existing) return formatChoghadiyaResponse(existing);
+
+    const payload = await fetchDivineData(CHOGHADIYA_URL, {
+        day, month, year, language,
+        lat: cityRow.lat,
+        lon: cityRow.lng,
+        place: cityRow.display_name || cityRow.name,
+        tzone: cityRow.tzone || 5.5,
+    });
+    const saved = await upsertChoghadiya(dateStr, language, cityRow, payload);
+    return formatChoghadiyaResponse(saved);
+}
+
+async function getStoredOrFetchPanchang(city, date, language) {
+    const cityRow = await getCityLocation(city);
+    const { day, month, year, dateStr } = getIstParts(date);
+    const existing = await findStoredDaily('panchangs', dateStr, language, cityRow.name);
+    if (existing) return formatPanchangResponse(existing);
+
+    const location = {
+        day, month, year, language,
+        lat: cityRow.lat,
+        lon: cityRow.lng,
+        place: cityRow.display_name || cityRow.name,
+        tzone: cityRow.tzone || 5.5,
+    };
+    const payload = await fetchPanchangBundle(location);
+    const saved = await upsertPanchang(dateStr, language, cityRow, payload);
+    return formatPanchangResponse(saved);
+}
+
 async function findBasicKundli(req, res) {
     try {
         let { profile_id, name, dob, type, birth_time, gender, birth_place, lat = '22.82', lng = '70.84', language = 'en' } = req.query;
@@ -1935,4 +2307,46 @@ async function getFreeSookshmaDasha(req, res) {
     }
 }
 
-module.exports = { findBasicKundli, findkundliTab, findkpTab, findAshtakvargaTab, findChartTab, findDashaTab, findReportTab, getHororscope, getPersonalHororscope, ashtakootMilan, getFreeBasicKundli, getFreekpTab, getFreeAshtakvargaTab, getFreeDashaTab, getGeneralReport, getRemedieReport, getDoshaReport, getFreeLagnaChart, getFreeNavamsaChart, getFreeTransitChart, getFreeDivisionalChart, getFreeSouthDivisionalChart, getFreeSouthTransitChart, getFreeSouthNavamsaChart, getFreeSouthLagnaChart, getFreePlanetsChart, getFreeSookshmaDasha };
+async function getFreePanchang(req, res) {
+    try {
+        const { date, language = 'en', city='New Delhi' } = req.query;
+        if (!city || !String(city).trim()) {
+            return res.status(400).json({ success: false, message: 'City is required.' });
+        }
+        const data = await getStoredOrFetchPanchang(city, date, language);
+        return res.status(200).json({
+            success: true,
+            data,
+            message: 'Panchang fetched successfully',
+        });
+    } catch (err) {
+        console.error(err);
+        if (err.status === 400) {
+            return res.status(400).json({ success: false, message: err.message });
+        }
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
+async function getFreeChoghdiya(req, res) {
+    try {
+        const { date, language = 'en', city='New Delhi' } = req.query;
+        if (!city || !String(city).trim()) {
+            return res.status(400).json({ success: false, message: 'City is required.' });
+        }
+        const data = await getStoredOrFetchChoghadiya(city, date, language);
+        return res.status(200).json({
+            success: true,
+            data,
+            message: 'Choghdiya fetched successfully',
+        });
+    } catch (err) {
+        console.error(err);
+        if (err.status === 400) {
+            return res.status(400).json({ success: false, message: err.message });
+        }
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
+module.exports = { findBasicKundli, findkundliTab, findkpTab, findAshtakvargaTab, findChartTab, findDashaTab, findReportTab, getHororscope, getPersonalHororscope, ashtakootMilan, getFreeBasicKundli, getFreekpTab, getFreeAshtakvargaTab, getFreeDashaTab, getGeneralReport, getRemedieReport, getDoshaReport, getFreeLagnaChart, getFreeNavamsaChart, getFreeTransitChart, getFreeDivisionalChart, getFreeSouthDivisionalChart, getFreeSouthTransitChart, getFreeSouthNavamsaChart, getFreeSouthLagnaChart, getFreePlanetsChart, getFreeSookshmaDasha, getFreePanchang, getFreeChoghdiya };

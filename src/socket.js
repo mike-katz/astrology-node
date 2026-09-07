@@ -6,6 +6,7 @@ const WS_URL = process.env.SOCKET_URL;
 let socket;
 let retries = 0;
 const MAX_RETRIES = 20;
+const messageQueue = [];
 
 function connect() {
     console.log('🔌 Connecting WS...');
@@ -15,6 +16,10 @@ function connect() {
     socket.on('open', () => {
         console.log('✅ Connected');
         retries = 0;
+        while (messageQueue.length) {
+            const msg = messageQueue.shift();
+            socket.send(JSON.stringify(msg));
+        }
     });
 
     socket.on('message', (data) => {
@@ -38,10 +43,13 @@ function connect() {
 }
 
 function callEvent(event, data) {
-    socket.send(JSON.stringify({
-        event,
-        data
-    }))
+    const payload = { event, data };
+    if (socket && socket.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify(payload));
+    } else {
+        messageQueue.push(payload);
+        console.warn('WS not open, event queued:', event);
+    }
 }
 
 function retryConnect() {

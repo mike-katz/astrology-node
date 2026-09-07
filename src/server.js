@@ -33,6 +33,7 @@ const twilioRoutes = require('./routes/twilio');
 const callRoutes = require('./routes/call');
 const liveStreamingRoutes = require('./routes/liveStreaming');
 const offerRoutes = require('./routes/offer');
+const tarotRoutes = require('./routes/tarot');
 
 
 // const cors = require('cors');
@@ -65,6 +66,7 @@ app.use('/firebase/auth', firebaseAuthRoutes);
 app.use('/pandit', panditRoutes);
 app.use('/upload', panditRoutes);
 app.use('/kundli', kundliRoutes);
+app.use('/tarot', tarotRoutes);
 app.use('/cancel-callback', callBackRoutes);
 app.use('/freeKundli', freeKundliRoutes);
 app.use('/faq', faqRoutes);

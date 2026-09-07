@@ -14,6 +14,23 @@ const { getCurrencyByCountry, getCurrencySymbolByCurrency } = require('../utils/
 const geoip = require('geoip-lite');
 
 const PANDIT_LIST_MAX = 150;
+const DUPLICATE_MOBILE_MSG = 'Your mobile number already registered.';
+
+function findActivePanditByMobile(mobile) {
+    return db('pandits')
+        .where({ mobile: String(mobile || '').trim() })
+        .first();
+}
+
+function findActiveOnboardingByMobile(mobile, country_code) {
+    return db('onboardings')
+        .where({
+            mobile: String(mobile || '').trim(),
+            country_code: String(country_code || '').trim(),
+        })
+        .orderBy('id', 'asc')
+        .first();
+}
 
 const PANDIT_LIST_SELECT = [
     'p.display_name as name',
@@ -54,7 +71,7 @@ const RATING_RATIO_RAW = `
 
 function applyChatCallFilter(query, { type, isFree, search }) {
     if (search?.trim()) return query;
-    if (isFree) {
+    if (isFree || !type) {
         return query.andWhere(function () {
             this.where('p.chat', true).orWhere('p.call', true);
         });
@@ -154,10 +171,7 @@ function formatPanditResults(user, currency, currencyData) {
         if (item?.unlimited_free_calls_chats) {
             item.chat = true;
         }
-        item.online = false;
-        if (item?.chat || item?.call) {
-            item.online = true;
-        }
+        item.online = item.chat || item.call ? true : false
         return item;
     });
 }
@@ -188,7 +202,7 @@ async function getPandits(req, res) {
         let limit = PANDIT_LIST_MAX;
         if (page < 1) page = 1;
         const offset = (page - 1) * limit;
-        let { type = "chat", search, sort_by, skill, language, gender, country, offer, top_astrologers, secondary_expertise } = req.query
+        let { type, search, sort_by, skill, language, gender, country, offer, top_astrologers, secondary_expertise } = req.query
         const filter = {
             "p.status": "active",
             "p.deleted_at": null
@@ -407,7 +421,7 @@ async function getPanditDetail(req, res) {
         experience: user?.experience,
         profile: user?.profile,
         waiting_time: user?.waiting_time,
-        online: user?.online,
+
         chat_call_rate: user?.chat_call_rate,
         available_for: user?.available_for ? deepParse(user?.available_for) : [],
         discounted_chat_call_rate: user?.discounted_chat_call_rate,
@@ -438,6 +452,7 @@ async function getPanditDetail(req, res) {
     if (user?.unlimited_free_calls_chats) {
         user.chat = true
     }
+    user.online = user?.chat || user?.call ? true : false;
     const authHeader = req.headers.authorization;
     // console.log("authHeader", authHeader);
     if (authHeader && authHeader.startsWith('Bearer ')) {
@@ -488,14 +503,14 @@ async function signup(req, res) {
         if (!mobile || !country_code) return res.status(400).json({ success: false, message: 'Mobile number required.' });
         const isValid = isValidMobile(mobile);
         if (!isValid) return res.status(400).json({ success: false, message: 'Enter valid mobile number.' });
-        const pandit = await db('pandits').where({ 'mobile': mobile, "deleted_at": null }).first();
-        if (pandit) return res.status(400).json({ success: false, message: 'Your mobile number already registered.' });
+        const pandit = await findActivePanditByMobile(mobile);
+        if (pandit) return res.status(400).json({ success: false, message: DUPLICATE_MOBILE_MSG });
 
         const user = await db('otpmanages').where(function () {
             this.where('mobile', mobile);
         }).first();
 
-        const onboardings = await db('onboardings').where({ mobile, country_code, deleted_at: null }).first();
+        const onboardings = await findActiveOnboardingByMobile(mobile, country_code);
         if (onboardings && onboardings?.status == 'blocked') {
             return res.status(400).json({ success: false, message: 'Your account is blocked.' });
         }
@@ -589,9 +604,19 @@ async function verifyOtp(req, res) {
             .where('id', latestRecord?.id)
             .update(update);
 
-        let user = await db('onboardings').where({ 'mobile': mobile, country_code, deleted_at: null }).first();
+        const existingPandit = await findActivePanditByMobile(mobile);
+        if (existingPandit) {
+            return res.status(400).json({ success: false, message: DUPLICATE_MOBILE_MSG });
+        }
+
+        let user = await findActiveOnboardingByMobile(mobile, country_code);
         if (!user) {
-            [user] = await db('onboardings').insert({ mobile, country_code, step: 0, status: "number", ad_set_id, utm_source, ad_id }).returning(['id', 'mobile', 'country_code', 'step']);
+            try {
+                [user] = await db('onboardings').insert({ mobile, country_code, step: 0, status: "number", ad_set_id, utm_source, ad_id }).returning(['id', 'mobile', 'country_code', 'step']);
+            } catch (insertErr) {
+                user = await findActiveOnboardingByMobile(mobile, country_code);
+                if (!user) throw insertErr;
+            }
         }
         // console.log("user", user);
         const token = jwt.sign({ userId: user.id, mobile: user.mobile, country_code: user.country_code }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '1h' });
@@ -673,8 +698,10 @@ async function basicOnboard(req, res) {
         const { name, dob, email, gender, primary_expertise, languages, country_code, mobile, country, city, experience, secondary_expertise } = req.body
         const { files } = req
         if (!name || !dob || !email || !gender || !primary_expertise || !languages || !country_code || !mobile || !country || !city || !experience || !secondary_expertise) return res.status(400).json({ message: 'Missing params.' });
-        const user = await db('onboardings').where({ mobile, country_code, deleted_at: null }).first();
+        const user = await findActiveOnboardingByMobile(mobile, country_code);
         if (!user) return res.status(400).json({ message: 'Wrong mobile number.' });
+        const existingPandit = await findActivePanditByMobile(mobile);
+        if (existingPandit) return res.status(400).json({ success: false, message: DUPLICATE_MOBILE_MSG });
         const orderId = Math.floor(1000000000000000 + Math.random() * 9000000000000000).toString();
         const ins = {
             name, dob, email, gender, application_id: orderId, step: 0, country, city, experience, status: "inquiry", step: 1
@@ -802,8 +829,10 @@ async function onboard(req, res) {
         }
 
         // console.log("tokenData", JSON.stringify(tokenData));
-        const user = await db('onboardings').where({ "mobile": tokenData?.data?.mobile, country_code: tokenData?.data?.country_code, deleted_at: null }).first();
+        const user = await findActiveOnboardingByMobile(tokenData?.data?.mobile, tokenData?.data?.country_code);
         if (!user) return res.status(400).json({ message: 'Wrong mobile number.' });
+        const existingPandit = await findActivePanditByMobile(tokenData?.data?.mobile);
+        if (existingPandit) return res.status(400).json({ success: false, message: DUPLICATE_MOBILE_MSG });
         // if (display_name) {
         //     if (display_name.length > 15) return res.status(400).json({ success: false, message: 'Max 15 character accept.' });
         //     const onboard = await db('onboardings').where({ "display_name": display_name, deleted_at: null }).whereNot({ id: user?.id }).first();
@@ -1221,8 +1250,10 @@ async function submitOnboard(req, res) {
         console.log("submitOnboard req.body", req.body);
         const tokenData = decodeJWT(`Bearer ${token}`)
         if (!tokenData?.success) return res.status(400).json({ success: false, message: 'Missing params.' });
-        const user = await db('onboardings').where({ "mobile": tokenData?.data?.mobile, country_code: tokenData?.data?.country_code, deleted_at: null }).first();
+        const user = await findActiveOnboardingByMobile(tokenData?.data?.mobile, tokenData?.data?.country_code);
         if (!user) return res.status(400).json({ message: 'Wrong mobile number.' });
+        const existingPandit = await findActivePanditByMobile(tokenData?.data?.mobile);
+        if (existingPandit) return res.status(400).json({ success: false, message: DUPLICATE_MOBILE_MSG });
 
         // Check if user is on step 4
         // if (user?.step >= 3) {

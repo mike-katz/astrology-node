@@ -21,6 +21,8 @@ router.get('/south-divisional-chart', kundli.getFreeSouthDivisionalChart);
 
 router.get('/planets', kundli.getFreePlanetsChart);
 router.get('/sookshma-dasha', kundli.getFreeSookshmaDasha);
+router.get('/panchang', kundli.getFreePanchang);
+router.get('/choghdiya', kundli.getFreeChoghdiya);
 
 
 module.exports = router;

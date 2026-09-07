@@ -15,6 +15,7 @@ const logger = require('../utils/logger').getLogger('authController');
 const geoip = require('geoip-lite');
 const { getClientIp } = require('../utils/getClientIp');
 const { getCurrencyByCountry } = require('../utils/countryCurrencyMap');
+const { resolveSignupReferral, creditReferrerBonus, isValidReferralCode } = require('../utils/referral');
 const admin = require('../config/firebase');
 
 async function register(req, res) {
@@ -244,7 +245,7 @@ function isNumber(str) {
 async function verifyOtp(req, res) {
     try {
         console.log("verifyOtp req.body", req.body);
-        let { mobile, country_code = '+91', otp, ad_set_id, utm_source, ad_id, type, version, referrer, device_id } = req.body;
+        let { mobile, country_code = '+91', otp, ad_set_id, utm_source, ad_id, type, version, referrer, device_id, referal_code } = req.body;
         if (!mobile || !otp || !country_code) return res.status(400).json({ success: false, message: 'Mobile number and otp required.' });
 
         const isValid = isValidMobile(mobile);
@@ -339,7 +340,24 @@ async function verifyOtp(req, res) {
                 console.log("currency", currency);
                 currency = currency?.currency
             }
-            [existing] = await db('users').insert({ mobile, country_code, status: "active", balance: 0, ad_set_id: set_id, utm_source, ad_id, mode, version, is_free_order_available: true, default_currency: currency, permanent_currency: currency }).returning(['id', 'mobile', 'avatar', 'country_code', 'otp', 'is_free_order_available', 'permanent_currency', 'default_currency']);
+            const referral = await resolveSignupReferral({ referal_code, mobile, country_code });
+            [existing] = await db('users').insert({
+                mobile,
+                country_code,
+                status: "active",
+                balance: 0,
+                ad_set_id: set_id,
+                utm_source,
+                ad_id,
+                mode,
+                version,
+                is_free_order_available: true,
+                default_currency: currency,
+                permanent_currency: currency,
+                referal_code: referral.referal_code,
+                registered_referal: referral.registered_referal,
+            }).returning(['id', 'mobile', 'avatar', 'country_code', 'otp', 'is_free_order_available', 'permanent_currency', 'default_currency', 'referal_code', 'registered_referal']);
+            await creditReferrerBonus(referral.referrer);
         }
         if (Object.keys(upd).length > 0) {
             await db('users').where({ id: Number(existing?.id) }).update(upd)
@@ -371,7 +389,7 @@ async function socialUrl(req, res) {
 
 async function getSettings(req, res) {
     try {
-        const setting = await db('settings').select('facebook', 'x', 'instagram', 'youtube', 'linkedin', 'ios_version', 'android_version', 'agora_app_id', 'agora_certificate', 'google_map_key', 'pandit_app_url', 'upload_base_url', 'user_response_time', 'call_type', 'map_api_key', 'is_live_enabled', 'min_minutes_required_balance', 'ashirvad_price','enable_ios_gift').first();
+        const setting = await db('settings').select('facebook', 'x', 'instagram', 'youtube', 'linkedin', 'ios_version', 'android_version', 'agora_app_id', 'agora_certificate', 'google_map_key', 'pandit_app_url', 'upload_base_url', 'user_response_time', 'call_type', 'map_api_key', 'is_live_enabled', 'min_minutes_required_balance', 'ashirvad_price', 'enable_ios_gift').first();
         return res.status(200).json({ success: true, data: setting, message: 'get config Successfully' });
     } catch (err) {
         console.error(err);
@@ -1000,6 +1018,7 @@ async function verifyFirebaseOtp(req, res) {
             version,
             referrer,
             device_id,
+            referal_code,
         } = req.body || {};
 
         if (!idToken) {
@@ -1096,6 +1115,7 @@ async function verifyFirebaseOtp(req, res) {
                 currency = await getCurrencyByCountry(country);
                 currency = currency?.currency;
             }
+            const referral = await resolveSignupReferral({ referal_code, mobile, country_code });
             [existing] = await db('users')
                 .insert({
                     mobile,
@@ -1110,6 +1130,8 @@ async function verifyFirebaseOtp(req, res) {
                     is_free_order_available: true,
                     default_currency: currency,
                     permanent_currency: currency,
+                    referal_code: referral.referal_code,
+                    registered_referal: referral.registered_referal,
                 })
                 .returning([
                     'id',
@@ -1120,7 +1142,10 @@ async function verifyFirebaseOtp(req, res) {
                     'is_free_order_available',
                     'permanent_currency',
                     'default_currency',
+                    'referal_code',
+                    'registered_referal',
                 ]);
+            await creditReferrerBonus(referral.referrer);
         }
         if (Object.keys(upd).length > 0) {
             await db('users').where({ id: Number(existing?.id) }).update(upd);
@@ -1159,6 +1184,25 @@ async function getCountryByIp(req, res) {
         return res.status(400).json({ success: false, message: "Server error" });
     }
 }
+
+async function checkReferralCode(req, res) {
+    try {
+        const referal_code = req.query?.referal_code || req.body?.referal_code;
+        if (!String(referal_code || '').trim()) {
+            return res.status(200).json({ success: true, data: { matched: false }, message: 'Referral code is required.' });
+        }
+        const matched = await isValidReferralCode(referal_code);
+        return res.status(200).json({
+            success: true,
+            data: { matched },
+            message: matched ? 'Referral code matched.' : 'Referral code not found.',
+        });
+    } catch (err) {
+        logger.error('checkReferralCode error', err?.message || err);
+        return res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
 module.exports = {
     register,
     login,
@@ -1174,5 +1218,6 @@ module.exports = {
     sendFirebaseOtp,
     verifyFirebaseOtp,
     getFirebaseRecaptchaParams,
-    getCountryByIp
+    getCountryByIp,
+    checkReferralCode,
 };
