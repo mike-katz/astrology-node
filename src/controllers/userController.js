@@ -530,6 +530,20 @@ async function getRecommendations(req, res) {
     }
 }
 
+async function upsertUserLogin(userId) {
+    const now = new Date();
+    await db('userlogins')
+        .insert({
+            user_id: Number(userId),
+            login_at: now,
+            created_at: now,
+        })
+        .onConflict('user_id')
+        .merge({
+            login_at: now,
+        });
+}
+
 async function findIsFree(req, res) {
     try {
         const existing = await db('users').where({ id: req.userId }).select('offer_amount', 'default_currency').first();
@@ -550,7 +564,7 @@ async function findIsFree(req, res) {
                 }
             }
         }
-        // }
+        await upsertUserLogin(req.userId);
         return res.status(200).json({ success: true, data: response, message: 'Get successfully' });
     }
     catch (err) {
