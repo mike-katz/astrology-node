@@ -524,7 +524,7 @@ async function googleLogin(req, res) {
             upd.mode = mode;
         }
 
-        let set_id = ad_set_id ?? referrer ?? null;
+        let set_id = ad_set_id ? ad_set_id : referrer || null;
         if (set_id != null) {
             const numOk = isNumber(set_id);
             if (!numOk) {
@@ -699,7 +699,7 @@ async function appleLogin(req, res) {
             upd.mode = mode;
         }
 
-        let set_id = ad_set_id ?? referrer ?? null;
+        let set_id = ad_set_id ? ad_set_id : referrer || null;
         if (set_id != null) {
             const numOk = isNumber(set_id);
             if (!numOk) {
