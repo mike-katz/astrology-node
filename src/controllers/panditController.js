@@ -626,7 +626,7 @@ async function verifyOtp(req, res) {
         const { name, gender, profile, email, dob, city, country, experience, primary_expertise, secondary_expertise, other_working, other_working_text,
             languages, available_for,
             chat_call_rate, training_type, guru_name, certificate,
-            govt_id, about, achievement_url, address, selfie, achievement_file,
+            govt_id, about, achievement_url, address, selfie, achievement_file, video_introduction, device_type,
             terms, no_false, consent_profile, step = 0, application_id, remark, reject_proof, status, spell_type, spell_type_other
         } = user
         if (status == 'blocked') {
@@ -663,7 +663,9 @@ async function verifyOtp(req, res) {
                 govt_id: govt_id ? deepParse(govt_id) : [],
                 about: about || "", achievement_url: achievement_url || "",
                 address: address ? deepParse(address) : [],
-                selfie: selfie || "", achievement_file: achievement_file || ""
+                selfie: selfie || "", achievement_file: achievement_file || "",
+                video_introduction: video_introduction || "",
+                device_type: device_type || ""
             },
             "step4": {
                 terms: terms || "", no_false: no_false || "", consent_profile: consent_profile || ""
@@ -783,7 +785,8 @@ async function basicOnboard(req, res) {
                 govt_id: [],
                 about: "", achievement_url: "",
                 address: [],
-                selfie: "", achievement_file: ""
+                selfie: "", achievement_file: "",
+                video_introduction: "", device_type: ""
             },
             "step4": {
                 terms: "", no_false: "", consent_profile: ""
