@@ -13,28 +13,28 @@ const upload = multer({
         files: 20,              // total files limit
         fileSize: 10 * 1024 * 1024 // 5MB per file
     },
-    fileFilter: (req, file, cb) => {
-        const allowedTypes = [
-            'image/*',
-            'audio/*',
-            'video/*',
-            'application/pdf'
-        ];
-        console.log("file.mimetype", file.mimetype);
-        const isAllowed = allowedTypes.some(type => {
-            if (type.endsWith('/*')) {
-                return file.mimetype.startsWith(type.replace('/*', '/'));
-            }
+    // fileFilter: (req, file, cb) => {
+    //     const allowedTypes = [
+    //         'image/*',
+    //         'audio/*',
+    //         'video/*',
+    //         'application/pdf'
+    //     ];
+    //     console.log("file.mimetype", file.mimetype);
+    //     const isAllowed = allowedTypes.some(type => {
+    //         if (type.endsWith('/*')) {
+    //             return file.mimetype.startsWith(type.replace('/*', '/'));
+    //         }
 
-            return file.mimetype === type;
-        });
+    //         return file.mimetype === type;
+    //     });
 
-        if (isAllowed) {
-            cb(null, true);
-        } else {
-            cb(new Error('Only images, audio, video & PDF files are allowed'), false);
-        }
-    }
+    //     if (isAllowed) {
+    //         cb(null, true);
+    //     } else {
+    //         cb(new Error('Only images, audio, video & PDF files are allowed'), false);
+    //     }
+    // }
 });
 router.get('/', pandits.getPandits);
 router.get('/detail', pandits.getPanditDetail);
