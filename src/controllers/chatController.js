@@ -1118,7 +1118,8 @@ async function newCreateOrder(req, res) {
             type,
             profile_id,
             currency: user?.default_currency,
-            is_free: false
+            is_free: false,
+            verify: false
         }
 
         const upd = { is_free_order: "paid" }

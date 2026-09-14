@@ -647,6 +647,7 @@ async function createMediaOrder(req, res) {
             profile_id,
             currency: user?.default_currency || 'INR',
             is_free: false,
+            verify: false,
         }
 
         const upd = { is_free_order: "paid" }

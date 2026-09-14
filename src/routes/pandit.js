@@ -11,22 +11,30 @@ const upload = multer({
     storage,
     limits: {
         files: 20,              // total files limit
-        fileSize: 10 * 1024 * 1024 // 5MB per file
+        fileSize: 50 * 1024 * 1024 // 5MB per file
     },
-    fileFilter: (req, file, cb) => {
-        const allowedTypes = [
-            'image/jpeg',
-            'image/png',
-            'image/jpg',
-            'application/pdf'
-        ];
+    // fileFilter: (req, file, cb) => {
+    //     const allowedTypes = [
+    //         'image/*',
+    //         'audio/*',
+    //         'video/*',
+    //         'application/pdf'
+    //     ];
+    //     console.log("file.mimetype", file.mimetype);
+    //     const isAllowed = allowedTypes.some(type => {
+    //         if (type.endsWith('/*')) {
+    //             return file.mimetype.startsWith(type.replace('/*', '/'));
+    //         }
 
-        if (allowedTypes.includes(file.mimetype)) {
-            cb(null, true);
-        } else {
-            cb(new Error('Only images & PDFs allowed'), false);
-        }
-    }
+    //         return file.mimetype === type;
+    //     });
+
+    //     if (isAllowed) {
+    //         cb(null, true);
+    //     } else {
+    //         cb(new Error('Only images, audio, video & PDF files are allowed'), false);
+    //     }
+    // }
 });
 router.get('/', pandits.getPandits);
 router.get('/detail', pandits.getPanditDetail);

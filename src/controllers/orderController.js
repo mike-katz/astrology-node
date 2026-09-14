@@ -210,7 +210,8 @@ async function create(req, res) {
             deduction,
             type,
             profile_id,
-            is_free: false
+            is_free: false,
+            verify: false
         }
         const upd = { is_free_order: "paid" }
         if (count == 0) {
@@ -375,6 +376,7 @@ async function createFreeChat(req, res) {
             type: "chat",
             profile_id,
             is_free: true,
+            verify: false,
             requested_pandits: JSON.stringify(requestedPanditIds),
         }).returning('*');
         await addOrderLog({

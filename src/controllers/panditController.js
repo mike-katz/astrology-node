@@ -626,7 +626,7 @@ async function verifyOtp(req, res) {
         const { name, gender, profile, email, dob, city, country, experience, primary_expertise, secondary_expertise, other_working, other_working_text,
             languages, available_for,
             chat_call_rate, training_type, guru_name, certificate,
-            govt_id, about, achievement_url, address, selfie, achievement_file,
+            govt_id, about, achievement_url, address, selfie, achievement_file, video_introduction, device_type,
             terms, no_false, consent_profile, step = 0, application_id, remark, reject_proof, status, spell_type, spell_type_other
         } = user
         if (status == 'blocked') {
@@ -663,7 +663,9 @@ async function verifyOtp(req, res) {
                 govt_id: govt_id ? deepParse(govt_id) : [],
                 about: about || "", achievement_url: achievement_url || "",
                 address: address ? deepParse(address) : [],
-                selfie: selfie || "", achievement_file: achievement_file || ""
+                selfie: selfie || "", achievement_file: achievement_file || "",
+                video_introduction: video_introduction || "",
+                device_type: device_type || ""
             },
             "step4": {
                 terms: terms || "", no_false: no_false || "", consent_profile: consent_profile || ""
@@ -783,7 +785,8 @@ async function basicOnboard(req, res) {
                 govt_id: [],
                 about: "", achievement_url: "",
                 address: [],
-                selfie: "", achievement_file: ""
+                selfie: "", achievement_file: "",
+                video_introduction: "", device_type: ""
             },
             "step4": {
                 terms: "", no_false: "", consent_profile: ""
@@ -801,7 +804,7 @@ async function onboard(req, res) {
         const { name, dob, country_code, mobile, email, city, country, gender, experience, primary_expertise, secondary_expertise, other_working, other_working_text, step = 1,
             languages, available_for,
             chat_call_rate, training_type, guru_name, certificate,
-            govt_id, about, achievement_url, address, achievement_file,
+            govt_id, about, achievement_url, address, achievement_file, video_introduction, device_type,
             terms, no_false, consent_profile, token,
             spell_type, spell_type_other
         } = req.body;
@@ -822,7 +825,7 @@ async function onboard(req, res) {
             if (!languages || !available_for || !chat_call_rate || !training_type || !guru_name) return res.status(400).json({ success: false, message: 'Missing params.' });
         }
         if (Number(step) == 3) {
-            if (!govt_id) return res.status(400).json({ success: false, message: 'Missing params.' });
+            if (!govt_id || !device_type) return res.status(400).json({ success: false, message: 'Missing params.' });
         }
         if (Number(step) == 4) {
             if (!terms || !no_false || !consent_profile) return res.status(400).json({ success: false, message: 'Missing params.' });
@@ -955,6 +958,12 @@ async function onboard(req, res) {
         }
         if (certificate) {
             ins.certificate = certificate //JSON.stringify(certificate)
+        }
+        if (device_type) {
+            ins.device_type = device_type
+        }
+        if (video_introduction) {
+            ins.video_introduction = video_introduction
         }
         if (experience) {
             ins.experience = experience
@@ -1210,21 +1219,24 @@ async function uploadImage(req, res) {
                     if (result?.length == 0) {
                         updateData.certificate = null
                     } else {
-                        updateData.certificate = result // JSON.stringify(result)
+                        updateData.certificate = JSON.stringify(result)
                     }
                 } catch (e) {
                     console.error('Error parsing certificate:', e);
                 }
             }
-
+            console.log("onboarding.govt_id", onboarding.govt_id);
             // Check and remove from govt_id array (array of objects with URL)
             if (onboarding.govt_id) {
                 const govt_id = deepParse(onboarding.govt_id);
                 const returns = removeMatchedUrl(govt_id, file)
-                updateData.govt_id = returns // JSON.stringify(returns);
-
+                updateData.govt_id = JSON.stringify(returns);
             }
-            // console.log("updateData", updateData);
+
+            if (onboarding.video_introduction == file) {
+                updateData.video_introduction = null;
+            }
+            console.log("updateData", JSON.stringify(updateData));
             // Update database if URL was found and removed
             if (Object.keys(updateData).length > 0) {
                 await db('onboardings')
