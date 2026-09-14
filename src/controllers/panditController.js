@@ -1231,7 +1231,7 @@ async function uploadImage(req, res) {
             if (onboarding.govt_id) {
                 const govt_id = deepParse(onboarding.govt_id);
                 const returns = removeMatchedUrl(govt_id, file)
-                updateData.govt_id = returns // JSON.stringify(returns);
+                updateData.govt_id = JSON.stringify(returns);
 
             }
             console.log("updateData", JSON.stringify(updateData));
