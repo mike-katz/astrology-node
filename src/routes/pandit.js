@@ -20,7 +20,7 @@ const upload = multer({
             'video/*',
             'application/pdf'
         ];
-
+        console.log("file.mimetype", file.mimetype);
         const isAllowed = allowedTypes.some(type => {
             if (type.endsWith('/*')) {
                 return file.mimetype.startsWith(type.replace('/*', '/'));
