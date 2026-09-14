@@ -1220,7 +1220,7 @@ async function uploadImage(req, res) {
                     if (result?.length == 0) {
                         updateData.certificate = null
                     } else {
-                        updateData.certificate = result // JSON.stringify(result)
+                        updateData.certificate = JSON.stringify(result)
                     }
                 } catch (e) {
                     console.error('Error parsing certificate:', e);
