@@ -20,10 +20,19 @@ const upload = multer({
             'video/*',
             'application/pdf'
         ];
-        if (allowedTypes.includes(file.mimetype)) {
+
+        const isAllowed = allowedTypes.some(type => {
+            if (type.endsWith('/*')) {
+                return file.mimetype.startsWith(type.replace('/*', '/'));
+            }
+
+            return file.mimetype === type;
+        });
+
+        if (isAllowed) {
             cb(null, true);
         } else {
-            cb(new Error('Only images & PDFs allowed'), false);
+            cb(new Error('Only images, audio, video & PDF files are allowed'), false);
         }
     }
 });
