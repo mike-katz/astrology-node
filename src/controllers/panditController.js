@@ -1232,7 +1232,10 @@ async function uploadImage(req, res) {
                 const govt_id = deepParse(onboarding.govt_id);
                 const returns = removeMatchedUrl(govt_id, file)
                 updateData.govt_id = JSON.stringify(returns);
+            }
 
+            if (onboarding.video_introduction == file) {
+                updateData.video_introduction = null;
             }
             console.log("updateData", JSON.stringify(updateData));
             // Update database if URL was found and removed
