@@ -1226,7 +1226,7 @@ async function uploadImage(req, res) {
                     console.error('Error parsing certificate:', e);
                 }
             }
-
+            console.log("onboarding.govt_id", onboarding.govt_id);
             // Check and remove from govt_id array (array of objects with URL)
             if (onboarding.govt_id) {
                 const govt_id = deepParse(onboarding.govt_id);
@@ -1234,7 +1234,7 @@ async function uploadImage(req, res) {
                 updateData.govt_id = returns // JSON.stringify(returns);
 
             }
-            // console.log("updateData", updateData);
+            console.log("updateData", JSON.stringify(updateData));
             // Update database if URL was found and removed
             if (Object.keys(updateData).length > 0) {
                 await db('onboardings')
