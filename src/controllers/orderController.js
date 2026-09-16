@@ -1175,4 +1175,29 @@ async function callEnd(req, res) {
     }
 }
 
-module.exports = { create, createFreeChat, list, acceptOrder, cancelOrder, deleteOrder, sendGift, generateCallToken, callReject, callEnd, sendAutoMessage };
+async function panditList(req, res) {
+    try {
+        const data = await db('orders as o')
+            .leftJoin('pandits as p', 'p.id', 'o.pandit_id')
+            .where({ 'o.user_id': req.userId, status: "completed" })
+            .whereNull('o.deleted_at')
+            .select(
+                'o.order_id',
+                'o.pandit_id',
+                'p.profile',
+                'p.display_name'
+            )
+            .orderBy('o.id', 'desc');
+
+        return res.status(200).json({
+            success: true,
+            data,
+            message: 'Order pandit list fetched successfully',
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
+module.exports = { create, createFreeChat, list, panditList, acceptOrder, cancelOrder, deleteOrder, sendGift, generateCallToken, callReject, callEnd, sendAutoMessage };

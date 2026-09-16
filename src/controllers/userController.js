@@ -10,6 +10,7 @@ const { uploadImageToAzure, deleteFileFromAzure } = require('../utils/azureUploa
 const { getCurrencySymbolByCurrency, getCurrencyIconByCurrency } = require('../utils/countryCurrencyMap');
 const { notifyPanditsOnNewUserProfile } = require('../utils/newUserPanditNotify');
 const { createUniqueReferralCode } = require('../utils/referral');
+const { creditUserCoin } = require('../utils/userCoins');
 
 async function makeAvtarString(user, gender) {
     if (!user || !gender) return null;
@@ -475,6 +476,42 @@ async function getCookie(req, res) {
     return res.status(200).json({ success: true, data: response?.data?.data?.prediction, message: 'Recharge list success' });
 }
 
+async function addUserCoin(req, res) {
+    try {
+        const type = req.body?.type || req.query?.type;
+        const coin = req.body?.coin ?? req.query?.coin;
+        const data = await creditUserCoin(req.userId, type, coin);
+        return res.status(200).json({
+            success: true,
+            data,
+            message: data.already ? 'Coin already claimed for this activity today' : 'Coin added successfully',
+        });
+    } catch (err) {
+        console.error(err);
+        if (err.status === 400) {
+            return res.status(400).json({ success: false, message: err.message });
+        }
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
+async function getAstroCoinTasks(req, res) {
+    try {
+        const data = await db('astro_coin_task')
+            .where({ status: true })
+            .whereNull('deleted_at')
+            .orderBy('id', 'asc');
+        return res.status(200).json({
+            success: true,
+            data,
+            message: 'Astro coin tasks fetched successfully',
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
 async function getRecommendations(req, res) {
     try {
         let page = parseInt(req.query.page) || 1;
@@ -910,4 +947,4 @@ async function getReferalCode(req, res) {
     }
 }
 
-module.exports = { updateProfile, getProfile, getBalance, updateToken, updateAllowNotification, getAllowNotification, profileUpdate, makeAvtarString, deleteMyAccount, getRecharge, getRechargeBanner, getCookie, getRecommendations, findIsFree, getUserStats, getCurrencyList, updateCurrency, getGiftList, getInboxMessages, getInboxDetail, getReferalCode };
+module.exports = { updateProfile, getProfile, getBalance, updateToken, updateAllowNotification, getAllowNotification, profileUpdate, makeAvtarString, deleteMyAccount, getRecharge, getRechargeBanner, getCookie, addUserCoin, getAstroCoinTasks, getRecommendations, findIsFree, getUserStats, getCurrencyList, updateCurrency, getGiftList, getInboxMessages, getInboxDetail, getReferalCode };
