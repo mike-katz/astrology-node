@@ -512,6 +512,33 @@ async function getAstroCoinTasks(req, res) {
     }
 }
 
+async function getUserCoins(req, res) {
+    try {
+        const [user, usercoins, settings] = await Promise.all([
+            db('users').where({ id: req.userId }).select('coin').first(),
+            db('usercoins').where({ user_id: req.userId }).first(),
+            db('settings').select('coin_streak_rewards', 'coin_all_activity_bonus').first(),
+        ]);
+        let coin_streak_rewards = settings?.coin_streak_rewards ?? [];
+        if (typeof coin_streak_rewards === 'string') {
+            try { coin_streak_rewards = JSON.parse(coin_streak_rewards); } catch (e) { coin_streak_rewards = []; }
+        }
+        return res.status(200).json({
+            success: true,
+            data: {
+                coin: Number(user?.coin || 0),
+                usercoins: usercoins || null,
+                coin_streak_rewards,
+                coin_all_activity_bonus: Number(settings?.coin_all_activity_bonus || 0),
+            },
+            message: 'User coins fetched successfully',
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
 async function getRecommendations(req, res) {
     try {
         let page = parseInt(req.query.page) || 1;
@@ -947,4 +974,4 @@ async function getReferalCode(req, res) {
     }
 }
 
-module.exports = { updateProfile, getProfile, getBalance, updateToken, updateAllowNotification, getAllowNotification, profileUpdate, makeAvtarString, deleteMyAccount, getRecharge, getRechargeBanner, getCookie, addUserCoin, getAstroCoinTasks, getRecommendations, findIsFree, getUserStats, getCurrencyList, updateCurrency, getGiftList, getInboxMessages, getInboxDetail, getReferalCode };
+module.exports = { updateProfile, getProfile, getBalance, updateToken, updateAllowNotification, getAllowNotification, profileUpdate, makeAvtarString, deleteMyAccount, getRecharge, getRechargeBanner, getCookie, addUserCoin, getAstroCoinTasks, getUserCoins, getRecommendations, findIsFree, getUserStats, getCurrencyList, updateCurrency, getGiftList, getInboxMessages, getInboxDetail, getReferalCode };
