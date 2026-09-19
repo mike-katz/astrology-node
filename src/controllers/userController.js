@@ -570,6 +570,134 @@ async function getUserCoins(req, res) {
     }
 }
 
+async function getCoinRedeems(req, res) {
+    try {
+        const user = await db('users').where({ id: req.userId }).select('id', 'default_currency').first();
+        if (!user) return res.status(400).json({ success: false, message: 'User not found.' });
+
+        const currency = user.default_currency || 'INR';
+        const currencyData = await db('currency').select('user_inr_rate').where({ currency_name: currency }).first();
+        const rate = currencyData?.user_inr_rate || 1;
+        const symbol = getCurrencySymbolByCurrency(currency);
+
+        const rows = await db('coin_redeems')
+            .where({ status: true })
+            .whereNull('deleted_at')
+            .orderBy('sort_order', 'asc')
+            .orderBy('coin', 'asc');
+
+        const data = rows.map((row) => ({
+            id: row.id,
+            coin: Number(row.coin),
+            amount: convertCurrency(row.amount, rate),
+            is_jackpot: Boolean(row.is_jackpot),
+            currency: symbol,
+        }));
+
+        return res.status(200).json({
+            success: true,
+            data,
+            message: 'Coin redeem list fetched successfully',
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
+async function redeemCoin(req, res) {
+    try {
+        const id = Number(req.body?.id || req.query?.id);
+        if (!id) {
+            return res.status(400).json({ success: false, message: 'id is required.' });
+        }
+
+        const result = await db.transaction(async (trx) => {
+            const pack = await trx('coin_redeems')
+                .where({ id, status: true })
+                .whereNull('deleted_at')
+                .first();
+            if (!pack) {
+                const err = new Error('Redeem pack not found.');
+                err.status = 400;
+                throw err;
+            }
+
+            const coinsNeeded = Number(pack.coin);
+            const creditInr = Number(pack.amount);
+            if (!coinsNeeded || !Number.isFinite(creditInr) || creditInr <= 0) {
+                const err = new Error('Invalid redeem pack.');
+                err.status = 400;
+                throw err;
+            }
+
+            const user = await trx('users').where({ id: req.userId }).forUpdate().select('id', 'coin', 'balance', 'default_currency').first();
+            if (!user) {
+                const err = new Error('User not found.');
+                err.status = 400;
+                throw err;
+            }
+
+            const currentCoin = Number(user.coin || 0);
+            if (currentCoin < coinsNeeded) {
+                const err = new Error('Not enough coins.');
+                err.status = 400;
+                throw err;
+            }
+
+            const oldBalance = Number(user.balance || 0);
+            const newBalance = Number((oldBalance + creditInr).toFixed(2));
+            const newCoin = currentCoin - coinsNeeded;
+
+            await trx('users').where({ id: user.id }).update({
+                coin: newCoin,
+                balance: newBalance,
+            });
+
+            await trx('balancelogs').insert({
+                user_id: user.id,
+                user_old_balance: oldBalance,
+                user_new_balance: newBalance,
+                amount: creditInr,
+                message: `Coin redeem (${coinsNeeded} coins)`,
+                currency: user.default_currency || 'INR',
+                type: 'coin_redeem',
+                gst: 0,
+            });
+
+            return {
+                coin: newCoin,
+                redeemed_coin: coinsNeeded,
+                balance: newBalance,
+                amount: creditInr,
+            };
+        });
+
+        const user = await db('users').where({ id: req.userId }).select('default_currency').first();
+        const currency = user?.default_currency || 'INR';
+        const currencyData = await db('currency').select('user_inr_rate').where({ currency_name: currency }).first();
+        const symbol = getCurrencySymbolByCurrency(currency);
+
+        return res.status(200).json({
+            success: true,
+            data: {
+                coin: result.coin,
+                redeemed_coin: result.redeemed_coin,
+                amount: convertCurrency(result.amount, currencyData?.user_inr_rate || 1),
+                balance: convertCurrency(result.balance, currencyData?.user_inr_rate || 1),
+                currency: symbol,
+            },
+            message: 'Coins redeemed successfully',
+        });
+    } catch (err) {
+        console.error(err);
+        if (err.status === 400) {
+            return res.status(400).json({ success: false, message: err.message });
+        }
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
 async function getRecommendations(req, res) {
     try {
         let page = parseInt(req.query.page) || 1;
@@ -1005,4 +1133,4 @@ async function getReferalCode(req, res) {
     }
 }
 
-module.exports = { updateProfile, getProfile, getBalance, updateToken, updateAllowNotification, getAllowNotification, profileUpdate, makeAvtarString, deleteMyAccount, getRecharge, getRechargeBanner, getCookie, addUserCoin, scratchCard, getAstroCoinTasks, getUserCoins, getRecommendations, findIsFree, getUserStats, getCurrencyList, updateCurrency, getGiftList, getInboxMessages, getInboxDetail, getReferalCode };
+module.exports = { updateProfile, getProfile, getBalance, updateToken, updateAllowNotification, getAllowNotification, profileUpdate, makeAvtarString, deleteMyAccount, getRecharge, getRechargeBanner, getCookie, addUserCoin, scratchCard, getAstroCoinTasks, getUserCoins, getCoinRedeems, redeemCoin, getRecommendations, findIsFree, getUserStats, getCurrencyList, updateCurrency, getGiftList, getInboxMessages, getInboxDetail, getReferalCode };

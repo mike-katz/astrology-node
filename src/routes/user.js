@@ -42,6 +42,8 @@ router.post('/coin', user.addUserCoin);
 router.post('/scratch-card', user.scratchCard);
 router.get('/coin-details', user.getUserCoins);
 router.get('/astro-coin-tasks', user.getAstroCoinTasks);
+router.get('/coin-redeems', user.getCoinRedeems);
+router.post('/coin-redeem', user.redeemCoin);
 router.get('/recommendation', user.getRecommendations);
 router.get('/check-is-free', user.findIsFree);
 router.get('/statistics-count', user.getUserStats);
