@@ -552,9 +552,7 @@ async function getUserCoins(req, res) {
                 usercoins.activity = activity.filter((item) => String(item || '').trim().toLowerCase() !== 'all');
             }
         }
-        if (usercoins) {
-            delete usercoins.scratch_date;
-        }
+       
         return res.status(200).json({
             success: true,
             data: {
