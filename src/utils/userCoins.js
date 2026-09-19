@@ -240,29 +240,39 @@ async function creditUserCoin(userId, type) {
     });
 }
 
-function parseScratchRewards(settings) {
-    const arr = parseJson(settings?.scratch_card_rewards, null);
-    if (!Array.isArray(arr) || !arr.length) return [];
-    return arr
-        .map((item) => Number(item?.coins ?? item?.coin ?? item))
-        .filter((n) => Number.isFinite(n) && n > 0)
-        .map((n) => Math.round(n));
+function parseBoolean(value) {
+    if (value === true || value === 1 || value === '1') return true;
+    if (value === false || value === 0 || value === '0') return false;
+    if (typeof value === 'string') {
+        const v = value.trim().toLowerCase();
+        if (v === 'true') return true;
+        if (v === 'false') return false;
+    }
+    return null;
 }
 
-function pickScratchReward(settings) {
-    const rewards = parseScratchRewards(settings);
-    if (!rewards.length) {
-        const err = new Error('Scratch card rewards not configured.');
+async function claimScratchCard(userId, payload = {}) {
+    const isCoin = parseBoolean(payload.is_coin);
+    if (isCoin == null) {
+        const err = new Error('is_coin is required.');
         err.status = 400;
         throw err;
     }
-    return rewards[Math.floor(Math.random() * rewards.length)];
-}
 
-async function claimScratchCard(userId) {
+    let value = Number(payload.value);
+    if (isCoin) {
+        if (!Number.isFinite(value) || value <= 0) {
+            const err = new Error('value is required.');
+            err.status = 400;
+            throw err;
+        }
+        value = Math.round(value);
+    } else {
+        value = 1;
+    }
+
     const today = getIstDateStr();
     return db.transaction(async (trx) => {
-        const settings = await trx('settings').first();
         const user = await trx('users').where({ id: userId }).forUpdate().select('id', 'coin').first();
         if (!user) {
             const err = new Error('User not found.');
@@ -273,21 +283,32 @@ async function claimScratchCard(userId) {
         const row = await trx('usercoins').where({ user_id: userId }).forUpdate().first();
         if (formatDateOnly(row?.scratch_date) === today) {
             return {
-                awarded: 0,
                 already: true,
+                is_coin: isCoin,
+                value,
                 coin: Number(user.coin || 0),
+                freeze: Number(row?.freeze || 0),
                 scratch_date: today,
             };
         }
 
-        const awarded = pickScratchReward(settings);
         const now = new Date();
+        let freeze = Number(row?.freeze || 0);
+        let coin = Number(user.coin || 0);
+
+        if (isCoin) {
+            await trx('users').where({ id: userId }).increment('coin', value);
+            coin += value;
+        } else {
+            freeze += 1;
+        }
+
         if (!row) {
             await trx('usercoins').insert({
                 user_id: userId,
                 date: null,
                 days: 0,
-                freeze: 0,
+                freeze,
                 activity: JSON.stringify([]),
                 scratch_date: today,
                 created_at: now,
@@ -295,22 +316,21 @@ async function claimScratchCard(userId) {
             });
         } else {
             await trx('usercoins').where({ user_id: userId }).update({
+                freeze,
                 scratch_date: today,
                 updated_at: now,
             });
         }
 
-        if (awarded > 0) {
-            await trx('users').where({ id: userId }).increment('coin', awarded);
-        }
-
         return {
-            awarded,
             already: false,
-            coin: Number(user.coin || 0) + awarded,
+            is_coin: isCoin,
+            value,
+            coin,
+            freeze,
             scratch_date: today,
         };
     });
 }
 
-module.exports = { creditUserCoin, claimScratchCard, getIstDateStr, formatDateOnly, parseScratchRewards };
+module.exports = { creditUserCoin, claimScratchCard, getIstDateStr, formatDateOnly };

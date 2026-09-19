@@ -496,7 +496,10 @@ async function addUserCoin(req, res) {
 
 async function scratchCard(req, res) {
     try {
-        const data = await claimScratchCard(req.userId);
+        const data = await claimScratchCard(req.userId, {
+            is_coin: req.body?.is_coin ?? req.query?.is_coin,
+            value: req.body?.value ?? req.query?.value,
+        });
         return res.status(200).json({
             success: true,
             data,
