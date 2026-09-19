@@ -242,19 +242,20 @@ async function creditUserCoin(userId, type) {
 
 function parseScratchRewards(settings) {
     const arr = parseJson(settings?.scratch_card_rewards, null);
-    if (Array.isArray(arr) && arr.length) {
-        return arr
-            .map((item) => Number(item?.coins ?? item?.coin ?? item))
-            .filter((n) => Number.isFinite(n) && n > 0)
-            .map((n) => Math.round(n));
-    }
-    const n = Number(settings?.scratch_card_coin);
-    if (Number.isFinite(n) && n > 0) return [Math.round(n)];
-    return [10];
+    if (!Array.isArray(arr) || !arr.length) return [];
+    return arr
+        .map((item) => Number(item?.coins ?? item?.coin ?? item))
+        .filter((n) => Number.isFinite(n) && n > 0)
+        .map((n) => Math.round(n));
 }
 
 function pickScratchReward(settings) {
     const rewards = parseScratchRewards(settings);
+    if (!rewards.length) {
+        const err = new Error('Scratch card rewards not configured.');
+        err.status = 400;
+        throw err;
+    }
     return rewards[Math.floor(Math.random() * rewards.length)];
 }
 
