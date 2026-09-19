@@ -71,47 +71,59 @@ function taskCoin(task) {
     return Number.isFinite(n) && n > 0 ? n : 0;
 }
 
+function isAllTitle(value) {
+    return normalizeType(value) === 'all';
+}
+
 async function loadCoinTasks(trx = db) {
     const rows = await trx('astro_coin_task').select('*').orderBy('id', 'asc');
     return rows.filter((row) => {
         if (row.deleted_at) return false;
         if (row.status === false || row.status === 0) return false;
+        if (isAllTitle(row.title)) return false;
         return true;
     });
 }
 
-async function resolveTaskCoin(type) {
+function findTaskByType(tasks, type) {
     const key = normalizeType(type);
-    if (!key) return 0;
-    const tasks = await loadCoinTasks();
-    const matched = tasks.find((task) => {
+    if (!key) return null;
+    return tasks.find((task) => {
         const title = normalizeType(task.title);
         return title === key || title.includes(key) || key.includes(title);
-    });
-    return taskCoin(matched);
+    }) || null;
 }
 
-async function creditUserCoin(userId, type, coinInput) {
-    const activityKey = normalizeType(type);
-    if (!activityKey) {
+function activityHasTitle(activity, title) {
+    const key = normalizeType(title);
+    return activity.some((done) => done === title || normalizeType(done) === key);
+}
+
+async function creditUserCoin(userId, type) {
+    if (!normalizeType(type)) {
         const err = new Error('Type is required.');
         err.status = 400;
         throw err;
     }
 
-    let reward = Number(coinInput);
-    if (!Number.isFinite(reward) || reward <= 0) {
-        reward = await resolveTaskCoin(activityKey);
-    }
-    if (!Number.isFinite(reward) || reward <= 0) {
-        const err = new Error('Coin is required.');
-        err.status = 400;
-        throw err;
-    }
-    reward = Math.round(reward);
-
     const today = getIstDateStr();
     return db.transaction(async (trx) => {
+        const tasks = await loadCoinTasks(trx);
+        const task = findTaskByType(tasks, type);
+        if (!task) {
+            const err = new Error('Invalid type.');
+            err.status = 400;
+            throw err;
+        }
+
+        const activityKey = String(task.title).trim();
+        const reward = taskCoin(task);
+        if (!reward) {
+            const err = new Error('Coin not found for this type.');
+            err.status = 400;
+            throw err;
+        }
+
         const row = await trx('usercoins').where({ user_id: userId }).forUpdate().first();
         const user = await trx('users').where({ id: userId }).forUpdate().select('id', 'coin').first();
         if (!user) {
@@ -122,7 +134,7 @@ async function creditUserCoin(userId, type, coinInput) {
 
         let days = Number(row?.days || 0);
         let freeze = Number(row?.freeze || 0);
-        let activity = parseActivity(row?.activity);
+        let activity = parseActivity(row?.activity).filter((item) => !isAllTitle(item));
         const lastDate = formatDateOnly(row?.date);
         const diff = daysBetween(lastDate, today);
         let addStreakBonus = false;
@@ -131,7 +143,7 @@ async function creditUserCoin(userId, type, coinInput) {
             days = 1;
             activity = [];
         } else if (diff === 0) {
-            if (activity.includes(activityKey)) {
+            if (activityHasTitle(activity, activityKey)) {
                 return {
                     awarded: 0,
                     already: true,
@@ -164,29 +176,23 @@ async function creditUserCoin(userId, type, coinInput) {
         const settings = await trx('settings').first();
         const dailyMax = Number(settings?.coin_daily_max || 60);
         const allBonus = Number(settings?.coin_all_activity_bonus || 10);
-        const tasks = await loadCoinTasks(trx);
-        const uniqueCompletable = [...new Set(tasks.map((item) => normalizeType(item.title)).filter(Boolean))];
+        const uniqueCompletable = [...new Set(tasks.map((item) => String(item.title || '').trim()).filter((title) => title && !isAllTitle(title)))];
 
         let activityGain = reward;
+        let appliedAllBonus = false;
         if (
             uniqueCompletable.length > 0
-            && uniqueCompletable.every((key) => activity.some((done) => done === key || done.includes(key) || key.includes(done)))
-            && !activity.includes('all')
+            && uniqueCompletable.every((title) => activityHasTitle(activity, title))
         ) {
             activityGain += allBonus;
-            activity.push('all');
+            appliedAllBonus = true;
         }
 
         const todayActivityTotal = activity
-            .filter((key) => key !== 'all')
             .reduce((sum, key) => {
                 if (key === activityKey) return sum + reward;
-                const matched = tasks.find((item) => {
-                    const title = normalizeType(item.title);
-                    return title === key || title.includes(key) || key.includes(title);
-                });
-                return sum + taskCoin(matched);
-            }, 0) + (activity.includes('all') ? allBonus : 0);
+                return sum + taskCoin(findTaskByType(tasks, key));
+            }, 0) + (appliedAllBonus ? allBonus : 0);
 
         if (todayActivityTotal > dailyMax) {
             activityGain = Math.max(activityGain - (todayActivityTotal - dailyMax), 0);

@@ -479,8 +479,7 @@ async function getCookie(req, res) {
 async function addUserCoin(req, res) {
     try {
         const type = req.body?.type || req.query?.type;
-        const coin = req.body?.coin ?? req.query?.coin;
-        const data = await creditUserCoin(req.userId, type, coin);
+        const data = await creditUserCoin(req.userId, type);
         return res.status(200).json({
             success: true,
             data,
@@ -500,6 +499,7 @@ async function getAstroCoinTasks(req, res) {
         const data = await db('astro_coin_task')
             .where({ status: true })
             .whereNull('deleted_at')
+            .whereRaw("LOWER(TRIM(title)) <> 'all'")
             .orderBy('id', 'asc');
         return res.status(200).json({
             success: true,
@@ -522,6 +522,15 @@ async function getUserCoins(req, res) {
         let coin_streak_rewards = settings?.coin_streak_rewards ?? [];
         if (typeof coin_streak_rewards === 'string') {
             try { coin_streak_rewards = JSON.parse(coin_streak_rewards); } catch (e) { coin_streak_rewards = []; }
+        }
+        if (usercoins?.activity) {
+            let activity = usercoins.activity;
+            if (typeof activity === 'string') {
+                try { activity = JSON.parse(activity); } catch (e) { activity = []; }
+            }
+            if (Array.isArray(activity)) {
+                usercoins.activity = activity.filter((item) => String(item || '').trim().toLowerCase() !== 'all');
+            }
         }
         return res.status(200).json({
             success: true,
