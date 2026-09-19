@@ -445,6 +445,7 @@ const FLAG_COUNTRY = {
     PHP: '🇵🇭',
     BRL: '🇧🇷',
     MXN: '🇲🇽',
+    NPR: '🇳🇵',
 }
 
 function getCurrencyIconByCurrency(currencyCode) {
