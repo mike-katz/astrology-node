@@ -39,6 +39,7 @@ router.get('/recharge', user.getRecharge);
 router.get('/rechargeBanner', user.getRechargeBanner);
 router.get('/cookie', user.getCookie);
 router.post('/coin', user.addUserCoin);
+router.post('/scratch-card', user.scratchCard);
 router.get('/coin-details', user.getUserCoins);
 router.get('/astro-coin-tasks', user.getAstroCoinTasks);
 router.get('/recommendation', user.getRecommendations);

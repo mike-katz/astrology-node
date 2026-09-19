@@ -10,7 +10,7 @@ const { uploadImageToAzure, deleteFileFromAzure } = require('../utils/azureUploa
 const { getCurrencySymbolByCurrency, getCurrencyIconByCurrency } = require('../utils/countryCurrencyMap');
 const { notifyPanditsOnNewUserProfile } = require('../utils/newUserPanditNotify');
 const { createUniqueReferralCode } = require('../utils/referral');
-const { creditUserCoin } = require('../utils/userCoins');
+const { creditUserCoin, claimScratchCard } = require('../utils/userCoins');
 
 async function makeAvtarString(user, gender) {
     if (!user || !gender) return null;
@@ -494,6 +494,23 @@ async function addUserCoin(req, res) {
     }
 }
 
+async function scratchCard(req, res) {
+    try {
+        const data = await claimScratchCard(req.userId);
+        return res.status(200).json({
+            success: true,
+            data,
+            message: data.already ? 'Scratch card already used today' : 'Scratch card claimed successfully',
+        });
+    } catch (err) {
+        console.error(err);
+        if (err.status === 400) {
+            return res.status(400).json({ success: false, message: err.message });
+        }
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
 async function getAstroCoinTasks(req, res) {
     try {
         const data = await db('astro_coin_task')
@@ -531,6 +548,9 @@ async function getUserCoins(req, res) {
             if (Array.isArray(activity)) {
                 usercoins.activity = activity.filter((item) => String(item || '').trim().toLowerCase() !== 'all');
             }
+        }
+        if (usercoins) {
+            delete usercoins.scratch_date;
         }
         return res.status(200).json({
             success: true,
@@ -983,4 +1003,4 @@ async function getReferalCode(req, res) {
     }
 }
 
-module.exports = { updateProfile, getProfile, getBalance, updateToken, updateAllowNotification, getAllowNotification, profileUpdate, makeAvtarString, deleteMyAccount, getRecharge, getRechargeBanner, getCookie, addUserCoin, getAstroCoinTasks, getUserCoins, getRecommendations, findIsFree, getUserStats, getCurrencyList, updateCurrency, getGiftList, getInboxMessages, getInboxDetail, getReferalCode };
+module.exports = { updateProfile, getProfile, getBalance, updateToken, updateAllowNotification, getAllowNotification, profileUpdate, makeAvtarString, deleteMyAccount, getRecharge, getRechargeBanner, getCookie, addUserCoin, scratchCard, getAstroCoinTasks, getUserCoins, getRecommendations, findIsFree, getUserStats, getCurrencyList, updateCurrency, getGiftList, getInboxMessages, getInboxDetail, getReferalCode };

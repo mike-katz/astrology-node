@@ -240,4 +240,76 @@ async function creditUserCoin(userId, type) {
     });
 }
 
-module.exports = { creditUserCoin };
+function parseScratchRewards(settings) {
+    const arr = parseJson(settings?.scratch_card_rewards, null);
+    if (Array.isArray(arr) && arr.length) {
+        return arr
+            .map((item) => Number(item?.coins ?? item?.coin ?? item))
+            .filter((n) => Number.isFinite(n) && n > 0)
+            .map((n) => Math.round(n));
+    }
+    const n = Number(settings?.scratch_card_coin);
+    if (Number.isFinite(n) && n > 0) return [Math.round(n)];
+    return [10];
+}
+
+function pickScratchReward(settings) {
+    const rewards = parseScratchRewards(settings);
+    return rewards[Math.floor(Math.random() * rewards.length)];
+}
+
+async function claimScratchCard(userId) {
+    const today = getIstDateStr();
+    return db.transaction(async (trx) => {
+        const settings = await trx('settings').first();
+        const user = await trx('users').where({ id: userId }).forUpdate().select('id', 'coin').first();
+        if (!user) {
+            const err = new Error('User not found.');
+            err.status = 400;
+            throw err;
+        }
+
+        const row = await trx('usercoins').where({ user_id: userId }).forUpdate().first();
+        if (formatDateOnly(row?.scratch_date) === today) {
+            return {
+                awarded: 0,
+                already: true,
+                coin: Number(user.coin || 0),
+                scratch_date: today,
+            };
+        }
+
+        const awarded = pickScratchReward(settings);
+        const now = new Date();
+        if (!row) {
+            await trx('usercoins').insert({
+                user_id: userId,
+                date: null,
+                days: 0,
+                freeze: 0,
+                activity: JSON.stringify([]),
+                scratch_date: today,
+                created_at: now,
+                updated_at: now,
+            });
+        } else {
+            await trx('usercoins').where({ user_id: userId }).update({
+                scratch_date: today,
+                updated_at: now,
+            });
+        }
+
+        if (awarded > 0) {
+            await trx('users').where({ id: userId }).increment('coin', awarded);
+        }
+
+        return {
+            awarded,
+            already: false,
+            coin: Number(user.coin || 0) + awarded,
+            scratch_date: today,
+        };
+    });
+}
+
+module.exports = { creditUserCoin, claimScratchCard, getIstDateStr, formatDateOnly, parseScratchRewards };
