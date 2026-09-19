@@ -534,7 +534,7 @@ async function getUserCoins(req, res) {
         const [user, usercoins, settings] = await Promise.all([
             db('users').where({ id: req.userId }).select('coin').first(),
             db('usercoins').where({ user_id: req.userId }).first(),
-            db('settings').select('coin_streak_rewards', 'coin_all_activity_bonus').first(),
+            db('settings').select('coin_streak_rewards', 'coin_all_activity_bonus','scratch_card_rewards').first(),
         ]);
         let coin_streak_rewards = settings?.coin_streak_rewards ?? [];
         if (typeof coin_streak_rewards === 'string') {
@@ -559,6 +559,7 @@ async function getUserCoins(req, res) {
                 usercoins: usercoins || null,
                 coin_streak_rewards,
                 coin_all_activity_bonus: Number(settings?.coin_all_activity_bonus || 0),
+                scratch_card_rewards: settings?.scratch_card_rewards || 0,
             },
             message: 'User coins fetched successfully',
         });
