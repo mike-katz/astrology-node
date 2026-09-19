@@ -98,7 +98,7 @@ const CURRENCIES = {
     NGN: { symbol: '₦', name: 'Nigerian Naira' },
     NIO: { symbol: 'C$', name: 'Nicaraguan Cordoba' },
     NOK: { symbol: 'kr', name: 'Norwegian Krone' },
-    NPR: { symbol: '₨', name: 'Nepalese Rupee' },
+    NPR: { symbol: 'NPR', name: 'Nepalese Rupee' },
     NZD: { symbol: 'NZ$', name: 'New Zealand Dollar' },
     OMR: { symbol: 'ر.ع.', name: 'Omani Rial' },
     PAB: { symbol: 'B/.', name: 'Panamanian Balboa' },
