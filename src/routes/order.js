@@ -8,6 +8,7 @@ router.post('/createFreeChat', order.createFreeChat);
 router.post('/acceptOrder', order.acceptOrder);
 router.post('/cancelOrder', order.cancelOrder);
 router.get('/list', order.list);
+router.get('/pandit-list', order.panditList);
 router.delete('/delete', order.deleteOrder);
 
 router.post('/sendGift', order.sendGift);

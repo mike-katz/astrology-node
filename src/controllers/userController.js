@@ -10,6 +10,7 @@ const { uploadImageToAzure, deleteFileFromAzure } = require('../utils/azureUploa
 const { getCurrencySymbolByCurrency, getCurrencyIconByCurrency } = require('../utils/countryCurrencyMap');
 const { notifyPanditsOnNewUserProfile } = require('../utils/newUserPanditNotify');
 const { createUniqueReferralCode } = require('../utils/referral');
+const { creditUserCoin, claimScratchCard } = require('../utils/userCoins');
 
 async function makeAvtarString(user, gender) {
     if (!user || !gender) return null;
@@ -475,6 +476,228 @@ async function getCookie(req, res) {
     return res.status(200).json({ success: true, data: response?.data?.data?.prediction, message: 'Recharge list success' });
 }
 
+async function addUserCoin(req, res) {
+    try {
+        const type = req.body?.type || req.query?.type;
+        const data = await creditUserCoin(req.userId, type);
+        return res.status(200).json({
+            success: true,
+            data,
+            message: data.already ? 'Coin already claimed for this activity today' : 'Coin added successfully',
+        });
+    } catch (err) {
+        console.error(err);
+        if (err.status === 400) {
+            return res.status(400).json({ success: false, message: err.message });
+        }
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
+async function scratchCard(req, res) {
+    try {
+        const data = await claimScratchCard(req.userId, {
+            is_coin: req.body?.is_coin ?? req.query?.is_coin,
+            value: req.body?.value ?? req.query?.value,
+        });
+        return res.status(200).json({
+            success: true,
+            data,
+            message: data.already ? 'Scratch card already used today' : 'Scratch card claimed successfully',
+        });
+    } catch (err) {
+        console.error(err);
+        if (err.status === 400) {
+            return res.status(400).json({ success: false, message: err.message });
+        }
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
+async function getAstroCoinTasks(req, res) {
+    try {
+        const data = await db('astro_coin_task')
+            .where({ status: true })
+            .whereNull('deleted_at')
+            .whereRaw("LOWER(TRIM(title)) <> 'all'")
+            .orderBy('id', 'asc');
+        return res.status(200).json({
+            success: true,
+            data,
+            message: 'Astro coin tasks fetched successfully',
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
+async function getUserCoins(req, res) {
+    try {
+        const [user, usercoins, settings] = await Promise.all([
+            db('users').where({ id: req.userId }).select('coin').first(),
+            db('usercoins').where({ user_id: req.userId }).first(),
+            db('settings').select('coin_streak_rewards', 'coin_all_activity_bonus','scratch_card_rewards').first(),
+        ]);
+        let coin_streak_rewards = settings?.coin_streak_rewards ?? [];
+        if (typeof coin_streak_rewards === 'string') {
+            try { coin_streak_rewards = JSON.parse(coin_streak_rewards); } catch (e) { coin_streak_rewards = []; }
+        }
+        if (usercoins?.activity) {
+            let activity = usercoins.activity;
+            if (typeof activity === 'string') {
+                try { activity = JSON.parse(activity); } catch (e) { activity = []; }
+            }
+            if (Array.isArray(activity)) {
+                usercoins.activity = activity.filter((item) => String(item || '').trim().toLowerCase() !== 'all');
+            }
+        }
+       
+        return res.status(200).json({
+            success: true,
+            data: {
+                coin: Number(user?.coin || 0),
+                usercoins: usercoins || null,
+                coin_streak_rewards,
+                coin_all_activity_bonus: Number(settings?.coin_all_activity_bonus || 0),
+                scratch_card_rewards: settings?.scratch_card_rewards || 0,
+            },
+            message: 'User coins fetched successfully',
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
+async function getCoinRedeems(req, res) {
+    try {
+        const user = await db('users').where({ id: req.userId }).select('id', 'default_currency').first();
+        if (!user) return res.status(400).json({ success: false, message: 'User not found.' });
+
+        const currency = user.default_currency || 'INR';
+        const currencyData = await db('currency').select('user_inr_rate').where({ currency_name: currency }).first();
+        const rate = currencyData?.user_inr_rate || 1;
+        const symbol = getCurrencySymbolByCurrency(currency);
+
+        const rows = await db('coin_redeems')
+            .where({ status: true })
+            .whereNull('deleted_at')
+            .orderBy('sort_order', 'asc')
+            .orderBy('coin', 'asc');
+
+        const data = rows.map((row) => ({
+            id: row.id,
+            coin: Number(row.coin),
+            amount: convertCurrency(row.amount, rate),
+            is_jackpot: Boolean(row.is_jackpot),
+            currency: symbol,
+        }));
+
+        return res.status(200).json({
+            success: true,
+            data,
+            message: 'Coin redeem list fetched successfully',
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
+async function redeemCoin(req, res) {
+    try {
+        const id = Number(req.body?.id || req.query?.id);
+        if (!id) {
+            return res.status(400).json({ success: false, message: 'id is required.' });
+        }
+
+        const result = await db.transaction(async (trx) => {
+            const pack = await trx('coin_redeems')
+                .where({ id, status: true })
+                .whereNull('deleted_at')
+                .first();
+            if (!pack) {
+                const err = new Error('Redeem pack not found.');
+                err.status = 400;
+                throw err;
+            }
+
+            const coinsNeeded = Number(pack.coin);
+            const creditInr = Number(pack.amount);
+            if (!coinsNeeded || !Number.isFinite(creditInr) || creditInr <= 0) {
+                const err = new Error('Invalid redeem pack.');
+                err.status = 400;
+                throw err;
+            }
+
+            const user = await trx('users').where({ id: req.userId }).forUpdate().select('id', 'coin', 'balance', 'default_currency').first();
+            if (!user) {
+                const err = new Error('User not found.');
+                err.status = 400;
+                throw err;
+            }
+
+            const currentCoin = Number(user.coin || 0);
+            if (currentCoin < coinsNeeded) {
+                const err = new Error('Not enough coins.');
+                err.status = 400;
+                throw err;
+            }
+
+            const oldBalance = Number(user.balance || 0);
+            const newBalance = Number((oldBalance + creditInr).toFixed(2));
+            const newCoin = currentCoin - coinsNeeded;
+
+            await trx('users').where({ id: user.id }).update({
+                coin: newCoin,
+                balance: newBalance,
+            });
+
+            await trx('balancelogs').insert({
+                user_id: user.id,
+                user_old_balance: oldBalance,
+                user_new_balance: newBalance,
+                amount: creditInr,
+                message: `Coin redeem (${coinsNeeded} coins)`,
+                currency: user.default_currency || 'INR',
+                type: 'coin_redeem',
+                gst: 0,
+            });
+
+            return {
+                coin: newCoin,
+                redeemed_coin: coinsNeeded,
+                balance: newBalance,
+                amount: creditInr,
+            };
+        });
+
+        const user = await db('users').where({ id: req.userId }).select('default_currency').first();
+        const currency = user?.default_currency || 'INR';
+        const currencyData = await db('currency').select('user_inr_rate').where({ currency_name: currency }).first();
+        const symbol = getCurrencySymbolByCurrency(currency);
+
+        return res.status(200).json({
+            success: true,
+            data: {
+                coin: result.coin,
+                redeemed_coin: result.redeemed_coin,
+                amount: convertCurrency(result.amount, currencyData?.user_inr_rate || 1),
+                balance: convertCurrency(result.balance, currencyData?.user_inr_rate || 1),
+                currency: symbol,
+            },
+            message: 'Coins redeemed successfully',
+        });
+    } catch (err) {
+        console.error(err);
+        if (err.status === 400) {
+            return res.status(400).json({ success: false, message: err.message });
+        }
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
 async function getRecommendations(req, res) {
     try {
         let page = parseInt(req.query.page) || 1;
@@ -924,4 +1147,4 @@ async function getReferalCode(req, res) {
     }
 }
 
-module.exports = { updateProfile, getProfile, getBalance, updateToken, updateAllowNotification, getAllowNotification, profileUpdate, makeAvtarString, deleteMyAccount, getRecharge, getRechargeBanner, getCookie, getRecommendations, findIsFree, getUserStats, getCurrencyList, updateCurrency, getGiftList, getInboxMessages, getInboxDetail, getReferalCode };
+module.exports = { updateProfile, getProfile, getBalance, updateToken, updateAllowNotification, getAllowNotification, profileUpdate, makeAvtarString, deleteMyAccount, getRecharge, getRechargeBanner, getCookie, addUserCoin, scratchCard, getAstroCoinTasks, getUserCoins, getCoinRedeems, redeemCoin, getRecommendations, findIsFree, getUserStats, getCurrencyList, updateCurrency, getGiftList, getInboxMessages, getInboxDetail, getReferalCode };
