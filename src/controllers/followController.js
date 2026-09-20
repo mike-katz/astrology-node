@@ -71,7 +71,8 @@ async function getFollow(req, res) {
             "p.primary_expertise",
             "p.experience",
             "p.tag",
-            'p.online',
+            'p.chat',
+            'p.call',
             'p.rating_1',
             'p.rating_2',
             'p.rating_3',
@@ -85,6 +86,7 @@ async function getFollow(req, res) {
     user?.map(item => {
         item.languages = deepParse(item?.languages)
         item.primary_expertise = deepParse(item?.primary_expertise)
+        item.online = (item?.chat || item?.call) || false
     })
 
     const [{ count }] = await db('follows')
