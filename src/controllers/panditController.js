@@ -626,7 +626,7 @@ async function verifyOtp(req, res) {
         const { name, gender, profile, email, dob, city, country, experience, primary_expertise, secondary_expertise, other_working, other_working_text,
             languages, available_for,
             chat_call_rate, training_type, guru_name, certificate,
-            govt_id, about, achievement_url, address, selfie, achievement_file, video_introduction, device_type,
+            govt_id, about, achievement_url, address, selfie, achievement_file, interview_video, device_type,
             terms, no_false, consent_profile, step = 0, application_id, remark, reject_proof, status, spell_type, spell_type_other
         } = user
         if (status == 'blocked') {
@@ -664,7 +664,7 @@ async function verifyOtp(req, res) {
                 about: about || "", achievement_url: achievement_url || "",
                 address: address ? deepParse(address) : [],
                 selfie: selfie || "", achievement_file: achievement_file || "",
-                video_introduction: video_introduction || "",
+                interview_video: interview_video || "",
                 device_type: device_type || ""
             },
             "step4": {
@@ -786,7 +786,7 @@ async function basicOnboard(req, res) {
                 about: "", achievement_url: "",
                 address: [],
                 selfie: "", achievement_file: "",
-                video_introduction: "", device_type: ""
+                interview_video: "", device_type: ""
             },
             "step4": {
                 terms: "", no_false: "", consent_profile: ""
@@ -804,7 +804,7 @@ async function onboard(req, res) {
         const { name, dob, country_code, mobile, email, city, country, gender, experience, primary_expertise, secondary_expertise, other_working, other_working_text, step = 1,
             languages, available_for,
             chat_call_rate, training_type, guru_name, certificate,
-            govt_id, about, achievement_url, address, achievement_file, video_introduction, device_type,
+            govt_id, about, achievement_url, address, achievement_file, interview_video, device_type,
             terms, no_false, consent_profile, token,
             spell_type, spell_type_other
         } = req.body;
@@ -962,8 +962,8 @@ async function onboard(req, res) {
         if (device_type) {
             ins.device_type = device_type
         }
-        if (video_introduction) {
-            ins.video_introduction = video_introduction
+        if (interview_video) {
+            ins.interview_video = interview_video
         }
         if (experience) {
             ins.experience = experience
@@ -1234,8 +1234,8 @@ async function uploadImage(req, res) {
                 updateData.govt_id = JSON.stringify(returns);
             }
 
-            if (onboarding.video_introduction == file) {
-                updateData.video_introduction = null;
+            if (onboarding.interview_video == file) {
+                updateData.interview_video = null;
             }
             console.log("updateData", JSON.stringify(updateData));
             // Update database if URL was found and removed
