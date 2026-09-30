@@ -10,7 +10,7 @@ const { uploadImageToAzure, deleteFileFromAzure } = require('../utils/azureUploa
 const { getCurrencySymbolByCurrency, getCurrencyIconByCurrency } = require('../utils/countryCurrencyMap');
 const { notifyPanditsOnNewUserProfile } = require('../utils/newUserPanditNotify');
 const { createUniqueReferralCode } = require('../utils/referral');
-const { creditUserCoin, claimScratchCard } = require('../utils/userCoins');
+const { creditUserCoin, claimScratchCard, getIstDateStr } = require('../utils/userCoins');
 
 async function makeAvtarString(user, gender) {
     if (!user || !gender) return null;
@@ -550,6 +550,13 @@ async function getUserCoins(req, res) {
             }
             if (Array.isArray(activity)) {
                 usercoins.activity = activity.filter((item) => String(item || '').trim().toLowerCase() !== 'all');
+            }
+        }
+        if (usercoins) {
+            const todayIst = getIstDateStr();
+            const updatedIst = usercoins.updated_at ? getIstDateStr(usercoins.updated_at) : null;
+            if (updatedIst !== todayIst) {
+                usercoins.days = 0;
             }
         }
        
