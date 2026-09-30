@@ -552,16 +552,16 @@ async function getUserCoins(req, res) {
                 usercoins.activity = activity.filter((item) => String(item || '').trim().toLowerCase() !== 'all');
             }
         }
-        if (usercoins) {
-            const todayIst = getIstDateStr();
-            const updatedIst = usercoins.updated_at ? getIstDateStr(usercoins.updated_at) : null;
-            const freeze = Number(usercoins.freeze || 0);
-            const diff = daysBetween(updatedIst, todayIst);
-            const keepDays = updatedIst && (diff === 0 || freeze >= diff - 1);
-            if (!keepDays) {
-                usercoins.days = 0;
-            }
-        }
+        // if (usercoins) {
+        //     const todayIst = getIstDateStr();
+        //     const updatedIst = usercoins.updated_at ? getIstDateStr(usercoins.updated_at) : null;
+        //     const freeze = Number(usercoins.freeze || 0);
+        //     const diff = daysBetween(updatedIst, todayIst);
+        //     const keepDays = updatedIst && (diff === 0 || freeze >= diff - 1);
+        //     if (!keepDays) {
+        //         usercoins.days = 0;
+        //     }
+        // }
        
         return res.status(200).json({
             success: true,
