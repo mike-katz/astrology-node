@@ -10,7 +10,7 @@ const { uploadImageToAzure, deleteFileFromAzure } = require('../utils/azureUploa
 const { getCurrencySymbolByCurrency, getCurrencyIconByCurrency } = require('../utils/countryCurrencyMap');
 const { notifyPanditsOnNewUserProfile } = require('../utils/newUserPanditNotify');
 const { createUniqueReferralCode } = require('../utils/referral');
-const { creditUserCoin, claimScratchCard, getIstDateStr, daysBetween } = require('../utils/userCoins');
+const { creditUserCoin, claimScratchCard, getIstDateStr, formatDateOnly, daysBetween } = require('../utils/userCoins');
 
 async function makeAvtarString(user, gender) {
     if (!user || !gender) return null;
@@ -552,16 +552,16 @@ async function getUserCoins(req, res) {
                 usercoins.activity = activity.filter((item) => String(item || '').trim().toLowerCase() !== 'all');
             }
         }
-        // if (usercoins) {
-        //     const todayIst = getIstDateStr();
-        //     const updatedIst = usercoins.updated_at ? getIstDateStr(usercoins.updated_at) : null;
-        //     const freeze = Number(usercoins.freeze || 0);
-        //     const diff = daysBetween(updatedIst, todayIst);
-        //     const keepDays = updatedIst && (diff === 0 || freeze >= diff - 1);
-        //     if (!keepDays) {
-        //         usercoins.days = 0;
-        //     }
-        // }
+        if (usercoins) {
+            const todayIst = getIstDateStr();
+            const lastDate = formatDateOnly(usercoins.date);
+            const freeze = Number(usercoins.freeze || 0);
+            const diff = daysBetween(lastDate, todayIst);
+            const keepDays = lastDate && (diff === 0 || freeze >= diff - 1);
+            if (!keepDays) {
+                usercoins.days = 0;
+            }
+        }
        
         return res.status(200).json({
             success: true,
