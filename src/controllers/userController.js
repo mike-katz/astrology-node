@@ -556,8 +556,8 @@ async function getUserCoins(req, res) {
             const todayIst = getIstDateStr();
             const updatedIst = usercoins.updated_at ? getIstDateStr(usercoins.updated_at) : null;
             const freeze = Number(usercoins.freeze || 0);
-            const keepDays = updatedIst === todayIst
-                || (freeze >= 1 && daysBetween(updatedIst, todayIst) === 1);
+            const diff = daysBetween(updatedIst, todayIst);
+            const keepDays = updatedIst && (diff === 0 || freeze >= diff - 1);
             if (!keepDays) {
                 usercoins.days = 0;
             }
