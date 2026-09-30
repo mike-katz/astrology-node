@@ -333,4 +333,4 @@ async function claimScratchCard(userId, payload = {}) {
     });
 }
 
-module.exports = { creditUserCoin, claimScratchCard, getIstDateStr, formatDateOnly };
+module.exports = { creditUserCoin, claimScratchCard, getIstDateStr, formatDateOnly, daysBetween };
