@@ -88,6 +88,10 @@ function normalizePoojaId(pooja_id) {
     return pooja_id;
 }
 
+function roundMoney(value) {
+    return Number(Number(value).toFixed(2));
+}
+
 function buildRechargeAmounts(amount, currencyRate, { skipGst } = {}) {
     const taxPercent = skipGst ? 0 : Number(currencyRate?.user_tax_percentage || 0);
     const currencyTax = taxPercent + 100;
@@ -95,13 +99,12 @@ function buildRechargeAmounts(amount, currencyRate, { skipGst } = {}) {
     const inrRate = Number(currencyRate?.user_inr_rate || 1);
     const withTaxUserCurrency = Number(amount);
 
-    const dbWithTax = withTaxUserCurrency * inrRate;
-    const dbAmount = (dbWithTax * 100) / currencyTax;
-    const dbGst = dbWithTax - dbAmount;
+    const dbWithTax = roundMoney(withTaxUserCurrency * inrRate);
+    const dbGst = taxPercent > 0 ? roundMoney((dbWithTax * taxPercent) / currencyTax) : 0;
+    const dbAmount = roundMoney(dbWithTax - dbGst);
 
     const gatewayWithTax = withTaxUserCurrency;
     const gatewayAmountMinor = Math.round(gatewayWithTax * 100);
-
     return {
         dbAmount,
         dbGst,
@@ -251,7 +254,7 @@ async function getFirstRechargeOfferAmount(user, userAmount) {
 
     if (currencyItem) {
         const currency = await db('currency').where({ "currency_name": currencyItem?.currency }).first();
-        const amount = Number(userAmount) / Number(currency?.user_inr_rate);
+        const amount = (Number(userAmount) / Number(currency?.user_inr_rate || 1)).toFixed(2);        
         if (Number(amount) == Number(currencyItem.amount)) {
             offer_amount = Number(currencyItem.offer_amount) * Number(currency?.user_inr_rate);
         }

@@ -10,7 +10,7 @@ const { uploadImageToAzure, deleteFileFromAzure } = require('../utils/azureUploa
 const { getCurrencySymbolByCurrency, getCurrencyIconByCurrency } = require('../utils/countryCurrencyMap');
 const { notifyPanditsOnNewUserProfile } = require('../utils/newUserPanditNotify');
 const { createUniqueReferralCode } = require('../utils/referral');
-const { creditUserCoin, claimScratchCard } = require('../utils/userCoins');
+const { creditUserCoin, claimScratchCard, getIstDateStr } = require('../utils/userCoins');
 
 async function makeAvtarString(user, gender) {
     if (!user || !gender) return null;
@@ -552,6 +552,13 @@ async function getUserCoins(req, res) {
                 usercoins.activity = activity.filter((item) => String(item || '').trim().toLowerCase() !== 'all');
             }
         }
+        if (usercoins) {
+            const todayIst = getIstDateStr();
+            const updatedIst = usercoins.updated_at ? getIstDateStr(usercoins.updated_at) : null;
+            if (updatedIst !== todayIst) {
+                usercoins.days = 0;
+            }
+        }
        
         return res.status(200).json({
             success: true,
@@ -753,6 +760,20 @@ async function getRecommendations(req, res) {
     }
 }
 
+async function upsertUserLogin(userId) {
+    const now = new Date();
+    await db('userlogins')
+        .insert({
+            user_id: Number(userId),
+            login_at: now,
+            created_at: now,
+        })
+        .onConflict('user_id')
+        .merge({
+            login_at: now,
+        });
+}
+
 async function findIsFree(req, res) {
     try {
         const existing = await db('users').where({ id: req.userId }).select('offer_amount', 'default_currency').first();
@@ -773,7 +794,7 @@ async function findIsFree(req, res) {
                 }
             }
         }
-        // }
+        await upsertUserLogin(req.userId);
         return res.status(200).json({ success: true, data: response, message: 'Get successfully' });
     }
     catch (err) {

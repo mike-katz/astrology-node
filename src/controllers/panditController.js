@@ -1116,7 +1116,6 @@ async function getReviewList(req, res) {
         };
 
         const user = await db('reviews as r')
-            .leftJoin('users as u', 'u.id', 'r.user_id')
             .select(
                 "r.id",
                 "r.message",
@@ -1124,9 +1123,9 @@ async function getReviewList(req, res) {
                 "r.replay",
                 "r.created_at",
                 "r.hide",
-                "u.name",
-                "u.avatar",
-                "u.profile"
+                "r.name",
+                "r.avatar",
+                "r.profile"
             )
             .where(reviewWhere)
             .orderBy('r.id', 'desc')
