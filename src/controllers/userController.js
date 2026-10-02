@@ -561,7 +561,12 @@ async function getUserCoins(req, res) {
             if (!keepDays) {
                 usercoins.days = 0;
                 usercoins.freeze = 0;
-                await db('usercoins').where({ user_id: req.userId }).update({ days: 0, freeze:0  });
+                await db('usercoins').where({ user_id: req.userId }).update({ days: 0, freeze: 0 });
+            } else if (diff > 1 && freeze > 0) {
+                usercoins.freeze = freeze - 1;
+                await db('usercoins').where({ user_id: req.userId }).update({
+                    freeze: usercoins.freeze,
+                });
             }
         }
        
