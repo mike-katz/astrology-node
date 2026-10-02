@@ -68,8 +68,8 @@ async function getSkillUpdate(req, res) {
         if (!row) {
             return res.status(400).json({ success: false, message: 'Invalid or expired link.' });
         }
-        if (String(row.status || '').toLowerCase() !== 'pending') {
-            return res.status(400).json({ success: false, message: 'This request is already closed.' });
+        if (String(row.status || '').toLowerCase() !== 'pending' || hasSubmittedNew(row.new)) {
+            return res.status(400).json({ success: false, message: 'This link has expired.' });
         }
 
         const pandit = await db('pandits')
@@ -100,11 +100,8 @@ async function submitSkillUpdate(req, res) {
         if (!row) {
             return res.status(400).json({ success: false, message: 'Invalid or expired link.' });
         }
-        if (String(row.status || '').toLowerCase() !== 'pending') {
-            return res.status(400).json({ success: false, message: 'This request is already closed.' });
-        }
-        if (hasSubmittedNew(row.new)) {
-            return res.status(400).json({ success: false, message: 'Skill update already submitted and pending approval.' });
+        if (String(row.status || '').toLowerCase() !== 'pending' || hasSubmittedNew(row.new)) {
+            return res.status(400).json({ success: false, message: 'This link has expired.' });
         }
 
         const primary = normalizeSkillList(primary_expertise);
@@ -135,12 +132,11 @@ async function submitSkillUpdate(req, res) {
             secondary_expertise: secondary,
             spell_type: nextSpellType,
             spell_type_other: nextSpellOther || null,
-           
         };
 
         await db(TABLE).where({ id: row.id }).update({
             new: JSON.stringify(payload),
-            status: 'user submitted',
+            status: 'Astrologer Submitted',
             updated_at: new Date(),
         });
 
