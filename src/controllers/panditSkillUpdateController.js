@@ -135,11 +135,12 @@ async function submitSkillUpdate(req, res) {
             secondary_expertise: secondary,
             spell_type: nextSpellType,
             spell_type_other: nextSpellOther || null,
-            status: 'user submitted',
+           
         };
 
         await db(TABLE).where({ id: row.id }).update({
             new: JSON.stringify(payload),
+            status: 'user submitted',
             updated_at: new Date(),
         });
 
