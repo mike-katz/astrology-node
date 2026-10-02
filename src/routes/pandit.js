@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const pandits = require('../controllers/panditController');
+const panditSkillUpdate = require('../controllers/panditSkillUpdateController');
 
 const multer = require('multer');
 
@@ -37,6 +38,8 @@ const upload = multer({
     // }
 });
 router.get('/', pandits.getPandits);
+router.get('/update-skill', panditSkillUpdate.getSkillUpdate);
+router.post('/update-skill', panditSkillUpdate.submitSkillUpdate);
 router.get('/detail', pandits.getPanditDetail);
 router.post('/signup', pandits.signup);
 router.post('/verifyOtp', pandits.verifyOtp);
