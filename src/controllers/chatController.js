@@ -1259,104 +1259,104 @@ async function sendNotification(token, username, chat_call_rate, panditId, type,
                 }
             }
 
-            if (defaultMode) {
-                message = {
-                    token,
+            // if (defaultMode) {
+            //     message = {
+            //         token,
+            //         notification: {
+            //             title: messages,
+            //         },
+
+            //         // 🔔 Android
+            //         android: {
+            //             notification: {
+            //                 sound: 'default'
+            //             }
+            //         },
+
+            //         // 🔔 iOS
+            //         apns: {
+            //             headers: {
+            //                 "apns-priority": "10",
+            //                 "apns-push-type": "alert"
+            //             },
+            //             payload: {
+            //                 aps: {
+            //                     alert: {
+            //                         title: messages
+            //                     },
+            //                     sound: 'default',
+            //                     badge: 1,
+            //                 }
+            //             }
+            //         },
+
+            //         // 🔔 Web Browser
+            //         webpush: {
+            //             notification: {
+            //                 // icon: '/icon.png',
+            //                 requireInteraction: true
+            //                 // NOTE: Browsers play default sound automatically
+            //             }
+            //         },
+
+            //         data: {
+            //             type: type == 'chat' ? "incoming_chat" : "incoming_call",
+            //             title: String(messages || ''),
+            //             orderId: String(order_id),
+            //             userId: String(user_id),
+            //             profile: String(profileUrl || ''),
+            //             userName: String(username || '')
+            //         },
+            //     };
+            // }
+            // else {
+            logger.info("inside else");
+
+            await db.raw(
+                `INSERT INTO pandit_online_check (pandit_id, created_at)
+                     VALUES (?, NOW())
+                     ON CONFLICT (pandit_id) DO UPDATE SET created_at = NOW()`,
+                [Number(panditId)]
+            );
+
+            message = {
+                token, // This must be the VoIP Token, not the standard FCM token
+                // notification: {
+                //     title: messages,
+                // },
+                android: {
+                    priority: "high",
                     notification: {
                         title: messages,
                     },
-
-                    // 🔔 Android
-                    android: {
-                        notification: {
-                            sound: 'default'
+                },
+                // iOS: FCM token = alert only (voip + fake .voip topic → NotRegistered)
+                apns: {
+                    headers: {
+                        "apns-priority": "10",
+                        "apns-push-type": "alert"
+                    },
+                    payload: {
+                        aps: {
+                            alert: {
+                                title: messages
+                            },
+                            sound: "default",
+                            badge: 1,
                         }
-                    },
-
-                    // 🔔 iOS
-                    apns: {
-                        headers: {
-                            "apns-priority": "10",
-                            "apns-push-type": "alert"
-                        },
-                        payload: {
-                            aps: {
-                                alert: {
-                                    title: messages
-                                },
-                                sound: 'default',
-                                badge: 1,
-                            }
-                        }
-                    },
-
-                    // 🔔 Web Browser
-                    webpush: {
-                        notification: {
-                            // icon: '/icon.png',
-                            requireInteraction: true
-                            // NOTE: Browsers play default sound automatically
-                        }
-                    },
-
-                    data: {
-                        type: type == 'chat' ? "incoming_chat" : "incoming_call",
-                        title: String(messages || ''),
-                        orderId: String(order_id),
-                        userId: String(user_id),
-                        profile: String(profileUrl || ''),
-                        userName: String(username || '')
-                    },
-                };
-            }
-            else {
-                logger.info("inside else");
-
-                await db.raw(
-                    `INSERT INTO pandit_online_check (pandit_id, created_at)
-                     VALUES (?, NOW())
-                     ON CONFLICT (pandit_id) DO UPDATE SET created_at = NOW()`,
-                    [Number(panditId)]
-                );
-
-                message = {
-                    token, // This must be the VoIP Token, not the standard FCM token
-                    // notification: {
-                    //     title: messages,
-                    // },
-                    android: {
-                        priority: "high",
-                        notification: {
-                            title: messages,
-                        },
-                    },
-                    // iOS: FCM token = alert only (voip + fake .voip topic → NotRegistered)
-                    apns: {
-                        headers: {
-                            "apns-priority": "10",
-                            "apns-push-type": "alert"
-                        },
-                        payload: {
-                            aps: {
-                                alert: {
-                                    title: messages
-                                },
-                                sound: "default",
-                                badge: 1,
-                            }
-                        }
-                    },
-                    data: {
-                        type: type == 'chat' ? "incoming_chat" : "incoming_call",
-                        title: String(messages || ''),
-                        order_id: String(order_id),
-                        orderId: String(order_id),
-                        userId: String(user_id),
-                        profile: String(profileUrl || ''),
-                        userName: String(username || '')
-                    },
-                };
-            }
+                    }
+                },
+                data: {
+                    type: type == 'chat' ? "incoming_chat" : "incoming_call",
+                    title: String(messages || ''),
+                    order_id: String(order_id),
+                    orderId: String(order_id),
+                    userId: String(user_id),
+                    profile: String(profileUrl || ''),
+                    userName: String(username || '')
+                },
+            };
+            // }
             // } else {
             //     message = {
             //         token,
