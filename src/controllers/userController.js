@@ -566,9 +566,11 @@ async function getUserCoins(req, res) {
             } else if (diff > 1 && freeze > 0) {
                 usercoins.freeze = freeze - 1;
                 usercoins.days = days + 1;
+                usercoins.date = todayIst;
                 await db('usercoins').where({ user_id: req.userId }).update({
                     freeze: usercoins.freeze,
                     days: usercoins.days,
+                    date: todayIst,
                 });
             }
         }
