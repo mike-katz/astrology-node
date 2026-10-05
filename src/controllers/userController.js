@@ -556,6 +556,7 @@ async function getUserCoins(req, res) {
             const todayIst = getIstDateStr();
             const lastDate = formatDateOnly(usercoins.date);
             const freeze = Number(usercoins.freeze || 0);
+            const days = Number(usercoins.days || 0);
             const diff = daysBetween(lastDate, todayIst);
             const keepDays = lastDate && (diff === 0 || freeze >= diff - 1);
             if (!keepDays) {
@@ -564,7 +565,7 @@ async function getUserCoins(req, res) {
                 await db('usercoins').where({ user_id: req.userId }).update({ days: 0, freeze: 0 });
             } else if (diff > 1 && freeze > 0) {
                 usercoins.freeze = freeze - 1;
-                usercoins.days = Number(usercoins.days || 0) + 1;
+                usercoins.days = days + 1;
                 await db('usercoins').where({ user_id: req.userId }).update({
                     freeze: usercoins.freeze,
                     days: usercoins.days,
