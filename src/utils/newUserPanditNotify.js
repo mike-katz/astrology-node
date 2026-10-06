@@ -130,17 +130,27 @@ async function processPanditsWithDelay(userId, userName, pandits) {
 
     for (let i = 0; i < pandits.length; i++) {
         const pandit = pandits[i];
+        let processed = false;
         try {
-            await notifyNewUserToPandits([pandit], userName);
-            await notifyUserAboutNewAstrologer(userToken, pandit);
-            await insertAstroInboxMessagesForPandits(userId, [pandit]);
+            const latest = await db('pandits')
+                .select('id', 'token', 'display_name', 'chat', 'call')
+                .where({ id: pandit.id })
+                .whereNull('deleted_at')
+                .first();
+
+            if (latest?.chat === true || latest?.call === true) {
+                await notifyNewUserToPandits([latest], userName);
+                await notifyUserAboutNewAstrologer(userToken, latest);
+                await insertAstroInboxMessagesForPandits(userId, [latest]);
+                processed = true;
+            }
         } catch (err) {
             console.error(
                 `notifyPanditsOnNewUserProfile pandit=${pandit?.id} error:`,
                 err?.message || err
             );
         }
-        if (i < pandits.length - 1) {
+        if (processed && i < pandits.length - 1) {
             await wait(delayMs);
         }
     }
