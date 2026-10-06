@@ -779,15 +779,21 @@ async function getRecommendations(req, res) {
     }
 }
 
+function todayInIndia() {
+    return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+}
+
 async function upsertUserLogin(userId) {
     const now = new Date();
+    const loginDate = todayInIndia();
     await db('userlogins')
         .insert({
             user_id: Number(userId),
             login_at: now,
+            login_date: loginDate,
             created_at: now,
         })
-        .onConflict('user_id')
+        .onConflict(['user_id', 'login_date'])
         .merge({
             login_at: now,
         });
