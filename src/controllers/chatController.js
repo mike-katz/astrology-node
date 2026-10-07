@@ -1341,7 +1341,7 @@ async function sendNotification(token, username, chat_call_rate, panditId, type,
                             alert: {
                                 title: messages
                             },
-                            sound: "default",
+                            sound: "special_notification.wav",
                             badge: 1,
                         }
                     }
