@@ -1597,6 +1597,73 @@ Marital Status: ${formatValue(profile?.marital_status)} \n`;
     }
 }
 
+function istDayStart(now = new Date()) {
+    const dateStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(now);
+    return new Date(`${dateStr}T00:00:00+05:30`);
+}
+
+function roundMoney(value) {
+    return Number(Number(value).toFixed(2));
+}
+
+function userCancelPenalty(order, seconds) {
+    const orderAmount = roundMoney(Number(order?.deduction || 0));
+    if (seconds <= 49) return { penalty: 0, percent: 0, orderAmount };
+    if (order?.is_offer) {
+        return seconds >= 120
+            ? { penalty: 20, percent: 0, orderAmount }
+            : { penalty: 0, percent: 0, orderAmount };
+    }
+    if (!Number.isFinite(orderAmount) || orderAmount <= 0) return { penalty: 0, percent: 0, orderAmount };
+
+    const percent = seconds <= 70 ? 20 : seconds <= 100 ? 40 : 50;
+    return { penalty: roundMoney((orderAmount * percent) / 100), percent, orderAmount };
+}
+
+async function applyUserCancelPenalty(order, now) {
+    const busy = await db('orders')
+        .where({ pandit_id: order.pandit_id, status: 'continue' })
+        .whereNot({ id: order.id })
+        .first();
+    if (busy) return 0;
+
+    const already = await db('balancelogs')
+        .where({ user_id: order.user_id, type: 'cancel_penalty' })
+        .where('created_at', '>=', istDayStart(now))
+        .first();
+    if (already) return 0;
+
+    const seconds = Math.max(0, Math.floor((now.getTime() - new Date(order.created_at).getTime()) / 1000));
+    const { penalty, percent, orderAmount } = userCancelPenalty(order, seconds);
+    if (penalty <= 0) return 0;
+
+    const penaltyMessage = percent
+        ? `Order amount ₹${orderAmount}, ${percent}% applied, ₹${penalty} cut`
+        : `Order amount ₹${orderAmount}, ₹${penalty} cut`;
+
+    await db.transaction(async (trx) => {
+        const pandit = await trx('pandits').where({ id: order.pandit_id }).forUpdate().first();
+        if (!pandit) return;
+        const oldBalance = Number(pandit.balance || 0);
+        const newBalance = roundMoney(oldBalance - penalty);
+        await trx('pandits').where({ id: pandit.id }).update({ balance: newBalance });
+        await trx('balancelogs').insert({
+            order_id: order.order_id,
+            user_id: order.user_id,
+            pandit_id: pandit.id,
+            pandit_old_balance: oldBalance,
+            pandit_new_balance: newBalance,
+            pandit_amount: -penalty,
+            amount: 0,
+            message: penaltyMessage,
+            pandit_message: penaltyMessage,
+            type: 'cancel_penalty',
+            currency: 'INR',
+        });
+    });
+    return penalty;
+}
+
 async function orderCancel(req, res) {
     const { order_id } = req.body || {};
     logger.info('order_cancelOrder', { userId: req.userId, order_id });
@@ -1618,10 +1685,12 @@ async function orderCancel(req, res) {
         // if (order?.is_accept) {
         //     status = 'rejected'
         // }
+        const canceledAt = new Date();
         upd.status = status
         upd.order_action = "user -> order canceled";
-        upd.canceled_at = new Date()
+        upd.canceled_at = canceledAt
         await db('orders').where({ id: order?.id }).update(upd);
+        const penalty = await applyUserCancelPenalty(order, canceledAt);
         await addOrderLog({
             order,
             action: 'cancelled',
@@ -1630,7 +1699,7 @@ async function orderCancel(req, res) {
             performed_by_type: 'user',
             performed_by_id: req.userId,
             place: 'user -> cancel chat order',
-            meta: upd,
+            meta: { ...upd, penalty },
         });
         await db('pandits').where({ id: order.pandit_id }).update({ waiting_time: null });
 
