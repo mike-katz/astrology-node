@@ -1638,8 +1638,8 @@ async function applyUserCancelPenalty(order, now) {
     if (penalty <= 0) return 0;
 
     const penaltyMessage = percent
-        ? `Order amount ₹${orderAmount}, ${percent}% applied, ₹${penalty} cut`
-        : `Order amount ₹${orderAmount}, ₹${penalty} cut`;
+        ? `Order amount: ₹${orderAmount} | ${percent}% Deduction Applied: ₹${penalty}`
+        : `Deduction Applied ₹${penalty} cut`;
 
     await db.transaction(async (trx) => {
         const pandit = await trx('pandits').where({ id: order.pandit_id }).forUpdate().first();
