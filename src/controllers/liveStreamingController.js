@@ -635,6 +635,8 @@ async function createMediaOrder(req, res) {
             return res.status(400).json({ success: false, message: 'Balance could not be NaN.' });
         }
 
+        const profile = await db('userprofiles').select('id').where({ user_id: req.userId, is_first: true }).first();
+
         const ins = {
             pandit_id,
             user_id: req.userId,
@@ -644,7 +646,7 @@ async function createMediaOrder(req, res) {
             duration,
             deduction,
             type,
-            profile_id,
+            profile_id: profile?.id,
             currency: user?.default_currency || 'INR',
             is_free: false,
             verify: false,
