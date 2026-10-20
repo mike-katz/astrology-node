@@ -1627,6 +1627,16 @@ async function applyUserCancelPenalty(order, now) {
         .first();
     if (busy) return 0;
 
+    const lastCompleted = await db('orders')
+        .where({ pandit_id: order.pandit_id, status: 'completed' })
+        .whereNot({ id: order.id })
+        .whereNotNull('end_time')
+        .orderBy('end_time', 'desc')
+        .first();
+    if (lastCompleted) {
+        const sinceMs = now.getTime() - new Date(lastCompleted.end_time).getTime();
+        if (sinceMs < 60 * 1000) return 0;
+    }
     const already = await db('balancelogs')
         .where({ user_id: order.user_id, type: 'cancel_penalty' })
         .where('created_at', '>=', istDayStart(now))
