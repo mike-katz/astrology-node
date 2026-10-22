@@ -774,7 +774,7 @@ async function rejectOrder(req, res) {
         //     status = 'rejected'
         // }
         upd.status = status
-        upd.order_action = "user -> order rejected";
+        upd.order_action = "user -> live order rejected";
         upd.canceled_at = new Date()
         await db('orders').where({ id: order?.id }).update(upd);
         await addOrderLog({
