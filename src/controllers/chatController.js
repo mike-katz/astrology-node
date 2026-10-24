@@ -16,6 +16,7 @@ const admin = require('../config/firebase');
 const { sendAutoMessage } = require('./orderController');
 const { consumeUserOfferRemaining } = require('../utils/userOfferBalance');
 const { addOrderLog } = require('../utils/orderLog');
+const { awardPanditOrderCoins } = require('../utils/panditCoinReward');
 
 async function getRoom(req, res) {
     logger.info('chat_getRoom', { userId: req.userId });
@@ -434,6 +435,8 @@ async function balanceCut(user_id, order, end_time, place) {
         let duplicateSkip = false;
         let cutCompleted = false;
         let isFreeOrder = false;      // transaction bahaar use mate
+        let coinOrderId = null;
+        let coinPanditId = null;
 
         await db.transaction(async (trx) => {
 
@@ -483,6 +486,8 @@ async function balanceCut(user_id, order, end_time, place) {
                             ? new Date(lockedOrder.end_time)
                             : new Date(end_time),
                     });
+                coinOrderId = lockedOrder.id;
+                coinPanditId = lockedOrder.pandit_id;
                 cutCompleted = true;
                 return;
             }
@@ -702,6 +707,8 @@ async function balanceCut(user_id, order, end_time, place) {
             });
 
             savedChatRow = chatSystemMessage;
+            coinOrderId = lockedOrder.id;
+            coinPanditId = lockedOrder.pandit_id;
             cutCompleted = true;
         }); // ── transaction end ──
 
@@ -709,6 +716,16 @@ async function balanceCut(user_id, order, end_time, place) {
 
         if (duplicateSkip) return true;
         if (!cutCompleted) return false;
+
+        try {
+            await awardPanditOrderCoins({
+                panditId: coinPanditId,
+                orderId: coinOrderId,
+                completedAt: end_time,
+            });
+        } catch (coinErr) {
+            logger.error('pandit coin award failed', coinErr?.message, { order_id: order?.order_id, place });
+        }
 
         // Chat end message — user + pandit
         if (order.type === 'chat' && savedChatRow) {
