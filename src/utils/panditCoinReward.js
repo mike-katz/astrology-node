@@ -161,40 +161,76 @@ async function countQualifyingDays(panditId, month, fromTime, toTime, minimum) {
 
 async function saveTracking(input, attempt = 0) {
     const steps = input.steps || [];
+    if (!steps.length) return;
     try {
         await db.transaction(async (trx) => {
             await trx('pandits').where({ id: input.panditId }).forUpdate().first();
-            const existing = await trx('pandit_coin_task_progress')
+            const legacyRows = await trx('pandit_coin_task_progress')
                 .where({
                     pandit_id: input.panditId,
                     task_id: input.taskId,
                     period_key: input.periodKey,
                 })
-                .forUpdate()
-                .first();
-            const paidByKey = new Map(parseSteps(existing?.detail).map((step) => [String(step.key), !!step.paid]));
+                .whereNull('step_key')
+                .forUpdate();
+            const paidByKey = new Map();
+            for (const row of legacyRows) {
+                for (const step of parseSteps(row.detail)) {
+                    if (step.paid) paidByKey.set(String(step.key), true);
+                }
+            }
+
             let addCoins = 0;
             let addFreeze = 0;
-            const stored = steps.map((step) => {
+            for (const step of steps) {
                 const key = String(step.key);
-                const paidBefore = paidByKey.get(key) === true;
+                const existing = await trx('pandit_coin_task_progress')
+                    .where({
+                        pandit_id: input.panditId,
+                        task_id: input.taskId,
+                        period_key: input.periodKey,
+                        step_key: key,
+                    })
+                    .forUpdate()
+                    .first();
+                const alreadyPaid = paidByKey.get(key) === true || parseSteps(existing?.detail).some((item) => item.paid);
                 const coins = Number(step.coins) || 0;
                 const freeze = Number(step.freeze) || 0;
-                const pay = !!step.reached && !paidBefore && (coins > 0 || freeze > 0);
+                const reached = !!step.reached;
+                const pay = reached && !alreadyPaid && (coins > 0 || freeze > 0);
                 if (pay) {
                     addCoins += coins;
                     addFreeze += freeze;
                 }
-                return {
+                const stored = {
                     key,
                     target: Number(step.target) || 0,
                     coins,
                     freeze,
-                    reached: !!step.reached,
-                    remaining: step.reached ? 0 : round2(Number(step.target) - Number(input.done)),
-                    paid: paidBefore || pay,
+                    reached,
+                    remaining: reached ? 0 : round2(Number(step.target) - Number(input.done)),
+                    paid: alreadyPaid || pay,
                 };
-            });
+                const row = {
+                    pandit_id: input.panditId,
+                    task_id: input.taskId,
+                    period_key: input.periodKey,
+                    period_type: input.periodType,
+                    step_key: key,
+                    done: round2(input.done),
+                    unit: input.unit,
+                    target: stored.target,
+                    remaining: stored.remaining,
+                    achieved: reached,
+                    detail: JSON.stringify({ steps: [stored] }),
+                    updated_at: new Date(),
+                };
+                if (existing) {
+                    await trx('pandit_coin_task_progress').where({ id: existing.id }).update(row);
+                } else {
+                    await trx('pandit_coin_task_progress').insert(row);
+                }
+            }
 
             if (addCoins > 0) {
                 await trx('pandits').where({ id: input.panditId }).update({
@@ -213,25 +249,8 @@ async function saveTracking(input, attempt = 0) {
                 }
             }
 
-            const open = stored.find((step) => !step.reached);
-            const last = stored.length ? stored[stored.length - 1] : null;
-            const row = {
-                pandit_id: input.panditId,
-                task_id: input.taskId,
-                period_key: input.periodKey,
-                period_type: input.periodType,
-                done: round2(input.done),
-                unit: input.unit,
-                target: open ? open.target : (last ? last.target : null),
-                remaining: open ? open.remaining : 0,
-                achieved: stored.length > 0 && !open,
-                detail: JSON.stringify({ steps: stored }),
-                updated_at: new Date(),
-            };
-            if (existing) {
-                await trx('pandit_coin_task_progress').where({ id: existing.id }).update(row);
-            } else {
-                await trx('pandit_coin_task_progress').insert(row);
+            if (legacyRows.length) {
+                await trx('pandit_coin_task_progress').whereIn('id', legacyRows.map((row) => row.id)).del();
             }
         });
     } catch (err) {
