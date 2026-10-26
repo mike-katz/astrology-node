@@ -71,10 +71,22 @@ function ruleIncludesPandit(rule, panditId) {
     return ids.map(Number).includes(Number(panditId));
 }
 
+function offerDateKey(value) {
+    if (!value) return null;
+    if (typeof value === 'string') return value.slice(0, 10);
+    return new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Kolkata',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+    }).format(value);
+}
+
 function ruleDateMatches(rule, ymd) {
     if (rule.type !== 'customize_order') return true;
-    if (!rule.offer_date) return true;
-    return String(rule.offer_date).slice(0, 10) === ymd;
+    const offerDate = offerDateKey(rule.offer_date);
+    if (!offerDate) return true;
+    return offerDate === ymd;
 }
 
 function round2(value) {
