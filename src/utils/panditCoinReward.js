@@ -196,11 +196,12 @@ async function saveTracking(input, attempt = 0) {
                 const alreadyPaid = paidByKey.get(key) === true || parseSteps(existing?.detail).some((item) => item.paid);
                 const coins = Number(step.coins) || 0;
                 const freeze = Number(step.freeze) || 0;
+                const grantFreeze = step.grantFreeze !== false;
                 const reached = !!step.reached;
-                const pay = reached && !alreadyPaid && (coins > 0 || freeze > 0);
+                const pay = reached && !alreadyPaid && (coins > 0 || (grantFreeze && freeze > 0));
                 if (pay) {
                     addCoins += coins;
-                    addFreeze += freeze;
+                    if (grantFreeze) addFreeze += freeze;
                 }
                 const stored = {
                     key,
@@ -208,7 +209,7 @@ async function saveTracking(input, attempt = 0) {
                     coins,
                     freeze,
                     reached,
-                    remaining: reached ? 0 : round2(Number(step.target) - Number(input.done)),
+                    remaining: reached ? 0 : round2(step.remaining != null ? Number(step.remaining) : (Number(step.target) - Number(input.done))),
                     paid: alreadyPaid || pay,
                 };
                 const row = {
@@ -262,6 +263,176 @@ async function saveTracking(input, attempt = 0) {
     }
 }
 
+function ymdList(year, monthIndex, startDay, length) {
+    const dim = new Date(Date.UTC(year, monthIndex + 1, 0)).getUTCDate();
+    const end = Math.min(startDay + length - 1, dim);
+    const month = String(monthIndex + 1).padStart(2, '0');
+    const dates = [];
+    for (let day = startDay; day <= end; day += 1) {
+        dates.push(`${year}-${month}-${String(day).padStart(2, '0')}`);
+    }
+    return dates;
+}
+
+function orderSequenceBlocks(at) {
+    const { year, month, day } = istParts(at);
+    const utc = new Date(Date.UTC(year, month, day));
+    const weekday = utc.getUTCDay();
+    const back = weekday === 0 ? 6 : weekday - 1;
+    utc.setUTCDate(utc.getUTCDate() - back);
+    const week = [];
+    for (let i = 0; i < 7; i += 1) {
+        const date = new Date(utc);
+        date.setUTCDate(utc.getUTCDate() + i);
+        week.push(date.toISOString().slice(0, 10));
+    }
+    const firstHalf = ymdList(year, month, 1, 15);
+    const fifteen = day > 15 ? ymdList(year, month, 16, 15) : firstHalf;
+    const thirty = ymdList(year, month, 1, 30);
+    return [
+        { days: 7, dates: week, periodKey: `7:${week[0]}` },
+        { days: 15, dates: fifteen, periodKey: `15:${fifteen[0]}` },
+        { days: 30, dates: thirty, periodKey: `30:${thirty[0]}` },
+    ];
+}
+
+function blocksCoveredByFreeze(items, allowance) {
+    const limit = Math.max(0, Number(allowance) || 0);
+    const accepted = new Set();
+    const used = new Set();
+    const ordered = [...items].sort((a, b) => Number(a.step.days) - Number(b.step.days));
+    for (const item of ordered) {
+        if (!item.closed) continue;
+        const first = item.block.dates[0];
+        const last = item.block.dates[item.block.dates.length - 1];
+        if (!item.achieved.has(first) || !item.achieved.has(last)) continue;
+        if (item.missed.length > limit) continue;
+        const next = new Set(used);
+        for (const date of item.missed) next.add(date);
+        if (next.size > limit) continue;
+        for (const date of item.missed) used.add(date);
+        accepted.add(item.step.id);
+    }
+    return accepted;
+}
+
+function freezePeriodKey(rule, at) {
+    const offer = offerDateKey(rule.offer_date);
+    return `freeze:${offer || istMonthRange(at).ymd}`;
+}
+
+async function grantCommonFreeze(rule, panditId, at) {
+    const count = Number(rule.freeze) || 0;
+    if (count <= 0) return;
+    if (rule.type !== 'customize_order') return;
+    const offer = offerDateKey(rule.offer_date);
+    await saveTracking({
+        panditId,
+        taskId: rule.id,
+        periodKey: freezePeriodKey(rule, at),
+        periodType: offer ? 'day' : 'month',
+        done: 1,
+        unit: 'freeze',
+        steps: [{
+            key: 'freeze',
+            target: 1,
+            coins: 0,
+            freeze: count,
+            grantFreeze: true,
+            reached: true,
+            remaining: 0,
+        }],
+    });
+}
+
+function sqlDayKey(value) {
+    if (value instanceof Date && !Number.isNaN(value.getTime())) return value.toISOString().slice(0, 10);
+    const match = String(value || '').match(/\d{4}-\d{2}-\d{2}/);
+    return match ? match[0] : String(value || '').slice(0, 10);
+}
+
+async function achievedOrderDays(panditId, dates, fromTime, toTime, minimum) {
+    const achieved = new Set();
+    if (!dates.length || !minimum) return achieved;
+    const from = new Date(`${dates[0]}T00:00:00+05:30`);
+    const to = new Date(`${dates[dates.length - 1]}T23:59:59.999+05:30`);
+    const query = db('orders')
+        .where({ pandit_id: panditId, status: 'completed' })
+        .whereNull('deleted_at')
+        .where('end_time', '>=', from)
+        .where('end_time', '<=', to);
+    applyIstClock(query, 'end_time', fromTime, toTime);
+    const rows = await query.select(db.raw("to_char((end_time AT TIME ZONE 'Asia/Kolkata')::date, 'YYYY-MM-DD') as day"));
+    const counts = new Map();
+    for (const row of rows) {
+        const key = sqlDayKey(row.day);
+        counts.set(key, (counts.get(key) || 0) + 1);
+    }
+    for (const ymd of dates) {
+        if ((counts.get(ymd) || 0) >= minimum) achieved.add(ymd);
+    }
+    return achieved;
+}
+
+async function awardOrderFreezeSequences(rule, panditId, at) {
+    const minimum = Number(rule.order_count) || 0;
+    const sequences = (await loadDaySequences(rule.id))
+        .filter((step) => [7, 15, 30].includes(Number(step.days)));
+    if (!minimum || !sequences.length) return;
+    const today = istParts(at).ymd;
+    const offer = offerDateKey(rule.offer_date);
+    const allowance = Number(rule.freeze) || 0;
+    const blocks = new Map(orderSequenceBlocks(at).map((block) => [block.days, block]));
+    const prepared = [];
+    for (const step of sequences) {
+        const block = blocks.get(Number(step.days));
+        if (!block) continue;
+        let achieved;
+        if (offer) {
+            achieved = new Set();
+            if (block.dates.includes(offer)) {
+                const day = istDayRange(new Date(`${offer}T12:00:00+05:30`));
+                const count = await countCompletedOrders(panditId, day.from, day.to, rule.from_time, rule.to_time);
+                if (count >= minimum) achieved.add(offer);
+            }
+        } else {
+            achieved = await achievedOrderDays(panditId, block.dates, rule.from_time, rule.to_time, minimum);
+        }
+        const last = block.dates[block.dates.length - 1];
+        const closed = today >= last;
+        prepared.push({
+            step,
+            block,
+            achieved,
+            closed,
+            missed: closed ? block.dates.filter((date) => !achieved.has(date)) : [],
+            done: block.dates.filter((date) => achieved.has(date)).length,
+        });
+    }
+    const covered = blocksCoveredByFreeze(prepared, allowance);
+    for (const item of prepared) {
+        const reached = covered.has(item.step.id);
+        const uncovered = item.missed.length;
+        await saveTracking({
+            panditId,
+            taskId: rule.id,
+            periodKey: item.block.periodKey,
+            periodType: 'days',
+            done: item.done,
+            unit: 'days',
+            steps: [{
+                key: `day:${item.step.id}`,
+                target: Number(item.step.days) || 0,
+                coins: Number(item.step.extra_coin) || 0,
+                freeze: 0,
+                grantFreeze: false,
+                reached,
+                remaining: reached ? 0 : Math.max(uncovered, 1),
+            }],
+        });
+    }
+}
+
 async function saveDaySequence(rule, panditId, month, qualifyingDays) {
     const sequences = await loadDaySequences(rule.id);
     if (!sequences.length) return;
@@ -279,7 +450,8 @@ async function saveDaySequence(rule, panditId, month, qualifyingDays) {
                 key: `day:${step.id}`,
                 target,
                 coins: Number(step.extra_coin) || 0,
-                freeze: Number(step.freeze) || 0,
+                freeze: 0,
+                grantFreeze: false,
                 reached,
                 remaining: reached ? 0 : target - qualifyingDays,
             };
@@ -328,10 +500,8 @@ async function awardPanditOrderCoins({ panditId, orderId, completedAt }) {
                     remaining: reached ? 0 : need - count,
                 }],
             });
-            const qualifyingDays = rule.offer_date
-                ? (reached ? 1 : 0)
-                : await countQualifyingDays(pandit_id, month, rule.from_time, rule.to_time, need);
-            await saveDaySequence(rule, pandit_id, month, qualifyingDays);
+            if (reached) await grantCommonFreeze(rule, pandit_id, at);
+            await awardOrderFreezeSequences(rule, pandit_id, at);
             continue;
         }
 
@@ -360,6 +530,9 @@ async function awardPanditOrderCoins({ panditId, orderId, completedAt }) {
         const qualifyingDays = rule.offer_date
             ? (count >= 1 ? 1 : 0)
             : await countQualifyingDays(pandit_id, month, null, null, 1);
+        if (rule.type === 'customize_order' && milestones.some((step) => count >= Number(step.target))) {
+            await grantCommonFreeze(rule, pandit_id, at);
+        }
         await saveDaySequence(rule, pandit_id, month, qualifyingDays);
     }
 }
