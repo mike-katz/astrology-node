@@ -1,6 +1,11 @@
 const db = require('../db');
 
 const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+const MINUTES_PER_HOUR = 60;
+
+function meetsHourTarget(minutes, targetHours) {
+    return minutes >= (Number(targetHours) || 0) * MINUTES_PER_HOUR;
+}
 
 function istParts(date) {
     const shifted = new Date(new Date(date).getTime() + IST_OFFSET_MS);
@@ -139,6 +144,23 @@ async function countCompletedOrders(panditId, from, to, fromTime, toTime) {
     return parseInt(row?.count || 0, 10);
 }
 
+async function completedOrderMinutes(panditId, from, to) {
+    const rows = await db('orders')
+        .where({ pandit_id: panditId, status: 'completed' })
+        .whereNull('deleted_at')
+        .where('end_time', '>=', from)
+        .where('end_time', '<=', to)
+        .whereNotNull('start_time')
+        .select('start_time', 'end_time');
+    let ms = 0;
+    for (const row of rows) {
+        const start = new Date(row.start_time).getTime();
+        const end = new Date(row.end_time).getTime();
+        if (end > start) ms += end - start;
+    }
+    return ms / 60000;
+}
+
 async function countQualifyingDays(panditId, month, fromTime, toTime, minimum) {
     const query = db('orders')
         .where({ pandit_id: panditId, status: 'completed' })
@@ -159,7 +181,107 @@ async function countQualifyingDays(panditId, month, fromTime, toTime, minimum) {
     return days;
 }
 
+function dayStepPaid(previous, step) {
+    const key = String(step.key);
+    const target = Number(step.target) || 0;
+    return previous.some((item) => item.paid && (String(item.key) === key || Number(item.target) === target));
+}
+
+async function saveDayEntry(input, attempt = 0) {
+    const steps = input.steps || [];
+    if (!steps.length) return;
+    try {
+        await db.transaction(async (trx) => {
+            await trx('pandits').where({ id: input.panditId }).forUpdate().first();
+            const existingRows = await trx('pandit_coin_task_progress')
+                .where({
+                    pandit_id: input.panditId,
+                    task_id: input.taskId,
+                    period_key: input.periodKey,
+                    period_type: 'day',
+                    unit: input.unit,
+                })
+                .orderBy('id', 'asc')
+                .forUpdate();
+            const previous = existingRows.flatMap((row) => parseSteps(row.detail));
+            let addCoins = 0;
+            let addFreeze = 0;
+            const storedSteps = steps.map((step) => {
+                const alreadyPaid = dayStepPaid(previous, step);
+                const coins = Number(step.coins) || 0;
+                const freeze = Number(step.freeze) || 0;
+                const grantFreeze = step.grantFreeze !== false;
+                const reached = !!step.reached;
+                const target = Number(step.target) || 0;
+                const pay = reached && !alreadyPaid && (coins > 0 || (grantFreeze && freeze > 0));
+                if (pay) {
+                    addCoins += coins;
+                    if (grantFreeze) addFreeze += freeze;
+                }
+                return {
+                    key: String(step.key),
+                    target,
+                    coins,
+                    freeze,
+                    reached,
+                    remaining: reached ? 0 : round2(step.remaining != null ? Number(step.remaining) : (target - Number(input.done))),
+                    paid: alreadyPaid || pay,
+                };
+            });
+            const row = {
+                pandit_id: input.panditId,
+                task_id: input.taskId,
+                period_key: input.periodKey,
+                period_type: 'day',
+                step_key: input.unit,
+                done: round2(input.done),
+                unit: input.unit,
+                target: storedSteps.length ? storedSteps[storedSteps.length - 1].target : 0,
+                remaining: storedSteps.length ? storedSteps[storedSteps.length - 1].remaining : 0,
+                achieved: storedSteps.some((step) => step.reached),
+                detail: JSON.stringify({ steps: storedSteps }),
+                updated_at: new Date(),
+            };
+            const extraIds = existingRows.slice(1).map((item) => item.id);
+            if (extraIds.length) {
+                await trx('pandit_coin_task_progress').whereIn('id', extraIds).del();
+            }
+            if (existingRows[0]) {
+                await trx('pandit_coin_task_progress').where({ id: existingRows[0].id }).update(row);
+            } else {
+                await trx('pandit_coin_task_progress').insert(row);
+            }
+            if (addCoins > 0) {
+                await trx('pandits').where({ id: input.panditId }).update({
+                    coin: trx.raw('COALESCE(coin, 0) + ?', [addCoins]),
+                });
+            }
+            if (addFreeze > 0) {
+                const streak = await trx('panditcoins').where({ pandit_id: input.panditId }).first();
+                if (!streak) {
+                    await trx('panditcoins').insert({ pandit_id: input.panditId, freeze: addFreeze });
+                } else {
+                    await trx('panditcoins').where({ pandit_id: input.panditId }).update({
+                        freeze: trx.raw('COALESCE(??, 0) + ?', ['freeze', addFreeze]),
+                        updated_at: trx.fn.now(),
+                    });
+                }
+            }
+        });
+    } catch (err) {
+        if (err?.code === '23505' && attempt < 1) {
+            await saveDayEntry(input, attempt + 1);
+            return;
+        }
+        console.error('pandit coin tracking save failed', err?.message || err);
+    }
+}
+
 async function saveTracking(input, attempt = 0) {
+    if (input.periodType === 'day') {
+        await saveDayEntry(input, attempt);
+        return;
+    }
     const steps = input.steps || [];
     if (!steps.length) return;
     try {
@@ -184,16 +306,29 @@ async function saveTracking(input, attempt = 0) {
             let addFreeze = 0;
             for (const step of steps) {
                 const key = String(step.key);
-                const existing = await trx('pandit_coin_task_progress')
+                const matches = await trx('pandit_coin_task_progress')
                     .where({
                         pandit_id: input.panditId,
                         task_id: input.taskId,
                         period_key: input.periodKey,
                         step_key: key,
                     })
-                    .forUpdate()
-                    .first();
-                const alreadyPaid = paidByKey.get(key) === true || parseSteps(existing?.detail).some((item) => item.paid);
+                    .orderBy('id', 'asc')
+                    .forUpdate();
+                const existing = matches[0] || null;
+                let alreadyPaid = paidByKey.get(key) === true || matches.some((row) => parseSteps(row.detail).some((item) => item.paid));
+                if (!alreadyPaid && input.periodType === 'days') {
+                    const prior = await trx('pandit_coin_task_progress')
+                        .where({
+                            pandit_id: input.panditId,
+                            task_id: input.taskId,
+                            step_key: key,
+                            period_type: 'days',
+                        })
+                        .whereNot('period_key', input.periodKey)
+                        .select('detail');
+                    alreadyPaid = prior.some((row) => parseSteps(row.detail).some((item) => item.paid));
+                }
                 const coins = Number(step.coins) || 0;
                 const freeze = Number(step.freeze) || 0;
                 const grantFreeze = step.grantFreeze !== false;
@@ -228,6 +363,9 @@ async function saveTracking(input, attempt = 0) {
                 };
                 if (existing) {
                     await trx('pandit_coin_task_progress').where({ id: existing.id }).update(row);
+                    if (matches.length > 1) {
+                        await trx('pandit_coin_task_progress').whereIn('id', matches.slice(1).map((item) => item.id)).del();
+                    }
                 } else {
                     await trx('pandit_coin_task_progress').insert(row);
                 }
@@ -244,7 +382,7 @@ async function saveTracking(input, attempt = 0) {
                     await trx('panditcoins').insert({ pandit_id: input.panditId, freeze: addFreeze });
                 } else {
                     await trx('panditcoins').where({ pandit_id: input.panditId }).update({
-                        freeze: trx.raw('COALESCE(freeze, 0) + ?', [addFreeze]),
+                        freeze: trx.raw('COALESCE(??, 0) + ?', ['freeze', addFreeze]),
                         updated_at: trx.fn.now(),
                     });
                 }
@@ -263,37 +401,19 @@ async function saveTracking(input, attempt = 0) {
     }
 }
 
-function ymdList(year, monthIndex, startDay, length) {
-    const dim = new Date(Date.UTC(year, monthIndex + 1, 0)).getUTCDate();
-    const end = Math.min(startDay + length - 1, dim);
-    const month = String(monthIndex + 1).padStart(2, '0');
-    const dates = [];
-    for (let day = startDay; day <= end; day += 1) {
-        dates.push(`${year}-${month}-${String(day).padStart(2, '0')}`);
-    }
-    return dates;
+function addDaysYmd(ymd, days) {
+    const [year, month, day] = String(ymd).split('-').map(Number);
+    const date = new Date(Date.UTC(year, month - 1, day));
+    date.setUTCDate(date.getUTCDate() + days);
+    return date.toISOString().slice(0, 10);
 }
 
-function orderSequenceBlocks(at) {
-    const { year, month, day } = istParts(at);
-    const utc = new Date(Date.UTC(year, month, day));
-    const weekday = utc.getUTCDay();
-    const back = weekday === 0 ? 6 : weekday - 1;
-    utc.setUTCDate(utc.getUTCDate() - back);
-    const week = [];
-    for (let i = 0; i < 7; i += 1) {
-        const date = new Date(utc);
-        date.setUTCDate(utc.getUTCDate() + i);
-        week.push(date.toISOString().slice(0, 10));
-    }
-    const firstHalf = ymdList(year, month, 1, 15);
-    const fifteen = day > 15 ? ymdList(year, month, 16, 15) : firstHalf;
-    const thirty = ymdList(year, month, 1, 30);
-    return [
-        { days: 7, dates: week, periodKey: `7:${week[0]}` },
-        { days: 15, dates: fifteen, periodKey: `15:${fifteen[0]}` },
-        { days: 30, dates: thirty, periodKey: `30:${thirty[0]}` },
-    ];
+function sequenceBlocksFrom(startYmd) {
+    return [7, 15, 30].map((days) => ({
+        days,
+        dates: Array.from({ length: days }, (_, index) => addDaysYmd(startYmd, index)),
+        periodKey: `${days}:${startYmd}`,
+    }));
 }
 
 function blocksCoveredByFreeze(items, allowance) {
@@ -374,6 +494,24 @@ async function achievedOrderDays(panditId, dates, fromTime, toTime, minimum) {
     return achieved;
 }
 
+async function firstOrderDay(panditId, fromTime, toTime, minimum) {
+    if (!minimum) return null;
+    const dayExpr = "(end_time AT TIME ZONE 'Asia/Kolkata')::date";
+    const query = db('orders')
+        .where({ pandit_id: panditId, status: 'completed' })
+        .whereNull('deleted_at')
+        .whereNotNull('end_time');
+    applyIstClock(query, 'end_time', fromTime, toTime);
+    const row = await query
+        .select(db.raw(`to_char(${dayExpr}, 'YYYY-MM-DD') as day`))
+        .count('* as count')
+        .groupByRaw(dayExpr)
+        .havingRaw('count(*) >= ?', [minimum])
+        .orderByRaw(`${dayExpr} asc`)
+        .first();
+    return row ? sqlDayKey(row.day) : null;
+}
+
 async function awardOrderFreezeSequences(rule, panditId, at) {
     const minimum = Number(rule.order_count) || 0;
     const sequences = (await loadDaySequences(rule.id))
@@ -381,8 +519,10 @@ async function awardOrderFreezeSequences(rule, panditId, at) {
     if (!minimum || !sequences.length) return;
     const today = istParts(at).ymd;
     const offer = offerDateKey(rule.offer_date);
+    const startYmd = offer || await firstOrderDay(panditId, rule.from_time, rule.to_time, minimum);
+    if (!startYmd) return;
     const allowance = Number(rule.freeze) || 0;
-    const blocks = new Map(orderSequenceBlocks(at).map((block) => [block.days, block]));
+    const blocks = new Map(sequenceBlocksFrom(startYmd).map((block) => [block.days, block]));
     const prepared = [];
     for (const step of sequences) {
         const block = blocks.get(Number(step.days));
@@ -502,6 +642,34 @@ async function awardPanditOrderCoins({ panditId, orderId, completedAt }) {
             });
             if (reached) await grantCommonFreeze(rule, pandit_id, at);
             await awardOrderFreezeSequences(rule, pandit_id, at);
+            continue;
+        }
+
+        const isOrderHours = rule.type === 'customize_order' && String(rule.customize_type || '') === 'hours';
+        if (isOrderHours) {
+            const orderMinutes = await completedOrderMinutes(pandit_id, day.from, day.to);
+            const orderHours = orderMinutes / MINUTES_PER_HOUR;
+            const hourSteps = await loadMilestones(rule.id);
+            await saveTracking({
+                panditId: pandit_id,
+                taskId: rule.id,
+                periodKey: day.ymd,
+                periodType: 'day',
+                done: orderHours,
+                unit: 'hours',
+                steps: hourSteps.map((step) => {
+                    const target = Number(step.target) || 0;
+                    const reached = meetsHourTarget(orderMinutes, target);
+                    return {
+                        key: String(step.id),
+                        target,
+                        coins: Number(step.coins) || 0,
+                        freeze: 0,
+                        reached,
+                        remaining: reached ? 0 : target - orderHours,
+                    };
+                }),
+            });
             continue;
         }
 
