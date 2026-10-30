@@ -61,7 +61,24 @@ function applyIstClock(query, column, fromTime, toTime) {
     else query.whereRaw(`(${expr} >= ? OR ${expr} <= ?)`, [start, end]);
 }
 
+function readPanditIds(value) {
+    if (value == null || value === '') return [];
+    let ids = value;
+    if (typeof ids === 'string') {
+        try {
+            ids = JSON.parse(ids);
+        } catch (_) {
+            return [];
+        }
+    }
+    if (!Array.isArray(ids)) return [];
+    return ids.map(Number).filter((id) => Number.isInteger(id) && id > 0);
+}
+
 function ruleIncludesPandit(rule, panditId) {
+    if (rule.type === 'order' || rule.type === 'live') {
+        return !readPanditIds(rule.exclude_pandit_ids).includes(Number(panditId));
+    }
     if (rule.type !== 'customize_order') return true;
     let ids = rule.pandit_ids;
     if (ids == null || ids === '') return true;
