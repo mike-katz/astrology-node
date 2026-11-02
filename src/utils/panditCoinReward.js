@@ -150,39 +150,54 @@ async function loadDaySequences(taskId) {
         .orderBy('days', 'asc');
 }
 
-async function countCompletedOrders(panditId, from, to, fromTime, toTime) {
+function ruleSince(rule) {
+    if (!rule?.created_at) return null;
+    const at = new Date(rule.created_at);
+    return Number.isNaN(at.getTime()) ? null : at;
+}
+
+function notBefore(from, since) {
+    if (!since) return from;
+    const at = since instanceof Date ? since : new Date(since);
+    if (Number.isNaN(at.getTime())) return from;
+    const start = from instanceof Date ? from : new Date(from);
+    return at > start ? at : start;
+}
+
+async function countCompletedOrders(panditId, from, to, fromTime, toTime, since) {
     const query = db('orders')
         .where({ pandit_id: panditId, status: 'completed' })
         .whereNull('deleted_at')
-        .where('end_time', '>=', from)
+        .where('end_time', '>=', notBefore(from, since))
         .where('end_time', '<=', to);
     applyIstClock(query, 'end_time', fromTime, toTime);
     const row = await query.count('* as count').first();
     return parseInt(row?.count || 0, 10);
 }
 
-async function completedOrderMinutes(panditId, from, to) {
+async function completedOrderMinutes(panditId, from, to, since) {
+    const startFrom = notBefore(from, since);
     const rows = await db('orders')
         .where({ pandit_id: panditId, status: 'completed' })
         .whereNull('deleted_at')
-        .where('end_time', '>=', from)
+        .where('end_time', '>=', startFrom)
         .where('end_time', '<=', to)
         .whereNotNull('start_time')
         .select('start_time', 'end_time');
     let ms = 0;
     for (const row of rows) {
-        const start = new Date(row.start_time).getTime();
+        const start = Math.max(new Date(row.start_time).getTime(), startFrom.getTime());
         const end = new Date(row.end_time).getTime();
         if (end > start) ms += end - start;
     }
     return ms / 60000;
 }
 
-async function countQualifyingDays(panditId, month, fromTime, toTime, minimum) {
+async function countQualifyingDays(panditId, month, fromTime, toTime, minimum, since) {
     const query = db('orders')
         .where({ pandit_id: panditId, status: 'completed' })
         .whereNull('deleted_at')
-        .where('end_time', '>=', month.from)
+        .where('end_time', '>=', notBefore(month.from, since))
         .where('end_time', '<=', month.to);
     applyIstClock(query, 'end_time', fromTime, toTime);
     const rows = await query.select(db.raw("(end_time AT TIME ZONE 'Asia/Kolkata')::date as day"));
@@ -488,11 +503,12 @@ function sqlDayKey(value) {
     return match ? match[0] : String(value || '').slice(0, 10);
 }
 
-async function achievedOrderDays(panditId, dates, fromTime, toTime, minimum) {
+async function achievedOrderDays(panditId, dates, fromTime, toTime, minimum, since) {
     const achieved = new Set();
     if (!dates.length || !minimum) return achieved;
-    const from = new Date(`${dates[0]}T00:00:00+05:30`);
+    const from = notBefore(new Date(`${dates[0]}T00:00:00+05:30`), since);
     const to = new Date(`${dates[dates.length - 1]}T23:59:59.999+05:30`);
+    const minYmd = since ? istParts(since).ymd : null;
     const query = db('orders')
         .where({ pandit_id: panditId, status: 'completed' })
         .whereNull('deleted_at')
@@ -506,18 +522,20 @@ async function achievedOrderDays(panditId, dates, fromTime, toTime, minimum) {
         counts.set(key, (counts.get(key) || 0) + 1);
     }
     for (const ymd of dates) {
+        if (minYmd && ymd < minYmd) continue;
         if ((counts.get(ymd) || 0) >= minimum) achieved.add(ymd);
     }
     return achieved;
 }
 
-async function firstOrderDay(panditId, fromTime, toTime, minimum) {
+async function firstOrderDay(panditId, fromTime, toTime, minimum, since) {
     if (!minimum) return null;
     const dayExpr = "(end_time AT TIME ZONE 'Asia/Kolkata')::date";
     const query = db('orders')
         .where({ pandit_id: panditId, status: 'completed' })
         .whereNull('deleted_at')
         .whereNotNull('end_time');
+    if (since) query.where('end_time', '>=', since);
     applyIstClock(query, 'end_time', fromTime, toTime);
     const row = await query
         .select(db.raw(`to_char(${dayExpr}, 'YYYY-MM-DD') as day`))
@@ -536,7 +554,8 @@ async function awardOrderFreezeSequences(rule, panditId, at) {
     if (!minimum || !sequences.length) return;
     const today = istParts(at).ymd;
     const offer = offerDateKey(rule.offer_date);
-    const startYmd = offer || await firstOrderDay(panditId, rule.from_time, rule.to_time, minimum);
+    const since = ruleSince(rule);
+    const startYmd = offer || await firstOrderDay(panditId, rule.from_time, rule.to_time, minimum, since);
     if (!startYmd) return;
     const allowance = Number(rule.freeze) || 0;
     const blocks = new Map(sequenceBlocksFrom(startYmd).map((block) => [block.days, block]));
@@ -549,11 +568,11 @@ async function awardOrderFreezeSequences(rule, panditId, at) {
             achieved = new Set();
             if (block.dates.includes(offer)) {
                 const day = istDayRange(new Date(`${offer}T12:00:00+05:30`));
-                const count = await countCompletedOrders(panditId, day.from, day.to, rule.from_time, rule.to_time);
+                const count = await countCompletedOrders(panditId, day.from, day.to, rule.from_time, rule.to_time, since);
                 if (count >= minimum) achieved.add(offer);
             }
         } else {
-            achieved = await achievedOrderDays(panditId, block.dates, rule.from_time, rule.to_time, minimum);
+            achieved = await achievedOrderDays(panditId, block.dates, rule.from_time, rule.to_time, minimum, since);
         }
         const last = block.dates[block.dates.length - 1];
         const closed = today >= last;
@@ -633,13 +652,15 @@ async function awardPanditOrderCoins({ panditId, orderId, completedAt }) {
     for (const rule of rules) {
         if (!ruleIncludesPandit(rule, pandit_id)) continue;
         if (!ruleDateMatches(rule, day.ymd)) continue;
+        const since = ruleSince(rule);
+        if (since && at < since) continue;
 
         const isTime = rule.type === 'customize_order' && String(rule.customize_type || '') === 'time';
         if (isTime) {
             if (!clockInWindow(at, rule.from_time, rule.to_time)) continue;
             const need = Number(rule.order_count) || 0;
             if (!need) continue;
-            const count = await countCompletedOrders(pandit_id, day.from, day.to, rule.from_time, rule.to_time);
+            const count = await countCompletedOrders(pandit_id, day.from, day.to, rule.from_time, rule.to_time, since);
             const reached = count >= need;
             await saveTracking({
                 panditId: pandit_id,
@@ -664,7 +685,7 @@ async function awardPanditOrderCoins({ panditId, orderId, completedAt }) {
 
         const isOrderHours = rule.type === 'customize_order' && String(rule.customize_type || '') === 'hours';
         if (isOrderHours) {
-            const orderMinutes = await completedOrderMinutes(pandit_id, day.from, day.to);
+            const orderMinutes = await completedOrderMinutes(pandit_id, day.from, day.to, since);
             const orderHours = orderMinutes / MINUTES_PER_HOUR;
             const hourSteps = await loadMilestones(rule.id);
             await saveTracking({
@@ -690,7 +711,7 @@ async function awardPanditOrderCoins({ panditId, orderId, completedAt }) {
             continue;
         }
 
-        const count = await countCompletedOrders(pandit_id, day.from, day.to);
+        const count = await countCompletedOrders(pandit_id, day.from, day.to, null, null, since);
         const milestones = await loadMilestones(rule.id);
         await saveTracking({
             panditId: pandit_id,
@@ -714,7 +735,7 @@ async function awardPanditOrderCoins({ panditId, orderId, completedAt }) {
         });
         const qualifyingDays = rule.offer_date
             ? (count >= 1 ? 1 : 0)
-            : await countQualifyingDays(pandit_id, month, null, null, 1);
+            : await countQualifyingDays(pandit_id, month, null, null, 1, since);
         if (rule.type === 'customize_order' && milestones.some((step) => count >= Number(step.target))) {
             await grantCommonFreeze(rule, pandit_id, at);
         }
