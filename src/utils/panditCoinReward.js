@@ -76,21 +76,12 @@ function readPanditIds(value) {
 }
 
 function ruleIncludesPandit(rule, panditId) {
-    if (rule.type === 'order' || rule.type === 'live') {
-        return !readPanditIds(rule.exclude_pandit_ids).includes(Number(panditId));
-    }
-    if (rule.type !== 'customize_order') return true;
-    let ids = rule.pandit_ids;
-    if (ids == null || ids === '') return true;
-    if (typeof ids === 'string') {
-        try {
-            ids = JSON.parse(ids);
-        } catch (_) {
-            return true;
-        }
-    }
-    if (!Array.isArray(ids) || !ids.length) return true;
-    return ids.map(Number).includes(Number(panditId));
+    if (rule.type !== 'customize_order' && rule.type !== 'customize_live') return true;
+    const visibility = String(rule.visibility || '').trim().toLowerCase();
+    const ids = readPanditIds(rule.pandit_ids);
+    if (visibility === 'is_visible') return ids.includes(Number(panditId));
+    if (visibility === 'is_not_visible') return !ids.includes(Number(panditId));
+    return true;
 }
 
 function offerDateKey(value) {
@@ -131,7 +122,7 @@ async function loadRules() {
     return db('pandit_coin_tasks')
         .where({ status: true })
         .whereNull('deleted_at')
-        .whereIn('type', ['order', 'customize_order']);
+        .whereIn('type', ['customize_order']);
 }
 
 async function loadMilestones(taskId) {
