@@ -12,10 +12,16 @@ const upload = multer({
         fileSize: 5 * 1024 * 1024 // 5MB per file
     },
     fileFilter: (req, file, cb) => {
-        if (file.mimetype.startsWith('image/')) {
+        const allowed = (
+            file.mimetype.startsWith('image/') ||
+            file.mimetype.startsWith('audio/') ||
+            file.mimetype.startsWith('video/') ||
+            file.mimetype === 'application/pdf'
+        );
+        if (allowed) {
             cb(null, true);
         } else {
-            cb(new Error('Only image files are allowed'));
+            cb(new Error('Only image, audio, video, and PDF files are allowed'));
         }
     }
 });
