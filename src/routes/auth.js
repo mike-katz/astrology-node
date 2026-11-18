@@ -17,9 +17,9 @@ router.post('/register', [
 router.post('/login', login);
 
 router.post('/verifyOtP', verifyOtp);
-// GET/POST /auth/google — token | id_token | idToken from Google Sign-In (verified); optional: type, version, ad_set_id, utm_source, ad_id, referrer
+// POST /auth/google — body: { id_token } or { idToken } from Google Sign-In; optional: type, version, ad_set_id, utm_source, ad_id, referrer
 router.get('/google', googleLogin);
-// GET/POST /auth/apple — Apple identity JWT in token | identity_token | identityToken (verified); optional name/userName, type, version, ad_set_id, utm_source, ad_id, referrer
+// POST /auth/apple — same payload pattern as Google; Apple identity JWT in token | identity_token | identityToken
 router.get('/apple', appleLogin);
 // router.get('/config', socialUrl);
 router.post('/test-call', sendCall);
