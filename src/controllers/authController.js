@@ -453,57 +453,72 @@ function parseGoogleClientIds() {
  * Verifies a Google ID token (from mobile/web Google Sign-In) and returns the same session shape as verifyOtp.
  * Configure GOOGLE_CLIENT_IDS (comma-separated) or GOOGLE_CLIENT_ID with your OAuth client IDs (Web, iOS, Android).
  */
+function authParams(req) {
+    return { ...(req.query || {}), ...(req.body || {}) };
+}
+
 async function googleLogin(req, res) {
-    console.log("googleLogin req.body", req.query);
     try {
-        // const idToken = req.query.token;
-        // if (!idToken) {
-        //     return res.status(400).json({ success: false, message: 'id_token or idToken is required' });
-        // }
+        const params = authParams(req);
+        const idToken = params.token || params.id_token || params.idToken;
+        if (!idToken) {
+            return res.status(400).json({ success: false, message: 'id_token or idToken is required' });
+        }
 
-        // const clientIds = parseGoogleClientIds();
-        // if (!clientIds.length) {
-        //     logger.warn('googleLogin: GOOGLE_CLIENT_IDS / GOOGLE_CLIENT_ID not set');
-        //     return res.status(503).json({ success: false, message: 'Google login is not configured' });
-        // }
+        const clientIds = parseGoogleClientIds();
+        if (!clientIds.length) {
+            logger.warn('googleLogin: GOOGLE_CLIENT_IDS / GOOGLE_CLIENT_ID not set');
+            return res.status(503).json({ success: false, message: 'Google login is not configured' });
+        }
 
-        // let tokenPayload;
-        // try {
-        //     const tokenRes = await axios.get('https://oauth2.googleapis.com/tokeninfo', {
-        //         params: { id_token: idToken },
-        //         timeout: 15000,
-        //     });
-        //     tokenPayload = tokenRes.data;
-        // } catch (e) {
-        //     if (e.response?.status === 400) {
-        //         return res.status(401).json({ success: false, message: 'Invalid or expired Google token' });
-        //     }
-        //     logger.error(e);
-        //     return res.status(502).json({ success: false, message: 'Could not verify Google token' });
-        // }
+        let tokenPayload;
+        try {
+            const tokenRes = await axios.get('https://oauth2.googleapis.com/tokeninfo', {
+                params: { id_token: idToken },
+                timeout: 15000,
+            });
+            tokenPayload = tokenRes.data;
+        } catch (e) {
+            if (e.response?.status === 400) {
+                return res.status(401).json({ success: false, message: 'Invalid or expired Google token' });
+            }
+            logger.error(e);
+            return res.status(502).json({ success: false, message: 'Could not verify Google token' });
+        }
 
-        // if (tokenPayload.error) {
-        //     return res.status(401).json({
-        //         success: false,
-        //         message: tokenPayload.error_description || tokenPayload.error || 'Invalid Google token',
-        //     });
-        // }
+        if (tokenPayload.error) {
+            return res.status(401).json({
+                success: false,
+                message: tokenPayload.error_description || tokenPayload.error || 'Invalid Google token',
+            });
+        }
 
-        // if (!clientIds.includes(tokenPayload.aud)) {
-        //     return res.status(401).json({ success: false, message: 'Invalid token audience' });
-        // }
+        if (!clientIds.includes(tokenPayload.aud)) {
+            return res.status(401).json({ success: false, message: 'Invalid token audience' });
+        }
 
-        // if (tokenPayload.email && tokenPayload.email_verified !== 'true') {
-        //     return res.status(400).json({ success: false, message: 'Google account email is not verified' });
-        // }
+        if (tokenPayload.email && tokenPayload.email_verified !== 'true' && tokenPayload.email_verified !== true) {
+            return res.status(400).json({ success: false, message: 'Google account email is not verified' });
+        }
 
-        // const sub = tokenPayload.sub;
-        // const email = tokenPayload.email || null;
-        // const name = tokenPayload.name || (email ? email.split('@')[0] : null) || 'User';
-        // const picture = tokenPayload.picture || null;
-        let { ad_set_id, utm_source, ad_id, type, version, referrer, email, device_id } = req.query;
+        const sub = tokenPayload.sub;
+        const email = tokenPayload.email || null;
+        const name = tokenPayload.name || (email ? email.split('@')[0] : null) || 'User';
+        const picture = tokenPayload.picture || null;
+        if (!sub) {
+            return res.status(401).json({ success: false, message: 'Invalid Google token' });
+        }
 
-        let existing = await db('users').whereNull('deleted_at').where({ email }).first();
+        let existing = await db('users').whereNull('deleted_at').where({ google_id: sub }).first();
+        if (!existing && email) {
+            existing = await db('users').whereNull('deleted_at').where({ email }).first();
+            if (existing?.google_id && existing.google_id !== sub) {
+                return res.status(409).json({
+                    success: false,
+                    message: 'This email is already linked to a different Google account',
+                });
+            }
+        }
 
         if (existing?.status === 'block') {
             return res.status(400).json({ success: false, message: 'Your account is blocked.' });
@@ -515,6 +530,7 @@ async function googleLogin(req, res) {
             });
         }
 
+        const { ad_set_id, utm_source, ad_id, type, version, referrer } = params;
         const mode = type ? type : 'APP';
         const upd = {};
         if (existing && version) {
@@ -541,21 +557,16 @@ async function googleLogin(req, res) {
         if (ip) {
             const geo = geoip.lookup(ip);
             const country = geo ? geo.country : 'IN';
-            currency = getCurrencyByCountry(country);
-            currency = currency?.currency
+            currency = getCurrencyByCountry(country)?.currency;
         }
-        currency = existing?.default_currency || 'INR';
+        currency = existing?.default_currency || currency || 'INR';
 
         if (!existing) {
-            // if (device_id) {
-            //     const devices = await db('users').where({ device_id }).first();
-            //     if (devices) return res.status(400).json({ success: false, message: 'This device is already linked to another account. Please sign in using the existing account or contact support if you need assistance.' });
-            // }
             const insertRow = {
-                // google_id: sub,
+                google_id: sub,
                 email,
-                // name: email,
-                // avatar: picture,
+                name,
+                avatar: picture,
                 country_code: '+91',
                 status: 'active',
                 balance: 0,
@@ -578,29 +589,29 @@ async function googleLogin(req, res) {
                 'profile',
                 'email',
                 'permanent_currency',
-                'default_currency'
-                // 'google_id',
+                'default_currency',
+                'google_id',
             ]);
         } else {
             const linkUpd = { ...upd };
-            // if (!existing.google_id) {
-            //     linkUpd.google_id = sub;
-            // }
+            if (!existing.google_id) {
+                linkUpd.google_id = sub;
+            }
             if (email) {
                 linkUpd.email = email;
             }
-            // if (picture) {
-            //     linkUpd.avatar = picture;
-            // }
-            // if (name && !existing.name) {
-            //     linkUpd.name = name;
-            // }
+            if (picture) {
+                linkUpd.avatar = picture;
+            }
+            if (name && !existing.name) {
+                linkUpd.name = name;
+            }
             if (Object.keys(linkUpd).length > 0) {
                 await db('users').where({ id: Number(existing.id) }).update(linkUpd);
             }
             existing = await db('users').where({ id: existing.id }).first();
         }
-        const response = await generateLoginResponse(existing, currency)
+        const response = await generateLoginResponse(existing, currency);
         return res.status(200).json(response);
     } catch (err) {
         logger.error(err);
@@ -673,12 +684,49 @@ async function verifyAppleIdentityToken(identityToken, audiences) {
  */
 async function appleLogin(req, res) {
     try {
-        const { ad_set_id, utm_source, ad_id, type, version, referrer, token: userToken, device_id } = req.query;
-        // const devices = await db('users').where({ device_id }).first();
-        // if (devices) {
-        //     if (devices?.email != userToken) { return res.status(400).json({ success: false, message: 'This device is already linked to another account. Please sign in using the existing account or contact support if you need assistance.' }); }
-        // }
-        let existing = await db('users').whereNull('deleted_at').where({ email: userToken }).first();
+        const params = authParams(req);
+        const identityToken = params.token || params.identity_token || params.identityToken;
+        if (!identityToken) {
+            return res.status(400).json({
+                success: false,
+                message: 'token, identity_token, or identityToken is required',
+            });
+        }
+
+        const audiences = parseAppleAudiences();
+        if (!audiences.length) {
+            logger.warn('appleLogin: APPLE_CLIENT_IDS / APPLE_CLIENT_ID not set');
+            return res.status(503).json({ success: false, message: 'Apple login is not configured' });
+        }
+
+        let tokenPayload;
+        try {
+            tokenPayload = await verifyAppleIdentityToken(identityToken, audiences);
+        } catch (e) {
+            logger.error('appleLogin token verify failed', e?.message || e);
+            return res.status(401).json({ success: false, message: 'Invalid or expired Apple token' });
+        }
+
+        const sub = tokenPayload?.sub;
+        const email = tokenPayload?.email || null;
+        const name = params.name || params.userName || (email ? email.split('@')[0] : null) || 'User';
+        if (!sub) {
+            return res.status(401).json({ success: false, message: 'Invalid Apple token' });
+        }
+        if (email && tokenPayload.email_verified !== true && tokenPayload.email_verified !== 'true') {
+            return res.status(400).json({ success: false, message: 'Apple account email is not verified' });
+        }
+
+        let existing = await db('users').whereNull('deleted_at').where({ apple_id: sub }).first();
+        if (!existing && email) {
+            existing = await db('users').whereNull('deleted_at').where({ email }).first();
+            if (existing?.apple_id && existing.apple_id !== sub) {
+                return res.status(409).json({
+                    success: false,
+                    message: 'This email is already linked to a different Apple account',
+                });
+            }
+        }
 
         if (existing?.status === 'block') {
             return res.status(400).json({ success: false, message: 'Your account is blocked.' });
@@ -690,6 +738,7 @@ async function appleLogin(req, res) {
             });
         }
 
+        const { ad_set_id, utm_source, ad_id, type, version, referrer } = params;
         const mode = type ? type : 'APP';
         const upd = {};
         if (existing && version) {
@@ -717,21 +766,15 @@ async function appleLogin(req, res) {
         if (ip) {
             const geo = geoip.lookup(ip);
             const country = geo ? geo.country : 'IN';
-            currency = getCurrencyByCountry(country);
-            currency = currency?.currency
+            currency = getCurrencyByCountry(country)?.currency;
         }
-        currency = existing?.default_currency || 'INR';
+        currency = existing?.default_currency || currency || 'INR';
 
         if (!existing) {
-            // if (device_id) {
-            //     const devices = await db('users').where({ device_id }).first();
-            //     if (devices) return res.status(400).json({ success: false, message: 'This device is already linked to another account. Please sign in using the existing account or contact support if you need assistance.' });
-            // }
             const insertRow = {
-                // google_id: sub,
-                email: userToken,
-                // name: email,
-                // avatar: picture,
+                apple_id: sub,
+                email,
+                name,
                 country_code: '+91',
                 status: 'active',
                 balance: 0,
@@ -754,67 +797,27 @@ async function appleLogin(req, res) {
                 'profile',
                 'email',
                 'permanent_currency',
-                'default_currency'
-                // 'google_id',
+                'default_currency',
+                'apple_id',
             ]);
         } else {
             const linkUpd = { ...upd };
-            // if (!existing.google_id) {
-            //     linkUpd.google_id = sub;
-            // }
-            if (userToken) {
-                linkUpd.email = userToken;
+            if (!existing.apple_id) {
+                linkUpd.apple_id = sub;
             }
-            // if (picture) {
-            //     linkUpd.avatar = picture;
-            // }
-            // if (name && !existing.name) {
-            //     linkUpd.name = name;
-            // }
+            if (email) {
+                linkUpd.email = email;
+            }
+            if (name && !existing.name) {
+                linkUpd.name = name;
+            }
             if (Object.keys(linkUpd).length > 0) {
                 await db('users').where({ id: Number(existing.id) }).update(linkUpd);
             }
             existing = await db('users').where({ id: existing.id }).first();
         }
-        const response = await generateLoginResponse(existing, currency)
+        const response = await generateLoginResponse(existing, currency);
         return res.status(200).json(response);
-
-        // const token = jwt.sign(
-        //     { userId: existing.id, username: existing.name, mobile: existing.mobile },
-        //     process.env.JWT_SECRET,
-        //     { expiresIn: process.env.JWT_EXPIRES_IN || '1h' },
-        // );
-        // const encryptToken = encrypt(token);
-
-        // const username = existing.id;
-        // const redisKey = `user_${username}`;
-        // const jwtExpiry = process.env.JWT_EXPIRES_IN || '1h';
-        // let ttlSeconds = 3600;
-        // if (jwtExpiry.includes('h')) {
-        //     ttlSeconds = parseInt(jwtExpiry.replace('h', ''), 10) * 3600;
-        // }
-        // await setCache(redisKey, encryptToken, ttlSeconds);
-
-        // const [{ count }] = await db('orders')
-        //     .count('* as count')
-        //     .where({ user_id: existing?.id })
-        //     .whereIn('status', ['continue', 'completed', 'pending']);
-        // const is_free = count == 0;
-
-        // return res.status(200).json({
-        //     success: true,
-        //     data: {
-        //         id: existing?.id,
-        //         name: existing?.name,
-        //         profile: existing?.profile,
-        //         avatar: existing?.avatar,
-        //         mobile: existing?.mobile,
-        //         country_code: existing?.country_code,
-        //         token: encryptToken,
-        //         is_free,
-        //     },
-        //     message: 'Apple sign-in successful',
-        // });
     } catch (err) {
         logger.error(err);
         res.status(500).json({ success: false, message: 'Server error' });

@@ -447,8 +447,8 @@ function blocksCoveredByFreeze(items, allowance) {
     for (const item of ordered) {
         if (!item.closed) continue;
         const first = item.block.dates[0];
-        const last = item.block.dates[item.block.dates.length - 1];
-        if (!item.achieved.has(first) || !item.achieved.has(last)) continue;
+        // Last day may be covered by freeze; only first day must be achieved.
+        if (!item.achieved.has(first)) continue;
         if (item.missed.length > limit) continue;
         const next = new Set(used);
         for (const date of item.missed) next.add(date);
