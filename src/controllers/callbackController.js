@@ -362,7 +362,7 @@ function verifyXpayWebhook(req) {
 
     const hmacSignature = req.headers['xpay-signature'];
     const ecdsaSignature = req.headers['xpay-private-signature'];
-    const signingKey = process.env.XPAY_WEBHOOK_SECRET || process.env.XPAY_SIGNING_KEY || '';
+    const signingKey = process.env.XPAY_WEBHOOK_SECRET || process.env.XPAY_SIGNING_KEY || process.env.XPAY_SECRET_KEY ||'';
 
     if (hmacSignature) {
         if (!signingKey) {
