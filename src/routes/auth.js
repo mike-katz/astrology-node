@@ -21,7 +21,7 @@ router.post('/verifyOtP', verifyOtp);
 router.get('/google', googleLogin);
 // POST /auth/apple — same payload pattern as Google; Apple identity JWT in token | identity_token | identityToken
 router.get('/apple', appleLogin);
-router.get('/config', socialUrl);
+// router.get('/config', socialUrl);
 router.post('/test-call', sendCall);
 router.get('/test', test);
 router.get('/get-ip-country', getCountryByIp);
