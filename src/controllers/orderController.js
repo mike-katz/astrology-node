@@ -1007,94 +1007,163 @@ async function deleteOrder(req, res) {
     }
 }
 
-async function sendGift(req, res) {
-    const { name, pandit_id, amount, qty, is_live } = req.body || {};
-    logger.info('order_sendGift', { userId: req.userId, pandit_id, amount, qty });
+function parseGiftAmountMap(value) {
+    if (value == null) return null;
+    if (typeof value === 'object') return value;
     try {
-        if (!pandit_id || !amount || !qty) {
+        return JSON.parse(value);
+    } catch (_) {
+        return null;
+    }
+}
+
+async function sendGift(req, res) {
+    const { name, gift_id, pandit_id, qty, is_live } = req.body || {};
+    logger.info('order_sendGift', { userId: req.userId, pandit_id, gift_id, name, qty });
+    try {
+        const quantity = Number(qty);
+        if (!pandit_id || (!name && !gift_id) || !Number.isInteger(quantity) || quantity <= 0) {
             logger.info('order_sendGift fail', { userId: req.userId, message: 'Missing params.' });
             return res.status(400).json({ success: false, message: 'Missing params.' });
         }
-        if (isNaN(qty)) {
-            logger.info('order_sendGift fail', { userId: req.userId, message: 'Missing params.' });
-            return res.status(400).json({ success: false, message: 'Missing params.' });
-        }
-        const pandit = await db('pandits').where({ id: pandit_id }).first();
+
         const user = await db('users').where({ id: req.userId }).first();
+        if (!user) {
+            return res.status(400).json({ success: false, message: 'User not found.' });
+        }
         if (user?.offer_amount > 0) {
             return res.status(400).json({ success: false, message: 'please complete order first.' });
         }
-        const order = await db('orders').where({ user_id: req.userId, status: "continue" }).first();
-
+        const order = await db('orders').where({ user_id: req.userId, status: 'continue' }).first();
         if (order) {
             logger.info('order_sendGift fail', { userId: req.userId, message: 'please finish your continue order.' });
             return res.status(400).json({ success: false, message: 'please finish your continue order.' });
         }
-        // const currencyRate = await db('currency').where('currency_name', (user?.default_currency || 'INR')).first();
-        // const finalAmount = Number(amount) * Number(currencyRate?.user_inr_rate || 1);
-        const final = amount
-        if (user?.balance < Number(final)) {
-            logger.info('order_sendGift fail', { userId: req.userId, message: 'Insufficient balance.' });
-            return res.status(400).json({ success: false, message: 'Insufficient balance.' });
+
+        const giftQuery = db('gifts').whereNull('deleted_at');
+        if (gift_id) giftQuery.where({ id: Number(gift_id) });
+        else giftQuery.where({ name });
+        const gift = await giftQuery.first();
+        if (!gift) {
+            logger.info('order_sendGift fail', { userId: req.userId, message: 'Gift not found.' });
+            return res.status(400).json({ success: false, message: 'Gift not found.' });
         }
-        if (!pandit) {
-            logger.info('order_sendGift fail', { userId: req.userId, pandit_id, message: 'Pandit not found.' });
-            return res.status(400).json({ success: false, message: 'Pandit not found.' });
+
+        const currency = user?.default_currency || 'INR';
+        const amountMap = parseGiftAmountMap(gift.amount);
+        const unitPrice = Number(amountMap?.[currency]);
+        if (!Number.isFinite(unitPrice) || unitPrice <= 0) {
+            logger.info('order_sendGift fail', { userId: req.userId, message: 'Invalid gift price.' });
+            return res.status(400).json({ success: false, message: 'Invalid gift price.' });
         }
-        if (isNaN(final)) {
+
+        const final = Number((unitPrice * quantity).toFixed(2));
+        if (!Number.isFinite(final) || final <= 0) {
             logger.info('order_sendGift fail', { userId: req.userId, message: 'Invalid amount.' });
             return res.status(400).json({ success: false, message: 'Invalid amount.' });
         }
 
-        const panditAmount = (Number(final) * Number(pandit?.gift_share)) / 100
-        await db('pandits').where({ id: pandit.id }).increment({ balance: Number(panditAmount) });
-        await db('users').where({ id: user?.id }).increment({ balance: -Number(final) });
-        await consumeUserOfferRemaining(db, user?.id, final);
-        const newBalance = Number(user.balance) - Number(final)
-        const pandit_new_balance = Number(pandit.balance) + Number(panditAmount)
-        await db('balancelogs').insert({ type: "gift", currency: user?.default_currency, pandit_old_balance: Number(pandit?.balance), pandit_new_balance, user_old_balance: Number(user.balance), user_new_balance: Number(newBalance), user_id: req.userId, message: `Send gift to ${pandit?.display_name} (${name}) - ${qty}`, pandit_id: pandit?.id, pandit_message: `Receive gift from ${user?.name} (${name}) - ${qty}`, pandit_amount: panditAmount, amount: - final, currency: user?.default_currency });
-        logger.info('order_sendGift success', { userId: req.userId, pandit_id, amount: final });
+        const giftName = gift.name;
+        let pandit;
+        let newBalance;
+        let panditAmount;
+        let pandit_new_balance;
 
-        if (is_live) {
-            const currencyData = await db('currency').where({ currency_name: user?.default_currency }).first();
-            console.log("currencyData", currencyData);
-            const balance = await convertCurrency(amount, (currencyData?.user_inr_rate || 1));
-            const symbol = getCurrencySymbolByCurrency(user?.default_currency)
-            console.log("balance", balance);
-            console.log("symbol", symbol);
-            callEvent("emit_to_live_gift_send", {
-                key: `pandit_${pandit_id}`,
-                payload: { name, user_id: req.userId, username: user?.name, avatar: user?.avatar, profile: user?.profile, amount, qty, is_live },
+        await db.transaction(async (trx) => {
+            const lockedUser = await trx('users').where({ id: user.id }).forUpdate().first();
+            if (!lockedUser) throw new Error('USER_NOT_FOUND');
+
+            pandit = await trx('pandits').where({ id: pandit_id }).forUpdate().first();
+            if (!pandit) throw new Error('PANDIT_NOT_FOUND');
+
+            const rows = await trx('users')
+                .where({ id: lockedUser.id })
+                .andWhere('balance', '>=', final)
+                .update({
+                    balance: trx.raw('balance - ?', [final]),
+                });
+            if (!rows) throw new Error('INSUFFICIENT_BALANCE');
+
+            panditAmount = (Number(final) * Number(pandit?.gift_share || 0)) / 100;
+            await trx('pandits').where({ id: pandit.id }).update({
+                balance: trx.raw('balance + ?', [panditAmount]),
             });
 
-            const channel = await db('live_streams').select('channel_id').where({ pandit_id: Number(pandit.id), status: "live" }).first();
+            await consumeUserOfferRemaining(trx, lockedUser.id, final);
+
+            newBalance = Number(lockedUser.balance) - Number(final);
+            pandit_new_balance = Number(pandit.balance) + Number(panditAmount);
+            await trx('balancelogs').insert({
+                type: 'gift',
+                currency,
+                pandit_old_balance: Number(pandit?.balance),
+                pandit_new_balance,
+                user_old_balance: Number(lockedUser.balance),
+                user_new_balance: Number(newBalance),
+                user_id: req.userId,
+                message: `Send gift to ${pandit?.display_name} (${giftName}) - ${quantity}`,
+                pandit_id: pandit?.id,
+                pandit_message: `Receive gift from ${lockedUser?.name} (${giftName}) - ${quantity}`,
+                pandit_amount: panditAmount,
+                amount: -final,
+            });
+        });
+
+        logger.info('order_sendGift success', { userId: req.userId, pandit_id, amount: final, qty: quantity });
+
+        if (is_live) {
+            const currencyData = await db('currency').where({ currency_name: currency }).first();
+            const balance = await convertCurrency(final, (currencyData?.user_inr_rate || 1));
+            const symbol = getCurrencySymbolByCurrency(currency);
+            callEvent('emit_to_live_gift_send', {
+                key: `pandit_${pandit_id}`,
+                payload: {
+                    name: giftName,
+                    user_id: req.userId,
+                    username: user?.name,
+                    avatar: user?.avatar,
+                    profile: user?.profile,
+                    amount: final,
+                    qty: quantity,
+                    is_live,
+                },
+            });
+
+            const channel = await db('live_streams').select('channel_id').where({ pandit_id: Number(pandit.id), status: 'live' }).first();
             const payload = {
                 username: user?.name,
                 profile: user?.profile,
                 avatar: user?.avatar,
-                gift_name: name,
-                amount,
+                gift_name: giftName,
+                amount: final,
                 currency: '₹',
-                channel_id: channel?.channel_id
-            }
+                channel_id: channel?.channel_id,
+            };
 
             if (channel?.channel_id) {
                 const joined_user_ids = await readJoinedUserIds(channel?.channel_id);
-                const base = payload;
                 for (const user_id of joined_user_ids) {
                     const uid = user_id != null && Number.isFinite(Number(user_id)) ? Number(user_id) : null;
                     if (uid != null && Number(uid) != Number(req.userId)) {
-                        callEvent('emit_to_user_send_gift', { key: `user_${uid}`, payload: base });
+                        callEvent('emit_to_user_send_gift', { key: `user_${uid}`, payload });
                     }
                 }
-                payload.amount = balance
-                payload.currency = symbol
-                console.log("payload", payload);
+                payload.amount = balance;
+                payload.currency = symbol;
                 callEvent('emit_to_user_send_gift', { key: `user_${req.userId}`, payload });
             }
         }
-        return res.status(200).json({ success: true, message: 'Order cancel Successfully' });
+        return res.status(200).json({ success: true, message: 'Gift sent successfully' });
     } catch (err) {
+        if (err?.message === 'INSUFFICIENT_BALANCE') {
+            return res.status(400).json({ success: false, message: 'Insufficient balance.' });
+        }
+        if (err?.message === 'PANDIT_NOT_FOUND') {
+            return res.status(400).json({ success: false, message: 'Pandit not found.' });
+        }
+        if (err?.message === 'USER_NOT_FOUND') {
+            return res.status(400).json({ success: false, message: 'User not found.' });
+        }
         logger.error('order_sendGift error', { userId: req.userId, err: err?.message });
         console.error(err);
         res.status(500).json({ success: false, message: 'Server error' });

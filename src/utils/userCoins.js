@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const db = require('../db');
 
 function getIstDateStr(dateInput) {
@@ -240,37 +241,45 @@ async function creditUserCoin(userId, type) {
     });
 }
 
-function parseBoolean(value) {
-    if (value === true || value === 1 || value === '1') return true;
-    if (value === false || value === 0 || value === '0') return false;
-    if (typeof value === 'string') {
-        const v = value.trim().toLowerCase();
-        if (v === 'true') return true;
-        if (v === 'false') return false;
+function getScratchPrizes(settings) {
+    const raw = parseJson(settings?.scratch_card_rewards, [10, 20, 50]);
+    const list = Array.isArray(raw) ? raw : [];
+    const prizes = [];
+    for (const item of list) {
+        if (item == null) continue;
+        if (typeof item === 'number' || (typeof item === 'string' && /^\d+$/.test(item.trim()))) {
+            const coins = Math.round(Number(item));
+            if (coins > 0) prizes.push({ is_coin: true, value: coins });
+            continue;
+        }
+        if (typeof item === 'string' && item.trim().toLowerCase() === 'freeze') {
+            prizes.push({ is_coin: false, value: 1 });
+            continue;
+        }
+        if (typeof item === 'object') {
+            const type = String(item.type || item.prize || '').toLowerCase();
+            if (type === 'freeze' || item.freeze === true) {
+                const freeze = Math.round(Number(item.value || item.freeze || 1));
+                if (freeze > 0) prizes.push({ is_coin: false, value: freeze });
+                continue;
+            }
+            const coins = Math.round(Number(item.coins ?? item.coin ?? item.value));
+            if (coins > 0) prizes.push({ is_coin: true, value: coins });
+        }
     }
-    return null;
+    return prizes.length ? prizes : [
+        { is_coin: true, value: 10 },
+        { is_coin: true, value: 20 },
+        { is_coin: true, value: 50 },
+    ];
 }
 
-async function claimScratchCard(userId, payload = {}) {
-    const isCoin = parseBoolean(payload.is_coin);
-    if (isCoin == null) {
-        const err = new Error('is_coin is required.');
-        err.status = 400;
-        throw err;
-    }
+function pickScratchPrize(prizes) {
+    const index = crypto.randomInt(0, prizes.length);
+    return prizes[index];
+}
 
-    let value = Number(payload.value);
-    if (isCoin) {
-        if (!Number.isFinite(value) || value <= 0) {
-            const err = new Error('value is required.');
-            err.status = 400;
-            throw err;
-        }
-        value = Math.round(value);
-    } else {
-        value = 1;
-    }
-
+async function claimScratchCard(userId) {
     const today = getIstDateStr();
     return db.transaction(async (trx) => {
         const user = await trx('users').where({ id: userId }).forUpdate().select('id', 'coin').first();
@@ -284,12 +293,22 @@ async function claimScratchCard(userId, payload = {}) {
         if (formatDateOnly(row?.scratch_date) === today) {
             return {
                 already: true,
-                is_coin: isCoin,
-                value,
+                is_coin: null,
+                value: 0,
                 coin: Number(user.coin || 0),
                 freeze: Number(row?.freeze || 0),
                 scratch_date: today,
             };
+        }
+
+        const settings = await trx('settings').select('scratch_card_rewards').first();
+        const prize = pickScratchPrize(getScratchPrizes(settings));
+        const isCoin = prize.is_coin;
+        const value = Number(prize.value) || 0;
+        if (value <= 0) {
+            const err = new Error('Scratch card rewards are not configured.');
+            err.status = 400;
+            throw err;
         }
 
         const now = new Date();
@@ -300,7 +319,7 @@ async function claimScratchCard(userId, payload = {}) {
             await trx('users').where({ id: userId }).increment('coin', value);
             coin += value;
         } else {
-            freeze += 1;
+            freeze += value;
         }
 
         if (!row) {

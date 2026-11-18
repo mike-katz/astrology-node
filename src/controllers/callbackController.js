@@ -110,19 +110,19 @@ async function razorpay(req, res) {
         logger.info('razorpay callback req.body', bodyStr);
 
         const signature = req.headers['x-razorpay-signature'];
-        // if (!signature) {
-        //     return res.status(400).send('Missing signature');
-        // }
-        // const gateway = await db('payment_gateways').where('status', true).first();
-        // const webhookSecret = gateway?.credentials?.webhook_secret || process.env.RAZORPAY_WEBHOOK_SECRET || '';
-        // if (!webhookSecret) {
-        //     console.error('Razorpay webhook secret not configured');
-        //     return res.status(500).send('Webhook not configured');
-        // }
-        // const expectedSign = crypto.createHmac('sha256', webhookSecret).update(bodyStr).digest('hex');
-        // if (expectedSign !== signature) {
-        //     return res.status(400).send('Invalid signature');
-        // }
+        if (!signature) {
+            return res.status(400).send('Missing signature');
+        }
+        const gateway = await db('payment_gateways').where('status', true).first();
+        const webhookSecret = gateway?.credentials?.webhook_secret || process.env.RAZORPAY_WEBHOOK_SECRET || '';
+        if (!webhookSecret) {
+            console.error('Razorpay webhook secret not configured');
+            return res.status(500).send('Webhook not configured');
+        }
+        const expectedSign = crypto.createHmac('sha256', webhookSecret).update(bodyStr).digest('hex');
+        if (expectedSign !== signature) {
+            return res.status(400).send('Invalid signature');
+        }
 
         let payload;
         try {
