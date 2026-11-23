@@ -439,6 +439,50 @@ function sequenceBlocksFrom(startYmd) {
     }));
 }
 
+function datesBetween(startYmd, endYmd) {
+    const dates = [];
+    let cursor = startYmd;
+    let guard = 0;
+    while (cursor <= endYmd && guard < 800) {
+        dates.push(cursor);
+        cursor = addDaysYmd(cursor, 1);
+        guard += 1;
+    }
+    return dates;
+}
+
+/**
+ * Streak start for 7/15/30.
+ * Freeze is a total pool: miss anytime is allowed up to `allowance`.
+ * The (allowance + 1)th miss breaks the whole streak and a new start is chosen.
+ * `length` should be the longest milestone window (usually 30).
+ */
+function cycleStart(achievedSet, today, allowance, length) {
+    const achievedDates = [...achievedSet].sort();
+    if (!achievedDates.length || !length) return null;
+    const limit = Math.max(0, Number(allowance) || 0);
+    let start = achievedDates[0];
+    let failed = null;
+    for (let guard = 0; start && guard < 200; guard += 1) {
+        if (!achievedSet.has(start)) {
+            start = achievedDates.find((date) => date > start) || null;
+            continue;
+        }
+        const windowEnd = addDaysYmd(start, length - 1);
+        const spanEnd = today < windowEnd ? today : windowEnd;
+        const missed = datesBetween(start, spanEnd)
+            .filter((date) => !achievedSet.has(date))
+            .sort();
+        if (missed.length <= limit) return start;
+
+        // 5th miss when freeze=4 breaks streak for 7/15/30 together.
+        const breakDay = missed[limit];
+        failed = start;
+        start = achievedDates.find((date) => date > breakDay) || null;
+    }
+    return failed;
+}
+
 function blocksCoveredByFreeze(items, allowance) {
     const limit = Math.max(0, Number(allowance) || 0);
     const accepted = new Set();
@@ -546,9 +590,27 @@ async function awardOrderFreezeSequences(rule, panditId, at) {
     const today = istParts(at).ymd;
     const offer = offerDateKey(rule.offer_date);
     const since = ruleSince(rule);
-    const startYmd = offer || await firstOrderDay(panditId, rule.from_time, rule.to_time, minimum, since);
-    if (!startYmd) return;
     const allowance = Number(rule.freeze) || 0;
+    const seqLengths = sequences.map((step) => Number(step.days)).filter((days) => days > 0);
+    const longest = seqLengths.length ? Math.max(...seqLengths) : 30;
+
+    let startYmd = offer || null;
+    if (!startYmd) {
+        const first = await firstOrderDay(panditId, rule.from_time, rule.to_time, minimum, since);
+        if (!first || first > today) return;
+        const allAchieved = await achievedOrderDays(
+            panditId,
+            datesBetween(first, today),
+            rule.from_time,
+            rule.to_time,
+            minimum,
+            since,
+        );
+        // Same freeze-break rule as live: 5th miss when freeze=4 resets 7/15/30 together.
+        startYmd = cycleStart(allAchieved, today, allowance, longest);
+    }
+    if (!startYmd) return;
+
     const blocks = new Map(sequenceBlocksFrom(startYmd).map((block) => [block.days, block]));
     const prepared = [];
     for (const step of sequences) {
