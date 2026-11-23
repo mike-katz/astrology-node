@@ -316,11 +316,96 @@ async function razorpay(req, res) {
     }
 }
 
-async function xpay(req, res) {
-    logger.info('xpay callback start body', req.body);
-    logger.info('xpay callback start query', req.query);
-    const { eventType, intentId, status, receiptId } = req.body
+const XPAY_WEBHOOK_ECDSA_PUBLIC_KEY = (
+    process.env.XPAY_WEBHOOK_PUBLIC_KEY
+    || 'MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEBlXbsIwGSYhdXBOtdrZr3L346JXi3dOg8vP9NCcTOV0ucLVl/GPi2ZVMsdBISQKTGIhzXY/gddRl846C27TfPw=='
+);
+
+function getXpayRawBody(req) {
+    if (Buffer.isBuffer(req.rawBody)) return req.rawBody.toString('utf8');
+    if (typeof req.rawBody === 'string') return req.rawBody;
+    if (Buffer.isBuffer(req.body)) return req.body.toString('utf8');
+    if (typeof req.body === 'string') return req.body;
+    if (req.body != null) return JSON.stringify(req.body);
+    return '';
+}
+
+function verifyXpayHmacSignature(incomingSignature, payload, secret) {
+    if (!incomingSignature || !secret) return false;
+    const hmac = crypto.createHmac('sha512', secret);
+    hmac.update(payload, 'utf8');
+    const generated = hmac.digest('base64');
+    const a = Buffer.from(String(incomingSignature));
+    const b = Buffer.from(generated);
+    if (a.length !== b.length) return false;
+    return crypto.timingSafeEqual(a, b);
+}
+
+function verifyXpayEcdsaSignature(incomingSignature, payload, publicKeyBase64) {
+    if (!incomingSignature || !publicKeyBase64) return false;
     try {
+        const lines = String(publicKeyBase64).match(/.{1,64}/g) || [];
+        const publicKeyPem = `-----BEGIN PUBLIC KEY-----\n${lines.join('\n')}\n-----END PUBLIC KEY-----`;
+        const verifier = crypto.createVerify('SHA256');
+        verifier.update(payload, 'utf8');
+        verifier.end();
+        return verifier.verify(publicKeyPem, Buffer.from(incomingSignature, 'base64'));
+    } catch (err) {
+        logger.info('xpay ecdsa verify error', err?.message || err);
+        return false;
+    }
+}
+
+function verifyXpayWebhook(req) {
+    const payload = getXpayRawBody(req);
+    if (!payload) return { ok: false, reason: 'Missing request body' };
+
+    const hmacSignature = req.headers['xpay-signature'];
+    const ecdsaSignature = req.headers['xpay-private-signature'];
+    const signingKey = process.env.XPAY_WEBHOOK_SECRET || process.env.XPAY_SIGNING_KEY || process.env.XPAY_SECRET_KEY ||'';
+
+    if (hmacSignature) {
+        if (!signingKey) {
+            return { ok: false, reason: 'XPAY_WEBHOOK_SECRET / XPAY_SIGNING_KEY not configured' };
+        }
+        if (!verifyXpayHmacSignature(hmacSignature, payload, signingKey)) {
+            return { ok: false, reason: 'Invalid xpay-signature' };
+        }
+        return { ok: true, method: 'hmac', payload };
+    }
+
+    if (ecdsaSignature) {
+        if (!verifyXpayEcdsaSignature(ecdsaSignature, payload, XPAY_WEBHOOK_ECDSA_PUBLIC_KEY)) {
+            return { ok: false, reason: 'Invalid xpay-private-signature' };
+        }
+        return { ok: true, method: 'ecdsa', payload };
+    }
+
+    return { ok: false, reason: 'Missing xpay-signature or xpay-private-signature' };
+}
+
+async function xpay(req, res) {
+    logger.info('xpay callback start query', req.query);
+    logger.info('xpay callback start headers', req.headers);
+    try {
+        const verified = verifyXpayWebhook(req);
+        if (!verified.ok) {
+            logger.info('xpay callback signature failed', verified.reason);
+            return res.status(401).json({ success: false, message: verified.reason || 'Invalid signature' });
+        }
+        logger.info('xpay callback signature ok', verified.method);
+
+        let body = req.body;
+        if (Buffer.isBuffer(body) || typeof body === 'string') {
+            try {
+                body = JSON.parse(verified.payload);
+            } catch (_) {
+                return res.status(400).json({ success: false, message: 'Invalid JSON' });
+            }
+        }
+        logger.info('xpay callback start body', body);
+
+        const { eventType, intentId, status, receiptId } = body || {};
         if (status == 'FAILED') {
             const paymentRow = await db('payments')
                 .where({ order_id: intentId })
@@ -449,8 +534,7 @@ async function xpay(req, res) {
         });
         logger.info('xpay callback end');
         return res.status(200).json({ success: true, message: 'Payment success updated' });
-    }
-    catch (err) {
+    } catch (err) {
         logger.info('xpay callback error catch', err);
         console.error('xpay callback:', err);
         res.status(500).json({ success: false, message: 'Server error' });

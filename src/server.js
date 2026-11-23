@@ -52,8 +52,6 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
 app.use('/callback', callBackRoutes);
-app.use('/voice', twilloVoiceRoutes);
-app.use('/twilio', twilioRoutes);
 app.use('/newKundli', freeKundliRoutes);
 
 app.use(decryptRequest);

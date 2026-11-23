@@ -1051,13 +1051,17 @@ async function sendGift(req, res) {
 
         const currency = user?.default_currency || 'INR';
         const amountMap = parseGiftAmountMap(gift.amount);
-        const unitPrice = Number(amountMap?.[currency]);
-        if (!Number.isFinite(unitPrice) || unitPrice <= 0) {
+        const localUnit = Number(amountMap?.[currency]);
+        if (!Number.isFinite(localUnit) || localUnit <= 0) {
             logger.info('order_sendGift fail', { userId: req.userId, message: 'Invalid gift price.' });
             return res.status(400).json({ success: false, message: 'Invalid gift price.' });
         }
 
-        const final = Number((unitPrice * quantity).toFixed(2));
+        // Wallet is INR. Gift list shows local amount and inr_amount = local * user_inr_rate.
+        const currencyData = await db('currency').where({ currency_name: currency }).select('user_inr_rate').first();
+        const userInrRate = Number(currencyData?.user_inr_rate || 1) || 1;
+        const unitInr = Number((localUnit * userInrRate).toFixed(2));
+        const final = Number((unitInr * quantity).toFixed(2));
         if (!Number.isFinite(final) || final <= 0) {
             logger.info('order_sendGift fail', { userId: req.userId, message: 'Invalid amount.' });
             return res.status(400).json({ success: false, message: 'Invalid amount.' });
@@ -1112,8 +1116,7 @@ async function sendGift(req, res) {
         logger.info('order_sendGift success', { userId: req.userId, pandit_id, amount: final, qty: quantity });
 
         if (is_live) {
-            const currencyData = await db('currency').where({ currency_name: currency }).first();
-            const balance = await convertCurrency(final, (currencyData?.user_inr_rate || 1));
+            const localDisplayAmount = convertCurrency(final, userInrRate);
             const symbol = getCurrencySymbolByCurrency(currency);
             callEvent('emit_to_live_gift_send', {
                 key: `pandit_${pandit_id}`,
@@ -1145,10 +1148,10 @@ async function sendGift(req, res) {
                 for (const user_id of joined_user_ids) {
                     const uid = user_id != null && Number.isFinite(Number(user_id)) ? Number(user_id) : null;
                     if (uid != null && Number(uid) != Number(req.userId)) {
-                        callEvent('emit_to_user_send_gift', { key: `user_${uid}`, payload });
+                        callEvent('emit_to_user_send_gift', { key: `user_${uid}`, payload: { ...payload } });
                     }
                 }
-                payload.amount = balance;
+                payload.amount = localDisplayAmount;
                 payload.currency = symbol;
                 callEvent('emit_to_user_send_gift', { key: `user_${req.userId}`, payload });
             }
