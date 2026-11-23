@@ -134,7 +134,7 @@ async function initXpayPayment({ user, userId, amount, currencyRate, from, pooja
 
     const { dbAmount, dbGst, dbCurrency, gatewayAmountMinor, gatewayCurrency } = buildRechargeAmounts(amount, currencyRate, { skipGst: !!pooja_id });
     const receiptId = `rcpt_${userId}_${Date.now()}`;
-    const contactNumber = `${user.country_code || '+91'}${user.mobile}`;
+    const contactNumber = `${user?.country_code || '+91'}${user?.mobile}`;
     const { data: intent } = await axios.post(
         `${getXpayBaseUrl()}/payments/create-intent`,
         {
@@ -144,11 +144,11 @@ async function initXpayPayment({ user, userId, amount, currencyRate, from, pooja
             callbackUrl,
             cancelUrl: cancelUrl || callbackUrl,
             customerDetails: {
-                name: user.name || 'Customer',
-                email: user.email || `user${user.id}@astroguruji.com`,
+                name: user?.name || 'Customer',
+                email: user?.email || `user${user?.id}@astroguruji.com`,
                 contactNumber,
             },
-            customerReferenceId: String(user.id),
+            customerReferenceId: String(user?.id),
             description: 'Wallet recharge',
             metadata: {
                 user_id: String(userId),
