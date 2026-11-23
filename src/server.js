@@ -49,8 +49,15 @@ app.get("/health", (req, res) => {
     res.status(200).send("user OK");
 });
 app.use(express.urlencoded({ extended: true }));
-app.use(express.json());
 
+app.use(express.json({
+    verify: (req, res, buf) => {
+        const url = req.originalUrl || req.url || '';
+        if (url.startsWith('/callback/xpay') || url.startsWith('/callback/razorpay')) {
+            req.rawBody = buf;
+        }
+    },
+}));
 app.use('/callback', callBackRoutes);
 app.use('/newKundli', freeKundliRoutes);
 
