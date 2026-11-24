@@ -6,6 +6,7 @@ const generateInvoicePDF = require('../utils/generatepdf');
 const { callEvent } = require('../socket');
 const path = require('path');
 const { emitCallDurationUpdate } = require('../callSocket');
+const { upgradeUserRateMultiplier } = require('../utils/rateMultiplier');
 const logger = require('log4js').getLogger(path.parse(__filename).name);
 
 function numberToIndianWords(amount) {
@@ -233,6 +234,7 @@ async function razorpay(req, res) {
         });
         const amount = paymentRow?.offer_amount > 0 ? paymentRow?.offer_amount : paymentRow?.amount
         await db('users').where({ id: user.id }).increment({ balance: Number(Number(amount) + Number(extra)), offer_amount: Number(paymentRow?.offer_amount || 0) });
+        await upgradeUserRateMultiplier(user.id, paymentRow?.amount);
 
         if (extra > 0) {
             await db('balancelogs').insert({
@@ -495,6 +497,7 @@ async function xpay(req, res) {
 
         const amount = paymentRow?.offer_amount > 0 ? paymentRow?.offer_amount : paymentRow?.amount
         await db('users').where({ id: user.id }).increment({ balance: Number(Number(amount) + Number(extra)), offer_amount: Number(paymentRow?.offer_amount || 0) });
+        await upgradeUserRateMultiplier(user.id, paymentRow?.amount);
 
         if (extra > 0) {
             await db('balancelogs').insert({

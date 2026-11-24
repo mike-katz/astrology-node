@@ -11,6 +11,7 @@ const { uploadImageToAzure, deleteFileFromAzure } = require('../utils/azureUploa
 const { sendSMS, verifySMS } = require('./authController');
 const { getClientIp } = require('../utils/getClientIp');
 const { getCurrencyByCountry, getCurrencySymbolByCurrency } = require('../utils/countryCurrencyMap');
+const { getUserRateMultiplier, applyRateMultiplier } = require('../utils/rateMultiplier');
 const geoip = require('geoip-lite');
 
 const PANDIT_LIST_MAX = 150;
@@ -155,13 +156,14 @@ function excludePanditIds(query, excludeIds) {
     return query;
 }
 
-function formatPanditResults(user, currency, currencyData) {
+function formatPanditResults(user, currency, currencyData, rateMultiplier = 1) {
     const symbol = getCurrencySymbolByCurrency(currency);
+    const multiplier = getUserRateMultiplier(rateMultiplier);
     return user.map(item => {
         item.currency = symbol;
-        item.chat_call_rate = convertCurrency(item.chat_call_rate, (currencyData?.pandit_inr_rate || 1));
-        item.discounted_chat_call_rate = convertCurrency(item.discounted_chat_call_rate, (currencyData?.pandit_inr_rate || 1));
-        item.final_chat_call_rate = convertCurrency(item.final_chat_call_rate, (currencyData?.pandit_inr_rate || 1));
+        item.chat_call_rate = convertCurrency(applyRateMultiplier(item.chat_call_rate, multiplier), (currencyData?.pandit_inr_rate || 1));
+        item.discounted_chat_call_rate = convertCurrency(applyRateMultiplier(item.discounted_chat_call_rate, multiplier), (currencyData?.pandit_inr_rate || 1));
+        item.final_chat_call_rate = convertCurrency(applyRateMultiplier(item.final_chat_call_rate, multiplier), (currencyData?.pandit_inr_rate || 1));
         item.govt_id = item?.govt_id ? deepParse(item?.govt_id) : [];
         item.available_for = item?.available_for ? deepParse(item?.available_for) : [];
         item.languages = item?.languages ? deepParse(item?.languages) : [];
@@ -209,6 +211,7 @@ async function getPandits(req, res) {
         }
         const authHeader = req.headers.authorization;
         let isFree = false
+        let rateMultiplier = 1
         if (authHeader) {
             const token = authHeader?.split(' ')[1];
             if (token) {
@@ -225,11 +228,12 @@ async function getPandits(req, res) {
                             .where({ user_id: Number(userId) })
                             .whereIn('status', ['continue', 'completed', 'pending']);
                         isFree = count == 0 ? true : false;
-                        const userData = await db('users').select('language', 'default_currency').where({ id: Number(userId) }).first();
+                        const userData = await db('users').select('language', 'default_currency', 'rate_multiplier').where({ id: Number(userId) }).first();
                         console.log("userData", userData?.default_currency);
                         if (userData?.default_currency) {
                             currency = userData.default_currency
                         }
+                        rateMultiplier = getUserRateMultiplier(userData);
                         if (isFree) {
                             language = userData?.language ? deepParse(userData?.language) : [] || []
                         }
@@ -354,7 +358,7 @@ async function getPandits(req, res) {
         const totalPages = Math.ceil(total / limit);
 
         console.log("currency", currency);
-        user = formatPanditResults(user, currency, currencyData);
+        user = formatPanditResults(user, currency, currencyData, rateMultiplier);
         const response = {
             page,
             limit,
@@ -453,6 +457,7 @@ async function getPanditDetail(req, res) {
         user.chat = true
     }
     user.online = user?.chat || user?.call ? true : false;
+    let rateMultiplier = 1;
     const authHeader = req.headers.authorization;
     // console.log("authHeader", authHeader);
     if (authHeader && authHeader.startsWith('Bearer ')) {
@@ -462,10 +467,11 @@ async function getPanditDetail(req, res) {
         // console.log("verified", verified);
         if (verified?.userId) {
             const follow = await db('follows').where({ 'pandit_id': user?.id, 'user_id': verified?.userId }).first();
-            const userDetail = await db('users').where({ 'id': Number(verified?.userId) }).select('default_currency').first();
+            const userDetail = await db('users').where({ 'id': Number(verified?.userId) }).select('default_currency', 'rate_multiplier').first();
             if (userDetail?.default_currency) {
                 currency = userDetail.default_currency
             }
+            rateMultiplier = getUserRateMultiplier(userDetail);
             // console.log("user", user);
             if (follow) {
                 response.isFollow = true
@@ -475,9 +481,9 @@ async function getPanditDetail(req, res) {
 
     const currencyData = await db('currency').select('currency_name', 'pandit_inr_rate').where({ currency_name: currency || 'INR' }).first();
     if (currencyData) {
-        response.chat_call_rate = convertCurrency(user.chat_call_rate, (currencyData?.pandit_inr_rate || 1));
-        response.discounted_chat_call_rate = convertCurrency(user.discounted_chat_call_rate, (currencyData?.pandit_inr_rate || 1));
-        response.final_chat_call_rate = convertCurrency(user.final_chat_call_rate, (currencyData?.pandit_inr_rate || 1));
+        response.chat_call_rate = convertCurrency(applyRateMultiplier(user.chat_call_rate, rateMultiplier), (currencyData?.pandit_inr_rate || 1));
+        response.discounted_chat_call_rate = convertCurrency(applyRateMultiplier(user.discounted_chat_call_rate, rateMultiplier), (currencyData?.pandit_inr_rate || 1));
+        response.final_chat_call_rate = convertCurrency(applyRateMultiplier(user.final_chat_call_rate, rateMultiplier), (currencyData?.pandit_inr_rate || 1));
     }
     const rate = currencyData?.pandit_inr_rate || 1;
     const symbol = getCurrencySymbolByCurrency(currency)
@@ -486,8 +492,8 @@ async function getPanditDetail(req, res) {
         id: item.id,
         remedy_id: item.remedy_id,
         name: item.name,
-        amount: convertCurrency(item.amount, rate),
-        discount: convertCurrency(item.discount || 0, rate),
+        amount: convertCurrency(applyRateMultiplier(item.amount, rateMultiplier), rate),
+        discount: convertCurrency(applyRateMultiplier(item.discount || 0, rateMultiplier), rate),
         currency: symbol,
         total_orders: Number(item.total_orders || 0),
         pooja_type: item.pooja_type,

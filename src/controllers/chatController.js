@@ -5,6 +5,7 @@ const logger = require('log4js').getLogger(path.parse(__filename).name);
 const axios = require('axios');
 const { convertCurrency } = require('../utils/decodeJWT');
 const { getCurrencySymbolByCurrency } = require('../utils/countryCurrencyMap');
+const { getUserRateMultiplier, applyRateMultiplier } = require('../utils/rateMultiplier');
 
 const { callEvent } = require("../socket");
 const { channelLeave, geneateToken } = require('./agoraController');
@@ -1057,8 +1058,10 @@ async function newCreateOrder(req, res) {
         //     .whereIn('status', ['continue', 'completed', 'pending']);
 
         const currencyData = await db('currency').select('currency_name', 'user_inr_rate', 'pandit_inr_rate').where({ currency_name: user?.default_currency }).first();
+        const rateMultiplier = getUserRateMultiplier(user);
         let panditRate = convertCurrency(pandit?.final_chat_call_rate, (currencyData?.pandit_inr_rate || 1));
         panditRate = Number(panditRate) * Number(currencyData?.user_inr_rate || 1)
+        panditRate = applyRateMultiplier(panditRate, rateMultiplier);
         const userBalance = user?.balance
 
         let duration = Math.floor(Number(Number(userBalance)) / Number(panditRate));

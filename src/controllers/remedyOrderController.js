@@ -5,6 +5,7 @@ const { callEvent } = require('../socket');
 const { RtcTokenBuilder, RtcRole } = require('agora-access-token');
 const { getCurrencySymbolByCurrency } = require('../utils/countryCurrencyMap');
 const { consumeUserOfferRemaining } = require('../utils/userOfferBalance');
+const { getUserRateMultiplier, applyRateMultiplier } = require('../utils/rateMultiplier');
 require('dotenv').config();
 
 const AGORA_APP_ID = process.env.AGORA_APP_ID;
@@ -475,11 +476,24 @@ async function createOrder(req, res) {
             ashirvadAmtInr = Number(setting?.ashirvad_price || 0);
         }
 
-        // wallet cut: (inr / pandit_inr_rate) * user_inr_rate
-        const finalCharge = calculateUserChargeAmount(finalAmountInr, panditInrRate, userInrRate);
-        const ashirvadCharge = calculateUserChargeAmount(ashirvadAmtInr, panditInrRate, userInrRate);
-        const amt = calculateUserChargeAmount(amount, panditInrRate, userInrRate);
-        const less = calculateUserChargeAmount(discount, panditInrRate, userInrRate);
+        // wallet cut: (inr / pandit_inr_rate) * user_inr_rate, then user rate multiplier
+        const rateMultiplier = getUserRateMultiplier(user);
+        const finalCharge = applyRateMultiplier(
+            calculateUserChargeAmount(finalAmountInr, panditInrRate, userInrRate),
+            rateMultiplier
+        );
+        const ashirvadCharge = applyRateMultiplier(
+            calculateUserChargeAmount(ashirvadAmtInr, panditInrRate, userInrRate),
+            rateMultiplier
+        );
+        const amt = applyRateMultiplier(
+            calculateUserChargeAmount(amount, panditInrRate, userInrRate),
+            rateMultiplier
+        );
+        const less = applyRateMultiplier(
+            calculateUserChargeAmount(discount, panditInrRate, userInrRate),
+            rateMultiplier
+        );
         const totalCharge = Number(finalCharge) + Number(ashirvadCharge);
 
         if (Number(user?.balance) < totalCharge) {

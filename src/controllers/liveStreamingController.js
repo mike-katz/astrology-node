@@ -9,6 +9,7 @@ const { channelLeave, geneateToken } = require('./agoraController');
 const { balanceCut } = require('./chatController');
 const { getCurrencySymbolByCurrency } = require('../utils/countryCurrencyMap');
 const { convertCurrency } = require('../utils/decodeJWT');
+const { getUserRateMultiplier, applyRateMultiplier } = require('../utils/rateMultiplier');
 
 require('dotenv').config();
 
@@ -216,9 +217,10 @@ async function listLive(req, res) {
         const data = await Promise.all(
             rows.map(async (r) => {
                 const isFollow = followData.find(i => i.pandit_id == r.pandit_id);
-                const userCurrency = await db('users').where({ id: Number(req.userId) }).select('default_currency').first();
+                const userCurrency = await db('users').where({ id: Number(req.userId) }).select('default_currency', 'rate_multiplier').first();
                 const currency = await getCurrencySymbolByCurrency(userCurrency?.default_currency || "INR");
                 const currencyData = await db('currency').select('currency_name', 'pandit_inr_rate').where({ currency_name: userCurrency?.default_currency || 'INR' }).first();
+                const rateMultiplier = getUserRateMultiplier(userCurrency);
 
                 return {
                     channel_id: r.channel_id,
@@ -240,8 +242,10 @@ async function listLive(req, res) {
                         rating_3: r.rating_3,
                         rating_4: r.rating_4,
                         rating_5: r.rating_5,
-                        final_chat_call_rate: convertCurrency(r.final_chat_call_rate, (currencyData?.pandit_inr_rate || 1)),
-                        // final_chat_call_rate: r.final_chat_call_rate,
+                        final_chat_call_rate: convertCurrency(
+                            applyRateMultiplier(r.final_chat_call_rate, rateMultiplier),
+                            (currencyData?.pandit_inr_rate || 1)
+                        ),
                         currency
                     }
                 };
@@ -573,8 +577,10 @@ async function createMediaOrder(req, res) {
             }
         }
         const currencyData = await db('currency').select('currency_name', 'user_inr_rate', 'pandit_inr_rate').where({ currency_name: user?.default_currency || "INR" }).first();
+        const rateMultiplier = getUserRateMultiplier(user);
         let panditRate = convertCurrency(pandit?.final_chat_call_rate, (currencyData?.pandit_inr_rate || 1));
         panditRate = Number(panditRate) * Number(currencyData?.user_inr_rate || 1)
+        panditRate = applyRateMultiplier(panditRate, rateMultiplier);
         const userBalance = user?.balance
 
         let duration = Math.floor(Number(Number(userBalance)) / Number(panditRate));

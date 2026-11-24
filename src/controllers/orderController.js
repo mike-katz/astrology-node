@@ -13,6 +13,7 @@ const { convertCurrency } = require('../utils/decodeJWT');
 const { getCurrencySymbolByCurrency } = require('../utils/countryCurrencyMap');
 const { consumeUserOfferRemaining } = require('../utils/userOfferBalance');
 const { addOrderLog } = require('../utils/orderLog');
+const { getUserRateMultiplier, applyRateMultiplier } = require('../utils/rateMultiplier');
 
 async function sendAutoMessage(profile, userId, orderId, panditId) {
     const panditIdNum = panditId != null && panditId !== '' ? Number(panditId) : null;
@@ -1060,7 +1061,8 @@ async function sendGift(req, res) {
         // Wallet is INR. Gift list shows local amount and inr_amount = local * user_inr_rate.
         const currencyData = await db('currency').where({ currency_name: currency }).select('user_inr_rate').first();
         const userInrRate = Number(currencyData?.user_inr_rate || 1) || 1;
-        const unitInr = Number((localUnit * userInrRate).toFixed(2));
+        const rateMultiplier = getUserRateMultiplier(user);
+        const unitInr = applyRateMultiplier(Number((localUnit * userInrRate).toFixed(2)), rateMultiplier);
         const final = Number((unitInr * quantity).toFixed(2));
         if (!Number.isFinite(final) || final <= 0) {
             logger.info('order_sendGift fail', { userId: req.userId, message: 'Invalid amount.' });

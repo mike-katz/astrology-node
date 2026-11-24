@@ -11,6 +11,7 @@ const { getCurrencySymbolByCurrency, getCurrencyIconByCurrency } = require('../u
 const { notifyPanditsOnNewUserProfile } = require('../utils/newUserPanditNotify');
 const { createUniqueReferralCode } = require('../utils/referral');
 const { creditUserCoin, claimScratchCard, getIstDateStr, formatDateOnly, daysBetween } = require('../utils/userCoins');
+const { getUserRateMultiplier, applyRateMultiplier } = require('../utils/rateMultiplier');
 
 async function makeAvtarString(user, gender) {
     if (!user || !gender) return null;
@@ -205,7 +206,7 @@ async function updateProfile(req, res) {
 async function getBalance(req, res) {
     const user = await db('users')
         .where('id', req?.userId)
-        .select('balance', 'default_currency', 'permanent_currency', 'offer_amount')
+        .select('balance', 'default_currency', 'permanent_currency', 'offer_amount', 'rate_multiplier')
         .first();
     if (!user) return res.status(400).json({ success: false, message: 'Please enter correct user.' });
     const currency = user?.default_currency
@@ -215,6 +216,7 @@ async function getBalance(req, res) {
     user.balance = balance;
     const symbol = getCurrencySymbolByCurrency(currency)
     user.currency = symbol;
+    user.rate_multiplier = getUserRateMultiplier(user);
 
     return res.status(200).json({ success: true, data: user, message: 'Profile get Successfully' });
 }
@@ -988,8 +990,9 @@ async function updateCurrency(req, res) {
 
 async function getGiftList(req, res) {
     try {
-        const userDetail = await db('users').where({ id: Number(req.userId) }).select('default_currency').first();
+        const userDetail = await db('users').where({ id: Number(req.userId) }).select('default_currency', 'rate_multiplier').first();
         const currency = userDetail?.default_currency || 'INR'
+        const rateMultiplier = getUserRateMultiplier(userDetail);
         let result = await db('gifts')
             .whereRaw("(amount::jsonb)->>? IS NOT NULL", [currency])
             .whereNull('deleted_at')
@@ -999,9 +1002,12 @@ async function getGiftList(req, res) {
             const rate = await db('currency').where({ currency_name: currency }).select('user_inr_rate').first();
             result.map(item => {
                 const amount = JSON.parse(item?.amount);
-                item.amount = Number(amount[currency])
+                item.amount = applyRateMultiplier(Number(amount[currency]), rateMultiplier)
                 item.currency = symbol
-                item.inr_amount = Number(amount[currency]) * Number(rate?.user_inr_rate || 1)
+                item.inr_amount = applyRateMultiplier(
+                    Number(amount[currency]) * Number(rate?.user_inr_rate || 1),
+                    rateMultiplier
+                )
             })
         }
         return res.status(200).json({

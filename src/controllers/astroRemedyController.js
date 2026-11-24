@@ -2,12 +2,19 @@ const db = require('../db');
 const { deepParse, convertCurrency } = require('../utils/decodeJWT');
 const { createOrder } = require('./remedyOrderController');
 const { getCurrencySymbolByCurrency } = require('../utils/countryCurrencyMap');
+const { getUserRateMultiplier, applyRateMultiplier } = require('../utils/rateMultiplier');
 require('dotenv').config();
 
 async function resolveUserCurrency(req) {
     if (!req.userId) return 'INR';
     const userData = await db('users').select('default_currency').where({ id: Number(req.userId) }).first();
     return userData?.default_currency || 'INR';
+}
+
+async function resolveUserRateMultiplier(req) {
+    if (!req.userId) return 1;
+    const userData = await db('users').select('rate_multiplier').where({ id: Number(req.userId) }).first();
+    return getUserRateMultiplier(userData);
 }
 
 function getFirstImage(image) {
@@ -109,6 +116,7 @@ async function getRemedyItems(req, res) {
         }
 
         const currency = await resolveUserCurrency(req);
+        const rateMultiplier = await resolveUserRateMultiplier(req);
         const currencyData = await db('currency')
             .select('currency_name', 'user_inr_rate', 'pandit_inr_rate')
             .where({ currency_name: currency })
@@ -159,8 +167,8 @@ async function getRemedyItems(req, res) {
             id: item.id,
             remedy_id: item.remedy_id,
             name: item.name,
-            amount: convertCurrency(item.amount, rate),
-            discount: convertCurrency(item.discount || 0, rate),
+            amount: convertCurrency(applyRateMultiplier(item.amount, rateMultiplier), rate),
+            discount: convertCurrency(applyRateMultiplier(item.discount || 0, rateMultiplier), rate),
             currency: symbol,
             total_orders: Number(item.total_orders || 0),
             pooja_type: item.pooja_type,
@@ -239,6 +247,7 @@ async function getRemedyDetail(req, res) {
         }
 
         const currency = await resolveUserCurrency(req);
+        const rateMultiplier = await resolveUserRateMultiplier(req);
         const currencyData = await db('currency')
             .select('currency_name', 'user_inr_rate', 'pandit_inr_rate')
             .where({ currency_name: currency })
@@ -300,8 +309,8 @@ async function getRemedyDetail(req, res) {
         if (Array.isArray(priceArray)) {
             priceArray = priceArray.map((p) => ({
                 ...p,
-                amount: convertCurrency(p?.amount || 0, rate),
-                discount: convertCurrency(p?.discount || 0, rate),
+                amount: convertCurrency(applyRateMultiplier(p?.amount || 0, rateMultiplier), rate),
+                discount: convertCurrency(applyRateMultiplier(p?.discount || 0, rateMultiplier), rate),
             }));
         } else {
             priceArray = item.price_array;
@@ -314,8 +323,8 @@ async function getRemedyDetail(req, res) {
             remedy_image: item.remedy_image,
             remedy_tag: item.remedy_tag,
             name: item.name,
-            amount: convertCurrency(item.amount, rate),
-            discount: convertCurrency(item.discount || 0, rate),
+            amount: convertCurrency(applyRateMultiplier(item.amount, rateMultiplier), rate),
+            discount: convertCurrency(applyRateMultiplier(item.discount || 0, rateMultiplier), rate),
             currency: symbol,
             tag: deepParse(item.tag),
             duration: item.duration,
