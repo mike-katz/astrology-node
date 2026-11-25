@@ -72,15 +72,34 @@ function deepParse(input) {
     return result;
 }
 
+/** Always return money with max 2 decimal places. */
+function roundMoney(value) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return 0;
+    return Number(n.toFixed(2));
+}
+
 function convertCurrency(amount, rate) {
-    return Number((Number(amount) / Number(rate)).toFixed(2));
+    const r = Number(rate);
+    return roundMoney(Number(amount || 0) / (Number.isFinite(r) && r !== 0 ? r : 1));
 }
 
 /** User wallet cut: (inrAmount / pandit_inr_rate) * user_inr_rate */
 function calculateUserChargeAmount(inrAmount, panditInrRate, userInrRate) {
     const pRate = Number(panditInrRate) || 1;
     const uRate = Number(userInrRate) || 1;
-    return Number(((Number(inrAmount || 0) / pRate) * uRate).toFixed(2));
+    return roundMoney((Number(inrAmount || 0) / pRate) * uRate);
+}
+
+/** Round known money keys on an object (mutates and returns). */
+function roundMoneyFields(obj, fields = []) {
+    if (!obj || typeof obj !== 'object') return obj;
+    for (const key of fields) {
+        if (obj[key] != null && obj[key] !== '') {
+            obj[key] = roundMoney(obj[key]);
+        }
+    }
+    return obj;
 }
 
 const generateLoginResponse = async (existing, currency) => {
@@ -122,4 +141,15 @@ const generateLoginResponse = async (existing, currency) => {
     }
 }
 
-module.exports = { decodeJWT, checkOrders, socketParseEventData, isValidMobile, deepParse, convertCurrency, calculateUserChargeAmount, generateLoginResponse };
+module.exports = {
+    decodeJWT,
+    checkOrders,
+    socketParseEventData,
+    isValidMobile,
+    deepParse,
+    roundMoney,
+    convertCurrency,
+    calculateUserChargeAmount,
+    roundMoneyFields,
+    generateLoginResponse,
+};

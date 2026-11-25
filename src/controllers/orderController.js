@@ -9,7 +9,7 @@ const { callEvent } = require("../socket");
 const { channelLeave } = require('./agoraController');
 const { replaceTemplate } = require('../utils/replaceTemplate');
 const { readJoinedUserIds, emitLiveChatMessage } = require('./liveStreamingController');
-const { convertCurrency } = require('../utils/decodeJWT');
+const { convertCurrency, roundMoney } = require('../utils/decodeJWT');
 const { getCurrencySymbolByCurrency } = require('../utils/countryCurrencyMap');
 const { consumeUserOfferRemaining } = require('../utils/userOfferBalance');
 const { addOrderLog } = require('../utils/orderLog');
@@ -256,7 +256,7 @@ async function create(req, res) {
         if (token) {
             const waiting_time = pandit?.waiting_time == null ? true : false
 
-            const resposne = await sendNotification(token, user?.name, pandit?.final_chat_call_rate, panditId, type, waiting_time)
+            const resposne = await sendNotification(token, user?.name, roundMoney(pandit?.final_chat_call_rate), panditId, type, waiting_time)
             logger.info('resposne', resposne)
         }
         // socket.emit("emit_to_user_for_register", {
@@ -401,7 +401,7 @@ async function createFreeChat(req, res) {
 
         const notificationPromises = (panditRecords || [])
             .filter((p) => p?.token)
-            .map((p) => sendNotification(p.token, user?.name, settings?.free_chat_amount_per_minute, p.id, type, p.waiting_time == null, true));
+            .map((p) => sendNotification(p.token, user?.name, roundMoney(settings?.free_chat_amount_per_minute), p.id, type, p.waiting_time == null, true));
         if (notificationPromises.length) await Promise.all(notificationPromises);
 
         sendAutoMessage(profile, req.userId, orderId);
@@ -438,7 +438,7 @@ async function sendNotification(token, username, chat_call_rate, panditId, type,
 
         const messages = replaceTemplate(template?.title, {
             user_name: username,
-            pandit_rate: chat_call_rate
+            pandit_rate: roundMoney(chat_call_rate)
         })
         logger.info("messages", messages);
         if (token) {

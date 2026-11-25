@@ -7,7 +7,7 @@ require('dotenv').config();
 const generateInvoicePDF = require('../utils/generatepdf');
 const Razorpay = require('razorpay');
 const axios = require('axios');
-const { convertCurrency } = require('../utils/decodeJWT');
+const { convertCurrency, roundMoney } = require('../utils/decodeJWT');
 const { getCurrencySymbolByCurrency } = require('../utils/countryCurrencyMap');
 
 function numberToIndianWords(amount) {
@@ -86,10 +86,6 @@ function getXpayBaseUrl() {
 function normalizePoojaId(pooja_id) {
     if (pooja_id === undefined || pooja_id === null || String(pooja_id).trim() === '') return null;
     return pooja_id;
-}
-
-function roundMoney(value) {
-    return Number(Number(value).toFixed(2));
 }
 
 function buildRechargeAmounts(amount, currencyRate, { skipGst } = {}) {
@@ -453,13 +449,13 @@ async function getPayment(req, res) {
             const currencyData = await db('currency').whereIn('currency_name', currencyArr);
             log?.map((item) => {
                 const currency = currencyData.find(i => i.currency_name == (item?.currency || "INR"))
-                const amount = convertCurrency(item.amount || 0, currency?.user_inr_rate || 1)
-                const gst = convertCurrency(item.gst || 0, currency?.user_inr_rate || 1)
+                const rate = currency?.user_inr_rate || 1
                 const icon = getCurrencySymbolByCurrency(item?.currency || 'INR')
 
-                item.amount = amount
+                item.amount = convertCurrency(item.amount || 0, rate)
+                item.gst = convertCurrency(item.gst || 0, rate)
+                item.offer_amount = roundMoney(item.offer_amount || 0)
                 item.currency = icon
-                item.gst = gst
             });
         }
 
@@ -509,13 +505,17 @@ async function getTransactions(req, res) {
             const currencyData = await db('currency').whereIn('currency_name', currencyArr);
             log?.map((item) => {
                 const currency = currencyData.find(i => i.currency_name == (item?.currency || "INR"))
-                const amount = convertCurrency(item.amount || 0, currency?.user_inr_rate || 1)
-                const gst = convertCurrency(item.gst || 0, currency?.user_inr_rate || 1)
+                const rate = currency?.user_inr_rate || 1
                 const icon = getCurrencySymbolByCurrency(item?.currency || 'INR')
 
-                item.amount = amount
+                item.amount = convertCurrency(item.amount || 0, rate)
+                item.gst = convertCurrency(item.gst || 0, rate)
+                item.user_old_balance = roundMoney(item.user_old_balance || 0)
+                item.user_new_balance = roundMoney(item.user_new_balance || 0)
+                item.pandit_amount = item.pandit_amount != null ? roundMoney(item.pandit_amount) : item.pandit_amount
+                item.pandit_old_balance = item.pandit_old_balance != null ? roundMoney(item.pandit_old_balance) : item.pandit_old_balance
+                item.pandit_new_balance = item.pandit_new_balance != null ? roundMoney(item.pandit_new_balance) : item.pandit_new_balance
                 item.currency = icon
-                item.gst = gst
             });
         }
         const response = {

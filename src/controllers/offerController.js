@@ -1,6 +1,7 @@
 const db = require('../db');
 const { expireDueUserOffers } = require('../utils/userOfferBalance');
 const { getCurrencySymbolByCurrency } = require('../utils/countryCurrencyMap');
+const { roundMoney } = require('../utils/decodeJWT');
 
 async function userHasCompletedOrder(userId) {
     const order = await db('orders')
@@ -103,8 +104,8 @@ async function getOfferList(req, res) {
             const converted = convertOfferAmount(offer.amount, offer.scope, userCurrency, rateMap);
             return {
                 ...offer,
-                amount: converted.displayAmount,
-                base_amount: Number(offer.amount),
+                amount: roundMoney(converted.displayAmount),
+                base_amount: roundMoney(offer.amount),
                 base_currency: converted.baseCurrency,
                 currency: symbol,
                 currency_code: converted.currency,
@@ -236,13 +237,13 @@ async function applyOffer(req, res) {
                 user_offer_id: result.userOffer.id,
                 offer_id: result.offer.id,
                 title: result.offer.title,
-                amount: result.converted.displayAmount,
-                amount_inr: result.creditInr,
-                base_amount: rawAmount,
+                amount: roundMoney(result.converted.displayAmount),
+                amount_inr: roundMoney(result.creditInr),
+                base_amount: roundMoney(rawAmount),
                 base_currency: result.converted.baseCurrency,
-                remaining_amount: result.converted.displayAmount,
+                remaining_amount: roundMoney(result.converted.displayAmount),
                 expires_at: result.offer.end_at,
-                balance: result.newBalance,
+                balance: roundMoney(result.newBalance),
                 currency: result.userCurrency,
                 currency_symbol: symbol,
             },

@@ -5,7 +5,7 @@ const jwt = require('jsonwebtoken');
 require('dotenv').config();
 const { validationResult } = require('express-validator');
 const { encrypt } = require("../utils/crypto")
-const { checkOrders, isValidMobile, generateLoginResponse } = require('../utils/decodeJWT');
+const { checkOrders, isValidMobile, generateLoginResponse, roundMoney } = require('../utils/decodeJWT');
 const axios = require('axios');
 const { sendTwilioSMS } = require('../utils/twilioSms');
 const { setCache } = require('../config/redisClient');
@@ -390,6 +390,9 @@ async function socialUrl(req, res) {
 async function getSettings(req, res) {
     try {
         const setting = await db('settings').select('facebook', 'x', 'instagram', 'youtube', 'linkedin', 'ios_version', 'android_version', 'agora_app_id', 'agora_certificate', 'google_map_key', 'pandit_app_url', 'upload_base_url', 'user_response_time', 'call_type', 'map_api_key', 'is_live_enabled', 'min_minutes_required_balance', 'ashirvad_price', 'enable_ios_gift').first();
+        if (setting) {
+            setting.ashirvad_price = roundMoney(setting.ashirvad_price);
+        }
         return res.status(200).json({ success: true, data: setting, message: 'get config Successfully' });
     } catch (err) {
         console.error(err);

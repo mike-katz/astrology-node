@@ -1,7 +1,7 @@
 const FormData = require('form-data');
 const db = require('../db');
 const axios = require('axios');
-const { decodeJWT, convertCurrency } = require('../utils/decodeJWT');
+const { decodeJWT, convertCurrency, roundMoney } = require('../utils/decodeJWT');
 
 require('dotenv').config();
 
@@ -61,6 +61,8 @@ async function getProfile(req, res) {
     if (!user) return res.status(400).json({ success: false, message: 'Please enter correct user.' });
     user.language = user?.language ? JSON.parse(user?.language) : [];
     user.my_interest = user?.my_interest ? JSON.parse(user?.my_interest) : [];
+    user.balance = roundMoney(user?.balance);
+    user.offer_amount = roundMoney(user?.offer_amount);
     return res.status(200).json({ success: true, data: user, message: 'Profile get Successfully' });
 }
 
@@ -212,8 +214,8 @@ async function getBalance(req, res) {
     const currency = user?.default_currency
     const currencyData = await db('currency').select('currency_name', 'user_inr_rate').where({ currency_name: currency }).first();
 
-    const balance = await convertCurrency(user?.balance, (currencyData?.user_inr_rate || 1));
-    user.balance = balance;
+    user.balance = convertCurrency(user?.balance, (currencyData?.user_inr_rate || 1));
+    user.offer_amount = roundMoney(user?.offer_amount);
     const symbol = getCurrencySymbolByCurrency(currency)
     user.currency = symbol;
     user.rate_multiplier = getUserRateMultiplier(user);
@@ -349,11 +351,12 @@ async function getRecharge(req, res) {
             });
         }
         const userDetail = await db('users').where({ id: Number(req.userId) }).first();
-        const amounts = matchedRecharge?.amounts[userDetail?.default_currency || 'INR'] || [];
+        const rawAmounts = matchedRecharge?.amounts[userDetail?.default_currency || 'INR'] || [];
+        const amounts = (Array.isArray(rawAmounts) ? rawAmounts : []).map((a) => roundMoney(a));
         const symbol = getCurrencySymbolByCurrency(userDetail?.default_currency || 'INR')
 
         const currencyDetail = await db('currency').where({ currency_name: userDetail?.default_currency || 'INR' }).first();
-        let gst = Number(currencyDetail?.user_tax_percentage || 0)
+        let gst = roundMoney(currencyDetail?.user_tax_percentage || 0)
         let taxDetail = 'GST'
         if (userDetail?.default_currency != 'INR') {
             taxDetail = 'VAT'
@@ -421,11 +424,11 @@ async function getRechargeBanner(req, res) {
                         status: order.status ?? null,
                         type: order.type ?? null,
                         isAccept: order.is_accept ?? null,
-                        rate: order.rate ?? null,
+                        rate: order.rate != null ? roundMoney(order.rate) : null,
                         endTime: order.end_time ? new Date(order.end_time).toISOString() : null,
                         startTime: order.start_time ? new Date(order.start_time).toISOString() : null,
                         duration: order.duration ?? null,
-                        deduction: order.deduction ?? null,
+                        deduction: order.deduction != null ? roundMoney(order.deduction) : null,
                         deletedAt: order.deleted_at ? new Date(order.deleted_at).toISOString() : null,
                         createdAt: order.created_at ? new Date(order.created_at).toISOString() : null,
                         profileId: order.profile_id ?? null,
@@ -759,12 +762,17 @@ async function getRecommendations(req, res) {
 
         const total = parseInt(count);
         const totalPages = Math.ceil(total / limit);
+        const results = (blogs || []).map((b) => ({
+            ...b,
+            main_price: roundMoney(b.main_price),
+            price: roundMoney(b.price),
+        }));
         const response = {
             page,
             limit,
             total,
             totalPages,
-            results: blogs
+            results
         };
 
         return res.status(200).json({
@@ -813,6 +821,8 @@ async function findIsFree(req, res) {
                 );
                 if (currencyItem) {
                     currencyItem.currency = getCurrencySymbolByCurrency(currencyItem?.currency)
+                    currencyItem.amount = roundMoney(currencyItem.amount)
+                    currencyItem.offer_amount = roundMoney(currencyItem.offer_amount)
                     response.is_offer = true
                     response.offer_detail = currencyItem
                 }

@@ -1,6 +1,6 @@
 const db = require('../db');
 const axios = require('axios');
-const { deepParse, convertCurrency, calculateUserChargeAmount } = require('../utils/decodeJWT');
+const { deepParse, convertCurrency, calculateUserChargeAmount, roundMoney } = require('../utils/decodeJWT');
 const { callEvent } = require('../socket');
 const { RtcTokenBuilder, RtcRole } = require('agora-access-token');
 const { getCurrencySymbolByCurrency } = require('../utils/countryCurrencyMap');
@@ -97,9 +97,9 @@ function formatOrderRow(order) {
         remedy_id: order.remedy_id,
         pooja_name: order.pooja_name,
         pooja_type: order.pooja_type || null,
-        amount: Number(order.amount),
-        discount: Number(order.discount || 0),
-        final_amount: Number(order.final_amount),
+        amount: roundMoney(order.amount),
+        discount: roundMoney(order.discount || 0),
+        final_amount: roundMoney(order.final_amount),
         currency: order.currency,
         join_mode: order.join_mode,
         status: order.status,
@@ -123,7 +123,7 @@ function formatOrderRow(order) {
         completed_at: order.completed_at,
         cancelled_at: order.cancelled_at,
         created_at: order.created_at,
-        ashirvad_amount: order.ashirvad_amount,
+        ashirvad_amount: roundMoney(order.ashirvad_amount || 0),
         is_ashirvad: order.is_ashirvad,
     };
 }

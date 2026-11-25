@@ -3,7 +3,7 @@ require('dotenv').config();
 const path = require('path');
 const logger = require('log4js').getLogger(path.parse(__filename).name);
 const axios = require('axios');
-const { convertCurrency } = require('../utils/decodeJWT');
+const { convertCurrency, roundMoney } = require('../utils/decodeJWT');
 const { getCurrencySymbolByCurrency } = require('../utils/countryCurrencyMap');
 const { getUserRateMultiplier, applyRateMultiplier } = require('../utils/rateMultiplier');
 
@@ -325,11 +325,15 @@ async function getDetail(req, res) {
         if (!order && orderDetail?.pandit_id != null) {
             order = await db('pandits').where({ id: orderDetail?.pandit_id }).first();
         }
+        const userDetail = await db('users').where({ id: req.userId }).select('default_currency', 'rate_multiplier').first();
+        const currencyData = await db('currency').select('pandit_inr_rate').where({ currency_name: userDetail?.default_currency || 'INR' }).first();
+        const rateMultiplier = getUserRateMultiplier(userDetail);
+        const panditRate = currencyData?.pandit_inr_rate || 1;
         const response = {
             id: panditId, name: order?.display_name, status: order?.status, profile: order?.profile, isOnline: order?.chat, is_free: orderDetail?.is_free, pandit_id: orderDetail?.pandit_id,
-            discounted_chat_call_rate: order?.discounted_chat_call_rate,
-            final_chat_call_rate: order?.final_chat_call_rate,
-            chat_call_rate: order?.chat_call_rate,
+            discounted_chat_call_rate: convertCurrency(applyRateMultiplier(order?.discounted_chat_call_rate, rateMultiplier), panditRate),
+            final_chat_call_rate: convertCurrency(applyRateMultiplier(order?.final_chat_call_rate, rateMultiplier), panditRate),
+            chat_call_rate: convertCurrency(applyRateMultiplier(order?.chat_call_rate, rateMultiplier), panditRate),
             tag: order?.tag,
             rating_1: order?.rating_1,
             rating_2: order?.rating_2,
@@ -1185,9 +1189,9 @@ async function newCreateOrder(req, res) {
         const token = pandit?.token || false;
         if (token) {
             const waiting_time = pandit?.waiting_time == null ? true : false
-            rate = rate.toFixed(2)
+            rate = roundMoney(rate)
             if (ins.is_offer) {
-                rate = settings?.free_chat_amount_per_minute
+                rate = roundMoney(settings?.free_chat_amount_per_minute)
             }
             await sendNotification(token, user?.name, rate, panditId, type, ins.is_offer, orderId, user?.id, user?.profile, user?.avatar, 'INR')
         }
@@ -1243,7 +1247,7 @@ async function sendNotification(token, username, chat_call_rate, panditId, type,
 
         const messages = replaceTemplate(template?.title, {
             user_name: username,
-            pandit_rate: chat_call_rate,
+            pandit_rate: roundMoney(chat_call_rate),
             currency: symbol
         })
         logger.info("messages", messages);
@@ -1622,10 +1626,6 @@ function istDayStart(now = new Date()) {
     return new Date(`${dateStr}T00:00:00+05:30`);
 }
 
-function roundMoney(value) {
-    return Number(Number(value).toFixed(2));
-}
-
 function userCancelPenalty(order, seconds) {
     const orderAmount = roundMoney(Number(order?.deduction || 0));
     if (seconds <= 49) return { penalty: 0, percent: 0, orderAmount };
@@ -1851,12 +1851,14 @@ async function newOrderDetail(req, res) {
         }
         const user = await db('users').where({ id: Number(req.userId) }).first();
         const currencyDetail = await db('currency').where({ currency_name: user?.default_currency }).select('pandit_inr_rate').first();
-        const finalAmount = Number((Number(pandit?.final_chat_call_rate) / Number(currencyDetail?.pandit_inr_rate)).toFixed(2))
+        const rateMultiplier = getUserRateMultiplier(user);
+        const panditRate = currencyDetail?.pandit_inr_rate || 1;
+        const finalAmount = convertCurrency(applyRateMultiplier(pandit?.final_chat_call_rate, rateMultiplier), panditRate);
         const response = {
             id: orderDetail?.pandit_id, name: pandit?.display_name, status: pandit?.status, profile: pandit?.profile, isOnline: pandit?.chat, is_free: orderDetail?.is_free, pandit_id: orderDetail?.pandit_id,
-            discounted_chat_call_rate: Number((Number(pandit?.discounted_chat_call_rate) / Number(currencyDetail?.pandit_inr_rate)).toFixed(2)),
+            discounted_chat_call_rate: convertCurrency(applyRateMultiplier(pandit?.discounted_chat_call_rate, rateMultiplier), panditRate),
             final_chat_call_rate: finalAmount,
-            chat_call_rate: Number((Number(pandit?.chat_call_rate) / Number(currencyDetail?.pandit_inr_rate)).toFixed(2)),
+            chat_call_rate: convertCurrency(applyRateMultiplier(pandit?.chat_call_rate, rateMultiplier), panditRate),
             tag: pandit?.tag,
             rating_1: pandit?.rating_1,
             rating_2: pandit?.rating_2,
