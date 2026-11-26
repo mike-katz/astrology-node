@@ -1192,4 +1192,23 @@ async function getReferalCode(req, res) {
     }
 }
 
-module.exports = { updateProfile, getProfile, getBalance, updateToken, updateAllowNotification, getAllowNotification, profileUpdate, makeAvtarString, deleteMyAccount, getRecharge, getRechargeBanner, getCookie, addUserCoin, scratchCard, getAstroCoinTasks, getUserCoins, getCoinRedeems, redeemCoin, getRecommendations, findIsFree, getUserStats, getCurrencyList, updateCurrency, getGiftList, getInboxMessages, getInboxDetail, getReferalCode };
+async function updatePackages(req, res) {
+    try {
+        const { packages } = req.body;
+        if (!packages) return res.status(400).json({ success: false, message: 'packages is required.' });
+
+        const user = await db('users')
+            .where({ id: req.userId })
+            .first();
+        if (!user) return res.status(400).json({ success: false, message: 'Please enter correct user.' });
+        
+        await db('users').where({ id: user.id }).update({ packages });
+
+        return res.status(200).json({ success: true, data: null, message: 'Packages updated successfully' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+}
+
+module.exports = { updateProfile, getProfile, getBalance, updateToken, updateAllowNotification, getAllowNotification, profileUpdate, makeAvtarString, deleteMyAccount, getRecharge, getRechargeBanner, getCookie, addUserCoin, scratchCard, getAstroCoinTasks, getUserCoins, getCoinRedeems, redeemCoin, getRecommendations, findIsFree, getUserStats, getCurrencyList, updateCurrency, getGiftList, getInboxMessages, getInboxDetail, getReferalCode,updatePackages };
