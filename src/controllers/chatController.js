@@ -7,7 +7,6 @@ const { convertCurrency, roundMoney } = require('../utils/decodeJWT');
 const { getCurrencySymbolByCurrency } = require('../utils/countryCurrencyMap');
 const { getUserRateMultiplier, applyRateMultiplier } = require('../utils/rateMultiplier');
 const { getDisplayPanditRate, getWalletPanditRate } = require('../utils/userPanditRate');
-const { getDisplayPanditRate, getWalletPanditRate } = require('../utils/userPanditRate');
 
 const { callEvent } = require("../socket");
 const { channelLeave, geneateToken } = require('./agoraController');
