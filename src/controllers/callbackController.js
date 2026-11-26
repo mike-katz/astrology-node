@@ -7,6 +7,7 @@ const { callEvent } = require('../socket');
 const path = require('path');
 const { emitCallDurationUpdate } = require('../callSocket');
 const { upgradeUserRateMultiplier } = require('../utils/rateMultiplier');
+const { addUserTotalDeposit } = require('../utils/totalDeposit');
 const { roundMoney } = require('../utils/decodeJWT');
 const logger = require('log4js').getLogger(path.parse(__filename).name);
 
@@ -236,6 +237,7 @@ async function razorpay(req, res) {
         const amount = paymentRow?.offer_amount > 0 ? paymentRow?.offer_amount : paymentRow?.amount
         await db('users').where({ id: user.id }).increment({ balance: Number(Number(amount) + Number(extra)), offer_amount: Number(paymentRow?.offer_amount || 0) });
         await upgradeUserRateMultiplier(user.id, paymentRow?.amount);
+        await addUserTotalDeposit(user.id, paymentRow?.amount, paymentRow?.gst);
 
         if (extra > 0) {
             await db('balancelogs').insert({
@@ -499,6 +501,7 @@ async function xpay(req, res) {
         const amount = paymentRow?.offer_amount > 0 ? paymentRow?.offer_amount : paymentRow?.amount
         await db('users').where({ id: user.id }).increment({ balance: Number(Number(amount) + Number(extra)), offer_amount: Number(paymentRow?.offer_amount || 0) });
         await upgradeUserRateMultiplier(user.id, paymentRow?.amount);
+        await addUserTotalDeposit(user.id, paymentRow?.amount, paymentRow?.gst);
 
         if (extra > 0) {
             await db('balancelogs').insert({
