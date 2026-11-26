@@ -355,10 +355,7 @@ async function getRecharge(req, res) {
       
         const amounts = matchedRecharge?.amounts[userDetail?.default_currency || 'INR'] || [];
         const symbol = getCurrencySymbolByCurrency(userDetail?.default_currency || 'INR')
-        amounts.map(item=>{
-            item.amount = roundMoney(item.amount);
-            item.discount = roundMoney(item.discount);
-        })
+      
         const currencyDetail = await db('currency').where({ currency_name: userDetail?.default_currency || 'INR' }).first();
         let gst = roundMoney(currencyDetail?.user_tax_percentage || 0)
         let taxDetail = 'GST'
