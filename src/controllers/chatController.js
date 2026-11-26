@@ -1200,29 +1200,30 @@ async function newCreateOrder(req, res) {
         const token = pandit?.token || false;
         if (token) {
             const waiting_time = pandit?.waiting_time == null ? true : false
-            let notifyRate = displayRate;
+          
+            rate = rate.toFixed(2)
             if (ins.is_offer) {
-                notifyRate = roundMoney(settings?.free_chat_amount_per_minute)
+                rate = settings?.free_chat_amount_per_minute
             }
-            await sendNotification(token, user?.name, notifyRate, panditId, type, ins.is_offer, orderId, user?.id, user?.profile, user?.avatar, 'INR')
+            await sendNotification(token, user?.name, rate, panditId, type, ins.is_offer, orderId, user?.id, user?.profile, user?.avatar, 'INR')
         }
         // socket.emit("emit_to_user_for_register", {
         //     key: `user_${req?.userId}`,
         //     payload: [{ ...saved, name: pandit?.name, profile: pandit?.profile }],
         // });
 
-        axios({
-            method: 'post',
-            url: process.env.ADMIN_CALLBACK_URL,
-            data: {
-                name: pandit?.display_name,
-                id: pandit?.id,
-                mobile: pandit?.mobile,
-                order_id: orderId,
-                type: "astrologer",
-                order_type: type
-            }
-        });
+        // axios({
+        //     method: 'post',
+        //     url: process.env.ADMIN_CALLBACK_URL,
+        //     data: {
+        //         name: pandit?.display_name,
+        //         id: pandit?.id,
+        //         mobile: pandit?.mobile,
+        //         order_id: orderId,
+        //         type: "astrologer",
+        //         order_type: type
+        //     }
+        // });
         logger.info('order_create success', { userId: req.userId, orderId, panditId, type });
         return res.status(200).json({ success: true, data: { orderId }, message: 'Order create Successfully' });
     } catch (err) {
