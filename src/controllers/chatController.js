@@ -1173,8 +1173,8 @@ async function newCreateOrder(req, res) {
         // if (count == 0 && type == "chat") {
         //     sendAutoMessage(profile, req.userId, orderId, panditId);
         // }
-        saved.rate = convertCurrency(rate, (currencyData?.user_inr_rate || 1));
-        saved.deduction = convertCurrency(deduction, (currencyData?.user_inr_rate || 1));
+        saved.rate = convertCurrency(roundMoney(rate), (currencyData?.user_inr_rate || 1));
+        saved.deduction = convertCurrency(roundMoney(deduction), (currencyData?.user_inr_rate || 1));
         saved.currency = await getCurrencySymbolByCurrency(saved.currency || "INR")
         callEvent("emit_to_user_for_register", {
             key: `user_${req?.userId}`,
@@ -1243,7 +1243,6 @@ async function sendNotification(token, username, chat_call_rate, panditId, type,
             filter.message_type = 'Free Call Request'
         }
         const template = await db('templates').where(filter).first();
-        logger.info("template", template);
         if (!template) return true;
 
         const messages = replaceTemplate(template?.title, {
