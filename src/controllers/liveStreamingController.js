@@ -10,6 +10,7 @@ const { balanceCut } = require('./chatController');
 const { getCurrencySymbolByCurrency } = require('../utils/countryCurrencyMap');
 const { convertCurrency, roundMoney } = require('../utils/decodeJWT');
 const { getUserRateMultiplier, applyRateMultiplier } = require('../utils/rateMultiplier');
+const { getWalletPanditRate } = require('../utils/userPanditRate');
 
 require('dotenv').config();
 
@@ -577,15 +578,16 @@ async function createMediaOrder(req, res) {
             }
         }
         const currencyData = await db('currency').select('currency_name', 'user_inr_rate', 'pandit_inr_rate').where({ currency_name: user?.default_currency || "INR" }).first();
-        const rateMultiplier = getUserRateMultiplier(user);
-        let panditRate = convertCurrency(pandit?.final_chat_call_rate, (currencyData?.pandit_inr_rate || 1));
-        panditRate = roundMoney(Number(panditRate) * Number(currencyData?.user_inr_rate || 1));
-        panditRate = applyRateMultiplier(panditRate, rateMultiplier);
+        let rate = getWalletPanditRate(
+            pandit?.final_chat_call_rate,
+            user,
+            currencyData?.pandit_inr_rate || 1,
+            currencyData?.user_inr_rate || 1
+        );
         const userBalance = roundMoney(user?.balance);
 
-        let duration = Math.floor(Number(userBalance) / Number(panditRate));
-        let deduction = roundMoney(Number(duration) * Number(panditRate));
-        let rate = roundMoney(panditRate);
+        let duration = Math.floor(Number(userBalance) / Number(rate));
+        let deduction = roundMoney(Number(duration) * Number(rate));
         const settings = await db('settings').first();
         const isFreeOrderAvail = user?.is_free_order_available || false
 
@@ -627,7 +629,7 @@ async function createMediaOrder(req, res) {
             // }
             // deduction = currencyItem?.amount
             const payment = await db('payments').where({ user_id: req.userId, status: "success" }).whereNot('offer_amount', 0).first();
-            duration = Math.floor(Number(roundMoney(user?.offer_amount)) / Number(panditRate));
+            duration = Math.floor(Number(roundMoney(user?.offer_amount)) / Number(rate));
             deduction = roundMoney(payment?.amount)
         }
 

@@ -12,6 +12,7 @@ const { sendSMS, verifySMS } = require('./authController');
 const { getClientIp } = require('../utils/getClientIp');
 const { getCurrencyByCountry, getCurrencySymbolByCurrency } = require('../utils/countryCurrencyMap');
 const { getUserRateMultiplier, applyRateMultiplier } = require('../utils/rateMultiplier');
+const { getDisplayPanditRate } = require('../utils/userPanditRate');
 const geoip = require('geoip-lite');
 
 const PANDIT_LIST_MAX = 150;
@@ -159,11 +160,12 @@ function excludePanditIds(query, excludeIds) {
 function formatPanditResults(user, currency, currencyData, rateMultiplier = 1) {
     const symbol = getCurrencySymbolByCurrency(currency);
     const multiplier = getUserRateMultiplier(rateMultiplier);
+    const panditInrRate = currencyData?.pandit_inr_rate || 1;
     return user.map(item => {
         item.currency = symbol;
-        item.chat_call_rate = convertCurrency(applyRateMultiplier(item.chat_call_rate, multiplier), (currencyData?.pandit_inr_rate || 1));
-        item.discounted_chat_call_rate = convertCurrency(applyRateMultiplier(item.discounted_chat_call_rate, multiplier), (currencyData?.pandit_inr_rate || 1));
-        item.final_chat_call_rate = convertCurrency(applyRateMultiplier(item.final_chat_call_rate, multiplier), (currencyData?.pandit_inr_rate || 1));
+        item.chat_call_rate = getDisplayPanditRate(item.chat_call_rate, multiplier, panditInrRate);
+        item.discounted_chat_call_rate = getDisplayPanditRate(item.discounted_chat_call_rate, multiplier, panditInrRate);
+        item.final_chat_call_rate = getDisplayPanditRate(item.final_chat_call_rate, multiplier, panditInrRate);
         item.govt_id = item?.govt_id ? deepParse(item?.govt_id) : [];
         item.available_for = item?.available_for ? deepParse(item?.available_for) : [];
         item.languages = item?.languages ? deepParse(item?.languages) : [];
@@ -481,9 +483,9 @@ async function getPanditDetail(req, res) {
 
     const currencyData = await db('currency').select('currency_name', 'pandit_inr_rate').where({ currency_name: currency || 'INR' }).first();
     if (currencyData) {
-        response.chat_call_rate = convertCurrency(applyRateMultiplier(user.chat_call_rate, rateMultiplier), (currencyData?.pandit_inr_rate || 1));
-        response.discounted_chat_call_rate = convertCurrency(applyRateMultiplier(user.discounted_chat_call_rate, rateMultiplier), (currencyData?.pandit_inr_rate || 1));
-        response.final_chat_call_rate = convertCurrency(applyRateMultiplier(user.final_chat_call_rate, rateMultiplier), (currencyData?.pandit_inr_rate || 1));
+        response.chat_call_rate = getDisplayPanditRate(user.chat_call_rate, rateMultiplier, currencyData?.pandit_inr_rate || 1);
+        response.discounted_chat_call_rate = getDisplayPanditRate(user.discounted_chat_call_rate, rateMultiplier, currencyData?.pandit_inr_rate || 1);
+        response.final_chat_call_rate = getDisplayPanditRate(user.final_chat_call_rate, rateMultiplier, currencyData?.pandit_inr_rate || 1);
     }
     const rate = currencyData?.pandit_inr_rate || 1;
     const symbol = getCurrencySymbolByCurrency(currency)

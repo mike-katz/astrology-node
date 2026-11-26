@@ -6,6 +6,8 @@ const axios = require('axios');
 const { convertCurrency, roundMoney } = require('../utils/decodeJWT');
 const { getCurrencySymbolByCurrency } = require('../utils/countryCurrencyMap');
 const { getUserRateMultiplier, applyRateMultiplier } = require('../utils/rateMultiplier');
+const { getDisplayPanditRate, getWalletPanditRate } = require('../utils/userPanditRate');
+const { getDisplayPanditRate, getWalletPanditRate } = require('../utils/userPanditRate');
 
 const { callEvent } = require("../socket");
 const { channelLeave, geneateToken } = require('./agoraController');
@@ -326,14 +328,15 @@ async function getDetail(req, res) {
             order = await db('pandits').where({ id: orderDetail?.pandit_id }).first();
         }
         const userDetail = await db('users').where({ id: req.userId }).select('default_currency', 'rate_multiplier').first();
-        const currencyData = await db('currency').select('pandit_inr_rate').where({ currency_name: userDetail?.default_currency || 'INR' }).first();
-        const rateMultiplier = getUserRateMultiplier(userDetail);
-        const panditRate = currencyData?.pandit_inr_rate || 1;
+        const currencyData = await db('currency').select('pandit_inr_rate', 'user_inr_rate').where({ currency_name: userDetail?.default_currency || 'INR' }).first();
+        const finalAmount = orderDetail?.rate != null
+            ? convertCurrency(orderDetail.rate, currencyData?.user_inr_rate || 1)
+            : getDisplayPanditRate(order?.final_chat_call_rate, userDetail, currencyData?.pandit_inr_rate || 1);
         const response = {
             id: panditId, name: order?.display_name, status: order?.status, profile: order?.profile, isOnline: order?.chat, is_free: orderDetail?.is_free, pandit_id: orderDetail?.pandit_id,
-            discounted_chat_call_rate: convertCurrency(applyRateMultiplier(order?.discounted_chat_call_rate, rateMultiplier), panditRate),
-            final_chat_call_rate: convertCurrency(applyRateMultiplier(order?.final_chat_call_rate, rateMultiplier), panditRate),
-            chat_call_rate: convertCurrency(applyRateMultiplier(order?.chat_call_rate, rateMultiplier), panditRate),
+            discounted_chat_call_rate: getDisplayPanditRate(order?.discounted_chat_call_rate, userDetail, currencyData?.pandit_inr_rate || 1),
+            final_chat_call_rate: finalAmount,
+            chat_call_rate: getDisplayPanditRate(order?.chat_call_rate, userDetail, currencyData?.pandit_inr_rate || 1),
             tag: order?.tag,
             rating_1: order?.rating_1,
             rating_2: order?.rating_2,
@@ -1062,15 +1065,22 @@ async function newCreateOrder(req, res) {
         //     .whereIn('status', ['continue', 'completed', 'pending']);
 
         const currencyData = await db('currency').select('currency_name', 'user_inr_rate', 'pandit_inr_rate').where({ currency_name: user?.default_currency }).first();
-        const rateMultiplier = getUserRateMultiplier(user);
-        let panditRate = convertCurrency(pandit?.final_chat_call_rate, (currencyData?.pandit_inr_rate || 1));
-        panditRate = roundMoney(Number(panditRate) * Number(currencyData?.user_inr_rate || 1));
-        panditRate = applyRateMultiplier(panditRate, rateMultiplier);
+        // Same 2-decimal rate user sees on list → that exact rate is stored/cut on order
+        const displayRate = getDisplayPanditRate(
+            pandit?.final_chat_call_rate,
+            user,
+            currencyData?.pandit_inr_rate || 1
+        );
+        let rate = getWalletPanditRate(
+            pandit?.final_chat_call_rate,
+            user,
+            currencyData?.pandit_inr_rate || 1,
+            currencyData?.user_inr_rate || 1
+        );
         const userBalance = roundMoney(user?.balance);
 
-        let duration = Math.floor(Number(userBalance) / Number(panditRate));
-        let deduction = roundMoney(Number(duration) * Number(panditRate));
-        let rate = roundMoney(panditRate);
+        let duration = Math.floor(Number(userBalance) / Number(rate));
+        let deduction = roundMoney(Number(duration) * Number(rate));
         const settings = await db('settings').first();
         const isFreeOrderAvail = user?.is_free_order_available || false
         // if (count == 0 || isFreeOrderAvail) {
@@ -1112,7 +1122,7 @@ async function newCreateOrder(req, res) {
             //     item => item?.currency === (user?.default_currency || 'INR')
             // );
             const payment = await db('payments').where({ user_id: req.userId, status: "success" }).whereNot('offer_amount', 0).first();
-            duration = Math.floor(Number(roundMoney(user?.offer_amount)) / Number(panditRate));
+            duration = Math.floor(Number(roundMoney(user?.offer_amount)) / Number(rate));
             deduction = roundMoney(payment?.amount)
 
             // if ((user?.balance) < currencyItem?.amount) {
@@ -1173,8 +1183,9 @@ async function newCreateOrder(req, res) {
         // if (count == 0 && type == "chat") {
         //     sendAutoMessage(profile, req.userId, orderId, panditId);
         // }
-        saved.rate = convertCurrency(roundMoney(rate), (currencyData?.user_inr_rate || 1));
-        saved.deduction = convertCurrency(roundMoney(deduction), (currencyData?.user_inr_rate || 1));
+        // Emit same 2-decimal display rate user already saw on list
+        saved.rate = displayRate;
+        saved.deduction = convertCurrency(deduction, (currencyData?.user_inr_rate || 1));
         saved.currency = await getCurrencySymbolByCurrency(saved.currency || "INR")
         callEvent("emit_to_user_for_register", {
             key: `user_${req?.userId}`,
@@ -1190,11 +1201,11 @@ async function newCreateOrder(req, res) {
         const token = pandit?.token || false;
         if (token) {
             const waiting_time = pandit?.waiting_time == null ? true : false
-            rate = roundMoney(rate)
+            let notifyRate = displayRate;
             if (ins.is_offer) {
-                rate = roundMoney(settings?.free_chat_amount_per_minute)
+                notifyRate = roundMoney(settings?.free_chat_amount_per_minute)
             }
-            await sendNotification(token, user?.name, rate, panditId, type, ins.is_offer, orderId, user?.id, user?.profile, user?.avatar, 'INR')
+            await sendNotification(token, user?.name, notifyRate, panditId, type, ins.is_offer, orderId, user?.id, user?.profile, user?.avatar, 'INR')
         }
         // socket.emit("emit_to_user_for_register", {
         //     key: `user_${req?.userId}`,
@@ -1858,15 +1869,16 @@ async function newOrderDetail(req, res) {
             pandit = await db('pandits').where({ id: orderDetail?.pandit_id }).first();
         }
         const user = await db('users').where({ id: Number(req.userId) }).first();
-        const currencyDetail = await db('currency').where({ currency_name: user?.default_currency }).select('pandit_inr_rate').first();
-        const rateMultiplier = getUserRateMultiplier(user);
-        const panditRate = currencyDetail?.pandit_inr_rate || 1;
-        const finalAmount = convertCurrency(applyRateMultiplier(pandit?.final_chat_call_rate, rateMultiplier), panditRate);
+        const currencyDetail = await db('currency').where({ currency_name: user?.default_currency }).select('pandit_inr_rate', 'user_inr_rate').first();
+        // Prefer order.rate (already locked at create, 2dp) so detail matches cut
+        const finalAmount = orderDetail?.rate != null
+            ? convertCurrency(orderDetail.rate, currencyDetail?.user_inr_rate || 1)
+            : getDisplayPanditRate(pandit?.final_chat_call_rate, user, currencyDetail?.pandit_inr_rate || 1);
         const response = {
             id: orderDetail?.pandit_id, name: pandit?.display_name, status: pandit?.status, profile: pandit?.profile, isOnline: pandit?.chat, is_free: orderDetail?.is_free, pandit_id: orderDetail?.pandit_id,
-            discounted_chat_call_rate: convertCurrency(applyRateMultiplier(pandit?.discounted_chat_call_rate, rateMultiplier), panditRate),
+            discounted_chat_call_rate: getDisplayPanditRate(pandit?.discounted_chat_call_rate, user, currencyDetail?.pandit_inr_rate || 1),
             final_chat_call_rate: finalAmount,
-            chat_call_rate: convertCurrency(applyRateMultiplier(pandit?.chat_call_rate, rateMultiplier), panditRate),
+            chat_call_rate: getDisplayPanditRate(pandit?.chat_call_rate, user, currencyDetail?.pandit_inr_rate || 1),
             tag: pandit?.tag,
             rating_1: pandit?.rating_1,
             rating_2: pandit?.rating_2,
