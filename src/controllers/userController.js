@@ -339,10 +339,11 @@ async function getRecharge(req, res) {
         const recharges = await db('recharges')
             .whereIn('recharge_number', [1111, rechargeNo])
             .whereNull('deleted_at');
+        // console.log("recharges", recharges);
         const matchedRecharge =
             recharges.find(r => r.recharge_number === rechargeNo) ||
             recharges.find(r => r.recharge_number === 1111);
-
+// console.log("matchedRecharge", matchedRecharge);
         if (!matchedRecharge) {
             return res.status(200).json({
                 success: true,
@@ -351,10 +352,13 @@ async function getRecharge(req, res) {
             });
         }
         const userDetail = await db('users').where({ id: Number(req.userId) }).first();
-        const rawAmounts = matchedRecharge?.amounts[userDetail?.default_currency || 'INR'] || [];
-        const amounts = (Array.isArray(rawAmounts) ? rawAmounts : []).map((a) => roundMoney(a));
+      
+        const amounts = matchedRecharge?.amounts[userDetail?.default_currency || 'INR'] || [];
         const symbol = getCurrencySymbolByCurrency(userDetail?.default_currency || 'INR')
-
+        amounts.map(item=>{
+            item.amount = roundMoney(item.amount);
+            item.discount = roundMoney(item.discount);
+        })
         const currencyDetail = await db('currency').where({ currency_name: userDetail?.default_currency || 'INR' }).first();
         let gst = roundMoney(currencyDetail?.user_tax_percentage || 0)
         let taxDetail = 'GST'
