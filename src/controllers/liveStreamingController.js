@@ -579,13 +579,13 @@ async function createMediaOrder(req, res) {
         const currencyData = await db('currency').select('currency_name', 'user_inr_rate', 'pandit_inr_rate').where({ currency_name: user?.default_currency || "INR" }).first();
         const rateMultiplier = getUserRateMultiplier(user);
         let panditRate = convertCurrency(pandit?.final_chat_call_rate, (currencyData?.pandit_inr_rate || 1));
-        panditRate = Number(panditRate) * Number(currencyData?.user_inr_rate || 1)
+        panditRate = roundMoney(Number(panditRate) * Number(currencyData?.user_inr_rate || 1));
         panditRate = applyRateMultiplier(panditRate, rateMultiplier);
-        const userBalance = user?.balance
+        const userBalance = roundMoney(user?.balance);
 
-        let duration = Math.floor(Number(Number(userBalance)) / Number(panditRate));
-        let deduction = Number(duration) * Number(panditRate)
-        let rate = panditRate;
+        let duration = Math.floor(Number(userBalance) / Number(panditRate));
+        let deduction = roundMoney(Number(duration) * Number(panditRate));
+        let rate = roundMoney(panditRate);
         const settings = await db('settings').first();
         const isFreeOrderAvail = user?.is_free_order_available || false
 
@@ -627,8 +627,8 @@ async function createMediaOrder(req, res) {
             // }
             // deduction = currencyItem?.amount
             const payment = await db('payments').where({ user_id: req.userId, status: "success" }).whereNot('offer_amount', 0).first();
-            duration = Math.floor(Number(Number(user?.offer_amount)) / Number(panditRate));
-            deduction = Number(payment?.amount)
+            duration = Math.floor(Number(roundMoney(user?.offer_amount)) / Number(panditRate));
+            deduction = roundMoney(payment?.amount)
         }
 
         const orderId = `${new Date().getTime().toString()}${Math.floor(100000 + Math.random() * 900000).toString()}`;

@@ -509,20 +509,20 @@ async function balanceCut(user_id, order, end_time, place) {
             console.log("order.is_offer", order.is_offer);
             console.log("lockedOrder.is_offer", lockedOrder.is_offer);
             let deduction = 0;
-            let newBalance = Number(user.balance);
+            let newBalance = roundMoney(user.balance);
             let panditAmount = 0;
 
             if (isFreeOrder) {
-                deduction = Number(user?.offer_amount);
-                newBalance = Number(user.balance) - deduction;
+                deduction = roundMoney(user?.offer_amount);
+                newBalance = roundMoney(Number(user.balance) - deduction);
                 const settings = await trx('settings').first();
-                const freeChatPerMinute = Number(settings?.free_chat_amount_per_minute) || 0;
-                panditAmount = (Number(diffMinutes) * Number(freeChatPerMinute));
+                const freeChatPerMinute = roundMoney(settings?.free_chat_amount_per_minute || 0);
+                panditAmount = roundMoney(Number(diffMinutes) * Number(freeChatPerMinute));
             } else {
-                const perMinute = Number(lockedOrder?.rate);
-                deduction = Number(diffMinutes) * Number(perMinute);
-                newBalance = Number(user.balance) - deduction;
-                panditAmount = (Number(deduction) * Number(panditDetail?.chat_call_share)) / 100;
+                const perMinute = roundMoney(lockedOrder?.rate);
+                deduction = roundMoney(Number(diffMinutes) * Number(perMinute));
+                newBalance = roundMoney(Number(user.balance) - deduction);
+                panditAmount = roundMoney((Number(deduction) * Number(panditDetail?.chat_call_share)) / 100);
             }
 
             if (newBalance < 0) throw new Error('INSUFFICIENT_BALANCE');
@@ -682,22 +682,22 @@ async function balanceCut(user_id, order, end_time, place) {
                 });
 
             // 11. Balance log
-            const pandit_new_balance = Number(panditDetail?.balance) + Number(panditAmount);
+            const pandit_new_balance = roundMoney(Number(panditDetail?.balance) + Number(panditAmount));
             const type = lockedOrder.type.charAt(0).toUpperCase() + lockedOrder.type.slice(1);
 
             await trx('balancelogs').insert({
                 place,
                 order_id: lockedOrder?.order_id,
                 user_id,
-                pandit_old_balance: Number(panditDetail?.balance),
+                pandit_old_balance: roundMoney(panditDetail?.balance),
                 pandit_new_balance,
-                user_old_balance: Number(user?.balance),
-                user_new_balance: Number(newBalance),
+                user_old_balance: roundMoney(user?.balance),
+                user_new_balance: roundMoney(newBalance),
                 message: `${type} with ${panditDetail?.display_name} for ${diffMinutes} minutes`,
                 pandit_id: panditDetail?.id,
                 pandit_message: `${type} with ${user?.name} for ${diffMinutes} minutes`,
-                pandit_amount: panditAmount,
-                amount: -deduction,
+                pandit_amount: roundMoney(panditAmount),
+                amount: roundMoney(-deduction),
                 type: lockedOrder?.type,
                 currency: lockedOrder?.currency || "INR"
             });
@@ -707,7 +707,7 @@ async function balanceCut(user_id, order, end_time, place) {
                 user_id,
                 pandit_id: lockedOrder?.pandit_id,
                 diffMinutes,
-                deduction: isFreeOrder ? 0 : deduction,
+                deduction: isFreeOrder ? 0 : roundMoney(deduction),
                 place
             });
 
@@ -1064,13 +1064,13 @@ async function newCreateOrder(req, res) {
         const currencyData = await db('currency').select('currency_name', 'user_inr_rate', 'pandit_inr_rate').where({ currency_name: user?.default_currency }).first();
         const rateMultiplier = getUserRateMultiplier(user);
         let panditRate = convertCurrency(pandit?.final_chat_call_rate, (currencyData?.pandit_inr_rate || 1));
-        panditRate = Number(panditRate) * Number(currencyData?.user_inr_rate || 1)
+        panditRate = roundMoney(Number(panditRate) * Number(currencyData?.user_inr_rate || 1));
         panditRate = applyRateMultiplier(panditRate, rateMultiplier);
-        const userBalance = user?.balance
+        const userBalance = roundMoney(user?.balance);
 
-        let duration = Math.floor(Number(Number(userBalance)) / Number(panditRate));
-        let deduction = Number(duration) * Number(panditRate)
-        let rate = panditRate;
+        let duration = Math.floor(Number(userBalance) / Number(panditRate));
+        let deduction = roundMoney(Number(duration) * Number(panditRate));
+        let rate = roundMoney(panditRate);
         const settings = await db('settings').first();
         const isFreeOrderAvail = user?.is_free_order_available || false
         // if (count == 0 || isFreeOrderAvail) {
@@ -1082,7 +1082,7 @@ async function newCreateOrder(req, res) {
         console.log("count", count);
         if (count != 0) {
             const minTime = Number(settings?.min_minutes_required_balance) || 5
-            if (user?.balance < minTime) {
+            if (userBalance < minTime) {
                 logger.info('order_create fail', { userId: req.userId, message: 'Please recharge your wallet.' });
                 return res.status(400).json({ success: false, message: 'Please recharge your wallet.' });
             }
@@ -1090,7 +1090,7 @@ async function newCreateOrder(req, res) {
                 logger.info('order_create fail', { userId: req.userId, message: 'Min. 5 min balance required.' });
                 return res.status(400).json({ success: false, message: `Min. ${minTime} min balance required.` });
             }
-            if (Number(user?.balance) < deduction) {
+            if (userBalance < deduction) {
                 logger.info('order_create fail', { userId: req.userId, message: 'Min. 5 min balance required.' });
                 return res.status(400).json({ success: false, message: `Min. ${minTime} min balance required.` });
             }
@@ -1112,8 +1112,8 @@ async function newCreateOrder(req, res) {
             //     item => item?.currency === (user?.default_currency || 'INR')
             // );
             const payment = await db('payments').where({ user_id: req.userId, status: "success" }).whereNot('offer_amount', 0).first();
-            duration = Math.floor(Number(Number(user?.offer_amount)) / Number(panditRate));
-            deduction = Number(payment?.amount)
+            duration = Math.floor(Number(roundMoney(user?.offer_amount)) / Number(panditRate));
+            deduction = roundMoney(payment?.amount)
 
             // if ((user?.balance) < currencyItem?.amount) {
             //     logger.info('order_create fail', { userId: req.userId, message: 'Please recharge your wallet.' });
@@ -1174,6 +1174,7 @@ async function newCreateOrder(req, res) {
         //     sendAutoMessage(profile, req.userId, orderId, panditId);
         // }
         saved.rate = convertCurrency(rate, (currencyData?.user_inr_rate || 1));
+        saved.deduction = convertCurrency(deduction, (currencyData?.user_inr_rate || 1));
         saved.currency = await getCurrencySymbolByCurrency(saved.currency || "INR")
         callEvent("emit_to_user_for_register", {
             key: `user_${req?.userId}`,
@@ -1464,14 +1465,15 @@ async function orderAccept(req, res) {
 
         const userDetail = await db('users').where({ id: order.user_id }).first();
 
+        const orderRate = roundMoney(order?.rate);
         let duration = order?.duration;
-        let deduction = order?.deduction;
+        let deduction = roundMoney(order?.deduction);
         if (!order.is_offer) {
             // const settings = await db('settings').first();
             // duration = Number(settings?.free_chat_minutes) || 0;
             // deduction = 0;
             // } else {
-            duration = Math.floor(Number(Number(userDetail?.balance)) / Number(order?.rate));
+            duration = Math.floor(Number(roundMoney(userDetail?.balance)) / Number(orderRate));
             // console.log("duration", duration);
             if (!Number.isFinite(duration)) {
                 logger.info('order_acceptOrder fail', { userId: req.userId, orderId, message: 'Min. 5 min balance required.' });
@@ -1482,7 +1484,7 @@ async function orderAccept(req, res) {
                 logger.info('order_acceptOrder fail', { userId: req.userId, orderId, message: 'Min. 5 min balance required.' });
                 return res.status(400).json({ success: false, message: 'Balance could not be NaN.' });
             }
-            deduction = Number(duration) * Number(order?.rate)
+            deduction = roundMoney(Number(duration) * Number(orderRate));
             if (isNaN(deduction)) {
                 logger.info('order_acceptOrder fail', { userId: req.userId, orderId, message: 'Balance could not be NaN.' });
                 return res.status(400).json({ success: false, message: 'Balance could not be NaN.' });
@@ -1492,7 +1494,7 @@ async function orderAccept(req, res) {
         const startTime = new Date()
         const endTime = new Date(Date.now() + `${duration}` * 60 * 1000);
         logger.info('order_acceptOrder update', { orderId, status: "continue", duration, deduction, start_time: startTime, end_time: endTime });
-        await db('orders').where({ id: order?.id }).update({ status: "continue", duration, deduction, start_time: startTime, end_time: endTime });
+        await db('orders').where({ id: order?.id }).update({ status: "continue", duration, deduction, rate: orderRate, start_time: startTime, end_time: endTime });
         await addOrderLog({
             order,
             action: 'accepted_by_user',
@@ -1811,8 +1813,15 @@ async function orderReject(req, res) {
         //         order_id: order?.order_id,
         //     });
         // }
+        const user = await db('users').where({ id: req.userId }).select('default_currency').first();
+        const currencyData = await db('currency').select('user_inr_rate').where({ currency_name: user?.default_currency || 'INR' }).first();
+        const amount = convertCurrency(order?.deduction ?? order?.rate ?? 0, currencyData?.user_inr_rate || 1);
         logger.info('order_rejectOrder success', { userId: req.userId, order_id });
-        return res.status(200).json({ success: true, message: 'Order cancel Successfully' });
+        return res.status(200).json({
+            success: true,
+            data: { amount },
+            message: 'Order cancel Successfully',
+        });
     } catch (err) {
         logger.error('order_rejectOrder error', { userId: req.userId, order_id, err: err?.message });
         console.error(err);

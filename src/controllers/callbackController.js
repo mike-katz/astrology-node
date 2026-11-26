@@ -7,6 +7,7 @@ const { callEvent } = require('../socket');
 const path = require('path');
 const { emitCallDurationUpdate } = require('../callSocket');
 const { upgradeUserRateMultiplier } = require('../utils/rateMultiplier');
+const { roundMoney } = require('../utils/decodeJWT');
 const logger = require('log4js').getLogger(path.parse(__filename).name);
 
 function numberToIndianWords(amount) {
@@ -266,11 +267,11 @@ async function razorpay(req, res) {
 
         const order = await db('orders').where({ user_id: user.id, status: 'continue', is_free: false }).first();
         if (order && !order?.is_offer) {
-            const minute = Math.floor(Number(paymentRow?.amount) / Number(order?.rate || order?.final_chat_call_rate || 1));
+            const rate = roundMoney(order?.rate || order?.final_chat_call_rate || 1);
+            const minute = Math.floor(Number(paymentRow?.amount) / Number(rate));
             const endTime = new Date(new Date(order.end_time).getTime() + minute * 60 * 1000);
             const duration = Number(order?.duration) + Number(minute);
-            const rate = order?.rate || order?.final_chat_call_rate;
-            const deduction = Number(duration) * Number(rate);
+            const deduction = roundMoney(Number(duration) * Number(rate));
             await db('orders').where({ id: order.id }).update({ duration, deduction, end_time: endTime });
             await addOrderLog({
                 order,
