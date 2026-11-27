@@ -283,7 +283,7 @@ async function createRazorpayOrder(req, res) {
 
         let result;
         if (userCurrency !== 'INR') {
-            result = await initXpayPayment({ user, userId: req.userId, amount, currencyRate, from, pooja_id, callbackUrl });
+            result = await initXpayPayment({ user, userId: req.userId, amount, currencyRate, from, pooja_id, callback: callbackUrl });
         } else {
             result = await initRazorpayPayment({ user, userId: req.userId, amount, currencyRate, gateway, pooja_id });
         }
