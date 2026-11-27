@@ -121,7 +121,7 @@ async function initXpayPayment({ user, userId, amount, currencyRate, from, pooja
         return { error: { status: 500, message: 'xPay is not configured.' } };
     }
     if (from == 'web') {
-        callbackUrl = `${process.env.XPAY_WEB_CALLBACK_URL}${callback}` || process.env.XPAY_WEB_CALLBACK_URL;
+        callbackUrl = callback || process.env.XPAY_WEB_CALLBACK_URL;
         cancelUrl = process.env.XPAY_WEB_CANCEL_URL;
     }
     if (!callbackUrl) {
