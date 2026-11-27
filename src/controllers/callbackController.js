@@ -134,16 +134,15 @@ async function razorpay(req, res) {
             return res.status(400).send('Invalid JSON');
         }
         console.log("payload", payload);
-        // Razorpay events: payment.failed | payment.authorized | payment.captured | order.paid
+        // Razorpay docs (Orders API): order.paid + payment.captured both fire on capture.
+        // Credit only on order.paid (includes order + payment entities). Ignore payment.captured to avoid double credit.
         const event = payload.event;
 
-        // 1. payment.authorized – only acknowledged, no DB update (wait for captured/order.paid)
-        if (event === 'payment.authorized') {
-            return res.status(200).json({ success: true, message: 'payment.authorized acknowledged' });
+        if (event === 'payment.authorized' || event === 'payment.captured') {
+            return res.status(200).json({ success: true, message: `${event} acknowledged` });
         }
 
-        // 2. payment.failed | 3. payment.captured | 4. order.paid
-        const status = (event === 'payment.captured' || event === 'order.paid') ? 'success' : (event === 'payment.failed') ? 'failed' : null;
+        const status = event === 'order.paid' ? 'success' : (event === 'payment.failed') ? 'failed' : null;
         if (!status) {
             logger.info('event ignore case', payload.payload?.payment?.entity?.order_id);
             return res.status(200).json({ success: true, message: 'Event ignored' });
@@ -152,24 +151,14 @@ async function razorpay(req, res) {
         logger.info('start processing payment event', event)
         const pay = payload.payload?.payment?.entity;
         const orderEntity = payload.payload?.order?.entity;
-        let orderId, razorpayPaymentId, amountPaise, utr;
-        if (pay) {
-            orderId = pay.order_id;
-            razorpayPaymentId = pay.id;
-            amountPaise = Number(pay.amount || 0);
-            utr = pay.acquirer_data?.rrn || pay.id;
-        } else if (orderEntity) {
-            orderId = orderEntity.id;
-            amountPaise = Number(orderEntity.amount || 0);
-            const p = payload.payload?.payment?.entity;
-            razorpayPaymentId = p?.id || null;
-            utr = p?.acquirer_data?.rrn || razorpayPaymentId;
-        } else {
-            return res.status(200).json({ success: true, message: 'No payment or order entity' });
+        const orderId = orderEntity?.id || pay?.order_id;
+        const razorpayPaymentId = pay?.id || null;
+        const utr = pay?.acquirer_data?.rrn || razorpayPaymentId;
+        if (!orderId) {
+            return res.status(200).json({ success: true, message: 'No order id' });
         }
-        const amountInr = amountPaise / 100;
 
-        // Same order: find row by Razorpay order_id (transaction_id). Failed path = only pending. Success path = pending or failed (retry pachi success)
+        // Same order: find row by Razorpay order_id. Failed path = only pending. Success path = pending or failed (retry pachi success)
         const paymentRow = await db('payments')
             .where({ order_id: orderId })
             .whereIn('status', status === 'failed' ? ['pending'] : ['pending', 'failed'])
@@ -183,6 +172,19 @@ async function razorpay(req, res) {
             logger.info('failed case', razorpayPaymentId);
             await db('payments').where({ id: paymentRow.id }).update({ status: 'failed', transaction_id: razorpayPaymentId });
             return res.status(200).json({ success: true, message: 'Payment marked failed' });
+        }
+
+        // Atomic claim: only one webhook can move pending/failed → success
+        const claimed = await db('payments')
+            .where({ id: paymentRow.id })
+            .whereIn('status', ['pending', 'failed'])
+            .update({
+                utr,
+                transaction_id: razorpayPaymentId,
+                status: 'success',
+            });
+        if (!claimed) {
+            return res.status(200).json({ success: true, message: 'Payment already processed' });
         }
 
         const user = await db('users').where('id', paymentRow.user_id).first();
@@ -228,11 +230,6 @@ async function razorpay(req, res) {
             type: "recharge",
             gst,
         }).returning('*');
-        await db('payments').where({ id: paymentRow.id }).update({
-            utr,
-            transaction_id: razorpayPaymentId,
-            status: 'success',
-        });
         const amount = paymentRow?.offer_amount > 0 ? paymentRow?.offer_amount : paymentRow?.amount
         await db('users').where({ id: user.id }).increment({ balance: Number(Number(amount) + Number(extra)), offer_amount: Number(paymentRow?.offer_amount || 0) });
 
