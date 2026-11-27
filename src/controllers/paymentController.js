@@ -112,7 +112,7 @@ function buildRechargeAmounts(amount, currencyRate, { skipGst } = {}) {
     };
 }
 
-async function initXpayPayment({ user, userId, amount, currencyRate, from, pooja_id ,callbackUrl}) {
+async function initXpayPayment({ user, userId, amount, currencyRate, from, pooja_id ,callback}) {
     const publicKey = process.env.XPAY_PUBLIC_KEY;
     const secretKey = process.env.XPAY_SECRET_KEY;
     let callbackUrl = process.env.XPAY_CALLBACK_URL;
@@ -121,7 +121,7 @@ async function initXpayPayment({ user, userId, amount, currencyRate, from, pooja
         return { error: { status: 500, message: 'xPay is not configured.' } };
     }
     if (from == 'web') {
-        callbackUrl = `${process.env.XPAY_WEB_CALLBACK_URL}${callbackUrl}` || process.env.XPAY_WEB_CALLBACK_URL;
+        callbackUrl = `${process.env.XPAY_WEB_CALLBACK_URL}${callback}` || process.env.XPAY_WEB_CALLBACK_URL;
         cancelUrl = process.env.XPAY_WEB_CANCEL_URL;
     }
     if (!callbackUrl) {
