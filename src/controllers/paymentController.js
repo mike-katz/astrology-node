@@ -112,7 +112,7 @@ function buildRechargeAmounts(amount, currencyRate, { skipGst } = {}) {
     };
 }
 
-async function initXpayPayment({ user, userId, amount, currencyRate, from, pooja_id }) {
+async function initXpayPayment({ user, userId, amount, currencyRate, from, pooja_id ,callbackUrl}) {
     const publicKey = process.env.XPAY_PUBLIC_KEY;
     const secretKey = process.env.XPAY_SECRET_KEY;
     let callbackUrl = process.env.XPAY_CALLBACK_URL;
@@ -121,7 +121,7 @@ async function initXpayPayment({ user, userId, amount, currencyRate, from, pooja
         return { error: { status: 500, message: 'xPay is not configured.' } };
     }
     if (from == 'web') {
-        callbackUrl = process.env.XPAY_WEB_CALLBACK_URL;
+        callbackUrl = `${process.env.XPAY_WEB_CALLBACK_URL}${callbackUrl}` || process.env.XPAY_WEB_CALLBACK_URL;
         cancelUrl = process.env.XPAY_WEB_CANCEL_URL;
     }
     if (!callbackUrl) {
@@ -262,7 +262,7 @@ async function getFirstRechargeOfferAmount(user, userAmount) {
 
 /** Create payment order – INR → Razorpay, other currency → xPay */
 async function createRazorpayOrder(req, res) {
-    const { amount, from, pooja_id: rawPoojaId } = req.body || {};
+    const { amount, from, pooja_id: rawPoojaId , callbackUrl} = req.body || {};
     const pooja_id = normalizePoojaId(rawPoojaId);
     logger.info('payment_createOrder', { userId: req.userId, amount });
     try {
@@ -283,7 +283,7 @@ async function createRazorpayOrder(req, res) {
 
         let result;
         if (userCurrency !== 'INR') {
-            result = await initXpayPayment({ user, userId: req.userId, amount, currencyRate, from, pooja_id });
+            result = await initXpayPayment({ user, userId: req.userId, amount, currencyRate, from, pooja_id, callbackUrl });
         } else {
             result = await initRazorpayPayment({ user, userId: req.userId, amount, currencyRate, gateway, pooja_id });
         }
