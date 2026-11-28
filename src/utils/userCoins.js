@@ -1,4 +1,3 @@
-const crypto = require('crypto');
 const db = require('../db');
 
 function getIstDateStr(dateInput) {
@@ -274,12 +273,13 @@ function getScratchPrizes(settings) {
     ];
 }
 
-function pickScratchPrize(prizes) {
-    const index = crypto.randomInt(0, prizes.length);
-    return prizes[index];
-}
+async function claimScratchCard(userId, valueInput) {
+    if (valueInput == null || valueInput === '') {
+        const err = new Error('Value is required.');
+        err.status = 400;
+        throw err;
+    }
 
-async function claimScratchCard(userId) {
     const today = getIstDateStr();
     return db.transaction(async (trx) => {
         const user = await trx('users').where({ id: userId }).forUpdate().select('id', 'coin').first();
@@ -302,7 +302,18 @@ async function claimScratchCard(userId) {
         }
 
         const settings = await trx('settings').select('scratch_card_rewards').first();
-        const prize = pickScratchPrize(getScratchPrizes(settings));
+        const prizes = getScratchPrizes(settings);
+        const isFreezeRequest = String(valueInput).trim().toLowerCase() === 'freeze';
+        const prize = isFreezeRequest
+            ? prizes.find((p) => !p.is_coin)
+            : prizes.find((p) => p.is_coin && Number(p.value) === Math.round(Number(valueInput)));
+
+        if (!prize) {
+            const err = new Error('Invalid scratch card value.');
+            err.status = 400;
+            throw err;
+        }
+
         const isCoin = prize.is_coin;
         const value = Number(prize.value) || 0;
         if (value <= 0) {
