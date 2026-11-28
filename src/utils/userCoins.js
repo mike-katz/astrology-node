@@ -273,8 +273,20 @@ function getScratchPrizes(settings) {
     ];
 }
 
-async function claimScratchCard(userId, valueInput) {
-    if (valueInput == null || valueInput === '') {
+function parseScratchIsCoin(input) {
+    if (input === true || input === 'true' || input === 1 || input === '1') return true;
+    if (input === false || input === 'false' || input === 0 || input === '0') return false;
+    return null;
+}
+
+async function claimScratchCard(userId, payload = {}) {
+    const isCoin = parseScratchIsCoin(payload?.is_coin);
+    if (isCoin == null) {
+        const err = new Error('is_coin is required.');
+        err.status = 400;
+        throw err;
+    }
+    if (payload?.value == null || payload?.value === '') {
         const err = new Error('Value is required.');
         err.status = 400;
         throw err;
@@ -303,34 +315,27 @@ async function claimScratchCard(userId, valueInput) {
 
         const settings = await trx('settings').select('scratch_card_rewards').first();
         const prizes = getScratchPrizes(settings);
-        const isFreezeRequest = String(valueInput).trim().toLowerCase() === 'freeze';
-        const prize = isFreezeRequest
-            ? prizes.find((p) => !p.is_coin)
-            : prizes.find((p) => p.is_coin && Number(p.value) === Math.round(Number(valueInput)));
-
-        if (!prize) {
-            const err = new Error('Invalid scratch card value.');
-            err.status = 400;
-            throw err;
-        }
-
-        const isCoin = prize.is_coin;
-        const value = Number(prize.value) || 0;
-        if (value <= 0) {
-            const err = new Error('Scratch card rewards are not configured.');
-            err.status = 400;
-            throw err;
-        }
-
         const now = new Date();
         let freeze = Number(row?.freeze || 0);
         let coin = Number(user.coin || 0);
+        let value = Math.round(Number(payload.value));
 
         if (isCoin) {
+            const prize = prizes.find((p) => p.is_coin && Number(p.value) === value);
+            if (!prize) {
+                const err = new Error('Invalid scratch card value.');
+                err.status = 400;
+                throw err;
+            }
+            value = Number(prize.value);
             await trx('users').where({ id: userId }).increment('coin', value);
             coin += value;
         } else {
-            freeze += value;
+            // freeze: client sends { is_coin: false, value: 0 }; apply freeze days from settings (default 1)
+            const freezePrize = prizes.find((p) => !p.is_coin);
+            const freezeAdd = freezePrize ? Number(freezePrize.value) || 1 : 1;
+            value = 0;
+            freeze += freezeAdd;
         }
 
         if (!row) {
