@@ -16,7 +16,23 @@ const { getDisplayPanditRate } = require('../utils/userPanditRate');
 const geoip = require('geoip-lite');
 
 const PANDIT_LIST_MAX = 150;
+const PANDIT_FIRST_WINDOW = 20;
+const PANDIT_BUSY_IN_FIRST = 5;
+const PANDIT_PERF_BUNCHES = [
+    { min: 90, max: 100, limit: 25 }, // 100-90
+    { min: 80, max: 90, limit: 25 },  // 90-80
+    { min: 70, max: 80, limit: 25 },  // 80-70
+];
 const DUPLICATE_MOBILE_MSG = 'Your mobile number already registered.';
+
+function shuffleArray(list) {
+    const arr = [...list];
+    for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+}
 
 function findActivePanditByMobile(mobile) {
     return db('pandits')
@@ -60,6 +76,7 @@ const PANDIT_LIST_SELECT = [
     'p.total_orders',
     'p.tag',
     'p.chat_call_rate',
+    'p.all_performance',
 ];
 
 const RATING_RATIO_RAW = `
@@ -304,60 +321,79 @@ async function getPandits(req, res) {
         let user = [];
         const excludeIds = [];
 
-        // Step 1: pandit_sequence table – sequence order, chat/call filter
-        try {
-            let step1Query = applyChatCallFilter(
-                db('pandits as p')
-                    .join('pandit_sequence as ps', 'ps.pandit_id', 'p.id')
-                    .select(PANDIT_LIST_SELECT)
-                    .where(filter),
-                // .orderBy('ps.sequence', 'asc'),
-                filterParams
-            );
-            step1Query = applyPanditFilters(step1Query, filterParams);
-            step1Query.orderByRaw('RANDOM()');
+        const basePanditQuery = () => {
+            let q = db('pandits as p').select(PANDIT_LIST_SELECT).where(filter);
+            q = applyChatCallFilter(q, filterParams);
+            q = applyPanditFilters(q, filterParams);
+            return q;
+        };
 
-            // if (search?.trim()) {
-            //     step1Query.andWhere('p.display_name', 'ilike', `%${search.trim()}%`);
-            // }
-            const step1Results = await step1Query.limit(PANDIT_LIST_MAX);
-            user.push(...step1Results);
-            step1Results.forEach((item) => excludeIds.push(item.id));
-        } catch (step1Err) {
-            console.error('getPandits step1 (pandit_sequence):', step1Err?.message);
-        }
+        // Explicit sort_by / search: keep filtered sorted list (no busy/performance mix)
+        if (sort_by || search?.trim()) {
+            let sortedQuery = basePanditQuery();
+            sortedQuery = applyPanditSort(sortedQuery, { sort_by, sorting });
+            user = await sortedQuery.limit(PANDIT_LIST_MAX).offset(offset);
+        } else {
+            // 1) Busy (waiting_time / continue order) — max 5 random
+            let busyQuery = basePanditQuery()
+                .where(function () {
+                    this.whereNotNull('p.waiting_time')
+                        .orWhereExists(function () {
+                            this.select(db.raw('1'))
+                                .from('orders as o')
+                                .whereRaw('o.pandit_id = p.id')
+                                .andWhere('o.status', 'continue');
+                        });
+                })
+                .orderByRaw('RANDOM()')
+                .limit(PANDIT_BUSY_IN_FIRST);
+            const busyResults = await busyQuery;
+            busyResults.forEach((item) => excludeIds.push(item.id));
 
-        // Step 2: current filtered list (exclude step 1 ids)
-        const step2Limit = PANDIT_LIST_MAX - user.length;
-        if (step2Limit > 0) {
-            let step2Query = db('pandits as p')
-                .select(PANDIT_LIST_SELECT)
-                .where(filter);
-            step2Query = applyChatCallFilter(step2Query, filterParams);
-            step2Query = applyPanditFilters(step2Query, filterParams);
-            step2Query = excludePanditIds(step2Query, excludeIds);
-            step2Query = applyPanditSort(step2Query, { sort_by, sorting });
-            const step2Results = await step2Query.limit(step2Limit).offset(offset);
-            user.push(...step2Results);
-            step2Results.forEach((item) => excludeIds.push(item.id));
-        }
+            // 2) Performance bunches (all_performance): 100-90, 90-80, 80-70 — 25 each, random
+            const performanceResults = [];
+            for (const bunch of PANDIT_PERF_BUNCHES) {
+                let perfQuery = basePanditQuery()
+                    .whereNotNull('p.all_performance')
+                    .andWhere('p.all_performance', '>=', bunch.min);
+                if (bunch.max >= 100) {
+                    perfQuery.andWhere('p.all_performance', '<=', bunch.max);
+                } else {
+                    perfQuery.andWhere('p.all_performance', '<', bunch.max);
+                }
+                perfQuery = excludePanditIds(perfQuery, excludeIds);
+                perfQuery.orderByRaw('RANDOM()');
+                const bunchRows = await perfQuery.limit(bunch.limit);
+                performanceResults.push(...bunchRows);
+                bunchRows.forEach((item) => excludeIds.push(item.id));
+            }
 
-        // Step 3: fill remaining up to 150 – basic chat/call filter only
-        const step3Limit = PANDIT_LIST_MAX - user.length;
-        if (step3Limit > 0) {
-            let step3Query = db('pandits as p')
-                .select(PANDIT_LIST_SELECT)
-                .where(filter);
-            step3Query = applyChatCallFilter(step3Query, filterParams);
-            step3Query = excludePanditIds(step3Query, excludeIds);
-            step3Query.orderByRaw('RANDOM()');
-            const step3Results = await step3Query.limit(step3Limit);
-            user.push(...step3Results);
+            // 3) Other random — fill remaining to 100
+            const otherNeed = PANDIT_LIST_MAX - busyResults.length - performanceResults.length;
+            let otherResults = [];
+            if (otherNeed > 0) {
+                let otherQuery = basePanditQuery();
+                otherQuery = excludePanditIds(otherQuery, excludeIds);
+                otherQuery.orderByRaw('RANDOM()');
+                otherResults = await otherQuery.limit(otherNeed);
+                otherResults.forEach((item) => excludeIds.push(item.id));
+            }
+
+            // First 20: ~5 busy at random spots + performance + other, then shuffle window
+            const firstPool = [...busyResults];
+            const nonBusyPool = [...performanceResults, ...otherResults];
+            while (firstPool.length < PANDIT_FIRST_WINDOW && nonBusyPool.length > 0) {
+                firstPool.push(nonBusyPool.shift());
+            }
+            const first20 = shuffleArray(firstPool).slice(0, PANDIT_FIRST_WINDOW);
+            const firstIds = new Set(first20.map((p) => p.id));
+            const rest = nonBusyPool.filter((p) => !firstIds.has(p.id));
+            user = [...first20, ...rest].slice(0, PANDIT_LIST_MAX);
         }
 
         user = user.slice(0, PANDIT_LIST_MAX);
-        const total = PANDIT_LIST_MAX;
-        const totalPages = Math.ceil(total / limit);
+        const total = user.length;
+        const totalPages = 1;
 
         console.log("currency", currency);
         user = formatPanditResults(user, currency, currencyData, rateMultiplier);

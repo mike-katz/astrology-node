@@ -204,6 +204,9 @@ async function login(req, res) {
         if (user && user?.status == 'inactive') {
             return res.status(400).json({ success: false, message: 'Oops! Your account is inactive right now. Please contact support.' });
         }
+        if (user && device_id) {
+            await db('users').where({ id: user.id }).update({ device_id });
+        }
         let newMobile = mobile
         console.log("mobile.length", mobile.length);
         if (mobile.length == 12 && country_code == "+91") {
@@ -302,6 +305,9 @@ async function verifyOtp(req, res) {
         if (mode) {
             upd.mode = mode
         }
+        if (device_id) {
+            upd.device_id = device_id;
+        }
         let set_id = ad_set_id ?? referrer ?? null;
 
         if (set_id != null) {
@@ -351,6 +357,7 @@ async function verifyOtp(req, res) {
                 ad_id,
                 mode,
                 version,
+                device_id: device_id || null,
                 is_free_order_available: true,
                 default_currency: currency,
                 permanent_currency: currency,
@@ -526,6 +533,9 @@ async function googleLogin(req, res) {
         if (mode) {
             upd.mode = mode;
         }
+        if (device_id) {
+            upd.device_id = device_id;
+        }
 
         let set_id = ad_set_id ? ad_set_id : referrer || null;
         if (set_id != null) {
@@ -567,6 +577,7 @@ async function googleLogin(req, res) {
                 version: version || null,
                 utm_source: utm_source || null,
                 ad_id: ad_id || null,
+                device_id: device_id || null,
                 permanent_currency: currency,
                 default_currency: currency,
                 ad_set_id: set_id != null && isNumber(set_id) ? Number(set_id) : null,
@@ -701,6 +712,9 @@ async function appleLogin(req, res) {
         if (mode) {
             upd.mode = mode;
         }
+        if (device_id) {
+            upd.device_id = device_id;
+        }
 
         let set_id = ad_set_id ? ad_set_id : referrer || null;
         if (set_id != null) {
@@ -745,6 +759,7 @@ async function appleLogin(req, res) {
                 permanent_currency: currency,
                 default_currency: currency,
                 ad_id: ad_id || null,
+                device_id: device_id || null,
                 ad_set_id: set_id != null && isNumber(set_id) ? Number(set_id) : null,
             };
             [existing] = await db('users').insert(insertRow).returning([
