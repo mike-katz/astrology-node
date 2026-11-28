@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const db = require('../db');
 
 function getIstDateStr(dateInput) {
@@ -273,14 +274,12 @@ function getScratchPrizes(settings) {
     ];
 }
 
-async function claimScratchCard(userId, coinInput) {
-    const value = Math.round(Number(coinInput));
-    if (!Number.isFinite(value) || value <= 0) {
-        const err = new Error('Coin is required.');
-        err.status = 400;
-        throw err;
-    }
+function pickScratchPrize(prizes) {
+    const index = crypto.randomInt(0, prizes.length);
+    return prizes[index];
+}
 
+async function claimScratchCard(userId) {
     const today = getIstDateStr();
     return db.transaction(async (trx) => {
         const user = await trx('users').where({ id: userId }).forUpdate().select('id', 'coin').first();
@@ -294,7 +293,7 @@ async function claimScratchCard(userId, coinInput) {
         if (formatDateOnly(row?.scratch_date) === today) {
             return {
                 already: true,
-                is_coin: true,
+                is_coin: null,
                 value: 0,
                 coin: Number(user.coin || 0),
                 freeze: Number(row?.freeze || 0),
@@ -303,20 +302,25 @@ async function claimScratchCard(userId, coinInput) {
         }
 
         const settings = await trx('settings').select('scratch_card_rewards').first();
-        const prizes = getScratchPrizes(settings);
-        const matched = prizes.find((p) => p.is_coin && Number(p.value) === value);
-        if (!matched) {
-            const err = new Error('Invalid scratch card coin.');
+        const prize = pickScratchPrize(getScratchPrizes(settings));
+        const isCoin = prize.is_coin;
+        const value = Number(prize.value) || 0;
+        if (value <= 0) {
+            const err = new Error('Scratch card rewards are not configured.');
             err.status = 400;
             throw err;
         }
 
         const now = new Date();
-        const freeze = Number(row?.freeze || 0);
+        let freeze = Number(row?.freeze || 0);
         let coin = Number(user.coin || 0);
 
-        await trx('users').where({ id: userId }).increment('coin', value);
-        coin += value;
+        if (isCoin) {
+            await trx('users').where({ id: userId }).increment('coin', value);
+            coin += value;
+        } else {
+            freeze += value;
+        }
 
         if (!row) {
             await trx('usercoins').insert({
@@ -331,6 +335,7 @@ async function claimScratchCard(userId, coinInput) {
             });
         } else {
             await trx('usercoins').where({ user_id: userId }).update({
+                freeze,
                 scratch_date: today,
                 updated_at: now,
             });
@@ -338,7 +343,7 @@ async function claimScratchCard(userId, coinInput) {
 
         return {
             already: false,
-            is_coin: true,
+            is_coin: isCoin,
             value,
             coin,
             freeze,
