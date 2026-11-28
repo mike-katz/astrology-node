@@ -253,6 +253,8 @@ async function getSupportTypes(req, res) {
 async function replyTicket(req, res) {
     try {
         const { id, message, type = 'text' } = req.body;
+        console.log("req.body",req.body);
+        
         const { files } = req;
 
         // Validation
@@ -295,7 +297,7 @@ async function replyTicket(req, res) {
         let messageType = type;
 
         // Handle image upload
-        if (type === 'image') {
+        if (['image', 'pdf', 'video', 'audio'].includes(type)) {
             if (!files || !Array.isArray(files) || files.length === 0) {
                 return res.status(400).json({
                     success: false,
@@ -305,7 +307,7 @@ async function replyTicket(req, res) {
             const file = files[0];
             const image = await uploadImageToAzure('message', file, 'support');
             messageText = `${process.env.AZURE_STORAGE_BASE_URL}${image?.data?.key}`;
-            messageType = 'image';
+            messageType = type;
         } else if (type === 'text') {
             if (!message || message.trim() === '') {
                 return res.status(400).json({
